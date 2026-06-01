@@ -1,88 +1,80 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// components/Hero.tsx
 "use client";
 
-import { useState } from "react";
+import { Play } from "lucide-react";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { toast } from "sonner";
 
-export default function Hero() {
-    const [email, setEmail] = useState("");
+interface HeroProps {
+    onDownloadClick: () => void;
+}
 
-    const handleSubmit = async () => {
-        const toastId = toast.loading("Submitting...");
-
-        if (!email) {
-            toast.error("Please enter your email.", { id: toastId });
-            return;
-        }
-
-        try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-            if (!baseUrl) {
-                throw new Error("API base URL is not configured.");
-            }
-
-            const response = await fetch(`${baseUrl}/notify`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ email }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || "Something went wrong.");
-            }
-
-            toast.success("You’ve been added to the waitlist!", { id: toastId });
-            setEmail("");
-        } catch (error: any) {
-            toast.error(error.message || "Failed to submit. Try again.", { id: toastId });
-        }
-    };
-
+export default function Hero({ onDownloadClick }: HeroProps) {
     return (
-        <section className="relative flex flex-col items-center justify-center py-20 lg:py-32 overflow-hidden">
-            <div className="absolute inset-0 -z-10 bg-[radial-gradient(100%_80%_at_50%_50%,rgba(56,189,248,0.15)_0%,rgba(255,255,255,0)_100%)]" />
+        <section className="w-full bg-white px-4 py-8 sm:px-6 lg:px-8">
+            <div className="container mx-auto max-w-7xl">
 
-            <div className="container px-4 text-center">
-                <div className="inline-flex items-center rounded-full border border-accent-blue/30 bg-accent-blue/10 px-3 py-1 text-xs font-medium text-primary mb-8">
-                    COMING SOON
+                {/* Rounded Hero Showcase Card */}
+                <div
+                    className="relative min-h-150 w-full overflow-hidden rounded-xl bg-gray-100 bg-cover bg-center px-6 py-16 sm:px-12 md:px-20 lg:min-h-230 lg:py-44"
+                    style={{
+                        backgroundImage: `url('/hero.png')`
+                    }}
+                >
+                    {/* Inner Content Alignment */}
+                    <div className="relative z-10 flex h-full max-w-xl flex-col justify-center0">
+
+                        {/* Tagline Badge */}
+                        <div className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#1AC1F2] px-4 py-1.5 text-xs font-semibold text-white shadow-sm">
+                            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                            </svg>
+                            AI-Powered Privacy First
+                        </div>
+
+                        {/* Typography Header Group */}
+                        <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-[#0A2540] sm:text-5xl md:text-6xl">
+                            Communicate <br />
+                            <span className="text-primary">Without Limits</span>
+                        </h1>
+
+                        {/* Support Paragraph Description */}
+                        <p className="mt-6 text-base leading-relaxed text-[#102A63] sm:text-lg">
+                            Experience the future of messaging with AI-powered privacy, real-time
+                            translation, and intelligent communication.
+                        </p>
+
+                        {/* Combined Download Trigger CTAs */}
+                        <div className="mt-10 flex flex-wrap gap-4">
+                            {/* iOS Downloader */}
+                            <Button
+                                onClick={onDownloadClick}
+                                variant="default"
+                                className="flex h-14 items-center gap-3 rounded-2xl bg-[#102A63] px-9 text-white shadow-xl transition-transform duration-200 hover:scale-[1.02] hover:bg-[#0b1d45] focus:outline-none"
+                            >
+                                {/* Outlined Apple Logo Icon */}
+                                <svg fill="#ffff" width="800px" height="800px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z" />
+                                </svg>
+                                <span className="text-base font-medium tracking-wide">Download for iOS</span>
+                            </Button>
+
+                            {/* Android Downloader */}
+                            <Button
+                                onClick={onDownloadClick}
+                                variant="outline"
+                                className="flex h-14 items-center gap-3 rounded-2xl border border-gray-100 bg-white px-9 text-gray-900 shadow-md transition-transform duration-200 hover:scale-[1.02] hover:bg-gray-50 focus:outline-none"
+                            >
+                                <Play
+                                    className="h-5 w-5 text-[#102A63]"
+                                    fill="currentColor"
+                                    stroke="currentColor"
+                                />
+                                <span className="text-base font-medium tracking-wide">Download for Android</span>
+                            </Button>
+                        </div>
+                    </div>
                 </div>
 
-                <h1 className="text-4xl font-extrabold tracking-tight text-dark-navy sm:text-6xl mb-6">
-                    The Future of <span className="text-primary">Connection</span> <br />
-                    is Coming Soon
-                </h1>
-
-                <p className="mx-auto max-w-150 text-gray-500 md:text-lg mb-10 leading-relaxed">
-                    Experience a new standard of digital communication.
-                </p>
-
-                {/* Form */}
-                <div className="mx-auto flex w-full max-w-md flex-col items-center space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0">
-                    <Input
-                        type="email"
-                        placeholder="Enter your email address"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="h-12 border-gray-200 focus-visible:ring-primary"
-                    />
-
-                    <Button
-                        onClick={handleSubmit}
-                        className="h-12 bg-primary hover:bg-primary/90 px-8 text-white"
-                    >
-                        Get Notified
-                    </Button>
-                </div>
-
-                <p className="mt-4 text-xs text-gray-400">
-                    Join 2,400+ people waiting for early access.
-                </p>
             </div>
         </section>
     );

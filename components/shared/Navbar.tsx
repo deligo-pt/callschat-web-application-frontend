@@ -1,12 +1,17 @@
-// components/Navbar.tsx
 "use client";
 
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Button } from "../ui/button";
+import Modal from "./Modal";
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+
+    const openModal = () => setIsDownloadModalOpen(true);
+    const closeModal = () => setIsDownloadModalOpen(false);
 
     const navLinks = [
         { label: "Features", href: "#features" },
@@ -18,7 +23,7 @@ export default function Navbar() {
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-background/80 bg-background/80 backdrop-blur-md">
-            <div className="container mx-auto flex h-20 items-center justify-between px-2 md:px-12">
+            <div className="container mx-auto flex h-20 items-center justify-between px-2 sm:px-6 lg:px-8">
 
                 {/* Logo Section */}
                 <Link href="#" className="flex items-center">
@@ -34,7 +39,7 @@ export default function Navbar() {
                         <Link
                             key={link.label}
                             href={link.href}
-                            className={`text-base font-medium transition-colors duration-200 rounded-md px-3 py-1 hover:bg-primary/10 text-[#2C3E50] hover:text-primary`}
+                            className={`text-base font-medium transition-colors duration-200 rounded-md px-3 py-1 hover:bg-primary/10 text-[#102A63] hover:text-primary`}
                         >
                             {link.label}
                         </Link>
@@ -43,12 +48,12 @@ export default function Navbar() {
 
                 {/* Desktop Download Button */}
                 <div className="hidden lg:block">
-                    <Link
-                        href="#download"
+                    <Button
+                        onClick={openModal}
                         className="rounded-xl bg-primary px-6 py-2.5 text-base font-medium text-background shadow-md shadow-blue-500/20 transition-all duration-200 hover:bg-primary/80 hover:shadow-lg"
                     >
                         Download
-                    </Link>
+                    </Button>
                 </div>
 
                 {/* Mobile Hamburger Menu Button */}
@@ -81,22 +86,26 @@ export default function Navbar() {
                                 key={link.label}
                                 href={link.href}
                                 onClick={() => setIsOpen(false)}
-                                className={`text-lg font-medium  transition-colors inline-block rounded-md px-3 py-1 text-[#2C3E50] hover:text-primary`}
+                                className={`text-lg font-medium  transition-colors inline-block rounded-md px-3 py-1 text-[#102A63] hover:text-primary`}
                             >
                                 {link.label}
                             </Link>
                         ))}
                         <hr className="my-2 border-background" />
-                        <Link
-                            href="#download"
-                            onClick={() => setIsOpen(false)}
-                            className="w-full rounded-xl bg-primary py-3 text-center font-medium text-background shadow-md block"
+                        <Button
+                            onClick={() => {
+                                setIsOpen(false);
+                                openModal();
+                            }}
+                            className="w-full rounded-xl bg-primary py-3 text-center font-medium text-background shadow-md"
                         >
                             Download
-                        </Link>
+                        </Button>
                     </div>
                 </div>
             )}
+
+            <Modal isOpen={isDownloadModalOpen} onClose={closeModal} />
         </nav>
     );
 }
