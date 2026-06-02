@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Hero from './Hero';
 import Modal from '../shared/Modal';
 import Features from './Features';
+import DualMood from './DualMode';
 
 const Home = () => {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
@@ -15,6 +16,7 @@ const Home = () => {
         <div>
             <Hero onDownloadClick={openModal} />
             <Features />
+            <DualMood />
 
             {/* 3. Global Modal Controller Element */}
             <Modal isOpen={isDownloadModalOpen} onClose={closeModal} />
