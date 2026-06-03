@@ -7,6 +7,8 @@ import Features from './Features';
 import DualMood from './DualMode';
 import Security from './Security';
 import Translation from './Translation';
+import SafetyLayer from './SafetyLayer';
+import DownloadCTA from './DownloadCTA';
 
 const Home = () => {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
@@ -21,6 +23,8 @@ const Home = () => {
             <DualMood />
             <Security />
             <Translation />
+            <SafetyLayer />
+            <DownloadCTA />
 
             {/* 3. Global Modal Controller Element */}
             <Modal isOpen={isDownloadModalOpen} onClose={closeModal} />
