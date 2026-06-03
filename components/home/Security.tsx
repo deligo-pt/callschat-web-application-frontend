@@ -24,7 +24,7 @@ export default function Security() {
     ];
 
     return (
-        <section id="security" className="w-full bg-[#102A63] px-4 py-24  sm:px-6 lg:px-8 scroll-mt-16">
+        <section id="security" className="w-full bg-[#102A63] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16">
             <div className="container mx-auto max-w-7xl">
 
                 {/* Section Badge Pill */}

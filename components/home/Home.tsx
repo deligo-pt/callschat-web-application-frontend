@@ -6,6 +6,7 @@ import Modal from '../shared/Modal';
 import Features from './Features';
 import DualMood from './DualMode';
 import Security from './Security';
+import Translation from './Translation';
 
 const Home = () => {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
@@ -19,6 +20,7 @@ const Home = () => {
             <Features />
             <DualMood />
             <Security />
+            <Translation />
 
             {/* 3. Global Modal Controller Element */}
             <Modal isOpen={isDownloadModalOpen} onClose={closeModal} />
