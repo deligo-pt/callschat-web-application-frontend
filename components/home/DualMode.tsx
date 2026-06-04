@@ -1,13 +1,14 @@
-// components/DualMood.tsx
-import { 
-  Briefcase, 
-  User, 
-  MessageSquare, 
-  Users,  
-  BarChart3 
-} from "lucide-react";
-import ModeCard from "../shared/ModeCard";
+"use client";
 
+import {
+  Briefcase,
+  User,
+  MessageSquare,
+  Users,
+  BarChart3
+} from "lucide-react";
+import { motion } from "framer-motion";
+import ModeCard from "../shared/ModeCard";
 
 export default function DualMood() {
   const personalFeatures = [
@@ -22,20 +23,50 @@ export default function DualMood() {
     { text: "Real-time response rate tracking and analytics", icon: MessageSquare, iconColor: "#3B82F6" },
   ];
 
+  // Motion Configuration Presets
+  const elementRevealVariants = {
+    hidden: { opacity: 0, y: 25 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, easeOut: true }
+    }
+  };
+
+  const layoutGridVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.2 }
+    }
+  };
+
   return (
-    <section id="dual-mood" className="w-full bg-[#F8FAFC] px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16">
+    <section id="dual-mood" className="w-full bg-[#F8FAFC] px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
       <div className="container mx-auto max-w-5xl">
-        
+
         {/* Section Pill Badge */}
-        <div className="flex justify-center mb-6">
+        <motion.div
+          className="flex justify-center mb-6"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={elementRevealVariants}
+        >
           <div className="inline-flex items-center gap-2 rounded-full border border-[#DCE7FF] bg-[#EDF3FF] px-4 py-1.5 text-sm font-semibold text-primary shadow-sm">
             <Briefcase className="h-4 w-4" />
             Dual Mode
           </div>
-        </div>
+        </motion.div>
 
         {/* Section Header Text */}
-        <div className="mb-14 text-center">
+        <motion.div
+          className="mb-14 text-center"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={elementRevealVariants}
+        >
           <h2 className="text-4xl font-extrabold tracking-tight text-[#102A63] sm:text-5xl">
             Personal to Business.<br />
             <span className="text-primary">One seamless switch.</span>
@@ -43,11 +74,17 @@ export default function DualMood() {
           <p className="mx-auto mt-5 max-w-xl text-base font-normal leading-relaxed text-gray-500">
             Toggle between personal conversations and professional communications instantly with dedicated modes for every aspect of your life.
           </p>
-        </div>
+        </motion.div>
 
         {/* Two-Column Mode Layout */}
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-          
+        <motion.div
+          className="grid grid-cols-1 gap-8 md:grid-cols-2"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-60px" }}
+          variants={layoutGridVariants}
+        >
+
           {/* 1. Personal Mode Card */}
           <ModeCard
             title="Personal Mode"
@@ -72,17 +109,17 @@ export default function DualMood() {
             title="Business Mode"
             icon={Briefcase}
             iconBgColor1="#34ABF5"
-            iconBgColor2="#2974ED" 
+            iconBgColor2="#2974ED"
             cardBgColor="#EFF6FF"
             borderColor="#BFDBFE"
             titleColor="text-[#1E3A8A]"
             features={businessFeatures}
           >
-            {/* You can inject an analytics mock snippet component here later if needed */}
+            {/* Optional element buffer placeholder slot */}
             <div className="h-10 w-full bg-transparent" />
           </ModeCard>
 
-        </div>
+        </motion.div>
 
       </div>
     </section>
