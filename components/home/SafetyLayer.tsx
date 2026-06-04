@@ -1,4 +1,5 @@
 import { Cpu, AlertTriangle, Link, ShieldCheck } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function SafetyLayer() {
     const safetyFeatures = [
@@ -21,6 +22,24 @@ export default function SafetyLayer() {
             iconBg: "bg-[#1A62E8]", // Blue Accent
         },
     ];
+
+    // Animation Variants
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.15 }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { type: "spring" as const, stiffness: 100, damping: 15 }
+        }
+    };
 
     return (
         <section id="ai-service" className="w-full bg-[#EDF7FD] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16">
@@ -69,8 +88,8 @@ export default function SafetyLayer() {
                                 <div className="h-2 w-2 rounded-full bg-[#34C759] shadow-sm animate-pulse" />
                             </div>
 
-                            {/* Status Layer Block 1: Potential Scam Warning */}
-                            <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex gap-3">
+                            {/* Status Layer Blocks with clean hover transitions */}
+                            <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex gap-3 transition-all duration-300 hover:bg-red-100/50 hover:scale-[1.01]">
                                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                                 <div className="flex flex-col gap-1.5">
                                     <span className="text-xs font-bold text-[#1D2E5B]">Potential Scam Detected</span>
@@ -83,8 +102,7 @@ export default function SafetyLayer() {
                                 </div>
                             </div>
 
-                            {/* Status Layer Block 2: Suspicious Link Warning */}
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3 transition-all duration-300 hover:bg-amber-100/50 hover:scale-[1.01]">
                                 <Link className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-xs font-bold text-[#1D2E5B]">Suspicious Link Detected</span>
@@ -94,8 +112,7 @@ export default function SafetyLayer() {
                                 </div>
                             </div>
 
-                            {/* Status Layer Block 3: Safe Message Confirmed */}
-                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex gap-3">
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex gap-3 transition-all duration-300 hover:bg-emerald-100/50 hover:scale-[1.01]">
                                 <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-xs font-bold text-[#1D2E5B]">Message Verified Safe</span>
@@ -109,13 +126,21 @@ export default function SafetyLayer() {
                     </div>
 
                     {/* Right Column: Information Feature List Cards */}
-                    <div className="flex flex-col gap-5 lg:col-span-7 w-full">
+                    <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        className="flex flex-col gap-5 lg:col-span-7 w-full"
+                    >
                         {safetyFeatures.map((item, idx) => {
                             const ItemIcon = item.icon;
                             return (
-                                <div
+                                <motion.div
                                     key={idx}
-                                    className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-300/40"
+                                    variants={itemVariants}
+                                    whileHover={{ y: -4, scale: 1.01 }}
+                                    className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md hover:border-gray-300/40 cursor-default"
                                 >
                                     <div className="flex items-start gap-5">
                                         {/* Circle Icon Badge */}
@@ -133,10 +158,10 @@ export default function SafetyLayer() {
                                             </p>
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             );
                         })}
-                    </div>
+                    </motion.div>
 
                 </div>
 
