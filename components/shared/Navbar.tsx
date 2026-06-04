@@ -28,7 +28,7 @@ export default function Navbar() {
                 {/* Logo Section */}
                 <Link href="#" className="flex items-center">
                     <Image src="/call_chats_logo.png" height={70} width={70} alt="CallsChat Logo" priority />
-                    <span className="text-2xl font-bold text-[#0A2540]">
+                    <span className="text-2xl font-bold text-[#0A2540] -ml-2">
                         <span className="text-2xl">Calls<span className="text-[#1A62E8]">Chat</span></span>
                     </span>
                 </Link>

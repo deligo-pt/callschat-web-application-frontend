@@ -23,8 +23,8 @@ export default function SafetyLayer() {
     ];
 
     return (
-        <section id="safety-layer" className="w-full bg-[#EDF7FD] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16">
-            <div className="container mx-auto max-w-6xl">
+        <section id="ai-service" className="w-full bg-[#EDF7FD] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16">
+            <div className="container mx-auto max-w-7xl w-full">
 
                 {/* Top Header Badge Pill */}
                 <div className="flex justify-center mb-6">
@@ -49,11 +49,11 @@ export default function SafetyLayer() {
                 </div>
 
                 {/* Main Columns Content Matrix */}
-                <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 max-w-5xl mx-auto">
+                <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-12 px-2 sm:px-6 lg:px-8">
 
                     {/* Left Column: Interactive Safety Monitor Display Box */}
                     <div className="lg:col-span-5 flex justify-center w-full">
-                        <div className="w-full max-w-97.5 rounded-[1.75rem] bg-white p-6 shadow-2xl shadow-blue-900/5 flex flex-col gap-4">
+                        <div className="w-full rounded-[1.75rem] bg-white p-6 shadow-2xl shadow-blue-900/5 flex flex-col gap-4">
 
                             {/* Header Status Bar */}
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
