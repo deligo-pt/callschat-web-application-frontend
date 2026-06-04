@@ -1,4 +1,3 @@
-// components/Hero.tsx
 "use client";
 
 import { Play } from "lucide-react";

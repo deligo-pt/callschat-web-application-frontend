@@ -73,7 +73,7 @@ export default function Translation() {
     };
 
     return (
-        <section id="translation" className="w-full bg-white px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
+        <section id="live-translation" className="w-full bg-white px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
             <div className="container mx-auto max-w-7xl">
 
                 {/* Top Header Badge Pill */}

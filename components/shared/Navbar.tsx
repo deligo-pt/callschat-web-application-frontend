@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "../ui/button";
 import Modal from "./Modal";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
@@ -20,6 +21,26 @@ export default function Navbar() {
         { label: "Live Translation", href: "#live-translation" },
         { label: "AI Service", href: "#ai-service" },
     ];
+
+    // Animation variants for the dropdown panel container
+    const menuVariants = {
+        hidden: {
+            opacity: 0,
+            height: 0,
+            transition: {
+                height: { duration: 0.25, easeOut: true },
+                opacity: { duration: 0.15 }
+            }
+        },
+        visible: {
+            opacity: 1,
+            height: "auto",
+            transition: {
+                height: { type: "spring" as const, stiffness: 100, damping: 15 },
+                opacity: { duration: 0.25 }
+            }
+        }
+    };
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-background/80 bg-background/80 backdrop-blur-md">
@@ -39,7 +60,7 @@ export default function Navbar() {
                         <Link
                             key={link.label}
                             href={link.href}
-                            className={`text-base font-medium transition-colors duration-200 rounded-md px-3 py-1 hover:bg-primary/10 text-[#102A63] hover:text-primary`}
+                            className="text-base font-medium transition-colors duration-200 rounded-md px-3 py-1 hover:bg-primary/10 text-[#102A63] hover:text-primary"
                         >
                             {link.label}
                         </Link>
@@ -62,8 +83,10 @@ export default function Navbar() {
                     className="flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-background lg:hidden focus:outline-none"
                     aria-label="Toggle Menu"
                 >
+                    {/* SVG icon smoothly rotates on state change */}
                     <svg
-                        className="h-6 w-6"
+                        className="h-6 w-6 transition-transform duration-200"
+                        style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -77,33 +100,41 @@ export default function Navbar() {
                 </button>
             </div>
 
-            {/* Mobile Dropdown Menu */}
-            {isOpen && (
-                <div className="border-b border-background bg-background px-6 py-4 shadow-inner lg:hidden">
-                    <div className="flex flex-col gap-4">
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.label}
-                                href={link.href}
-                                onClick={() => setIsOpen(false)}
-                                className={`text-lg font-medium  transition-colors inline-block rounded-md px-3 py-1 text-[#102A63] hover:text-primary`}
+            {/* Mobile Dropdown Menu with AnimatePresence for exit animations */}
+            <AnimatePresence initial={false}>
+                {isOpen && (
+                    <motion.div
+                        variants={menuVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
+                        className="overflow-hidden border-b border-background bg-background px-6 shadow-inner lg:hidden"
+                    >
+                        <div className="flex flex-col gap-4 pb-6 pt-2">
+                            {navLinks.map((link) => (
+                                <Link
+                                    key={link.label}
+                                    href={link.href}
+                                    onClick={() => setIsOpen(false)}
+                                    className="text-lg font-medium transition-colors inline-block rounded-md px-3 py-1 text-[#102A63] hover:text-primary hover:bg-primary/5"
+                                >
+                                    {link.label}
+                                </Link>
+                            ))}
+                            <hr className="my-2 border-background" />
+                            <Button
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    openModal();
+                                }}
+                                className="w-full rounded-xl bg-primary py-3 text-center font-medium text-background shadow-md"
                             >
-                                {link.label}
-                            </Link>
-                        ))}
-                        <hr className="my-2 border-background" />
-                        <Button
-                            onClick={() => {
-                                setIsOpen(false);
-                                openModal();
-                            }}
-                            className="w-full rounded-xl bg-primary py-3 text-center font-medium text-background shadow-md"
-                        >
-                            Download
-                        </Button>
-                    </div>
-                </div>
-            )}
+                                Download
+                            </Button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <Modal isOpen={isDownloadModalOpen} onClose={closeModal} />
         </nav>
