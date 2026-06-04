@@ -1,5 +1,7 @@
-// components/Security.tsx
+"use client";
+
 import { Lock, EyeOff, LockKeyhole, FingerprintPattern, Clock } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function Security() {
     const securityFeatures = [
@@ -23,20 +25,71 @@ export default function Security() {
         },
     ];
 
+    // Design: Crisp slide-ups for headers
+    const textRevealPresets = {
+        hidden: { opacity: 0, y: 20 },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.5, easeOut: true }
+        }
+    };
+
+    // Design: Staggered entry from left for the features list
+    const featureListVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.1 }
+        }
+    };
+
+    const individualFeatureVariants = {
+        hidden: { opacity: 0, x: -30 },
+        visible: {
+            opacity: 1,
+            x: 0,
+            transition: { type: "spring" as const, stiffness: 100, damping: 15 }
+        }
+    };
+
+    // Design: High impact spring scaling for the Right Column Monitor Dashboard
+    const monitorDisplayVariants = {
+        hidden: { opacity: 0, scale: 0.9, y: 30 },
+        visible: {
+            opacity: 1,
+            scale: 1,
+            y: 0,
+            transition: { type: "spring" as const, stiffness: 80, damping: 15, delay: 0.2 }
+        }
+    };
+
     return (
-        <section id="security" className="w-full bg-[#102A63] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16">
+        <section id="security" className="w-full bg-[#102A63] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
             <div className="container mx-auto max-w-7xl">
 
                 {/* Section Badge Pill */}
-                <div className="flex justify-center mb-6">
+                <motion.div
+                    className="flex justify-center mb-6"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    variants={textRevealPresets}
+                >
                     <div className="inline-flex items-center gap-2 rounded-2xl border border-accent-blue bg-white/5 px-4 py-2 text-xl font-semibold text-[#7AD3FA] backdrop-blur-md">
                         <Lock className="h-5 w-5" />
                         Maximum Security
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Section Titles */}
-                <div className="mb-16 text-center">
+                <motion.div
+                    className="mb-16 text-center"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    variants={textRevealPresets}
+                >
                     <h2 className="text-4xl font-extrabold tracking-tight text-white sm:text-[64px]">
                         Secret Mode.
                     </h2>
@@ -46,19 +99,26 @@ export default function Security() {
                     <p className="mx-auto mt-6 max-w-xl text-2xl leading-relaxed text-gray-300/90 font-normal">
                         Ultra-secure encrypted conversations with advanced protection features that keep your most sensitive chats completely private.
                     </p>
-                </div>
+                </motion.div>
 
                 {/* Two Column Section Layout */}
                 <div className="flex flex-col md:flex-row justify-between items-center w-full gap-10">
 
                     {/* Left Column: Feature Items List Block */}
-                    <div className="flex flex-col gap-12 flex-1 w-full">
+                    <motion.div
+                        className="flex flex-col gap-12 flex-1 w-full"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-50px" }}
+                        variants={featureListVariants}
+                    >
                         {securityFeatures.map((feature, idx) => {
                             const FeatureIcon = feature.icon;
                             return (
-                                <div
+                                <motion.div
                                     key={idx}
-                                    className="rounded-[1.25rem] border-2 border-accent-blue bg-transparent p-6 transition-all duration-200 hover:bg-white/2"
+                                    variants={individualFeatureVariants}
+                                    className="rounded-[1.25rem] border-2 border-accent-blue bg-transparent p-6 transition-colors duration-200 hover:bg-white/5"
                                 >
                                     <div className="flex items-center gap-5">
                                         {/* Circle Icon Badge */}
@@ -76,20 +136,30 @@ export default function Security() {
                                             </p>
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             );
                         })}
-                    </div>
+                    </motion.div>
 
                     {/* Right Column: Dynamic Screen Status Monitor Display */}
-                    <div className="flex justify-center w-full flex-1 h-fit">
+                    <motion.div
+                        className="flex justify-center w-full flex-1 h-fit"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-50px" }}
+                        variants={monitorDisplayVariants}
+                    >
                         <div className="w-full max-w-105 rounded-4xl border-2 border-accent-blue bg-transparent p-10 text-center shadow-xl shadow-black/10">
                             <div className="flex flex-col items-center">
 
                                 {/* Big Floating Security Radar Lock Status Circle */}
-                                <div className="flex h-16 w-16 items-center justify-center border-2 border-primary/80 rounded-full bg-accent-blue text-white shadow-lg shadow-blue-600/20 ring-4 ring-blue-600/10">
+                                <motion.div
+                                    className="flex h-16 w-16 items-center justify-center border-2 border-primary/80 rounded-full bg-accent-blue text-white shadow-lg shadow-blue-600/20 ring-4 ring-blue-600/10"
+                                    animate={{ scale: [1, 1.06, 1] }}
+                                    transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                                >
                                     <LockKeyhole className="h-6 w-6" />
-                                </div>
+                                </motion.div>
 
                                 <h4 className="mt-5 text-[17px] font-bold text-white tracking-wide">
                                     Secret Mode Active
@@ -138,7 +208,7 @@ export default function Security() {
 
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                 </div>
 

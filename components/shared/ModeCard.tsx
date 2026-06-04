@@ -61,7 +61,7 @@ export default function ModeCard({
     return (
         <motion.div variants={cardContainerVariants} className="w-full h-full">
             <Card
-                className="flex flex-col rounded-4xl border p-8 md:p-10 shadow-none min-h-[380px] md:min-h-[440px] transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/30 gap-0 hover:scale-[1.02] h-full"
+                className="flex flex-col rounded-4xl border p-8 md:p-10 shadow-none min-h-95 md:min-h-110 transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/30 gap-0 hover:scale-[1.02] h-full"
                 style={{ backgroundColor: cardBgColor, borderColor: borderColor }}
             >
                 {/* Card Header with Top Rounded Icon */}
@@ -86,7 +86,7 @@ export default function ModeCard({
                                 <motion.div
                                     key={idx}
                                     variants={individualRowVariants}
-                                    className="flex items-center gap-3 rounded-xl bg-white/90 px-4 py-2.5 shadow-xs border border-black/[0.03]"
+                                    className="flex items-center gap-3 rounded-xl bg-white/90 px-4 py-2.5 shadow-xs border border-black/3"
                                 >
                                     {FeatureIcon && (
                                         <FeatureIcon className="h-4 w-4 shrink-0" style={{ color: item.iconColor }} strokeWidth={2} />
