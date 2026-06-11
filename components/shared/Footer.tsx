@@ -157,9 +157,9 @@ export default function Footer() {
                 <div className="pt-5 border-t border-blue-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-semibold text-gray-500">
                     <span>© 2026 CallsChat. All rights reserved.</span>
                     <div className="flex items-center gap-5">
-                        <Link href="#" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
-                        <Link href="#" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
-                        <Link href="#" className="hover:text-blue-600 transition-colors">Cookie Policy</Link>
+                        <Link href="/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
+                        <Link href="/terms-of-service" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
+                        <Link href="/cookie-policy" className="hover:text-blue-600 transition-colors">Cookie Policy</Link>
                     </div>
                 </div>
 

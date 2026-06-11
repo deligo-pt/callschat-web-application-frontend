@@ -23,22 +23,25 @@ export default function DualMood() {
     { text: "Real-time response rate tracking and analytics", icon: MessageSquare, iconColor: "#3B82F6" },
   ];
 
-  // Motion Configuration Presets
-  const elementRevealVariants = {
-    hidden: { opacity: 0, y: 25 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6, easeOut: true }
-    }
+  // Per the Figma prototype, this whole section simply FADES IN (no slide, no
+  // zoom) — badge, header and both cards fade together over 0.8s EASE_IN.
+  const easeIn = [0.42, 0, 1, 1] as const;
+
+  const badgeVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.8, ease: easeIn } },
   };
 
-  const layoutGridVariants = {
+  const headerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.2 }
-    }
+    visible: { opacity: 1, transition: { duration: 0.8, ease: easeIn } },
+  };
+
+  // The two cards each slide in as one unit (left from the left, right from the
+  // right) and fade — no stagger, they animate together over the same 0.8s.
+  const layoutGridVariants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0 } },
   };
 
   return (
@@ -51,7 +54,7 @@ export default function DualMood() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          variants={elementRevealVariants}
+          variants={badgeVariants}
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-[#DCE7FF] bg-[#EDF3FF] px-4 py-1.5 text-sm font-semibold text-primary shadow-sm">
             <Briefcase className="h-4 w-4" />
@@ -65,7 +68,7 @@ export default function DualMood() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          variants={elementRevealVariants}
+          variants={headerVariants}
         >
           <h2 className="text-4xl font-extrabold tracking-tight text-[#102A63] sm:text-5xl">
             Personal to Business.<br />
@@ -95,6 +98,7 @@ export default function DualMood() {
             borderColor="#E9D5FF"
             titleColor="text-[#1E1B4B]"
             features={personalFeatures}
+            offsetX={0}
           >
             {/* Custom Interactive Chat Blocks matching layout graphic */}
             <div className="flex flex-col gap-2.5 mt-2 font-sans">
@@ -114,6 +118,7 @@ export default function DualMood() {
             borderColor="#BFDBFE"
             titleColor="text-[#1E3A8A]"
             features={businessFeatures}
+            offsetX={0}
           >
             {/* Optional element buffer placeholder slot */}
             <div className="h-10 w-full bg-transparent" />

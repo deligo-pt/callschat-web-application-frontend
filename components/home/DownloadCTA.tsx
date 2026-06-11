@@ -1,16 +1,35 @@
+"use client";
+
 import { Play, QrCode } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 export default function DownloadCTA() {
+    const prefersReducedMotion = useReducedMotion();
+
+    // Ported from Figma (Frame 95 set 125, Default→Variant2), 1.1s EASE_IN. The
+    // headings + download buttons stay put (no entrance in the prototype); only
+    // the QR dashboard zooms in and the bottom feature list rises into place.
+    const easeIn = [0.42, 0, 1, 1] as const;
+
+    // The scan/QR dashboard panel ZOOMS up from ~half size (513→1045px, ~2x in
+    // Figma) anchored slightly below-right of centre + fades in.
+    const qrVariants = {
+        hidden: { opacity: 0, scale: prefersReducedMotion ? 1 : 0.49 },
+        visible: { opacity: 1, scale: 1, transition: { duration: 1.1, ease: easeIn } },
+    };
+
+    // In-place trigger so the bottom list reveals together; each item rises up a
+    // slightly different distance (40 / 56 / 64px in Figma).
+    const triggerVariants = { hidden: {}, visible: {} };
+    const featureItemVariants = {
+        hidden: (y: number) => ({ opacity: 0, y }),
+        visible: { opacity: 1, y: 0, transition: { duration: 1.1, ease: easeIn } },
+    };
+    const featureOffsets = prefersReducedMotion ? [0, 0, 0] : [40, 56, 64];
+
     return (
         <section id="download" className="w-full bg-[#1A62E8] px-4 py-20 sm:px-6 lg:px-8 text-white overflow-hidden">
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="container mx-auto max-w-4xl flex flex-col items-center text-center"
-            >
+            <div className="container mx-auto max-w-4xl flex flex-col items-center text-center">
 
                 {/* Main Section Headings */}
                 <h2 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
@@ -56,10 +75,11 @@ export default function DownloadCTA() {
 
                 {/* Central Scan Dashboard Container Panel */}
                 <motion.div
-                    initial={{ scale: 0.95, opacity: 0 }}
-                    whileInView={{ scale: 1, opacity: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-40px" }}
+                    variants={qrVariants}
+                    style={{ transformOrigin: "56% 56%" }}
                     className="mt-12 w-full max-w-3xl rounded-[2.5rem] border border-white/10 bg-white/8 p-8 md:p-10 backdrop-blur-sm"
                 >
                     <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-10 text-left">
@@ -87,22 +107,28 @@ export default function DownloadCTA() {
                 </motion.div>
 
                 {/* Bottom Feature Value Properties List */}
-                <div className="mt-16 flex flex-wrap justify-center items-center gap-x-12 gap-y-4 text-sm font-medium text-white/90">
-                    <div className="flex items-center gap-2.5">
+                <motion.div
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-40px" }}
+                    variants={triggerVariants}
+                    className="mt-16 flex flex-wrap justify-center items-center gap-x-12 gap-y-4 text-sm font-medium text-white/90"
+                >
+                    <motion.div variants={featureItemVariants} custom={featureOffsets[0]} className="flex items-center gap-2.5">
                         <span className="h-2 w-2 rounded-full bg-white shadow-sm" />
                         <span>Free to download</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
+                    </motion.div>
+                    <motion.div variants={featureItemVariants} custom={featureOffsets[1]} className="flex items-center gap-2.5">
                         <span className="h-2 w-2 rounded-full bg-white shadow-sm" />
                         <span>No credit card required</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
+                    </motion.div>
+                    <motion.div variants={featureItemVariants} custom={featureOffsets[2]} className="flex items-center gap-2.5">
                         <span className="h-2 w-2 rounded-full bg-white shadow-sm" />
                         <span>Available worldwide</span>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
 
-            </motion.div>
+            </div>
         </section>
     );
 }

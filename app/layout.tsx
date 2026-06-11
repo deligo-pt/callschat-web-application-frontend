@@ -17,6 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://callschat.com"),
   title: "CallsChat | The Future of Connection",
   description: "Ultra-high-quality voice calls and lightning-fast messaging.",
 };

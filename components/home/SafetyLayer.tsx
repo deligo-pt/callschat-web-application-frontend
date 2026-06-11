@@ -1,7 +1,11 @@
+"use client";
+
 import { Cpu, AlertTriangle, Link, ShieldCheck } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 export default function SafetyLayer() {
+    const prefersReducedMotion = useReducedMotion();
+
     const safetyFeatures = [
         {
             title: "Scam Detection",
@@ -23,22 +27,37 @@ export default function SafetyLayer() {
         },
     ];
 
-    // Animation Variants
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.15 }
-        }
+    // Ported from Figma (Frame 83 set 121, Default→Variant2), 1.1s EASE_IN, all
+    // elements animating simultaneously (no stagger).
+    const easeIn = [0.42, 0, 1, 1] as const;
+
+    // The "AI Protection" pill slides down ~56px into place.
+    const badgeVariants = {
+        hidden: { opacity: 0, y: prefersReducedMotion ? 0 : -56 },
+        visible: { opacity: 1, y: 0, transition: { duration: 1.1, ease: easeIn } },
     };
 
-    const itemVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { type: "spring" as const, stiffness: 100, damping: 15 }
-        }
+    // The title + subtitle fade in while sliding down ~115px into place.
+    const headerVariants = {
+        hidden: { opacity: 0, y: prefersReducedMotion ? 0 : -115 },
+        visible: { opacity: 1, y: 0, transition: { duration: 1.1, ease: easeIn } },
+    };
+
+    // An in-place trigger (never moves) so the IntersectionObserver fires; the
+    // moving/zooming panels live one level inside it.
+    const triggerVariants = { hidden: {}, visible: {} };
+
+    // The AI Safety Monitor panel ZOOMS up from ~1/3 size (169→518px, ~3x in
+    // Figma) anchored near its centre + fades in.
+    const monitorVariants = {
+        hidden: { opacity: 0, scale: prefersReducedMotion ? 1 : 0.33 },
+        visible: { opacity: 1, scale: 1, transition: { duration: 1.1, ease: easeIn } },
+    };
+
+    // The three info cards slide in from the RIGHT together (~416px block) + fade.
+    const infoRowVariants = {
+        hidden: { opacity: 0, x: prefersReducedMotion ? 0 : 416 },
+        visible: { opacity: 1, x: 0, transition: { duration: 1.1, ease: easeIn } },
     };
 
     return (
@@ -46,15 +65,27 @@ export default function SafetyLayer() {
             <div className="container mx-auto max-w-7xl w-full">
 
                 {/* Top Header Badge Pill */}
-                <div className="flex justify-center mb-6">
+                <motion.div
+                    className="flex justify-center mb-6"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    variants={badgeVariants}
+                >
                     <div className="inline-flex items-center gap-2 rounded-full border border-[#0A2540]/10 bg-[#0A2540] px-4 py-1.5 text-xs font-semibold text-[#4AA5FF] shadow-sm">
                         <Cpu className="h-3.5 w-3.5 text-[#4AA5FF]" />
                         AI Protection
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Section Headings */}
-                <div className="mb-16 text-center">
+                <motion.div
+                    className="mb-16 text-center"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    variants={headerVariants}
+                >
                     <h2 className="text-4xl font-extrabold tracking-tight text-[#1A62E8] sm:text-5xl">
                         AI Safety Layer.
                     </h2>
@@ -65,14 +96,26 @@ export default function SafetyLayer() {
                         Ultra-secure encrypted conversations with advanced protection features that<br />
                         keep your most sensitive chats completely private.
                     </p>
-                </div>
+                </motion.div>
 
                 {/* Main Columns Content Matrix */}
                 <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-12 px-2 sm:px-6 lg:px-8">
 
-                    {/* Left Column: Interactive Safety Monitor Display Box */}
-                    <div className="lg:col-span-5 flex justify-center w-full">
-                        <div className="w-full rounded-[1.75rem] bg-white p-6 shadow-2xl shadow-blue-900/5 flex flex-col gap-4">
+                    {/* Left Column: Interactive Safety Monitor Display Box. The
+                        trigger lives on this in-place wrapper; the inner panel
+                        zooms up from ~1/3 size. */}
+                    <motion.div
+                        className="lg:col-span-5 flex justify-center w-full"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-40px" }}
+                        variants={triggerVariants}
+                    >
+                        <motion.div
+                            variants={monitorVariants}
+                            style={{ transformOrigin: "42% 42%" }}
+                            className="w-full rounded-[1.75rem] bg-white p-6 shadow-2xl shadow-blue-900/5 flex flex-col gap-4"
+                        >
 
                             {/* Header Status Bar */}
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
@@ -122,15 +165,15 @@ export default function SafetyLayer() {
                                 </div>
                             </div>
 
-                        </div>
-                    </div>
+                        </motion.div>
+                    </motion.div>
 
                     {/* Right Column: Information Feature List Cards */}
                     <motion.div
-                        variants={containerVariants}
+                        variants={triggerVariants}
                         initial="hidden"
                         whileInView="visible"
-                        viewport={{ once: true, margin: "-100px" }}
+                        viewport={{ once: true, margin: "-50px" }}
                         className="flex flex-col gap-5 lg:col-span-7 w-full"
                     >
                         {safetyFeatures.map((item, idx) => {
@@ -138,7 +181,7 @@ export default function SafetyLayer() {
                             return (
                                 <motion.div
                                     key={idx}
-                                    variants={itemVariants}
+                                    variants={infoRowVariants}
                                     whileHover={{ y: -4, scale: 1.01 }}
                                     className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md hover:border-gray-300/40 cursor-default"
                                 >

@@ -19,6 +19,10 @@ interface ModeCardProps {
         iconColor?: string;
     }[];
     children?: ReactNode;
+    /** Horizontal start offset (px) the whole card slides in FROM — ported from
+     *  the Figma "Dual mood" set Default→Variant2 move (left card from the left,
+     *  right card from the right). */
+    offsetX: number;
 }
 
 export default function ModeCard({
@@ -31,35 +35,23 @@ export default function ModeCard({
     titleColor = "text-[#0A2540]",
     features,
     children,
+    offsetX,
 }: ModeCardProps) {
 
-    // Main column entries sliding upward slightly
+    // Ported from Figma (Dual mood set, Default→Variant2): the card moves as ONE
+    // unit — sliding in horizontally from offscreen + fading in. EASE_IN over
+    // 0.8s, no internal row stagger (all card contents travel with the card).
     const cardContainerVariants = {
-        hidden: { opacity: 0, y: 40 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: {
-                duration: 0.6,
-                easeOut: true,
-                staggerChildren: 0.12, // Staggers the internal horizontal row blocks cleanly
-                delayChildren: 0.15
-            }
-        }
-    };
-
-    // Sequential reveal for feature entries inside the card body
-    const individualRowVariants = {
-        hidden: { opacity: 0, x: -15 },
+        hidden: (x: number) => ({ opacity: 0, x }),
         visible: {
             opacity: 1,
             x: 0,
-            transition: { duration: 0.4, easeOut: true }
-        }
+            transition: { duration: 0.8, ease: [0.42, 0, 1, 1] as const },
+        },
     };
 
     return (
-        <motion.div variants={cardContainerVariants} className="w-full h-full">
+        <motion.div variants={cardContainerVariants} custom={offsetX} className="w-full h-full">
             <Card
                 className="flex flex-col rounded-4xl border p-8 md:p-10 shadow-none min-h-95 md:min-h-110 transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/30 gap-0 hover:scale-[1.02] h-full"
                 style={{ backgroundColor: cardBgColor, borderColor: borderColor }}
@@ -83,9 +75,8 @@ export default function ModeCard({
                         {features.map((item, idx) => {
                             const FeatureIcon = item.icon;
                             return (
-                                <motion.div
+                                <div
                                     key={idx}
-                                    variants={individualRowVariants}
                                     className="flex items-center gap-3 rounded-xl bg-white/90 px-4 py-2.5 shadow-xs border border-black/3"
                                 >
                                     {FeatureIcon && (
@@ -94,23 +85,13 @@ export default function ModeCard({
                                     <span className="text-sm font-medium text-gray-700">
                                         {item.text}
                                     </span>
-                                </motion.div>
+                                </div>
                             );
                         })}
                     </div>
 
                     {/* Custom Child Components Placement (Chat/Analytics elements) */}
-                    {children && (
-                        <motion.div
-                            className="mt-6 w-full"
-                            variants={{
-                                hidden: { opacity: 0, scale: 0.95 },
-                                visible: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: "easeOut" } }
-                            }}
-                        >
-                            {children}
-                        </motion.div>
-                    )}
+                    {children && <div className="mt-6 w-full">{children}</div>}
                 </CardContent>
             </Card>
         </motion.div>
