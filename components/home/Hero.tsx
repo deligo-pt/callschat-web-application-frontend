@@ -1,75 +1,82 @@
 "use client";
 
+import { useEffect, useLayoutEffect } from "react";
 import { Play } from "lucide-react";
 import { Button } from "../ui/button";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, useAnimationControls } from "framer-motion";
 
 interface HeroProps {
     onDownloadClick: () => void;
 }
 
+// useLayoutEffect on the client (so the hidden start-state is applied before the
+// first paint — no flash), but fall back to useEffect on the server to avoid the
+// SSR warning. The server never runs either, it just needs to not warn.
+const useIsomorphicLayoutEffect =
+    typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export default function Hero({ onDownloadClick }: HeroProps) {
     const prefersReducedMotion = useReducedMotion();
+    const imageControls = useAnimationControls();
+    const contentControls = useAnimationControls();
 
-    // Animation ported from the Figma "Hero" component set (id 94:185),
-    // variant chain Default → Variant3 → Final (Smart Animate, GENTLE spring):
+    // A calm, STABLE entrance (no spring overshoot, no large slide): both layers
+    // simply fade in, the image gently settling down from a slight zoom and the
+    // content easing up a touch. Smooth easeOut tweens keep it steady.
     //
-    //   Default  --(after 100ms)--> Variant3 : everything fades to opacity 0
-    //                                           (stage clear) — spring 400.1 / 30
-    //   Variant3 --(after 200ms)--> Final    : the real entrance — spring 52.9 / 10.91
-    //
-    // The Default→Variant3 fade-out is a reset, so on first load we simply
-    // start hidden and play the Variant3→Final entrance (~300ms in). Per the
-    // file geometry, in that entrance:
-    //   • the text block slides in from the LEFT (x −537 → +79) + fades in,
-    //     moving as ONE unit;
-    //   • the hero image zooms from a small upper-right thumbnail (517×392)
-    //     to full-bleed (1236×938) + fades in.
-    const gentleSpring = { type: "spring" as const, mass: 1, stiffness: 52.9, damping: 10.91 };
-    const entranceDelay = 0.3; // 100ms (Default) + 200ms (Variant3) timeouts
+    // IMPORTANT: the elements render in their FINAL, visible state on the server
+    // (initial={false}). The hidden start-state is only applied on the client, in
+    // a layout effect, right before the entrance plays. That way the hero is fully
+    // visible if JavaScript is slow or never runs — no blank white page — and the
+    // animation is a progressive enhancement on top.
+    const ease = [0.22, 1, 0.36, 1] as const; // smooth, stable easeOut
+
+    useIsomorphicLayoutEffect(() => {
+        if (prefersReducedMotion) return;
+
+        // Snap to the hidden start-state, then ease to the final visible state.
+        imageControls.set({ opacity: 0, scale: 1.06 });
+        contentControls.set({ opacity: 0, y: 28 });
+
+        imageControls.start({
+            opacity: 1,
+            scale: 1,
+            transition: { duration: 1, ease, delay: 0.1 },
+        });
+        contentControls.start({
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.7, ease, delay: 0.25 },
+        });
+    }, [prefersReducedMotion]);
 
     return (
         <section className="w-full bg-white px-4 py-8 sm:px-6 lg:px-8">
             <div className="container mx-auto max-w-7xl">
 
-                {/* Rounded Hero Showcase Card */}
-                <motion.div
-                    initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3, delay: 0.1 }}
-                    className="relative min-h-150 w-full overflow-hidden rounded-xl bg-gray-100 px-6 py-16 sm:px-12 md:px-20 lg:min-h-230 lg:py-44"
-                >
-                    {/* Image layer — eases in from the TOP-RIGHT corner: the image
-                        scales up from a small thumbnail (~0.42 → 1) with its
-                        top-right corner pinned, while fading in. Per the Figma
-                        Hero set, the top-right corner stays fixed at (1248,126)
-                        across Variant3 → Final. */}
+                {/* Rounded Hero Showcase Card — always visible (no fade) so the
+                    stage is never a blank white block. */}
+                <div className="relative min-h-150 w-full overflow-hidden rounded-xl bg-gray-100 px-6 py-16 sm:px-12 md:px-20 lg:min-h-230 lg:py-44">
+
+                    {/* Image layer — fades in while gently settling down from a
+                        slight zoom (centered). Renders full-bleed/visible on the
+                        server as the safe fallback. */}
                     <motion.div
                         aria-hidden
-                        initial={
-                            prefersReducedMotion
-                                ? { scale: 1, opacity: 1 }
-                                : { scale: 0.42, opacity: 0 }
-                        }
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ ...gentleSpring, delay: entranceDelay }}
+                        initial={false}
+                        animate={imageControls}
                         style={{
                             backgroundImage: `url('/hero.png')`,
-                            transformOrigin: "top right",
+                            transformOrigin: "center",
                         }}
                         className="absolute inset-0 z-0 bg-cover bg-center"
                     />
 
-                    {/* Content block — slides in from the left as a single unit.
-                        Travel distance matches Figma (x −537 → 79 = 616px). */}
+                    {/* Content block — slides in from the left as one unit. Renders
+                        in place/visible on the server as the safe fallback. */}
                     <motion.div
-                        initial={
-                            prefersReducedMotion
-                                ? { opacity: 1, x: 0 }
-                                : { opacity: 0, x: -616 }
-                        }
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ ...gentleSpring, delay: entranceDelay }}
+                        initial={false}
+                        animate={contentControls}
                         className="relative z-10 flex h-full max-w-xl flex-col justify-center"
                     >
 
@@ -127,7 +134,7 @@ export default function Hero({ onDownloadClick }: HeroProps) {
                             </motion.div>
                         </div>
                     </motion.div>
-                </motion.div>
+                </div>
 
             </div>
         </section>

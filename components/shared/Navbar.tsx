@@ -20,6 +20,7 @@ export default function Navbar() {
         { label: "Security", href: "#security" },
         { label: "Live Translation", href: "#live-translation" },
         { label: "AI Service", href: "#ai-service" },
+        { label: "Videos", href: "/media" },
     ];
 
     // Animation variants for the dropdown panel container
@@ -46,8 +47,8 @@ export default function Navbar() {
         <nav className="sticky top-0 z-50 w-full border-b border-background/80 bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-20 items-center justify-between px-2 sm:px-6 lg:px-8">
 
-                {/* Logo Section */}
-                <Link href="#" className="flex items-center">
+                {/* Logo Section — click returns to the homepage */}
+                <Link href="/" className="flex items-center">
                     <Image src="/call_chats_logo.png" height={70} width={70} alt="CallsChat Logo" priority />
                     <span className="text-2xl font-bold text-[#0A2540] -ml-2">
                         <span className="text-2xl">Calls<span className="text-[#1A62E8]">Chat</span></span>
