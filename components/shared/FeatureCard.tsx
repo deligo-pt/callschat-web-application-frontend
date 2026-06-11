@@ -14,21 +14,26 @@ interface FeatureCardProps {
     description: string;
     icon: LucideIcon;
     iconBgColor: string;
+    /** Initial downward Y offset (px) the card slides up FROM — ported from the
+     *  Figma "feature" set Default→Variant2 move, where each card travels a
+     *  different distance into the grid. */
+    offsetY: number;
 }
 
-// Entry transition variants for individual items
+// Ported from Figma (feature set, Default→Variant2): each card slides up from a
+// per-card downward offset into its grid slot. No fade (opacity stays 1), EASE_IN
+// over 1.1s, all cards moving simultaneously so farther cards travel faster.
 const cardVariants = {
-    hidden: { opacity: 0, y: 40 },
+    hidden: (offsetY: number) => ({ y: offsetY }),
     visible: {
-        opacity: 1,
         y: 0,
-        transition: { duration: 0.5, easeOut: true }
-    }
+        transition: { duration: 1.1, ease: [0.42, 0, 1, 1] as const },
+    },
 };
 
-export default function FeatureCard({ title, description, icon: Icon, iconBgColor }: FeatureCardProps) {
+export default function FeatureCard({ title, description, icon: Icon, iconBgColor, offsetY }: FeatureCardProps) {
     return (
-        <motion.div variants={cardVariants} className="w-full">
+        <motion.div variants={cardVariants} custom={offsetY} className="w-full">
             <Card className="flex flex-col items-start rounded-[1.75rem] border border-gray-200/80 bg-white p-8 gap-0 shadow-none transition-all duration-300 hover:shadow-lg hover:shadow-gray-100/50 hover:scale-105 h-full">
 
                 {/* Card Header contains the icon box */}

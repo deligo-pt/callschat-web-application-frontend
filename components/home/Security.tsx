@@ -1,9 +1,11 @@
 "use client";
 
 import { Lock, EyeOff, LockKeyhole, FingerprintPattern, Clock } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 export default function Security() {
+    const prefersReducedMotion = useReducedMotion();
+
     const securityFeatures = [
         {
             title: "Screenshot Blocked",
@@ -25,43 +27,49 @@ export default function Security() {
         },
     ];
 
-    // Design: Crisp slide-ups for headers
-    const textRevealPresets = {
-        hidden: { opacity: 0, y: 20 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.5, easeOut: true }
-        }
+    // Ported from Figma (max security set, Default→Variant2), 1.1s EASE_IN, all
+    // elements animating simultaneously (no stagger).
+    const easeIn = [0.42, 0, 1, 1] as const;
+
+    // The "Maximum Security" pill simply fades in.
+    const badgeVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { duration: 1.1, ease: easeIn } },
     };
 
-    // Design: Staggered entry from left for the features list
+    // The title + subtitle fade in while sliding DOWN ~90px into place.
+    const headerVariants = {
+        hidden: { opacity: 0, y: prefersReducedMotion ? 0 : -90 },
+        visible: { opacity: 1, y: 0, transition: { duration: 1.1, ease: easeIn } },
+    };
+
+    // The left feature list: each card slides in from the LEFT a different
+    // distance (top card nearest, lower cards from further out) and fades in.
     const featureListVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1 }
-        }
+        hidden: {},
+        visible: { transition: { staggerChildren: 0 } },
     };
 
     const individualFeatureVariants = {
-        hidden: { opacity: 0, x: -30 },
+        hidden: (x: number) => ({ opacity: 0, x }),
         visible: {
             opacity: 1,
             x: 0,
-            transition: { type: "spring" as const, stiffness: 100, damping: 15 }
-        }
+            transition: { duration: 1.1, ease: easeIn },
+        },
     };
 
-    // Design: High impact spring scaling for the Right Column Monitor Dashboard
+    // Per-card horizontal start offset (px) measured from the Figma geometry.
+    const featureOffsets = prefersReducedMotion ? [0, 0, 0] : [-768, -952, -1096];
+
+    // The right monitor panel slides in from the RIGHT as one unit + fades in.
     const monitorDisplayVariants = {
-        hidden: { opacity: 0, scale: 0.9, y: 30 },
+        hidden: { opacity: 0, x: prefersReducedMotion ? 0 : 656 },
         visible: {
             opacity: 1,
-            scale: 1,
-            y: 0,
-            transition: { type: "spring" as const, stiffness: 80, damping: 15, delay: 0.2 }
-        }
+            x: 0,
+            transition: { duration: 1.1, ease: easeIn },
+        },
     };
 
     return (
@@ -74,7 +82,7 @@ export default function Security() {
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-100px" }}
-                    variants={textRevealPresets}
+                    variants={badgeVariants}
                 >
                     <div className="inline-flex items-center gap-2 rounded-2xl border border-accent-blue bg-white/5 px-4 py-2 text-xl font-semibold text-[#7AD3FA] backdrop-blur-md">
                         <Lock className="h-5 w-5" />
@@ -88,7 +96,7 @@ export default function Security() {
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-100px" }}
-                    variants={textRevealPresets}
+                    variants={headerVariants}
                 >
                     <h2 className="text-4xl font-extrabold tracking-tight text-white sm:text-[64px]">
                         Secret Mode.
@@ -118,6 +126,7 @@ export default function Security() {
                                 <motion.div
                                     key={idx}
                                     variants={individualFeatureVariants}
+                                    custom={featureOffsets[idx]}
                                     className="rounded-[1.25rem] border-2 border-accent-blue bg-transparent p-6 transition-colors duration-200 hover:bg-white/5"
                                 >
                                     <div className="flex items-center gap-5">
@@ -141,15 +150,23 @@ export default function Security() {
                         })}
                     </motion.div>
 
-                    {/* Right Column: Dynamic Screen Status Monitor Display */}
+                    {/* Right Column: Dynamic Screen Status Monitor Display.
+                        The trigger lives on this in-place wrapper (it never moves)
+                        so the IntersectionObserver fires reliably; the inner panel
+                        carries the slide-in transform. Putting the large x-offset
+                        on the observed element itself would push it off-screen and
+                        the whileInView entrance would never trigger. */}
                     <motion.div
                         className="flex justify-center w-full flex-1 h-fit"
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: true, margin: "-50px" }}
-                        variants={monitorDisplayVariants}
+                        variants={{ hidden: {}, visible: {} }}
                     >
-                        <div className="w-full max-w-105 rounded-4xl border-2 border-accent-blue bg-transparent p-10 text-center shadow-xl shadow-black/10">
+                        <motion.div
+                            variants={monitorDisplayVariants}
+                            className="w-full max-w-105 rounded-4xl border-2 border-accent-blue bg-transparent p-10 text-center shadow-xl shadow-black/10"
+                        >
                             <div className="flex flex-col items-center">
 
                                 {/* Big Floating Security Radar Lock Status Circle */}
@@ -207,7 +224,7 @@ export default function Security() {
                                 </div>
 
                             </div>
-                        </div>
+                        </motion.div>
                     </motion.div>
 
                 </div>

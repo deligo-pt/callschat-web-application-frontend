@@ -8,10 +8,12 @@ import {
     Phone,
     Briefcase
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import FeatureCard from "../shared/FeatureCard";
 
 export default function Features() {
+    const prefersReducedMotion = useReducedMotion();
+
     const featuresData = [
         {
             title: "Secret Mode",
@@ -51,23 +53,26 @@ export default function Features() {
         },
     ];
 
-    // Framer Motion staggered grid presets
+    // Ported from Figma (feature set, Default→Variant2). The cards assemble into
+    // the grid simultaneously (no stagger) — the varied "feel" comes from each
+    // card travelling a different distance, not from delays. EASE_IN over 1.1s.
+    const easeIn = [0.42, 0, 1, 1] as const;
+
+    // Per-card downward start offset (px) measured from the Figma variant
+    // geometry: each card slides UP this far into its grid slot.
+    const cardOffsets = prefersReducedMotion ? [0, 0, 0, 0, 0, 0] : [88, 216, 208, 176, 248, 337];
+
     const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.12, // Gap delay between card entries
-            },
-        },
+        hidden: {},
+        visible: { transition: { staggerChildren: 0 } },
     };
 
+    // The header slides DOWN 72px into place (title + subtitle start high).
     const headerVariants = {
-        hidden: { opacity: 0, y: 30 },
+        hidden: { y: prefersReducedMotion ? 0 : -72 },
         visible: {
-            opacity: 1,
             y: 0,
-            transition: { duration: 0.6, easeOut: true },
+            transition: { duration: 1.1, ease: easeIn },
         },
     };
 
@@ -106,6 +111,7 @@ export default function Features() {
                             description={feature.description}
                             icon={feature.icon}
                             iconBgColor={feature.iconBgColor}
+                            offsetY={cardOffsets[index]}
                         />
                     ))}
                 </motion.div>

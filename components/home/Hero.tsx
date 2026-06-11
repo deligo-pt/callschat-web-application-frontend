@@ -2,87 +2,99 @@
 
 import { Play } from "lucide-react";
 import { Button } from "../ui/button";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 interface HeroProps {
     onDownloadClick: () => void;
 }
 
 export default function Hero({ onDownloadClick }: HeroProps) {
-    // Animation configuration presets
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.12, delayChildren: 0.1 }
-        }
-    };
+    const prefersReducedMotion = useReducedMotion();
 
-    const elementVariants = {
-        hidden: { opacity: 0, y: 25 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { type: "spring" as const, stiffness: 90, damping: 14 }
-        }
-    };
+    // Animation ported from the Figma "Hero" component set (id 94:185),
+    // variant chain Default → Variant3 → Final (Smart Animate, GENTLE spring):
+    //
+    //   Default  --(after 100ms)--> Variant3 : everything fades to opacity 0
+    //                                           (stage clear) — spring 400.1 / 30
+    //   Variant3 --(after 200ms)--> Final    : the real entrance — spring 52.9 / 10.91
+    //
+    // The Default→Variant3 fade-out is a reset, so on first load we simply
+    // start hidden and play the Variant3→Final entrance (~300ms in). Per the
+    // file geometry, in that entrance:
+    //   • the text block slides in from the LEFT (x −537 → +79) + fades in,
+    //     moving as ONE unit;
+    //   • the hero image zooms from a small upper-right thumbnail (517×392)
+    //     to full-bleed (1236×938) + fades in.
+    const gentleSpring = { type: "spring" as const, mass: 1, stiffness: 52.9, damping: 10.91 };
+    const entranceDelay = 0.3; // 100ms (Default) + 200ms (Variant3) timeouts
 
     return (
         <section className="w-full bg-white px-4 py-8 sm:px-6 lg:px-8">
             <div className="container mx-auto max-w-7xl">
 
-                {/* Rounded Hero Showcase Card with smooth fade-in reveal */}
+                {/* Rounded Hero Showcase Card */}
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.99 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.6, ease: "easeOut" }}
-                    className="relative min-h-150 w-full overflow-hidden rounded-xl bg-gray-100 bg-cover bg-center px-6 py-16 sm:px-12 md:px-20 lg:min-h-230 lg:py-44"
-                    style={{
-                        backgroundImage: `url('/hero.png')`
-                    }}
+                    initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                    className="relative min-h-150 w-full overflow-hidden rounded-xl bg-gray-100 px-6 py-16 sm:px-12 md:px-20 lg:min-h-230 lg:py-44"
                 >
-                    {/* Inner Content Alignment with sequential content staging */}
+                    {/* Image layer — eases in from the TOP-RIGHT corner: the image
+                        scales up from a small thumbnail (~0.42 → 1) with its
+                        top-right corner pinned, while fading in. Per the Figma
+                        Hero set, the top-right corner stays fixed at (1248,126)
+                        across Variant3 → Final. */}
                     <motion.div
-                        variants={containerVariants}
-                        initial="hidden"
-                        animate="visible"
+                        aria-hidden
+                        initial={
+                            prefersReducedMotion
+                                ? { scale: 1, opacity: 1 }
+                                : { scale: 0.42, opacity: 0 }
+                        }
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ ...gentleSpring, delay: entranceDelay }}
+                        style={{
+                            backgroundImage: `url('/hero.png')`,
+                            transformOrigin: "top right",
+                        }}
+                        className="absolute inset-0 z-0 bg-cover bg-center"
+                    />
+
+                    {/* Content block — slides in from the left as a single unit.
+                        Travel distance matches Figma (x −537 → 79 = 616px). */}
+                    <motion.div
+                        initial={
+                            prefersReducedMotion
+                                ? { opacity: 1, x: 0 }
+                                : { opacity: 0, x: -616 }
+                        }
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ ...gentleSpring, delay: entranceDelay }}
                         className="relative z-10 flex h-full max-w-xl flex-col justify-center"
                     >
 
                         {/* Tagline Badge */}
-                        <motion.div
-                            variants={elementVariants}
-                            className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#1AC1F2] px-4 py-1.5 text-xs font-semibold text-white shadow-sm"
-                        >
+                        <div className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#1AC1F2] px-4 py-1.5 text-xs font-semibold text-white shadow-sm">
                             <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
                             </svg>
                             AI-Powered Privacy First
-                        </motion.div>
+                        </div>
 
                         {/* Typography Header Group */}
-                        <motion.h1
-                            variants={elementVariants}
-                            className="mt-6 text-4xl font-extrabold tracking-tight text-[#0A2540] sm:text-5xl md:text-6xl"
-                        >
+                        <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-[#0A2540] sm:text-5xl md:text-6xl">
                             Communicate <br />
                             <span className="text-primary">Without Limits</span>
-                        </motion.h1>
+                        </h1>
 
                         {/* Support Paragraph Description */}
-                        <motion.p
-                            variants={elementVariants}
-                            className="mt-6 text-base leading-relaxed text-[#102A63] sm:text-lg"
-                        >
+                        <p className="mt-6 text-base leading-relaxed text-[#102A63] sm:text-lg">
                             Experience the future of messaging with AI-powered privacy, real-time
                             translation, and intelligent communication.
-                        </motion.p>
+                        </p>
 
                         {/* Combined Download Trigger CTAs */}
-                        <motion.div
-                            variants={elementVariants}
-                            className="mt-10 flex flex-wrap gap-4"
-                        >
+                        <div className="mt-10 flex flex-wrap gap-4">
                             {/* iOS Downloader */}
                             <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.98 }}>
                                 <Button
@@ -113,7 +125,7 @@ export default function Hero({ onDownloadClick }: HeroProps) {
                                     <span className="text-base font-medium tracking-wide">Download for Android</span>
                                 </Button>
                             </motion.div>
-                        </motion.div>
+                        </div>
                     </motion.div>
                 </motion.div>
 
