@@ -13,7 +13,7 @@ export default function Footer() {
                     {/* Left Block: Branding Description & App Store Downloads */}
                     <div className="lg:col-span-5 flex flex-col items-start max-w-sm">
                         {/* Logo Section */}
-                        <Link href="#" className="flex items-center -ml-2">
+                        <Link href="/" className="flex items-center -ml-2">
                             <Image src="/call_chats_logo.png" height={70} width={70} alt="CallsChat Logo" priority />
                             <span className="text-2xl font-bold text-[#0A2540] -ml-2">
                                 <span className="text-2xl">Calls<span className="text-[#1A62E8]">Chat</span></span>
@@ -55,8 +55,8 @@ export default function Footer() {
                         <div className="flex flex-col gap-3">
                             <h4 className="text-[15px] font-bold text-[#1A62E8]">Product</h4>
                             <ul className="flex flex-col gap-2.5 text-[14px] font-semibold text-gray-600">
-                                <li><Link href="#" className="hover:text-blue-600 transition-colors">Features</Link></li>
-                                <li><Link href="#" className="hover:text-blue-600 transition-colors">Security</Link></li>
+                                <li><Link href="/#features" className="hover:text-blue-600 transition-colors">Features</Link></li>
+                                <li><Link href="/#security" className="hover:text-blue-600 transition-colors">Security</Link></li>
                                 <li><Link href="#" className="hover:text-blue-600 transition-colors">Business</Link></li>
                                 <li><Link href="#" className="hover:text-blue-600 transition-colors">Pricing</Link></li>
                                 <li><Link href="#" className="hover:text-blue-600 transition-colors">API</Link></li>
