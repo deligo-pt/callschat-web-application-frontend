@@ -15,11 +15,11 @@ export default function Navbar() {
     const closeModal = () => setIsDownloadModalOpen(false);
 
     const navLinks = [
-        { label: "Features", href: "#features" },
-        { label: "Dual Mood", href: "#dual-mood" },
-        { label: "Security", href: "#security" },
-        { label: "Live Translation", href: "#live-translation" },
-        { label: "AI Service", href: "#ai-service" },
+        { label: "Features", href: "/#features" },
+        { label: "Dual Mood", href: "/#dual-mood" },
+        { label: "Security", href: "/#security" },
+        { label: "Live Translation", href: "/#live-translation" },
+        { label: "AI Service", href: "/#ai-service" },
         { label: "Videos", href: "/media" },
     ];
 

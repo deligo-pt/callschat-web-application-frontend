@@ -173,7 +173,7 @@ export default function Translation() {
                                             <div className="w-0.5 h-2 bg-gray-300 rounded-full"></div>
                                         </div>
                                     </div>
-                                    <p className="text-[11px] text-gray-400 mt-1 italic font-normal">✨ Translated from Bengali</p>
+                                    <p className="text-[11px] text-gray-400 mt-1 italic font-normal">✨ Translated from Spanish</p>
                                 </div>
                             </div>
 
