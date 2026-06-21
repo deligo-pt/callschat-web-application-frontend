@@ -68,14 +68,22 @@ export default function Navbar() {
                     ))}
                 </div>
 
-                {/* Desktop Download Button */}
-                <div className="hidden lg:block">
+                {/* Desktop Buttons */}
+                <div className="hidden lg:flex items-center gap-4">
                     <Button
                         onClick={openModal}
                         className="rounded-xl bg-primary px-6 py-2.5 text-base font-medium text-background shadow-md shadow-blue-500/20 transition-all duration-200 hover:bg-primary/80 hover:shadow-lg"
                     >
                         Download
                     </Button>
+                    <Link href="/register">
+                        <Button
+                            variant="outline"
+                            className="rounded-xl border-primary text-primary px-6 py-2.5 text-base font-medium shadow-md transition-all duration-200 hover:bg-primary/10"
+                        >
+                            Getting Started
+                        </Button>
+                    </Link>
                 </div>
 
                 {/* Mobile Hamburger Menu Button */}
@@ -123,15 +131,25 @@ export default function Navbar() {
                                 </Link>
                             ))}
                             <hr className="my-2 border-background" />
-                            <Button
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    openModal();
-                                }}
-                                className="w-full rounded-xl bg-primary py-3 text-center font-medium text-background shadow-md"
-                            >
-                                Download
-                            </Button>
+                            <div className="flex flex-col gap-3">
+                                <Button
+                                    onClick={() => {
+                                        setIsOpen(false);
+                                        openModal();
+                                    }}
+                                    className="w-full rounded-xl bg-primary py-3 text-center font-medium text-background shadow-md"
+                                >
+                                    Download
+                                </Button>
+                                <Link href="/register" className="w-full" onClick={() => setIsOpen(false)}>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full rounded-xl border-primary text-primary py-3 text-center font-medium shadow-md hover:bg-primary/10"
+                                    >
+                                        Getting Started
+                                    </Button>
+                                </Link>
+                            </div>
                         </div>
                     </motion.div>
                 )}
