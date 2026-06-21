@@ -57,7 +57,7 @@ export default function OnboardingSlider() {
 
   const handleNext = () => {
     if (currentSlide === SLIDES.length - 1) {
-      router.push("/login");
+      router.push("/permissions");
     } else {
       setDirection(1);
       setCurrentSlide((prev) => prev + 1);
@@ -65,7 +65,7 @@ export default function OnboardingSlider() {
   };
 
   const handleSkip = () => {
-    router.push("/login");
+    router.push("/permissions");
   };
 
   if (!isMounted) {
