@@ -51,26 +51,35 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   // Handle OTP countdown timer
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (step === "OTP" && timer > 0) {
+    if (step === "OTP") {
       interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
+        setTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [step, timer]);
+  }, [step]);
 
   const countries = getCountries();
 
   const handleRequestOTP = () => {
     if (!phoneNumber) return;
     
+    // Ensure phoneNumber is sanitized (no spaces)
+    const sanitizedPhone = phoneNumber.replace(/\s+/g, "");
+
     startTransition(async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
         const res = await fetch(`${baseUrl}/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phoneNumber })
+          body: JSON.stringify({ phoneNumber: sanitizedPhone })
         });
         
         const data = await res.json();
@@ -88,8 +97,11 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   };
 
   const handleVerifyOTP = () => {
-    const otpString = otp.join("");
-    if (otpString.length !== 6) return;
+    const otpString = otp.join("").trim();
+    if (otpString.length !== 6 || !phoneNumber) return;
+
+    // Ensure phoneNumber is sanitized (no spaces)
+    const sanitizedPhone = phoneNumber.replace(/\s+/g, "");
 
     startTransition(async () => {
       try {
@@ -97,34 +109,126 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
         const res = await fetch(`${baseUrl}/auth/otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phoneNumber, otp: otpString })
+          body: JSON.stringify({ phoneNumber: sanitizedPhone, otp: otpString })
         });
         
         const responseData = await res.json();
         
-        // The backend wraps the payload inside a "data" property.
-        if (responseData.success && responseData.data) {
-          toast.success("Verification successful!");
+        // Extract from data wrapper if it exists, otherwise use root level
+        const token = responseData.data?.registrationToken || responseData.registrationToken;
+        const isExistingUser = responseData.data?.isExistingUser !== undefined 
+          ? responseData.data.isExistingUser 
+          : responseData.isExistingUser;
+
+        if (responseData.success && token) {
           
-          if (responseData.data.isExistingUser) {
-            // User already has an account, log them in directly
-            if (responseData.data.accessToken) {
-              localStorage.setItem("accessToken", responseData.data.accessToken);
-              localStorage.setItem("refreshToken", responseData.data.refreshToken);
+          if (type === "login") {
+            if (isExistingUser) {
+              toast.success("Verification successful!");
+              // Branch A: Existing User -> Background call to Login Route
+              try {
+                const loginRes = await fetch(`${baseUrl}/auth/login`, {
+                  method: "POST",
+                  headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({})
+                });
+                
+                const loginData = await loginRes.json();
+                
+                const accessToken = loginData.data?.accessToken || loginData.accessToken;
+                const refreshToken = loginData.data?.refreshToken || loginData.refreshToken;
+
+                if ((loginData.success || loginRes.ok) && accessToken) {
+                  localStorage.setItem("accessToken", accessToken);
+                  if (refreshToken) {
+                    localStorage.setItem("refreshToken", refreshToken);
+                  }
+                  router.push("/chats");
+                } else {
+                  toast.error(loginData.message || loginData.data?.message || "Failed to finalize login.");
+                }
+              } catch (err) {
+                toast.error("Network error during login finalization.");
+              }
+            } else {
+              toast.info("No account found. Let's get you signed up!");
+              router.push("/signup");
             }
-            router.push("/dashboard"); // Or wherever the main app is
-          } else if (responseData.data.registrationToken) {
-            // New user, send to profile setup
-            sessionStorage.setItem("registrationToken", responseData.data.registrationToken);
-            router.push("/profile");
           } else {
-            toast.error("Unexpected response from server.");
+            // type === "signup"
+            
+            if (isExistingUser) {
+              toast.info("You already have an account! Logging you in...");
+              
+              try {
+                const loginRes = await fetch(`${baseUrl}/auth/login`, {
+                  method: "POST",
+                  headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({})
+                });
+                
+                const loginData = await loginRes.json();
+                const accessToken = loginData.data?.tokens?.accessToken || loginData.data?.accessToken || loginData.accessToken;
+                const refreshToken = loginData.data?.tokens?.refreshToken || loginData.data?.refreshToken || loginData.refreshToken;
+
+                if ((loginData.success || loginRes.ok) && accessToken) {
+                  localStorage.setItem("accessToken", accessToken);
+                  if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+                  router.push("/chats");
+                } else {
+                  toast.error(`Login failed: ${loginData.message || JSON.stringify(loginData)}`);
+                }
+              } catch (err) {
+                toast.error(`Network error: ${err}`);
+              }
+            } else {
+              toast.success("Verification successful!");
+              const sessionMode = sessionStorage.getItem("auth_account_mode") || "PERSONAL";
+              
+              try {
+                const registerRes = await fetch(`${baseUrl}/auth/register`, {
+                  method: "POST",
+                  headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ 
+                    name: "User", 
+                    accountType: sessionMode,
+                    ...(sessionMode === "BUSINESS" && { companyName: "Business Account" })
+                  })
+                });
+              
+              const registerData = await registerRes.json();
+              
+              const accessToken = registerData.data?.tokens?.accessToken || registerData.data?.accessToken || registerData.accessToken;
+              const refreshToken = registerData.data?.tokens?.refreshToken || registerData.data?.refreshToken || registerData.refreshToken;
+
+              if ((registerData.success || registerRes.ok) && accessToken) {
+                localStorage.setItem("accessToken", accessToken);
+                if (refreshToken) {
+                  localStorage.setItem("refreshToken", refreshToken);
+                }
+                router.push("/setup-profile");
+              } else {
+                toast.error(`Register failed: ${registerData.message || JSON.stringify(registerData)}`);
+              }
+            } catch (err) {
+              toast.error(`Network error: ${err}`);
+            }
           }
+        }
         } else {
-          toast.error(responseData.message || responseData.data?.message || "Invalid OTP.");
+          toast.error(`OTP Verify failed: ${responseData.message || JSON.stringify(responseData)}`);
         }
       } catch (err) {
-        toast.error("Network error. Please try again.");
+        toast.error(`Network error: ${err}`);
       }
     });
   };

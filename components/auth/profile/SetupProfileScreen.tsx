@@ -54,49 +54,58 @@ export default function SetupProfileScreen() {
   };
 
   const handleRegister = () => {
-    if (!firstName || !registrationToken) return;
+    if (!firstName) return;
+
+    // Use registrationToken, or fall back to accessToken if the backend unified them
+    const token = registrationToken || localStorage.getItem("accessToken");
+    if (!token) {
+      toast.error("Authentication token missing. Please verify again.");
+      return;
+    }
 
     startTransition(async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
         
         const formData = new FormData();
-        formData.append("name", `${firstName} ${lastName}`.trim());
-        formData.append("accountType", "PERSONAL"); // Defaulting to PERSONAL
+        formData.append("firstName", firstName.trim());
+        if (lastName) formData.append("lastName", lastName.trim());
 
-        // If an image was selected, append it (ensure the backend expects 'profilePicture', 'avatar', or 'image')
+        // Send 'profileImage' as specified by the user
         if (fileInputRef.current?.files?.[0]) {
-          formData.append("profilePicture", fileInputRef.current.files[0]);
+          formData.append("profileImage", fileInputRef.current.files[0]);
         }
 
-        const res = await fetch(`${baseUrl}/auth/register`, {
-          method: "POST",
+        const res = await fetch(`${baseUrl}/user/profile/setup`, {
+          method: "PATCH",
           headers: { 
-            "Authorization": `Bearer ${registrationToken}`
-            // Note: Omit Content-Type when sending FormData so browser sets the multipart boundary!
+            "Authorization": `Bearer ${token}`
+            // Note: Omit Content-Type when sending FormData so browser sets the multipart boundary
           },
           body: formData
         });
         
         const data = await res.json();
-        if (data.success && data.data?.accessToken) {
-          toast.success("Profile created successfully!");
+        
+        // Handle successful profile setup
+        if (data.success || res.ok) {
+          toast.success("Profile updated successfully!");
           
-          localStorage.setItem("accessToken", data.data.accessToken);
-          localStorage.setItem("refreshToken", data.data.refreshToken);
+          // If the setup route returns permanent tokens (like replacing the registrationToken)
+          if (data.data?.accessToken) {
+            localStorage.setItem("accessToken", data.data.accessToken);
+            localStorage.setItem("refreshToken", data.data.refreshToken);
+          } else if (data.accessToken) {
+            localStorage.setItem("accessToken", data.accessToken);
+            localStorage.setItem("refreshToken", data.refreshToken);
+          }
+          
+          // Clear temporary registration token
           sessionStorage.removeItem("registrationToken");
           
-          router.push("/permissions");
-        } else if (data.success && data.accessToken) {
-          toast.success("Profile created successfully!");
-          
-          localStorage.setItem("accessToken", data.accessToken);
-          localStorage.setItem("refreshToken", data.refreshToken);
-          sessionStorage.removeItem("registrationToken");
-          
-          router.push("/permissions");
+          router.push("/home"); // Redirecting to home/dashboard since it's now updated
         } else {
-          toast.error(data.message || data.data?.message || "Failed to register profile. User might already exist.");
+          toast.error(data.message || data.data?.message || "Failed to setup profile.");
         }
       } catch (err) {
         toast.error("Network error. Please try again.");
