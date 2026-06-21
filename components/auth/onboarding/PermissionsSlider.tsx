@@ -46,7 +46,7 @@ export default function PermissionsSlider() {
 
   const handleAction = () => {
     if (currentSlide === PERMISSIONS.length - 1) {
-      router.push("/login");
+      router.push("/mode");
     } else {
       setDirection(1);
       setCurrentSlide((prev) => prev + 1);
