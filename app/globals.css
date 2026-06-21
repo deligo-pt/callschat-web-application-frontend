@@ -123,3 +123,91 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+
+/* Custom styles for react-phone-number-input to match Figma design */
+.PhoneInput {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.PhoneInputCountry {
+  display: flex;
+  height: 52px;
+  width: 96px;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 1rem;
+  border: 2px solid #EEF0F5;
+  background-color: #F7F9FC;
+  padding: 0 12px;
+  transition: border-color 0.2s;
+  position: relative;
+}
+
+.PhoneInputCountry:focus-within {
+  border-color: #3B58F5;
+}
+
+.PhoneInputCountrySelect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.PhoneInputCountryIcon {
+  width: 24px;
+  height: 16px;
+  border: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+.PhoneInputCountryIconImg {
+  width: 100%;
+  height: 100%;
+}
+
+.PhoneInputCountrySelectArrow {
+  display: block;
+  content: "";
+  width: 4px;
+  height: 4px;
+  margin-left: auto;
+  border-style: solid;
+  border-color: #8F95B2;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 1 !important;
+}
+
+.PhoneInputInput {
+  flex: 1;
+  height: 52px;
+  border-radius: 1rem;
+  border: 2px solid #EEF0F5;
+  background-color: #F7F9FC;
+  padding: 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  color: #11142D;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.PhoneInputInput::placeholder {
+  color: #A0A6C0;
+  font-weight: 600;
+}
+
+.PhoneInputInput:focus {
+  border-color: #3B58F5;
+}
