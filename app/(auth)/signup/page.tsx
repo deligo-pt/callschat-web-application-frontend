@@ -1,9 +1,9 @@
 import PhoneAuthScreen from "@/components/auth/PhoneAuthScreen";
 
-export default function LoginPage() {
+export default function SignUpPage() {
   return (
     <div>
-      <PhoneAuthScreen type="login" />
+      <PhoneAuthScreen type="signup" />
     </div>
   );
 }

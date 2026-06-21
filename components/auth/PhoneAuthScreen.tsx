@@ -8,7 +8,10 @@ import Input from "react-phone-number-input/input";
 import { getCountries, getCountryCallingCode } from "react-phone-number-input";
 import type { Country } from "react-phone-number-input";
 
-// Helper to convert country code (e.g., 'US') to flag emoji
+interface PhoneAuthScreenProps {
+  type: "login" | "signup";
+}
+
 const getFlagEmoji = (countryCode: string) => {
   const codePoints = countryCode
     .toUpperCase()
@@ -17,7 +20,7 @@ const getFlagEmoji = (countryCode: string) => {
   return String.fromCodePoint(...codePoints);
 };
 
-export default function LoginScreen() {
+export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   const [phoneNumber, setPhoneNumber] = React.useState<string | undefined>("");
   const [selectedCountry, setSelectedCountry] = React.useState<Country>("US");
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
@@ -36,6 +39,20 @@ export default function LoginScreen() {
 
   const countries = getCountries();
 
+  // Dynamic Content based on type
+  const isLogin = type === "login";
+  const title = isLogin ? "Welcome Back" : "Create Account";
+  const subtitle = isLogin ? "Log in to continue" : "Join CallsChat today";
+  const sheetTitle = isLogin ? "Enter your number" : "Enter your phone number";
+  const sheetSubtitle = isLogin 
+    ? "We'll send you a verification code via SMS" 
+    : "Make sure this number can receive SMS. You'll receive your activation code through it.";
+  const buttonText = isLogin ? "Send verification code" : "Continue";
+  
+  // Note: the design screenshot for SignUp shows an active blue button even when empty.
+  // We'll follow the exact look of the active state for signup, or just standard disabled logic.
+  // Standard logic is better UX, but we can match the design exactly if requested. Let's stick to disabled state logic for UX.
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-100 sm:p-6">
       {/* Mobile constraint container */}
@@ -48,10 +65,10 @@ export default function LoginScreen() {
             <MessageCircle className="h-9 w-9 text-white" strokeWidth={1.5} />
           </div>
           <h1 className="text-[28px] font-bold tracking-tight text-white">
-            Welcome Back
+            {title}
           </h1>
           <p className="mt-1.5 text-[14px] font-medium text-white/80">
-            Log in to continue
+            {subtitle}
           </p>
         </div>
 
@@ -59,10 +76,10 @@ export default function LoginScreen() {
         <div className="relative flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-8 pt-10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
           
           <h2 className="mb-2 text-[22px] font-bold tracking-tight text-[#11142D]">
-            Enter your number
+            {sheetTitle}
           </h2>
           <p className="mb-8 text-[14px] font-medium text-[#8F95B2]">
-            We'll send you a verification code via SMS
+            {sheetSubtitle}
           </p>
 
           <div className="flex flex-col gap-2.5">
@@ -116,9 +133,15 @@ export default function LoginScreen() {
             </div>
           </div>
 
-          <p className="mt-8 px-2 text-center text-[12px] font-medium leading-[1.6] text-[#8F95B2]">
-            By continuing you agree to our <Link href="#" className="font-semibold text-[#3B58F5] hover:underline">Terms of Service</Link> and <Link href="#" className="font-semibold text-[#3B58F5] hover:underline">Privacy Policy</Link>
-          </p>
+          {/* Conditional Terms & Conditions for Login */}
+          {isLogin ? (
+            <p className="mt-8 px-2 text-center text-[12px] font-medium leading-[1.6] text-[#8F95B2]">
+              By continuing you agree to our <Link href="#" className="font-semibold text-[#3B58F5] hover:underline">Terms of Service</Link> and <Link href="#" className="font-semibold text-[#3B58F5] hover:underline">Privacy Policy</Link>
+            </p>
+          ) : (
+            // Spacer to push the button down if terms are absent, keeping layout stable
+            <div className="mt-8 h-[38px] w-full" />
+          )}
 
           <button
             disabled={!phoneNumber}
@@ -129,13 +152,16 @@ export default function LoginScreen() {
                 : "cursor-not-allowed bg-[#B5C7FE] text-white"
             )}
           >
-            Send verification code
+            {buttonText}
           </button>
 
           <div className="mt-auto pb-8 pt-6 text-center text-[14px] font-medium text-[#8F95B2]">
-            Don't have an account?{" "}
-            <Link href="/register" className="font-bold text-[#3B58F5] hover:underline transition-colors">
-              Sign Up
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <Link 
+              href={isLogin ? "/signup" : "/login"} 
+              className="font-bold text-[#3B58F5] hover:underline transition-colors"
+            >
+              {isLogin ? "Sign Up" : "Login"}
             </Link>
           </div>
 
