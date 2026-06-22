@@ -5,17 +5,53 @@ import { Search, Star, Bell, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
+interface ActiveUser {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  isOnline: boolean;
+}
+
 export default function ChatsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [activeUsers, setActiveUsers] = React.useState<ActiveUser[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
 
-  // Static mock data for scaffolding
-  const activeUsers = [
-    { id: 1, name: "Sarah", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" },
-    { id: 2, name: "Brooklyn", avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" },
-    { id: 3, name: "Alex", avatarUrl: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80" },
-    { id: 4, name: "Emma", avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80" },
-    { id: 5, name: "James", avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80" },
-  ];
+  React.useEffect(() => {
+    async function fetchUsers() {
+      try {
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+          setIsLoadingUsers(false);
+          return;
+        }
+
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+        const res = await fetch(`${baseUrl}/user/all`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        
+        const data = await res.json();
+        if (data.success && data.data) {
+          const mappedUsers = data.data.map((u: any) => ({
+            id: u.id,
+            name: u.profile.displayName || u.profile.username || "Unknown",
+            avatarUrl: u.profile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.profile.displayName || u.profile.username || "U")}&background=F4F6FC&color=3B58F5`,
+            isOnline: u.profile.isOnline || false
+          }));
+          setActiveUsers(mappedUsers);
+        }
+      } catch (error) {
+        console.error("Failed to fetch users", error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    }
+    
+    fetchUsers();
+  }, []);
 
   const messages = [
     {
@@ -140,20 +176,31 @@ export default function ChatsPage() {
             </div>
             
             <div className="mt-4 flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-              {activeUsers.map((user) => (
-                <div key={user.id} className="relative flex shrink-0 flex-col items-center">
-                  <div className="relative rounded-full border-[2.5px] border-[#22C55E] p-0.5 transition-transform hover:scale-105 cursor-pointer">
-                    <img 
-                      src={user.avatarUrl} 
-                      alt={user.name} 
-                      className="h-[52px] w-[52px] rounded-full object-cover"
-                    />
-                  </div>
-                  <span className="mt-1.5 text-[11px] font-medium text-[#8F95B2]">
-                    {user.name.split(' ')[0]}
-                  </span>
+              {isLoadingUsers ? (
+                <div className="flex w-full items-center justify-center py-4">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#3B58F5] border-t-transparent" />
                 </div>
-              ))}
+              ) : activeUsers.length > 0 ? (
+                activeUsers.map((user) => (
+                  <div key={user.id} className="relative flex shrink-0 flex-col items-center">
+                    <div className={cn(
+                      "relative rounded-full border-[2.5px] p-0.5 transition-transform hover:scale-105 cursor-pointer",
+                      user.isOnline ? "border-[#22C55E]" : "border-[#E6EAFA]"
+                    )}>
+                      <img 
+                        src={user.avatarUrl} 
+                        alt={user.name} 
+                        className="h-[52px] w-[52px] rounded-full object-cover bg-white"
+                      />
+                    </div>
+                    <span className="mt-1.5 text-[11px] font-medium text-[#8F95B2]">
+                      {user.name.split(' ')[0]}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-[13px] text-[#8F95B2]">No users found</div>
+              )}
             </div>
           </div>
 
