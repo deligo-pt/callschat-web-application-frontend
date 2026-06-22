@@ -7,9 +7,9 @@ export interface CallContextType {
   incomingCall: IncomingCall | null;
   activeCall: ActiveCall | null;
   initiateCall: (receiverId: string, callType: 'AUDIO' | 'VIDEO') => void;
-  acceptCall: (callId: string) => void;
-  rejectCall: (callId: string) => void;
-  hangupCall: (roomName: string) => void;
+  acceptCall: (callId: string, roomName: string) => void;
+  rejectCall: (callId: string, roomName: string) => void;
+  hangupCall: (callId: string) => void;
 }
 
 export const CallContext = createContext<CallContextType | null>(null);
