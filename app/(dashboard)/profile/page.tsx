@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2 } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -145,6 +145,41 @@ export default function ProfilePage() {
     });
   };
 
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const refreshToken = localStorage.getItem("refreshToken");
+      
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+      
+      // Attempt to call logout API, but don't block local logout on failure
+      if (refreshToken) {
+        await fetch(`${baseUrl}/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ refreshToken })
+        }).catch(err => console.error("Logout API error:", err));
+      }
+      
+    } catch (error) {
+      console.error("Error during logout:", error);
+    } finally {
+      // Always clear local session
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      toast.success("Logged out successfully");
+      router.push("/login");
+    }
+  };
+
   return (
     <div className="flex h-full w-full bg-[#F8FAFC]">
       
@@ -160,6 +195,14 @@ export default function ProfilePage() {
             <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
           </button>
           <h1 className="text-[18px] font-bold">Profile</h1>
+          
+          <button 
+             onClick={handleLogout}
+             className="ml-auto rounded-full p-1.5 transition-colors hover:bg-red-500/80 text-red-100 hover:text-white flex items-center justify-center bg-red-500/20"
+             title="Logout"
+          >
+             <LogOut className="h-5 w-5" strokeWidth={2.5} />
+          </button>
         </div>
 
         {isLoading ? (

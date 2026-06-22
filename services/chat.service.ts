@@ -33,5 +33,10 @@ export const chatService = {
   fetchHistory: async (conversationId: string) => {
     const response = await apiClient.get(`/conversations/${conversationId}/messages`);
     return response.data;
-  }
+  },
+
+  fetchMyConversations: async () => {
+    const response = await apiClient.get('/conversations');
+    return response.data;
+  },
 };

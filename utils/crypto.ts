@@ -4,7 +4,7 @@ export const initCrypto = async () => {
   await sodium.ready;
 };
 
-export const generateAndStoreKeyPair = async () => {
+export const generateAndStoreKeyPair = async (userId: string = "") => {
   await sodium.ready;
   const keypair = sodium.crypto_box_keypair();
   
@@ -14,8 +14,10 @@ export const generateAndStoreKeyPair = async () => {
   
   // Store securely
   if (typeof window !== "undefined") {
-    localStorage.setItem("privateKey", privateKeyBase64);
-    localStorage.setItem("publicKey", publicKeyBase64);
+    const privKeyName = userId ? `privateKey_${userId}` : "privateKey";
+    const pubKeyName = userId ? `publicKey_${userId}` : "publicKey";
+    localStorage.setItem(privKeyName, privateKeyBase64);
+    localStorage.setItem(pubKeyName, publicKeyBase64);
   }
   
   return publicKeyBase64;
