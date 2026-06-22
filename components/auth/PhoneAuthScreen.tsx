@@ -144,8 +144,8 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                 
                 const loginData = await loginRes.json();
                 
-                const accessToken = loginData.data?.accessToken || loginData.accessToken;
-                const refreshToken = loginData.data?.refreshToken || loginData.refreshToken;
+                const accessToken = loginData.data?.tokens?.accessToken || loginData.data?.accessToken || loginData.accessToken;
+                const refreshToken = loginData.data?.tokens?.refreshToken || loginData.data?.refreshToken || loginData.refreshToken;
 
                 if ((loginData.success || loginRes.ok) && accessToken) {
                   localStorage.setItem("accessToken", accessToken);

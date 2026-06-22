@@ -245,7 +245,10 @@ export default function ContactsPage() {
 
                         {/* Action Buttons */}
                         <div className="flex items-center gap-2 shrink-0">
-                          <button className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF2FB] text-[#3B58F5] transition-transform hover:scale-110">
+                          <button 
+                            onClick={() => router.push(`/chats/${contact.id}`)}
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF2FB] text-[#3B58F5] transition-transform hover:scale-110"
+                          >
                             <MessageSquare className="h-[18px] w-[18px]" strokeWidth={2.5} />
                           </button>
                           <button className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ECFDF3] text-[#22C55E] transition-transform hover:scale-110">

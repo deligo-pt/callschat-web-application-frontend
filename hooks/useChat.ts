@@ -28,7 +28,8 @@ export const useChat = (conversationId: string, recipientId: string) => {
         pubKey = await generateAndStoreKeyPair();
         privKey = localStorage.getItem("privateKey");
         
-        const deviceId = localStorage.getItem("deviceId") || "web-" + Date.now();
+        // Use a consistent deviceId so it overwrites old keys if local storage is cleared
+        const deviceId = localStorage.getItem("deviceId") || "web-client";
         localStorage.setItem("deviceId", deviceId);
         try {
           await chatService.uploadPublicKey(deviceId, pubKey!);
@@ -44,7 +45,8 @@ export const useChat = (conversationId: string, recipientId: string) => {
         if (res?.success && res?.data?.publicKey) {
           setRecipientPublicKey(res.data.publicKey);
         } else if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          setRecipientPublicKey(res.data[0].publicKey);
+          // Grab the last key in the array (most recently inserted)
+          setRecipientPublicKey(res.data[res.data.length - 1].publicKey);
         }
       } catch (err) {
         console.error("Failed to fetch recipient public key", err);
@@ -55,12 +57,69 @@ export const useChat = (conversationId: string, recipientId: string) => {
   }, [recipientId]);
 
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (!conversationId || !myPrivateKey || !recipientPublicKey) return;
+
+    const loadHistory = async () => {
+      try {
+        const historyRes = await chatService.fetchHistory(conversationId);
+        if (historyRes?.success && historyRes?.data) {
+          const rawMessages = Array.isArray(historyRes.data) ? historyRes.data : historyRes.data.messages;
+          if (Array.isArray(rawMessages)) {
+            const decryptedHistory = await Promise.all(
+              rawMessages.map(async (msg: any) => {
+                try {
+                  const text = await decryptMessage(
+                    msg.ciphertext,
+                    msg.nonce,
+                    recipientPublicKey,
+                    myPrivateKey
+                  );
+                  return {
+                    id: msg.id,
+                    conversationId: msg.conversationId,
+                    senderId: msg.senderId,
+                    text,
+                    createdAt: msg.createdAt,
+                  };
+                } catch (e) {
+                  return {
+                    id: msg.id,
+                    conversationId: msg.conversationId,
+                    senderId: msg.senderId,
+                    text: "🔒 Encrypted Message",
+                    createdAt: msg.createdAt,
+                  };
+                }
+              })
+            );
+            // Sort by createdAt ascending
+            decryptedHistory.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            setMessages(decryptedHistory);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load history", err);
+      }
+    };
+
+    loadHistory();
+  }, [conversationId, myPrivateKey, recipientPublicKey]);
+
+  useEffect(() => {
+    if (!socket || !isConnected || !conversationId) return;
 
     socket.emit("chat:join_room", { conversationId });
 
     const handleReceiveMessage = async (payload: any) => {
-      if (payload.conversationId !== conversationId) return;
+      console.log("📥 [Socket] Received chat:receive_message payload:", payload);
+      
+      if (payload.conversationId !== conversationId) {
+        console.log("⚠️ [Socket] Ignored message for different conversation:", payload.conversationId, "Expected:", conversationId);
+        return;
+      }
+      
+      if (!myPrivateKey) console.error("⚠️ [Socket] Missing myPrivateKey");
+      if (!recipientPublicKey) console.error("⚠️ [Socket] Missing recipientPublicKey");
       
       if (myPrivateKey && recipientPublicKey && payload.ciphertext && payload.nonce) {
         try {
@@ -71,29 +130,52 @@ export const useChat = (conversationId: string, recipientId: string) => {
             myPrivateKey
           );
           
-          setMessages(prev => [...prev, {
-            id: payload.id || Date.now().toString(),
-            conversationId: payload.conversationId,
-            senderId: payload.senderId,
-            text,
-            createdAt: payload.createdAt || new Date().toISOString()
-          }]);
+          console.log("✅ [Socket] Successfully decrypted message:", text);
+          
+          setMessages(prev => {
+            if (prev.some(m => m.id === payload.id)) {
+               console.log("🔄 [Socket] Message already exists, ignoring duplicate");
+               return prev;
+            }
+            
+            return [...prev, {
+              id: payload.id || Date.now().toString(),
+              conversationId: payload.conversationId,
+              senderId: payload.senderId,
+              text,
+              createdAt: payload.createdAt || new Date().toISOString()
+            }];
+          });
         } catch (err) {
-          console.error("Failed to decrypt message", err);
+          console.error("❌ [Socket] Failed to decrypt message", err);
         }
+      } else {
+        console.log("⚠️ [Socket] Missing keys or ciphertext/nonce in payload");
       }
     };
 
+    const handleChatError = (err: any) => {
+      console.error("🚨 [Socket] Chat Error:", err);
+    };
+
+    const handleJoinedRoom = (payload: any) => {
+      console.log("✅ [Socket] Successfully joined room:", payload);
+    };
+
     socket.on("chat:receive_message", handleReceiveMessage);
+    socket.on("chat:error", handleChatError);
+    socket.on("chat:joined_room", handleJoinedRoom);
 
     return () => {
       socket.off("chat:receive_message", handleReceiveMessage);
+      socket.off("chat:error", handleChatError);
+      socket.off("chat:joined_room", handleJoinedRoom);
     };
   }, [socket, isConnected, conversationId, myPrivateKey, recipientPublicKey]);
 
   const sendMessage = useCallback(async (text: string, currentUserId: string) => {
-    if (!socket || !isConnected || !myPrivateKey || !recipientPublicKey) {
-      console.error("Cannot send message. Missing keys or socket connection.");
+    if (!socket || !isConnected || !myPrivateKey || !recipientPublicKey || !conversationId) {
+      console.error("Cannot send message. Missing keys, socket connection, or conversationId.");
       return;
     }
 
