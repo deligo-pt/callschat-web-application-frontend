@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { ArrowLeft, Search, MessageSquare, Phone, Video, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, MessageSquare, Phone, Search, Users, Video, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 interface Contact {
   id: string;
@@ -19,44 +19,97 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchContacts() {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-          setIsLoading(false);
-          return;
-        }
+  // Add Contact Modal State
+  const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
+  const [newContactPhone, setNewContactPhone] = useState("");
+  const [newContactName, setNewContactName] = useState("");
+  const [isAddingContact, setIsAddingContact] = useState(false);
+  const [addContactError, setAddContactError] = useState("");
 
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-        const res = await fetch(`${baseUrl}/user/all`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-        
-        const data = await res.json();
-        if (data.success && data.data) {
-          const mappedContacts = data.data.map((u: any) => ({
-            id: u.id,
-            name: u.profile.displayName || u.profile.username || "Unknown",
-            phone: u.phone || "No phone number",
-            avatarUrl: u.profile.avatarUrl
-          }));
-          
-          // Sort alphabetically
-          mappedContacts.sort((a: Contact, b: Contact) => a.name.localeCompare(b.name));
-          setContacts(mappedContacts);
-        }
-      } catch (error) {
-        console.error("Failed to fetch contacts", error);
-      } finally {
+  const fetchContacts = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
         setIsLoading(false);
+        return;
       }
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+      const res = await fetch(`${baseUrl}/contacts`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      const data = await res.json();
+      let contactsArray = [];
+      if (data.success && Array.isArray(data.data)) {
+        contactsArray = data.data;
+      } else if (Array.isArray(data)) {
+        contactsArray = data;
+      } else if (data.data && Array.isArray(data.data.contacts)) {
+        contactsArray = data.data.contacts;
+      }
+
+      const mappedContacts = contactsArray.map((u: any) => ({
+        id: u.id,
+        name: u.customName || u.contact?.profile?.displayName || u.profile?.displayName || u.profile?.username || "Unknown",
+        phone: u.contact?.phone || u.phoneNumber || u.phone || "No phone number",
+        avatarUrl: u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || null
+      }));
+      
+      // Sort alphabetically
+      mappedContacts.sort((a: Contact, b: Contact) => a.name.localeCompare(b.name));
+      setContacts(mappedContacts);
+    } catch (error) {
+      console.error("Failed to fetch contacts", error);
+    } finally {
+      setIsLoading(false);
     }
-    
+  };
+
+  useEffect(() => {
     fetchContacts();
   }, []);
+
+  const handleAddContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddContactError("");
+    setIsAddingContact(true);
+    
+    try {
+      const token = localStorage.getItem("accessToken");
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+      
+      const res = await fetch(`${baseUrl}/contacts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          phoneNumber: newContactPhone,
+          customName: newContactName
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success !== false) {
+        setIsAddContactModalOpen(false);
+        setNewContactPhone("");
+        setNewContactName("");
+        fetchContacts();
+      } else {
+        setAddContactError(data.message || "Failed to add contact");
+      }
+    } catch (error) {
+      setAddContactError("Network error. Please try again.");
+    } finally {
+      setIsAddingContact(false);
+    }
+  };
 
   // Filter contacts by search query
   const filteredContacts = contacts.filter(contact => 
@@ -98,14 +151,23 @@ export default function ContactsPage() {
         
         {/* Blue Header Area */}
         <div className="flex flex-col bg-[#3B58F5] px-6 py-6 text-white shrink-0">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => router.push("/chats")}
-              className="rounded-full p-1.5 transition-colors hover:bg-white/20"
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => router.push("/chats")}
+                className="rounded-full p-1.5 transition-colors hover:bg-white/20"
+              >
+                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+              <h1 className="text-[20px] font-bold">Contacts</h1>
+            </div>
+            <button
+              onClick={() => setIsAddContactModalOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+              title="Add New Contact"
             >
-              <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+              <Plus className="h-5 w-5" strokeWidth={2.5} />
             </button>
-            <h1 className="text-[20px] font-bold">Contacts</h1>
           </div>
 
           {/* Search Bar */}
@@ -218,6 +280,93 @@ export default function ContactsPage() {
           </p>
         </div>
       </div>
+
+      {/* Add Contact Modal */}
+      <AnimatePresence>
+        {isAddContactModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1D2A54]/40 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-[20px] font-bold text-[#1D2A54]">Add New Contact</h2>
+                <button
+                  onClick={() => setIsAddContactModalOpen(false)}
+                  className="rounded-full p-2 text-[#8F95B2] transition-colors hover:bg-[#F8FAFC] hover:text-[#1D2A54]"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddContact} className="flex flex-col gap-4">
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-bold text-[#1D2A54]">
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="+8801712345678"
+                    value={newContactPhone}
+                    onChange={(e) => setNewContactPhone(e.target.value)}
+                    className="w-full rounded-xl border border-[#E6EAFA] bg-[#F8FAFC] px-4 py-3 text-[14px] font-medium text-[#1D2A54] placeholder-[#8F95B2] focus:border-[#3B58F5] focus:outline-none focus:ring-1 focus:ring-[#3B58F5] transition-colors"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-bold text-[#1D2A54]">
+                    Contact Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Alice (Work)"
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    className="w-full rounded-xl border border-[#E6EAFA] bg-[#F8FAFC] px-4 py-3 text-[14px] font-medium text-[#1D2A54] placeholder-[#8F95B2] focus:border-[#3B58F5] focus:outline-none focus:ring-1 focus:ring-[#3B58F5] transition-colors"
+                    required
+                  />
+                </div>
+
+                {addContactError && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="rounded-lg bg-red-50 p-3"
+                  >
+                    <p className="text-[13px] font-medium text-red-600">{addContactError}</p>
+                  </motion.div>
+                )}
+
+                <div className="mt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddContactModalOpen(false)}
+                    className="flex-1 rounded-xl bg-[#F8FAFC] py-3 text-[14px] font-bold text-[#1D2A54] transition-colors hover:bg-[#E6EAFA]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isAddingContact}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#3B58F5] py-3 text-[14px] font-bold text-white transition-colors hover:bg-[#2A41C7] disabled:opacity-70"
+                  >
+                    {isAddingContact ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        <span>Adding...</span>
+                      </>
+                    ) : (
+                      "Add Contact"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

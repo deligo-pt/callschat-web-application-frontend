@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
-import { Search, Star, Bell, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { Bell, MessageSquare, Search, Star } from "lucide-react";
+import Link from "next/link";
+import React from "react";
 
 interface ActiveUser {
   id: string;
@@ -27,7 +27,7 @@ export default function ChatsPage() {
         }
 
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-        const res = await fetch(`${baseUrl}/user/all`, {
+        const res = await fetch(`${baseUrl}/contacts`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -35,7 +35,7 @@ export default function ChatsPage() {
         
         const data = await res.json();
         if (data.success && data.data) {
-          const mappedUsers = data.data.map((u: any) => ({
+          const mappedUsers = data.data?.map((u: any) => ({
             id: u.id,
             name: u.profile.displayName || u.profile.username || "Unknown",
             avatarUrl: u.profile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.profile.displayName || u.profile.username || "U")}&background=F4F6FC&color=3B58F5`,
@@ -53,71 +53,7 @@ export default function ChatsPage() {
     fetchUsers();
   }, []);
 
-  const messages = [
-    {
-      id: 1,
-      senderName: "Sarah Jenkins",
-      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
-      lastMessage: "Hey, are we still on for the meeting later?",
-      time: "09:20",
-      unreadCount: 3,
-      isActive: true,
-    },
-    {
-      id: 2,
-      senderName: "Design Team",
-      avatarUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=150&q=80",
-      lastMessage: "Brooklyn: I've uploaded the new assets.",
-      time: "Yesterday",
-      unreadCount: 0,
-      isActive: false,
-    },
-    {
-      id: 3,
-      senderName: "Alex Morgan",
-      avatarUrl: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80",
-      lastMessage: "Thanks for the help! 🙌",
-      time: "Yesterday",
-      unreadCount: 0,
-      isActive: true,
-    },
-    {
-      id: 4,
-      senderName: "Emma Davis",
-      avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80",
-      lastMessage: "Can you send me the presentation?",
-      time: "Tuesday",
-      unreadCount: 1,
-      isActive: false,
-    },
-    {
-      id: 5,
-      senderName: "James Wilson",
-      avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80",
-      lastMessage: "Sounds good to me.",
-      time: "Monday",
-      unreadCount: 0,
-      isActive: false,
-    },
-    {
-      id: 6,
-      senderName: "Marketing Group",
-      avatarUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32b7?auto=format&fit=crop&w=150&q=80",
-      lastMessage: "Don't forget the deadline tomorrow!",
-      time: "Monday",
-      unreadCount: 5,
-      isActive: true,
-    },
-    {
-      id: 7,
-      senderName: "Marketing Group",
-      avatarUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32b7?auto=format&fit=crop&w=150&q=80",
-      lastMessage: "Don't forget the deadline tomorrow!",
-      time: "Monday",
-      unreadCount: 0,
-      isActive: false,
-    },
-  ];
+  const [recentChats, setRecentChats] = React.useState([]);
 
   const notificationsCount = 2;
 
@@ -182,7 +118,7 @@ export default function ChatsPage() {
                 </div>
               ) : activeUsers.length > 0 ? (
                 activeUsers.map((user) => (
-                  <div key={user.id} className="relative flex shrink-0 flex-col items-center">
+                  <Link href={`/chats/${user.id}`} key={user.id} className="relative flex shrink-0 flex-col items-center">
                     <div className={cn(
                       "relative rounded-full border-[2.5px] p-0.5 transition-transform hover:scale-105 cursor-pointer",
                       user.isOnline ? "border-[#22C55E]" : "border-[#E6EAFA]"
@@ -196,7 +132,7 @@ export default function ChatsPage() {
                     <span className="mt-1.5 text-[11px] font-medium text-[#8F95B2]">
                       {user.name.split(' ')[0]}
                     </span>
-                  </div>
+                  </Link>
                 ))
               ) : (
                 <div className="text-[13px] text-[#8F95B2]">No users found</div>
@@ -210,54 +146,16 @@ export default function ChatsPage() {
               <h2 className="text-[14px] font-bold text-[#1D2A54]">Recent</h2>
             </div>
             
-            <div className="flex flex-col">
-              {messages.map((msg, index) => (
-                <motion.button 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  key={msg.id} 
-                  className="group relative flex w-full items-center gap-4 px-6 py-3.5 transition-colors hover:bg-[#F4F7FE] focus:bg-[#F4F7FE] focus:outline-none"
-                >
-                  {/* Avatar */}
-                  <div className="relative shrink-0">
-                    <img 
-                      src={msg.avatarUrl} 
-                      alt={msg.senderName} 
-                      className="h-[54px] w-[54px] rounded-full object-cover"
-                    />
-                    {msg.isActive && (
-                      <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#22C55E]" />
-                    )}
-                  </div>
-
-                  {/* Message Content */}
-                  <div className="flex flex-1 flex-col items-start overflow-hidden">
-                    <h3 className="text-[15px] font-bold text-[#1D2A54] truncate w-full text-left">{msg.senderName}</h3>
-                    <p className={cn(
-                      "mt-0.5 w-full truncate text-left text-[14px]", 
-                      msg.unreadCount > 0 ? "font-bold text-[#1D2A54]" : "font-medium text-[#8F95B2]"
-                    )}>
-                      {msg.lastMessage}
-                    </p>
-                  </div>
-
-                  {/* Time & Badge */}
-                  <div className="flex flex-col items-end justify-center gap-1.5 shrink-0">
-                    <span className={cn(
-                      "text-[12px] font-semibold",
-                      msg.unreadCount > 0 ? "text-[#3B58F5]" : "text-[#8F95B2]"
-                    )}>{msg.time}</span>
-                    {msg.unreadCount > 0 ? (
-                      <div className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-[#3B58F5] px-1.5 text-[11px] font-bold text-white shadow-sm">
-                        {msg.unreadCount}
-                      </div>
-                    ) : (
-                      <div className="h-[22px]" />
-                    )}
-                  </div>
-                </motion.button>
-              ))}
+            <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+              {recentChats.length === 0 ? (
+                <p className="text-[13px] font-medium text-[#8F95B2]">
+                  No recent conversations. Click an active user above to start chatting securely.
+                </p>
+              ) : (
+                <p className="text-[13px] font-medium text-[#8F95B2]">
+                  Loading recent chats...
+                </p>
+              )}
             </div>
           </div>
         </div>

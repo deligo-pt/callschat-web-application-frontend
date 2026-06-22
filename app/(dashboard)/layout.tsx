@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageSquare, PhoneCall, Users, Contact, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SocketProvider } from "@/components/providers/SocketProvider";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,7 +18,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
+    <SocketProvider>
+      <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
       {/* Persistent Left Sidebar - Desktop First */}
       <nav className="hidden md:flex h-full w-[88px] flex-col items-center border-r border-[#E6EAFA] bg-white py-6 shadow-sm z-20">
         <div className="mb-8">
@@ -109,5 +111,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Link>
       </nav>
     </div>
+    </SocketProvider>
   );
 }

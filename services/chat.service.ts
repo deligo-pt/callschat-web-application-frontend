@@ -1,0 +1,37 @@
+import apiClient from './api.client';
+
+export interface MessagePayload {
+  id?: string;
+  conversationId: string;
+  senderId: string;
+  ciphertext: string;
+  nonce: string;
+  createdAt?: string;
+}
+
+export const chatService = {
+  uploadPublicKey: async (deviceId: string, publicKey: string) => {
+    const response = await apiClient.post('/encryption/keys', {
+      deviceId,
+      publicKey
+    });
+    return response.data;
+  },
+
+  fetchRecipientKey: async (userId: string) => {
+    const response = await apiClient.get(`/encryption/keys/${userId}`);
+    return response.data;
+  },
+
+  initiateConversation: async (targetUserId: string) => {
+    const response = await apiClient.post('/conversations/initiate', {
+      targetUserId
+    });
+    return response.data;
+  },
+
+  fetchHistory: async (conversationId: string) => {
+    const response = await apiClient.get(`/conversations/${conversationId}/messages`);
+    return response.data;
+  }
+};

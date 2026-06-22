@@ -36,6 +36,9 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   // OTP Step State
   const [otp, setOtp] = React.useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = React.useState(60);
+  // Capture the exact phone string sent to the backend for OTP request
+  // so verify uses the IDENTICAL string (prevents backend key mismatch)
+  const [sentPhoneNumber, setSentPhoneNumber] = React.useState("");
 
   // Handle dropdown outside click
   React.useEffect(() => {
@@ -70,12 +73,14 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   const handleRequestOTP = () => {
     if (!phoneNumber) return;
     
-    // Ensure phoneNumber is sanitized (no spaces)
-    const sanitizedPhone = phoneNumber.replace(/\s+/g, "");
+    // Normalise: remove all whitespace, ensure leading +
+    const sanitizedPhone = phoneNumber.replace(/\s+/g, "").trim();
+    if (!sanitizedPhone) return;
 
     startTransition(async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+        console.log("[OTP Request] Sending phoneNumber:", sanitizedPhone);
         const res = await fetch(`${baseUrl}/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -84,11 +89,13 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
         
         const data = await res.json();
         if (data.success) {
+          // ✅ Freeze the exact string the backend stored the OTP against
+          setSentPhoneNumber(sanitizedPhone);
           toast.success("OTP sent successfully!");
           setStep("OTP");
-          setTimer(60); // Reset timer on new request
+          setTimer(60);
         } else {
-          toast.error(data.message || "Failed to send OTP.");
+          toast.error(data.error?.message || data.message || "Failed to send OTP.");
         }
       } catch (err) {
         toast.error("Network error. Please try again.");
@@ -98,18 +105,17 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
 
   const handleVerifyOTP = () => {
     const otpString = otp.join("").trim();
-    if (otpString.length !== 6 || !phoneNumber) return;
-
-    // Ensure phoneNumber is sanitized (no spaces)
-    const sanitizedPhone = phoneNumber.replace(/\s+/g, "");
+    // ✅ Use the EXACT phone string that was sent to /otp/request
+    if (otpString.length !== 6 || !sentPhoneNumber) return;
 
     startTransition(async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+        console.log("[OTP Verify] phoneNumber:", sentPhoneNumber, "otp:", otpString);
         const res = await fetch(`${baseUrl}/auth/otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phoneNumber: sanitizedPhone, otp: otpString })
+          body: JSON.stringify({ phoneNumber: sentPhoneNumber, otp: otpString })
         });
         
         const responseData = await res.json();
@@ -225,7 +231,8 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
           }
         }
         } else {
-          toast.error(`OTP Verify failed: ${responseData.message || JSON.stringify(responseData)}`);
+          const errMsg = responseData.error?.message || responseData.message || JSON.stringify(responseData);
+          toast.error(`Verification failed: ${errMsg}`);
         }
       } catch (err) {
         toast.error(`Network error: ${err}`);
@@ -278,7 +285,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
     ? "We'll send you a verification code via SMS" 
     : "Make sure this number can receive SMS. You'll receive your activation code through it.";
   const buttonText = isLogin ? "Send verification code" : "Continue";
-  const isOtpComplete = otp.every((digit) => digit.length === 1);
+  const isOtpComplete = otp.every((digit) => digit.length === 1) && !!sentPhoneNumber;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-100 sm:p-6">
