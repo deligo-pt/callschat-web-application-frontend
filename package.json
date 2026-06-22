@@ -9,12 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@livekit/components-react": "^2.9.21",
+    "@livekit/components-styles": "^1.2.0",
     "@types/libsodium-wrappers": "^0.8.2",
     "axios": "^1.18.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
     "libsodium-wrappers": "^0.8.4",
+    "livekit-client": "^2.19.2",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
     "next-themes": "^0.4.6",
@@ -37,6 +40,5 @@
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "packageManager": "pnpm@11.5.3+sha512.7ac1c919341c213a34dc0d02afb7143c5c26ac26ee8c4782deea821b8ac64d2134a081fd8941dae6e29bbb48f58dfc2b7fbceeccc07cb2f09d219d342a4969ed"
+  }
 }
