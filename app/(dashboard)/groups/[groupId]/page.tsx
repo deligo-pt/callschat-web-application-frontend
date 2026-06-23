@@ -7,6 +7,26 @@ import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip,
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import apiClient from "@/services/api.client";
+import { useGroupChat } from "@/hooks/useGroupChat";
+
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split("")
+        .map(function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
 
 export default function GroupChatPage() {
   const params = useParams();
@@ -19,9 +39,22 @@ export default function GroupChatPage() {
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [inputText, setInputText] = useState("");
-  const [messages, setMessages] = useState<any[]>([]);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      const decoded = parseJwt(token);
+      if (decoded) {
+        setCurrentUserId(decoded.sub || decoded.id || "");
+      }
+    }
+  }, []);
+
+  const { messages, sendMessage, isReady, error } = useGroupChat(groupId, currentUserId);
 
   const isCallActive = activeGroupCalls.includes(groupId);
 
@@ -53,21 +86,21 @@ export default function GroupChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+  }, [messages]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !isReady) return;
+    sendMessage(inputText);
     setInputText("");
   };
 
   const handleLeaveGroup = async () => {
     if (!confirm("Are you sure you want to leave this group?")) return;
     try {
-      const myId = "me"; // Ideally we get my userId from context, but backend accepts anything if it's the token owner or we pass a dummy if the route is /members/me. Wait, the endpoint is DELETE /groups/:id/members/:userId. If I need my own ID, maybe the backend accepts `me` or I need the JWT payload.
-      // We will assume the user has the ID from a store, or we can fetch it. 
-      // For now, let's just use a dummy implementation for the UI.
-      alert("Leave group clicked! (Integration pending)");
+      if (!currentUserId) return;
+      await apiClient.delete(`/groups/${groupId}/members/${currentUserId}`);
+      router.push("/groups");
     } catch (e) {
       console.error(e);
     }
@@ -152,7 +185,12 @@ export default function GroupChatPage() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 relative">
-          {messages.length === 0 ? (
+          {!isReady && messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2] gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
+              <p className="text-sm font-medium">Unlocking Group Keys...</p>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2]">
               <p className="bg-white px-4 py-2 rounded-lg text-sm shadow-sm text-center">
                 This is the start of the <strong>{groupName}</strong> group.<br/>
@@ -161,32 +199,45 @@ export default function GroupChatPage() {
             </div>
           ) : (
             messages.map((msg, index) => {
-              const showAvatar = !msg.isMe && (index === messages.length - 1 || messages[index + 1]?.sender?.name !== msg.sender?.name);
-              const isNextSameSender = index < messages.length - 1 && messages[index + 1]?.sender?.name === msg.sender?.name;
+              const isMe = msg.senderId === currentUserId;
+              const showAvatar = !isMe && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
+              const isNextSameSender = index < messages.length - 1 && messages[index + 1]?.senderId === msg.senderId;
+              
+              const senderName = msg.sender?.profile?.displayName || "Unknown";
+              const senderInitials = senderName.charAt(0).toUpperCase();
+              
+              const formatTime = (dateString: string) => {
+                const d = new Date(dateString);
+                return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              };
 
               return (
-                <div key={msg.id} className={cn("flex w-full", msg.isMe ? "justify-end" : "justify-start")}>
-                  {!msg.isMe && (
+                <div key={msg.id} className={cn("flex w-full", isMe ? "justify-end" : "justify-start")}>
+                  {!isMe && (
                     <div className="w-8 shrink-0 mr-3 flex items-end pb-5">
-                      {showAvatar && msg.sender && (
-                        <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm", msg.sender.color)}>
-                          {msg.sender.initials}
+                      {showAvatar && (
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center bg-[#3B58F5] text-white text-xs font-bold shadow-sm">
+                          {msg.sender?.profile?.avatarUrl ? (
+                            <img src={msg.sender.profile.avatarUrl} className="h-full w-full rounded-full object-cover" alt={senderName} />
+                          ) : (
+                            senderInitials
+                          )}
                         </div>
                       )}
                     </div>
                   )}
 
-                  <div className={cn("flex flex-col max-w-[75%]", msg.isMe ? "items-end" : "items-start")}>
-                    {!msg.isMe && (index === 0 || messages[index - 1]?.sender?.name !== msg.sender?.name) && (
+                  <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
+                    {!isMe && (index === 0 || messages[index - 1]?.senderId !== msg.senderId) && (
                       <span className="text-[12px] font-semibold text-[#3B58F5] ml-1 mb-1">
-                        {msg.sender?.name}
+                        {senderName}
                       </span>
                     )}
 
                     <div
                       className={cn(
                         "px-4 py-3 text-[14.5px] shadow-sm leading-relaxed",
-                        msg.isMe 
+                        isMe 
                           ? "bg-[#3B58F5] text-white rounded-[20px] rounded-br-sm" 
                           : "bg-white text-[#11142D] rounded-[20px] rounded-bl-sm"
                       )}
@@ -195,14 +246,11 @@ export default function GroupChatPage() {
                       {msg.text}
                     </div>
 
-                    {(!isNextSameSender || msg.isMe) && (
-                      <div className={cn("flex flex-col mt-1", msg.isMe ? "items-end mr-1" : "ml-1")}>
+                    {(!isNextSameSender || isMe) && (
+                      <div className={cn("flex flex-col mt-1", isMe ? "items-end mr-1" : "ml-1")}>
                         <span className="text-[11px] font-medium text-[#8F95B2]">
-                          {msg.time}
+                          {formatTime(msg.createdAt)}
                         </span>
-                        {msg.isMe && msg.seen && (
-                          <span className="text-[11px] text-[#8F95B2]">Seen</span>
-                        )}
                       </div>
                     )}
                   </div>
@@ -238,10 +286,11 @@ export default function GroupChatPage() {
             </div>
             
             <button
-              type={inputText.trim() ? "submit" : "button"}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3B58F5] text-white transition-transform hover:scale-105 active:scale-95 shadow-md"
+              type={inputText.trim() && isReady ? "submit" : "button"}
+              disabled={!isReady}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3B58F5] text-white transition-transform hover:scale-105 active:scale-95 shadow-md disabled:opacity-50 disabled:hover:scale-100"
             >
-              {inputText.trim() ? (
+              {inputText.trim() && isReady ? (
                 <Send className="h-5 w-5 ml-0.5" strokeWidth={2} />
               ) : (
                 <Mic className="h-5 w-5" strokeWidth={2} />

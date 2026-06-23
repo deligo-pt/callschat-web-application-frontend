@@ -229,10 +229,22 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         try {
           const currentUser = currentUserIdRef.current;
           const peerUser = activePeerIdRef.current;
-          const targetUserId = payload.senderId === currentUser ? peerUser : payload.senderId;
+          
+          // Defensively extract senderId from payload, handling nested objects if backend sends populated data
+          const senderId = payload.senderId || payload.sender?.id;
+          
+          if (!senderId) {
+            console.error("❌ [Socket] Malformed payload: missing senderId. Cannot determine decryption key.", payload);
+            throw new Error("Missing senderId in payload");
+          }
+
+          // If we sent the message (echoed back), we decrypt with the peer's public key.
+          // If the peer sent it, we decrypt with the peer's public key.
+          const targetUserId = senderId === currentUser ? peerUser : senderId;
 
           let pubKeyToUse = pubKey;
           if (targetUserId !== peerUser) {
+            console.log(`[Socket] Target user (${targetUserId}) is not active peer (${peerUser}), fetching their key...`);
             const res = await chatService.fetchRecipientKey(targetUserId);
             if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
               pubKeyToUse = res.data[res.data.length - 1].publicKey;
@@ -240,6 +252,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               pubKeyToUse = res.data.publicKey;
             }
           }
+
+          console.log(`[Socket] Attempting decryption. Sender: ${senderId}, Decrypting with Public Key of: ${targetUserId}`);
 
           let text: string;
           try {
@@ -297,7 +311,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               {
                 id: payload.id || Date.now().toString(),
                 conversationId: payload.conversationId,
-                senderId: payload.senderId,
+                senderId: senderId,
                 text,
                 createdAt: payload.createdAt || new Date().toISOString(),
               },
@@ -305,6 +319,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           });
         } catch (err) {
           console.error("❌ [Socket] Failed to decrypt message:", err);
+          
+          const fallbackSenderId = payload.senderId || payload.sender?.id || "unknown";
+
           // Still add the message as unreadable rather than losing it
           setMessages((prev) => {
             if (prev.some((m) => m.id === payload.id)) return prev;
@@ -313,8 +330,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               {
                 id: payload.id || Date.now().toString(),
                 conversationId: payload.conversationId,
-                senderId: payload.senderId,
-                text: "🔒 Encrypted message",
+                senderId: fallbackSenderId,
+                text: "🔒 Encrypted message (Decryption Failed)",
                 createdAt: payload.createdAt || new Date().toISOString(),
               },
             ];
@@ -337,7 +354,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             {
               id: payload.id || Date.now().toString(),
               conversationId: payload.conversationId,
-              senderId: payload.senderId,
+              senderId: payload.senderId || payload.sender?.id || "unknown",
               text: mediaLabel,
               createdAt: payload.createdAt || new Date().toISOString(),
             },

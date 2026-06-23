@@ -51,13 +51,19 @@ export const groupService = {
     avatarUrl?: string;
     isPublic?: boolean;
     maxMembers?: number;
+    keys?: Array<{ userId: string; encryptedGroupKey: string; keyNonce: string }>;
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       const response = await apiClient.post('/groups', data);
       return response.data;
     } catch (error: any) {
-      console.error('Failed to create group', error);
-      return { success: false, error: error.response?.data?.message || 'Failed to create group' };
+      console.error('Failed to create group', error.response?.data || error);
+      return { 
+        success: false, 
+        error: error.response?.data?.message 
+          ? JSON.stringify(error.response.data.message) 
+          : 'Failed to create group' 
+      };
     }
   },
 
@@ -68,6 +74,26 @@ export const groupService = {
     } catch (error: any) {
       console.error(`Failed to add member ${userId} to group ${groupId}`, error);
       return { success: false, error: error.response?.data?.message || 'Failed to add member' };
+    }
+  },
+
+  async fetchGroupKey(groupId: string): Promise<{ success: boolean; data?: { encryptedGroupKey: string; keyNonce: string } }> {
+    try {
+      const response = await apiClient.get(`/groups/${groupId}/key`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch group key for ${groupId}`, error);
+      return { success: false };
+    }
+  },
+
+  async fetchGroupMessages(groupId: string): Promise<{ success: boolean; data?: any[] }> {
+    try {
+      const response = await apiClient.get(`/groups/${groupId}/messages`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch group messages for ${groupId}`, error);
+      return { success: false };
     }
   },
 };

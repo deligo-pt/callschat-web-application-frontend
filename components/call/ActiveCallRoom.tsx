@@ -60,7 +60,7 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
           {remoteParticipant ? (
             remoteTrackRef ? (
               <VideoTrack 
-                trackRef={remoteTrackRef} 
+                trackRef={remoteTrackRef as any} 
                 className="w-full h-full object-cover" 
               />
             ) : (
@@ -72,7 +72,7 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
           ) : localTrackRef ? (
             // Remote hasn't joined, show local video full screen
             <VideoTrack 
-              trackRef={localTrackRef} 
+              trackRef={localTrackRef as any} 
               className="w-full h-full object-cover scale-x-[-1]" 
             />
           ) : null}
@@ -147,7 +147,7 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
       {isVideoMode && remoteParticipant && localTrackRef && (
         <div className="absolute bottom-36 right-6 z-20 w-32 h-44 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-800 transition-all hover:scale-105">
           <VideoTrack 
-            trackRef={localTrackRef} 
+            trackRef={localTrackRef as any} 
             className="w-full h-full object-cover scale-x-[-1]" 
           />
         </div>

@@ -6,6 +6,27 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { groupService } from "@/services/group.service";
+import { chatService } from "@/services/chat.service";
+import { generateGroupKey, encryptMessage } from "@/utils/crypto";
+
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split("")
+        .map(function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
 
 interface Contact {
   id: string;
@@ -106,12 +127,60 @@ export default function CreateGroupPage() {
   const handleCreateGroup = async () => {
     setIsCreating(true);
     try {
-      // Step 1: Create the group
+      const token = localStorage.getItem("accessToken");
+      let myUserId = "";
+      if (token) {
+        const decoded = parseJwt(token);
+        if (decoded) myUserId = decoded.sub || decoded.id || "";
+      }
+
+      if (!myUserId) throw new Error("Could not identify current user");
+
+      const myPrivKeyName = `privateKey_${myUserId}`;
+      let myPrivKey = localStorage.getItem(myPrivKeyName) || localStorage.getItem("privateKey");
+      
+      if (!myPrivKey) throw new Error("Local private key missing");
+
+      // 1. Generate the symmetric group key
+      const plaintextGroupKey = await generateGroupKey();
+
+      // 2. Fetch public keys for everyone (creator + selectedMembers)
+      const allMembers = Array.from(new Set([myUserId, ...selectedMembers]));
+      const keys = [];
+
+      for (const userId of allMembers) {
+        const res = await chatService.fetchRecipientKey(userId);
+        let pubKey = "";
+        if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+          pubKey = res.data[res.data.length - 1].publicKey;
+        } else if (res?.success && res?.data?.publicKey) {
+          pubKey = res.data.publicKey;
+        }
+
+        if (pubKey) {
+          // Encrypt group key for this user
+          const { ciphertext, nonce } = await encryptMessage(plaintextGroupKey, pubKey, myPrivKey);
+          keys.push({
+            userId,
+            encryptedGroupKey: ciphertext,
+            keyNonce: nonce,
+          });
+        } else {
+          console.warn(`Could not fetch public key for user ${userId}. They won't be able to decrypt the group.`);
+        }
+      }
+
+      if (keys.length === 0) {
+        throw new Error("Could not retrieve public keys for any members");
+      }
+
+      // Step 3: Create the group
       const groupRes = await groupService.createGroup({
         name: groupName,
-        description: description,
+        description: description || undefined,
         isPublic: false,
         maxMembers: 50,
+        keys: keys,
       });
 
       if (!groupRes.success || !groupRes.data) {
@@ -120,15 +189,7 @@ export default function CreateGroupPage() {
         return;
       }
 
-      const groupId = groupRes.data.id;
-
-      // Step 2: Add selected members
-      // Using Promise.all to add them concurrently for speed
-      await Promise.all(
-        selectedMembers.map((userId) => groupService.addMember(groupId, userId))
-      );
-
-      // Redirect to groups list (or the newly created group page)
+      // Redirect to groups list
       router.push(`/groups`);
     } catch (err) {
       console.error("Error creating group:", err);
