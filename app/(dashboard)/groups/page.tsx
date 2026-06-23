@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, Search, Lock, Users, Plus, Loader2, MessageSquare } from "lucide-react";
+import { ArrowLeft, Search, Lock, Users, Plus, Loader2, MessageSquare, MoreVertical, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { groupService, GroupItem } from "@/services/group.service";
@@ -12,6 +12,9 @@ export default function GroupsPage() {
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
+  const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -29,6 +32,30 @@ export default function GroupsPage() {
 
     fetchGroups();
   }, []);
+
+  const handleDeleteGroup = async (groupId: string) => {
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return;
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+      const res = await fetch(`${baseUrl}/groups/${groupId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGroups(prev => prev.filter(g => g.id !== groupId));
+      } else {
+        console.error("Failed to delete group", data);
+      }
+    } catch (error) {
+      console.error("Failed to delete group", error);
+    } finally {
+      setIsDeleting(false);
+      setGroupToDelete(null);
+    }
+  };
 
   const filteredGroups = groups.filter(g => 
     g.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -132,61 +159,130 @@ export default function GroupsPage() {
                 const color = COLORS[index % COLORS.length];
                 
                 return (
-                  <Link 
-                    href={`/groups/${group.id}`} 
+                  <div
                     key={group.id}
-                    className="flex items-center gap-4 p-4 rounded-2xl hover:bg-[#F8FAFC] transition-colors cursor-pointer group/item border border-transparent hover:border-[#E6EAFA]"
+                    className="relative group"
+                    onMouseLeave={() => setMenuOpenForId(null)}
                   >
-                    {/* Avatar */}
-                    <div className="relative shrink-0">
-                      {group.avatarUrl ? (
-                        <img 
-                          src={group.avatarUrl} 
-                          alt={group.name} 
-                          className="h-[52px] w-[52px] rounded-full object-cover border border-[#E6EAFA]"
-                        />
-                      ) : (
-                        <div className={cn("h-[52px] w-[52px] rounded-full flex items-center justify-center text-white font-bold text-[16px] shadow-sm", color)}>
-                          {getInitials(group.name)}
+                    <Link 
+                      href={`/groups/${group.id}`} 
+                      className="flex items-center gap-4 p-4 rounded-2xl hover:bg-[#F8FAFC] transition-colors cursor-pointer group/item border border-transparent hover:border-[#E6EAFA]"
+                    >
+                      {/* Avatar */}
+                      <div className="relative shrink-0">
+                        {group.avatarUrl ? (
+                          <img 
+                            src={group.avatarUrl} 
+                            alt={group.name} 
+                            className="h-[52px] w-[52px] rounded-full object-cover border border-[#E6EAFA]"
+                          />
+                        ) : (
+                          <div className={cn("h-[52px] w-[52px] rounded-full flex items-center justify-center text-white font-bold text-[16px] shadow-sm", color)}>
+                            {getInitials(group.name)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[16px] font-bold text-[#1D2A54] truncate pr-2">
+                            {group.name}
+                          </h3>
+                          <span className="text-[11px] font-semibold text-[#8F95B2] shrink-0">
+                            {formatTime(group.createdAt)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex flex-col gap-0.5 truncate min-w-0">
+                            <div className="flex items-center gap-1.5 text-[#8F95B2]">
+                              <Users className="h-3.5 w-3.5 shrink-0" />
+                              <span className="text-[12px] font-medium">{group.memberCount || 1} members</span>
+                            </div>
+                            <p className="text-[13px] text-[#8F95B2] truncate">
+                              {group.description || "No description provided"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* Context Menu Button */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setMenuOpenForId(menuOpenForId === group.id ? null : group.id);
+                        }}
+                        className="p-1.5 rounded-full hover:bg-black/5 text-[#8F95B2] hover:text-[#1D2A54]"
+                      >
+                        <MoreVertical className="h-5 w-5" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {menuOpenForId === group.id && (
+                        <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-[#E6EAFA] py-1 z-50">
+                          {group.myRole === 'ADMIN' ? (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setGroupToDelete(group.id);
+                                setMenuOpenForId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete Group
+                            </button>
+                          ) : (
+                            <div className="w-full px-4 py-2 text-left text-[13px] font-semibold text-[#8F95B2] italic">
+                              Admin only
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-[16px] font-bold text-[#1D2A54] truncate pr-2">
-                          {group.name}
-                        </h3>
-                        <span className="text-[11px] font-semibold text-[#8F95B2] shrink-0">
-                          {formatTime(group.createdAt)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex flex-col gap-0.5 truncate min-w-0">
-                          <div className="flex items-center gap-1.5 text-[#8F95B2]">
-                            <Users className="h-3.5 w-3.5 shrink-0" />
-                            <span className="text-[12px] font-medium">{group.memberCount || 1} members</span>
-                          </div>
-                          <p className="text-[13px] text-[#8F95B2] truncate">
-                            {group.description || "No description provided"}
-                          </p>
-                        </div>
-                        
-                        {/* Optional unread badge placeholder - can be wired to real data later */}
-                        {/* <div className="h-5 w-5 rounded-full bg-[#3B58F5] flex items-center justify-center text-white text-[10px] font-bold shrink-0">
-                          3
-                        </div> */}
-                      </div>
-                    </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {groupToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1D2A54]/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">Delete Group</h2>
+            <p className="text-[14px] font-medium text-[#8F95B2] mb-6">
+              Are you sure you want to delete this group? This action cannot be undone and will permanently remove all messages and members.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setGroupToDelete(null)}
+                className="flex-1 rounded-xl bg-[#F8FAFC] py-3 text-[14px] font-bold text-[#1D2A54] transition-colors hover:bg-[#E6EAFA]"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isDeleting}
+                onClick={() => handleDeleteGroup(groupToDelete)}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-[14px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-70"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                ) : (
+                  "Delete Group"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

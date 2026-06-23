@@ -5,6 +5,7 @@ import { Search, Bell, MessageSquare, PhoneCall, Users, Contact, UserCircle2, St
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 // --- Types for Real-Time Data ---
 interface ActiveUser {
@@ -25,6 +26,7 @@ interface ChatPreview {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = React.useState("");
   
   // Real-time state placeholders
@@ -272,7 +274,10 @@ export default function HomeScreen() {
           <p className="mt-2 text-[15px] font-medium text-[#8F95B2] max-w-sm">
             Select a conversation from the sidebar or start a new chat to begin messaging.
           </p>
-          <button className="mt-8 rounded-2xl bg-[#3B58F5] px-8 py-3.5 text-[15px] font-bold text-white shadow-lg shadow-[#3B58F5]/25 transition-all hover:bg-[#2C48B8] active:scale-95">
+          <button 
+            onClick={() => router.push("/contacts")}
+            className="mt-8 rounded-2xl bg-[#3B58F5] px-8 py-3.5 text-[15px] font-bold text-white shadow-lg shadow-[#3B58F5]/25 transition-all hover:bg-[#2C48B8] active:scale-95"
+          >
             Start a New Conversation
           </button>
         </div>

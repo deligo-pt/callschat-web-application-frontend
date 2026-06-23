@@ -300,10 +300,10 @@ export const useCallSignaling = () => {
     });
   }, [socket]);
 
-  const leaveGroupCall = useCallback((groupId: string) => {
+  const leaveGroupCall = useCallback((callId: string) => {
     if (!socket) return;
-    console.log('[Call] Leaving group call for', groupId);
-    socket.emit('group:call_leave', { groupId });
+    console.log('[Call] Leaving group call', callId);
+    socket.emit('group:call_leave', { callId });
     setActiveCall(null);
   }, [socket]);
 

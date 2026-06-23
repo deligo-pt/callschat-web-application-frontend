@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Bell, MessageSquare, Search, Star, Lock } from "lucide-react";
+import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { chatService } from "@/services/chat.service";
@@ -39,6 +39,9 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -132,6 +135,31 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
       }
     } catch (err) {
       console.error("Failed to initiate conversation", err);
+    }
+  };
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return;
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+      const res = await fetch(`${baseUrl}/conversations/${conversationId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConversations(prev => prev.filter(c => c.id !== conversationId));
+        if (pathname === `/chats/${conversationId}`) {
+          router.push('/chats');
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete conversation", err);
+    } finally {
+      setIsDeleting(false);
+      setConversationToDelete(null);
     }
   };
 
@@ -276,11 +304,13 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.04 }}
+                      className="relative group"
+                      onMouseLeave={() => setMenuOpenForId(null)}
                     >
                       <Link
                         href={`/chats/${conv.id}?recipientId=${conv.otherUserId}`}
                         className={cn(
-                          "group relative flex w-full items-center gap-4 px-6 py-3.5 transition-colors",
+                          "flex w-full items-center gap-4 px-6 py-3.5 transition-colors",
                           isActive ? "bg-[#EEF2FF]" : "hover:bg-[#F4F7FE]"
                         )}
                       >
@@ -314,6 +344,38 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                           </span>
                         </div>
                       </Link>
+
+                      {/* Context Menu Button */}
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setMenuOpenForId(menuOpenForId === conv.id ? null : conv.id);
+                          }}
+                          className="p-1.5 rounded-full hover:bg-black/5 text-[#8F95B2] hover:text-[#1D2A54]"
+                        >
+                          <MoreVertical className="h-5 w-5" />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {menuOpenForId === conv.id && (
+                          <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-[#E6EAFA] py-1 z-50">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setConversationToDelete(conv.id);
+                                setMenuOpenForId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -332,6 +394,41 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
       >
         {children}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {conversationToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1D2A54]/40 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">Delete Conversation</h2>
+            <p className="text-[14px] font-medium text-[#8F95B2] mb-6">
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConversationToDelete(null)}
+                className="flex-1 rounded-xl bg-[#F8FAFC] py-3 text-[14px] font-bold text-[#1D2A54] transition-colors hover:bg-[#E6EAFA]"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isDeleting}
+                onClick={() => handleDeleteConversation(conversationToDelete)}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-[14px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-70"
+              >
+                {isDeleting ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

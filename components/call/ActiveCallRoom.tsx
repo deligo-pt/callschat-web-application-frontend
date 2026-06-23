@@ -203,8 +203,7 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
           <button
             onClick={() => {
               if (activeCall?.isGroup) {
-                // For group calls, roomName often holds the groupId or we fallback to callId
-                leaveGroupCall && leaveGroupCall(activeCall.roomName || activeCall.callId);
+                leaveGroupCall && leaveGroupCall(activeCall.callId);
               } else {
                 activeCall && hangupCall(activeCall.callId);
               }
@@ -245,7 +244,7 @@ export const ActiveCallRoom = () => {
           connect={true}
           onDisconnected={() => {
             if (activeCall.isGroup) {
-              leaveGroupCall && leaveGroupCall(activeCall.roomName || activeCall.callId);
+              leaveGroupCall && leaveGroupCall(activeCall.callId);
             } else {
               hangupCall(activeCall.callId);
             }
