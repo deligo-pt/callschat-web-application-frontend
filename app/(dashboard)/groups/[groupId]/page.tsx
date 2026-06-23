@@ -3,11 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallContext } from "@/components/providers/CallContext";
-import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight, UserPlus, X } from "lucide-react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import apiClient from "@/services/api.client";
 import { useGroupChat } from "@/hooks/useGroupChat";
+import { encryptMessage } from "@/utils/crypto";
+import { chatService } from "@/services/chat.service";
 
 function parseJwt(token: string) {
   try {
@@ -43,6 +46,9 @@ export default function GroupChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -54,7 +60,7 @@ export default function GroupChatPage() {
     }
   }, []);
 
-  const { messages, sendMessage, isReady, error } = useGroupChat(groupId, currentUserId);
+  const { messages, sendMessage, isReady, error, getGroupKey } = useGroupChat(groupId, currentUserId);
 
   const isCallActive = activeGroupCalls.includes(groupId);
 
@@ -83,6 +89,77 @@ export default function GroupChatPage() {
       fetchGroupData();
     }
   }, [groupId]);
+
+  const fetchContacts = async () => {
+    try {
+      const res = await apiClient.get('/contacts');
+      if (res.data?.success) {
+        let contactsArray = [];
+        if (Array.isArray(res.data.data)) {
+          contactsArray = res.data.data;
+        } else if (res.data.data?.contacts) {
+          contactsArray = res.data.data.contacts;
+        }
+        setContacts(contactsArray);
+      }
+    } catch (e) {
+      console.error("Failed to fetch contacts", e);
+    }
+  };
+
+  const handleOpenAddMember = () => {
+    fetchContacts();
+    setIsAddMemberModalOpen(true);
+  };
+
+  const handleAddMember = async (userId: string) => {
+    setIsAddingMember(true);
+    try {
+      const gKey = getGroupKey();
+      if (!gKey) {
+        throw new Error("Group key is not loaded");
+      }
+
+      // 1. Fetch target user's public key
+      const resKey = await chatService.fetchRecipientKey(userId);
+      let targetPubKey = "";
+      if (resKey?.data && Array.isArray(resKey.data) && resKey.data.length > 0) {
+        targetPubKey = resKey.data[resKey.data.length - 1].publicKey;
+      } else if (resKey?.success && resKey?.data?.publicKey) {
+        targetPubKey = resKey.data.publicKey;
+      }
+
+      if (!targetPubKey) {
+        throw new Error("Could not find public key for this user.");
+      }
+
+      // 2. Encrypt the group key
+      const myPrivKey = localStorage.getItem(`privateKey_${currentUserId}`);
+      if (!myPrivKey) throw new Error("Missing local private key");
+
+      const { ciphertext, nonce } = await encryptMessage(gKey, targetPubKey, myPrivKey);
+
+      // 3. Add member via API
+      const res = await apiClient.post(`/groups/${groupId}/members`, { 
+        userId,
+        encryptedGroupKey: ciphertext,
+        keyNonce: nonce
+      });
+      
+      if (res.data?.success) {
+        setIsAddMemberModalOpen(false);
+        // Refresh group members
+        const membersRes = await apiClient.get(`/groups/${groupId}/members`);
+        if (membersRes.data?.success) {
+          setGroupMembers(membersRes.data.data.members || []);
+        }
+      }
+    } catch (e: any) {
+      alert(e.message || e.response?.data?.message || "Failed to add member");
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -117,6 +194,10 @@ export default function GroupChatPage() {
   const groupName = groupDetails?.name || "Group Chat";
   const avatarImage = groupDetails?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=3B58F5&color=fff&size=256`;
   const memberCount = groupDetails?.memberCount || groupMembers.length || 0;
+
+  const myMemberInfo = groupMembers.find(m => m.userId === currentUserId || m.user?.id === currentUserId);
+  const myRole = groupDetails?.myRole || myMemberInfo?.role || groupDetails?.requesterRole || "MEMBER";
+  const isAdmin = myRole === "ADMIN" || myRole === "OWNER";
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[#EEF2FF]">
@@ -387,8 +468,17 @@ export default function GroupChatPage() {
 
             {/* Members Section */}
             <div className="py-5 bg-white">
-              <div className="px-6 mb-3">
+              <div className="px-6 mb-3 flex items-center justify-between">
                 <h3 className="text-[13px] font-bold text-[#8F95B2] uppercase tracking-wider">{memberCount} Members</h3>
+                {isAdmin && (
+                  <button 
+                    onClick={handleOpenAddMember}
+                    className="flex items-center gap-1.5 text-[12px] font-bold text-[#3B58F5] bg-[#EEF2FF] px-2.5 py-1 rounded-full hover:bg-[#E0E7FF] transition-colors"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Add Member
+                  </button>
+                )}
               </div>
               <div className="flex flex-col">
                 {groupMembers.map((member, index) => {
@@ -437,6 +527,67 @@ export default function GroupChatPage() {
           </div>
         </div>
       )}
+
+      {/* Add Member Modal */}
+      <AnimatePresence>
+        {isAddMemberModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1D2A54]/40 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl flex flex-col max-h-[80vh]"
+            >
+              <div className="mb-4 flex items-center justify-between shrink-0">
+                <h2 className="text-[18px] font-bold text-[#1D2A54]">Add Member</h2>
+                <button
+                  onClick={() => setIsAddMemberModalOpen(false)}
+                  className="rounded-full p-2 text-[#8F95B2] transition-colors hover:bg-[#F8FAFC] hover:text-[#1D2A54]"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto min-h-[200px]">
+                {contacts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-[#8F95B2] text-sm">
+                    No contacts found.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {contacts.map((contact) => {
+                      const cName = contact.customName || contact.addressee?.profile?.displayName || contact.profile?.displayName || "Unknown";
+                      const cId = contact.addressee?.id || contact.userId || contact.id;
+                      const cAvatar = contact.addressee?.profile?.avatarUrl || contact.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(cName)}&background=random`;
+                      const isAlreadyMember = groupMembers.some(m => m.userId === cId || m.user?.id === cId);
+
+                      return (
+                        <div key={contact.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F8FAFC] transition-colors">
+                          <div className="flex items-center gap-3">
+                            <img src={cAvatar} alt={cName} className="w-10 h-10 rounded-full object-cover" />
+                            <span className="text-[14px] font-bold text-[#11142D]">{cName}</span>
+                          </div>
+                          {isAlreadyMember ? (
+                            <span className="text-[12px] font-medium text-[#8F95B2]">Member</span>
+                          ) : (
+                            <button
+                              disabled={isAddingMember}
+                              onClick={() => handleAddMember(cId)}
+                              className="px-4 py-1.5 rounded-full bg-[#3B58F5] text-white text-[12px] font-bold hover:bg-[#2A41C7] transition-colors disabled:opacity-50"
+                            >
+                              Add
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

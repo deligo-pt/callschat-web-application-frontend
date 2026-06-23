@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, MessageSquare, Phone, Search, Users, Video, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { chatService } from "@/services/chat.service";
 
 interface Contact {
   id: string;
+  userId: string;
   name: string;
   phone: string;
   avatarUrl: string | null;
@@ -54,9 +56,10 @@ export default function ContactsPage() {
 
       const mappedContacts = contactsArray.map((u: any) => ({
         id: u.id,
-        name: u.customName || u.contact?.profile?.displayName || u.profile?.displayName || u.profile?.username || "Unknown",
+        userId: u.addressee?.id || u.userId || u.id,
+        name: u.customName || u.addressee?.profile?.displayName || u.profile?.displayName || u.profile?.username || "Unknown",
         phone: u.contact?.phone || u.phoneNumber || u.phone || "No phone number",
-        avatarUrl: u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || null
+        avatarUrl: u.addressee?.profile?.avatarUrl || u.profile?.avatarUrl || null
       }));
       
       // Sort alphabetically
@@ -73,6 +76,17 @@ export default function ContactsPage() {
     fetchContacts();
   }, []);
 
+  const handleStartChat = async (targetUserId: string) => {
+    try {
+      const res = await chatService.initiateConversation(targetUserId);
+      if (res.success && res.data?.conversationId) {
+        router.push(`/chats/${res.data.conversationId}`);
+      }
+    } catch (error) {
+      console.error("Failed to start conversation:", error);
+    }
+  };
+
   const handleAddContact = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddContactError("");
@@ -81,7 +95,15 @@ export default function ContactsPage() {
     try {
       const token = localStorage.getItem("accessToken");
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-      
+      let formattedPhone = newContactPhone.trim().replace(/\s|-|\(|\)/g, "");
+      if (!formattedPhone.startsWith('+')) {
+        // If it doesn't start with +, add it (assuming they typed the country code without +)
+        // If they typed a local number starting with 0, we'll let the backend regex catch it and show a nice error
+        if (/^[1-9]/.test(formattedPhone)) {
+          formattedPhone = '+' + formattedPhone;
+        }
+      }
+
       const res = await fetch(`${baseUrl}/contacts`, {
         method: "POST",
         headers: {
@@ -89,7 +111,7 @@ export default function ContactsPage() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          phoneNumber: newContactPhone,
+          phoneNumber: formattedPhone,
           customName: newContactName
         })
       });
@@ -102,7 +124,16 @@ export default function ContactsPage() {
         setNewContactName("");
         fetchContacts();
       } else {
-        setAddContactError(data.message || "Failed to add contact");
+        // Beautify the zod validation error if it comes from fastify
+        let errorMessage = data.message || "Failed to add contact";
+        if (errorMessage.includes("body/phoneNumber") || res.status === 400) {
+          errorMessage = "Please enter a valid international phone number starting with '+' and country code (e.g., +88017...).";
+        } else if (res.status === 409) {
+          errorMessage = "This contact already exists or you are trying to add yourself.";
+        } else if (res.status === 404) {
+          errorMessage = "No registered user found with this phone number.";
+        }
+        setAddContactError(errorMessage);
       }
     } catch (error) {
       setAddContactError("Network error. Please try again.");
@@ -246,7 +277,11 @@ export default function ContactsPage() {
                         {/* Action Buttons */}
                         <div className="flex items-center gap-2 shrink-0">
                           <button 
-                            onClick={() => router.push(`/chats/${contact.id}`)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleStartChat(contact.userId);
+                            }}
                             className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF2FB] text-[#3B58F5] transition-transform hover:scale-110"
                           >
                             <MessageSquare className="h-[18px] w-[18px]" strokeWidth={2.5} />

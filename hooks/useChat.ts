@@ -54,14 +54,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       if (!privKey || !pubKey) {
         pubKey = await generateAndStoreKeyPair(currentUserId);
         privKey = localStorage.getItem(privKeyName);
+      }
 
-        const deviceId = localStorage.getItem("deviceId") || "web-client";
-        localStorage.setItem("deviceId", deviceId);
-        try {
-          await chatService.uploadPublicKey(deviceId, pubKey!);
-        } catch (e) {
-          console.error("Failed to upload public key", e);
-        }
+      const deviceId = localStorage.getItem("deviceId") || "web-client";
+      localStorage.setItem("deviceId", deviceId);
+      try {
+        await chatService.uploadPublicKey(deviceId, pubKey!);
+      } catch (e) {
+        console.error("Failed to upload public key", e);
       }
 
       setMyPrivateKey(privKey);
@@ -273,6 +273,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             if (latestKey !== pubKeyToUse) {
               text = await decryptMessage(payload.ciphertext, payload.nonce, latestKey, privKey);
               console.log("✅ [Socket] Successfully decrypted with latest key!");
+              // Update the ref so future messages don't fail!
+              if (targetUserId === peerUser) {
+                setRecipientPublicKey(latestKey);
+                recipientPublicKeyRef.current = latestKey;
+              }
             } else {
               throw initialErr; // Key didn't change, rethrow
             }

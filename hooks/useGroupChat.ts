@@ -280,5 +280,6 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     sendMessage,
     isReady,
     error,
+    getGroupKey: () => groupKeyRef.current,
   };
 };
