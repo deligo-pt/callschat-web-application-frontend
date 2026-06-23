@@ -7,6 +7,7 @@ import { Send, ArrowLeft, Loader2, Lock, MoreVertical, Phone, Video } from "luci
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
+import { useCallContext } from "@/components/providers/CallContext";
 
 function parseJwt(token: string) {
   try {
@@ -37,6 +38,7 @@ interface UserProfile {
 export default function ChatRoomPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const { initiateCall } = useCallContext();
 
   // The route param is now the CONVERSATION ID
   const conversationId = params.chatId as string;
@@ -242,10 +244,18 @@ export default function ChatRoomPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors">
+          <button 
+            onClick={() => recipientId && initiateCall(recipientId, 'AUDIO')}
+            disabled={!recipientId}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors disabled:opacity-50"
+          >
             <Phone className="h-5 w-5" strokeWidth={2} />
           </button>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors">
+          <button 
+            onClick={() => recipientId && initiateCall(recipientId, 'VIDEO')}
+            disabled={!recipientId}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors disabled:opacity-50"
+          >
             <Video className="h-5 w-5" strokeWidth={2} />
           </button>
           <button className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors">

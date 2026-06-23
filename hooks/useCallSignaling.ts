@@ -9,10 +9,11 @@ export interface IncomingCall {
 }
 
 export interface ActiveCall {
-  callId: string;  // store callId so we can emit call:hangup correctly
+  callId: string;
   token: string;
-  livekitUrl: string;
+  serverUrl: string;
   roomName: string;
+  callType: 'AUDIO' | 'VIDEO';
 }
 
 export const useCallSignaling = () => {
@@ -33,10 +34,16 @@ export const useCallSignaling = () => {
       setIncomingCall(payload);
     };
 
-    const handleCallConnected = (payload: ActiveCall) => {
+    const handleCallConnected = (payload: any) => {
       console.log('[Call] Call connected, joining LiveKit room:', payload);
       setIncomingCall(null);
-      setActiveCall(payload);
+      setActiveCall({
+        callId: payload.callId,
+        token: payload.token,
+        serverUrl: payload.livekitUrl,
+        roomName: payload.roomName,
+        callType: payload.callType,
+      });
     };
 
     const handleCallEnded = (payload?: unknown) => {

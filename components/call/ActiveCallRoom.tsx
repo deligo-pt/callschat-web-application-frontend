@@ -36,15 +36,13 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
   }, []);
 
   const remoteParticipant = remoteParticipants[0];
-  const isVideoMode = isCameraEnabled || (remoteParticipant?.isCameraEnabled);
   
-  // Get remote video track if available
-  const videoTracks = useTracks([Track.Source.Camera]).filter(t => t.participant.identity === remoteParticipant?.identity);
+  // Use useTracks to ensure reactivity when tracks are published/unpublished
+  const cameraTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }]);
+  const remoteTrackRef = cameraTracks.find((t) => t.participant.identity !== localParticipant.identity);
+  const localTrackRef = cameraTracks.find((t) => t.participant.identity === localParticipant.identity);
 
-  // If no remote video but we have local video, show local video as full screen
-  const localVideoTracks = useTracks([Track.Source.Camera]).filter(t => t.participant.identity === localParticipant.identity);
-
-  const displayVideoTrack = videoTracks.length > 0 ? videoTracks[0] : (isVideoMode ? localVideoTracks[0] : null);
+  const isVideoMode = activeCall?.callType === 'VIDEO' || isCameraEnabled || remoteParticipant?.isCameraEnabled;
 
   // Avatar generator
   const remoteName = activeCall?.roomName?.split('_')[0] || "Unknown User"; // fallback logic
@@ -57,10 +55,38 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
     )}>
       
       {/* Video Background Layer */}
-      {isVideoMode && displayVideoTrack && (
+      {isVideoMode && (
         <div className="absolute inset-0 z-0">
-          <VideoTrack trackRef={displayVideoTrack} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/20" /> {/* Subtle overlay to make UI readable */}
+          {remoteParticipant ? (
+            remoteTrackRef ? (
+              <VideoTrack 
+                trackRef={remoteTrackRef} 
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              // Remote joined but video is off
+              <div className="w-full h-full flex flex-col items-center justify-center bg-[#1D2A54]">
+                 <img src={avatarUrl} alt={remoteName} className="h-44 w-44 rounded-full object-cover border-4 border-[#3B58F5]" />
+              </div>
+            )
+          ) : localTrackRef ? (
+            // Remote hasn't joined, show local video full screen
+            <VideoTrack 
+              trackRef={localTrackRef} 
+              className="w-full h-full object-cover scale-x-[-1]" 
+            />
+          ) : null}
+
+          <div className="absolute inset-0 bg-black/20" /> {/* Subtle overlay */}
+          
+          {/* Overlay text if waiting for remote participant */}
+          {!remoteParticipant && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <span className="text-white text-lg font-medium tracking-wide drop-shadow-lg">
+                Calling...
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -117,10 +143,13 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
         </div>
       )}
 
-      {/* Local Video Picture-in-Picture (Only in Video Mode when remote is full screen) */}
-      {isVideoMode && localVideoTracks.length > 0 && displayVideoTrack?.participant.identity !== localParticipant.identity && (
-        <div className="absolute bottom-36 right-6 z-20 w-32 h-44 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl">
-          <VideoTrack trackRef={localVideoTracks[0]} className="w-full h-full object-cover" />
+      {/* Local Video Picture-in-Picture (Only in Video Mode when remote has joined) */}
+      {isVideoMode && remoteParticipant && localTrackRef && (
+        <div className="absolute bottom-36 right-6 z-20 w-32 h-44 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-800 transition-all hover:scale-105">
+          <VideoTrack 
+            trackRef={localTrackRef} 
+            className="w-full h-full object-cover scale-x-[-1]" 
+          />
         </div>
       )}
 
@@ -202,10 +231,10 @@ export const ActiveCallRoom = () => {
         )}
       >
         <LiveKitRoom
-          video={true}
+          video={activeCall.callType === 'VIDEO'}
           audio={true}
           token={activeCall.token}
-          serverUrl={activeCall.livekitUrl}
+          serverUrl={activeCall.serverUrl}
           connect={true}
           onDisconnected={() => hangupCall(activeCall.callId)}
           className="flex-1 w-full h-full"
