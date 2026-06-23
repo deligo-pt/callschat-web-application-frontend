@@ -1,15 +1,20 @@
 "use client";
 
 import { createContext, useContext } from 'react';
-import { IncomingCall, ActiveCall } from '@/hooks/useCallSignaling';
+import { IncomingCall, ActiveCall, OutgoingCall } from '@/hooks/useCallSignaling';
 
 export interface CallContextType {
   incomingCall: IncomingCall | null;
   activeCall: ActiveCall | null;
+  outgoingCall: OutgoingCall | null;
+  activeGroupCalls: string[];
   initiateCall: (receiverId: string, callType: 'AUDIO' | 'VIDEO') => void;
   acceptCall: (callId: string, roomName: string) => void;
   rejectCall: (callId: string, roomName: string) => void;
   hangupCall: (callId: string) => void;
+  cancelOutgoingCall: () => void;
+  startGroupCall: (groupId: string, callType: 'AUDIO' | 'VIDEO') => void;
+  joinGroupCall: (groupId: string) => void;
 }
 
 export const CallContext = createContext<CallContextType | null>(null);
