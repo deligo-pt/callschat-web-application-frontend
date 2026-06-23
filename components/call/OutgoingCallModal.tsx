@@ -10,7 +10,8 @@ export const OutgoingCallModal = () => {
   if (!outgoingCall) return null;
 
   // Auto-generate avatar if none provided
-  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(outgoingCall.receiverId)}&background=3B58F5&color=fff&size=128`;
+  const displayName = outgoingCall.receiverName || outgoingCall.receiverId;
+  const avatarUrl = outgoingCall.receiverAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff&size=128`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
@@ -39,7 +40,7 @@ export const OutgoingCallModal = () => {
           
           <img 
             src={avatarUrl} 
-            alt={outgoingCall.receiverId}
+            alt={displayName}
             className="relative h-28 w-28 rounded-full object-cover border-4 border-[#1D2A54] shadow-xl"
           />
         </div>
@@ -47,7 +48,7 @@ export const OutgoingCallModal = () => {
         {/* Receiver Info */}
         <div className="flex flex-col items-center text-center z-10 mb-12 w-full">
           <h2 className="text-[26px] font-bold text-white tracking-tight truncate w-full px-4">
-            {outgoingCall.receiverId}
+            {displayName}
           </h2>
           <p className="mt-1.5 text-sm font-medium text-white/60">
             Ringing...

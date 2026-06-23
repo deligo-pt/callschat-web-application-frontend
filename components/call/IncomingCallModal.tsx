@@ -1,17 +1,53 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
 import { cn } from "@/lib/utils";
 
 export const IncomingCallModal = () => {
   const { incomingCall, acceptCall, rejectCall } = useCallContext();
+  const [callerName, setCallerName] = useState<string>("");
+  const [callerAvatar, setCallerAvatar] = useState<string>("");
+
+  useEffect(() => {
+    if (!incomingCall?.callerId) return;
+
+    const fetchCallerProfile = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+        
+        // Try fetching all users to find the caller
+        const res = await fetch(`${baseUrl}/user/all`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          const caller = data.data.find((u: any) => u.id === incomingCall.callerId);
+          if (caller) {
+            const firstName = caller.profile?.firstName || "";
+            const lastName = caller.profile?.lastName || "";
+            const fullName = `${firstName} ${lastName}`.trim();
+            const displayName = caller.profile?.displayName || fullName || caller.username || "Anonymous";
+            setCallerName(displayName);
+            setCallerAvatar(caller.profile?.avatarUrl || "");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch caller profile", err);
+      }
+    };
+
+    fetchCallerProfile();
+  }, [incomingCall?.callerId]);
 
   if (!incomingCall) return null;
 
-  // Auto-generate avatar if none provided
-  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(incomingCall.callerId)}&background=3B58F5&color=fff&size=128`;
+  const displayName = callerName || incomingCall.callerId;
+  const avatarUrl = callerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff&size=128`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
@@ -40,7 +76,7 @@ export const IncomingCallModal = () => {
           
           <img 
             src={avatarUrl} 
-            alt={incomingCall.callerId}
+            alt={displayName}
             className="relative h-28 w-28 rounded-full object-cover border-4 border-[#1D2A54] shadow-xl"
           />
         </div>
@@ -48,7 +84,7 @@ export const IncomingCallModal = () => {
         {/* Caller Info */}
         <div className="flex flex-col items-center text-center z-10 mb-12 w-full">
           <h2 className="text-[26px] font-bold text-white tracking-tight truncate w-full px-4">
-            {incomingCall.callerId}
+            {displayName}
           </h2>
           <p className="mt-1.5 text-sm font-medium text-white/60">
             CallsChat Call

@@ -245,14 +245,14 @@ export default function ChatRoomPage() {
 
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => recipientId && initiateCall(recipientId, 'AUDIO')}
+            onClick={() => recipientId && initiateCall(recipientId, 'AUDIO', recipient?.name, recipient?.avatarUrl)}
             disabled={!recipientId}
             className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors disabled:opacity-50"
           >
             <Phone className="h-5 w-5" strokeWidth={2} />
           </button>
           <button 
-            onClick={() => recipientId && initiateCall(recipientId, 'VIDEO')}
+            onClick={() => recipientId && initiateCall(recipientId, 'VIDEO', recipient?.name, recipient?.avatarUrl)}
             disabled={!recipientId}
             className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors disabled:opacity-50"
           >

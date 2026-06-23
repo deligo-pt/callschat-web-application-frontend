@@ -20,6 +20,8 @@ export interface OutgoingCall {
   receiverId: string;
   callType: 'AUDIO' | 'VIDEO';
   callId?: string; // Set once backend acknowledges initiate
+  receiverName?: string;
+  receiverAvatar?: string;
 }
 
 export const useCallSignaling = () => {
@@ -111,11 +113,11 @@ export const useCallSignaling = () => {
     };
   }, [socket]);
 
-  const initiateCall = useCallback((receiverId: string, callType: 'AUDIO' | 'VIDEO') => {
+  const initiateCall = useCallback((receiverId: string, callType: 'AUDIO' | 'VIDEO', receiverName?: string, receiverAvatar?: string) => {
     if (!socket) return;
     console.log('[Call] Initiating call to', receiverId, callType);
     pendingCancelRef.current = false;
-    setOutgoingCall({ receiverId, callType });
+    setOutgoingCall({ receiverId, callType, receiverName, receiverAvatar });
     
     socket.emit('call:initiate', { receiverId, callType }, (response: any) => {
       if (response?.success && response?.callId) {

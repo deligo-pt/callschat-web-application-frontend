@@ -8,7 +8,7 @@ export interface CallContextType {
   activeCall: ActiveCall | null;
   outgoingCall: OutgoingCall | null;
   activeGroupCalls: string[];
-  initiateCall: (receiverId: string, callType: 'AUDIO' | 'VIDEO') => void;
+  initiateCall: (receiverId: string, callType: 'AUDIO' | 'VIDEO', receiverName?: string, receiverAvatar?: string) => void;
   acceptCall: (callId: string, roomName: string) => void;
   rejectCall: (callId: string, roomName: string) => void;
   hangupCall: (callId: string) => void;
