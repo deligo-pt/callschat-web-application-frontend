@@ -5,6 +5,8 @@ import { useCallSignaling } from '@/hooks/useCallSignaling';
 import { CallContext } from '@/components/providers/CallContext';
 import { IncomingCallModal } from '@/components/call/IncomingCallModal';
 import { OutgoingCallModal } from '@/components/call/OutgoingCallModal';
+import { GroupIncomingModal } from '@/components/call/GroupIncomingModal';
+import { GroupOutgoingModal } from '@/components/call/GroupOutgoingModal';
 import { ActiveCallRoom } from '@/components/call/ActiveCallRoom';
 
 export const CallProvider = ({ children }: { children: React.ReactNode }) => {
@@ -15,6 +17,8 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       {children}
       <IncomingCallModal />
       <OutgoingCallModal />
+      <GroupIncomingModal />
+      <GroupOutgoingModal />
       <ActiveCallRoom />
     </CallContext.Provider>
   );

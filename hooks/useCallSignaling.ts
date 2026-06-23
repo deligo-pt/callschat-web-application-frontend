@@ -27,11 +27,29 @@ export interface OutgoingCall {
   receiverAvatar?: string;
 }
 
+export interface IncomingGroupCall {
+  callId: string;
+  groupId: string;
+  initiatorName?: string;
+  callType: 'AUDIO' | 'VIDEO';
+}
+
+export interface OutgoingGroupCall {
+  groupId: string;
+  callType: 'AUDIO' | 'VIDEO';
+  callId?: string;
+  token?: string;
+  livekitUrl?: string;
+  roomName?: string;
+}
+
 export const useCallSignaling = () => {
   const { socket } = useSocket();
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [outgoingCall, setOutgoingCall] = useState<OutgoingCall | null>(null);
+  const [incomingGroupCall, setIncomingGroupCall] = useState<IncomingGroupCall | null>(null);
+  const [outgoingGroupCall, setOutgoingGroupCall] = useState<OutgoingGroupCall | null>(null);
   const [activeGroupCalls, setActiveGroupCalls] = useState<string[]>([]);
   const pendingCancelRef = useRef<boolean>(false);
 
@@ -94,15 +112,33 @@ export const useCallSignaling = () => {
       console.log('[Call] Group call active in:', payload.groupId);
       setActiveGroupCalls(prev => prev.includes(payload.groupId) ? prev : [...prev, payload.groupId]);
       
-      // Ring the user!
-      setIncomingCall({
-        callId: payload.callId,
-        callerId: payload.startedBy,
-        callType: payload.callType,
-        roomName: payload.roomName,
-        isGroup: true,
-        groupId: payload.groupId
+      // If we are currently ringing OUTGOING for this exact group, it means someone answered!
+      setOutgoingGroupCall(prev => {
+        if (prev && prev.groupId === payload.groupId) {
+          // Transition to active call
+          setActiveCall({
+            callId: prev.callId || payload.callId,
+            token: prev.token!,
+            serverUrl: prev.livekitUrl!,
+            roomName: prev.roomName!,
+            callType: prev.callType,
+            isGroup: true,
+          });
+          return null;
+        }
+        return prev;
       });
+    };
+
+    const handleGroupCallIncoming = (payload: IncomingGroupCall) => {
+      console.log('[Call] Incoming group call:', payload);
+      setIncomingGroupCall(payload);
+    };
+
+    const handleGroupCallTerminated = (payload: { groupId: string }) => {
+      console.log('[Call] Group call terminated/missed in:', payload.groupId);
+      setIncomingGroupCall(prev => prev?.groupId === payload.groupId ? null : prev);
+      setOutgoingGroupCall(prev => prev?.groupId === payload.groupId ? null : prev);
     };
 
     const handleGroupCallEnded = (payload: { groupId: string }) => {
@@ -111,6 +147,9 @@ export const useCallSignaling = () => {
     };
 
     socket.on('group:call_active', handleGroupCallActive);
+    socket.on('group:call_incoming', handleGroupCallIncoming);
+    socket.on('group:call_missed', handleGroupCallTerminated);
+    socket.on('group:call_terminated', handleGroupCallTerminated);
     socket.on('group:call_ended', handleGroupCallEnded);
 
     return () => {
@@ -122,6 +161,9 @@ export const useCallSignaling = () => {
       socket.off('call:unavailable', handleCallUnavailable);
       socket.off('call:error', handleCallError);
       socket.off('group:call_active', handleGroupCallActive);
+      socket.off('group:call_incoming', handleGroupCallIncoming);
+      socket.off('group:call_missed', handleGroupCallTerminated);
+      socket.off('group:call_terminated', handleGroupCallTerminated);
       socket.off('group:call_ended', handleGroupCallEnded);
     };
   }, [socket]);
@@ -190,18 +232,55 @@ export const useCallSignaling = () => {
   const startGroupCall = useCallback((groupId: string, callType: 'AUDIO' | 'VIDEO') => {
     if (!socket) return;
     console.log('[Call] Starting group call for', groupId, callType);
+    
+    setOutgoingGroupCall({ groupId, callType });
+
     socket.emit('group:call_start', { groupId, callType }, (response: any) => {
       if (response?.success && response?.token) {
+        setOutgoingGroupCall({
+          groupId,
+          callType,
+          callId: response.callId || groupId,
+          token: response.token,
+          livekitUrl: response.livekitUrl,
+          roomName: response.roomName,
+        });
+      } else {
+        setOutgoingGroupCall(null);
+      }
+    });
+  }, [socket]);
+
+  const cancelGroupCall = useCallback((groupId: string) => {
+    if (!socket) return;
+    console.log('[Call] Canceling group call for', groupId);
+    socket.emit('group:call_cancel', { groupId });
+    setOutgoingGroupCall(null);
+  }, [socket]);
+
+  const acceptGroupCall = useCallback((groupId: string) => {
+    if (!socket) return;
+    console.log('[Call] Accepting group call for', groupId);
+    socket.emit('group:call_join', { groupId }, (response: any) => {
+      if (response?.success && response?.token) {
+        setIncomingGroupCall(null);
         setActiveCall({
-          callId: response.callId || groupId, // fallback if backend doesn't return callId
+          callId: response.callId || groupId,
           token: response.token,
           serverUrl: response.livekitUrl,
           roomName: response.roomName,
-          callType,
+          callType: 'VIDEO', // typically join enables what user wants
           isGroup: true,
         });
       }
     });
+  }, [socket]);
+
+  const rejectGroupCall = useCallback((groupId: string) => {
+    if (!socket) return;
+    console.log('[Call] Rejecting group call for', groupId);
+    socket.emit('group:call_reject', { groupId });
+    setIncomingGroupCall(null);
   }, [socket]);
 
   const joinGroupCall = useCallback((groupId: string) => {
@@ -209,8 +288,6 @@ export const useCallSignaling = () => {
     console.log('[Call] Joining group call for', groupId);
     socket.emit('group:call_join', { groupId }, (response: any) => {
       if (response?.success && response?.token) {
-        // Active group calls don't explicitly pass callType down, 
-        // we can default to VIDEO for UI layout. The user can disable their camera.
         setActiveCall({
           callId: response.callId || groupId,
           token: response.token,
@@ -234,6 +311,8 @@ export const useCallSignaling = () => {
     incomingCall,
     activeCall,
     outgoingCall,
+    incomingGroupCall,
+    outgoingGroupCall,
     activeGroupCalls,
     initiateCall,
     acceptCall,
@@ -241,6 +320,9 @@ export const useCallSignaling = () => {
     hangupCall,
     cancelOutgoingCall,
     startGroupCall,
+    cancelGroupCall,
+    acceptGroupCall,
+    rejectGroupCall,
     joinGroupCall,
     leaveGroupCall,
   };
