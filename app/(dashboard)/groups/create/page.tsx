@@ -1,18 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-// Dummy data for contacts
-const DUMMY_CONTACTS = [
-  { id: "1", name: "Sarah Johnson", phone: "+1 (555) 123-4567", initials: "SJ", color: "bg-blue-500" },
-  { id: "2", name: "Alex Chen", phone: "+1 (555) 234-5678", initials: "AC", color: "bg-blue-600" },
-  { id: "3", name: "Emma Wilson", phone: "+1 (555) 345-6789", initials: "EW", color: "bg-indigo-500" },
-  { id: "4", name: "Michael Smith", phone: "+1 (555) 456-7890", initials: "MS", color: "bg-blue-500" },
-  { id: "5", name: "Lisa Anderson", phone: "+1 (555) 567-8901", initials: "LA", color: "bg-indigo-600" },
-];
+interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  initials: string;
+  color: string;
+  avatarUrl?: string;
+}
+
+const COLORS = ["bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-pink-500", "bg-emerald-500"];
 
 export default function CreateGroupPage() {
   const [step, setStep] = useState(1);
@@ -20,6 +22,61 @@ export default function CreateGroupPage() {
   // Step 1 State
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
+
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+        const res = await fetch(`${baseUrl}/contacts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        const data = await res.json();
+        
+        let usersArray: any[] = [];
+        if (data.success && Array.isArray(data.data)) {
+          usersArray = data.data;
+        } else if (Array.isArray(data)) {
+          usersArray = data;
+        } else if (data.data && Array.isArray(data.data.contacts)) {
+          usersArray = data.data.contacts;
+        }
+
+        const mappedContacts = usersArray.map((u: any, index: number) => {
+          const userProfile = u.addressee?.profile || u.contact?.profile || u.profile || {};
+          const userId = u.addressee?.id || u.contact?.id || u.id;
+          const displayName = u.customName || userProfile.displayName || userProfile.username || "Unknown";
+          const phone = u.addressee?.phone || u.contact?.phone || userProfile.phone || "";
+          
+          return {
+            id: userId,
+            name: displayName,
+            phone: phone,
+            initials: displayName.slice(0, 2).toUpperCase(),
+            color: COLORS[index % COLORS.length],
+            avatarUrl: userProfile.avatarUrl,
+          };
+        });
+
+        // Remove duplicates just in case
+        const uniqueContacts = Array.from(new Map(mappedContacts.map(item => [item.id, item])).values());
+        
+        setContacts(uniqueContacts);
+      } catch (error) {
+        console.error("Failed to fetch contacts", error);
+      } finally {
+        setIsLoadingContacts(false);
+      }
+    };
+
+    fetchContacts();
+  }, []);
 
   // Step 2 State
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,8 +94,9 @@ export default function CreateGroupPage() {
     );
   };
 
-  const filteredContacts = DUMMY_CONTACTS.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredContacts = contacts.filter((c) =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (c.phone && c.phone.includes(searchQuery))
   );
 
   return (
@@ -148,36 +206,59 @@ export default function CreateGroupPage() {
 
                 {/* Contacts List */}
                 <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide pr-2 pb-4">
-                  {filteredContacts.map((contact) => {
-                    const isSelected = selectedMembers.includes(contact.id);
-                    return (
-                      <div
-                        key={contact.id}
-                        onClick={() => toggleMember(contact.id)}
-                        className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F8FAFC] cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={cn("h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold text-[14px]", contact.color)}>
-                            {contact.initials}
-                          </div>
-                          <div>
-                            <p className="text-[15px] font-bold text-[#1D2A54]">{contact.name}</p>
-                            <p className="text-[12px] text-[#8F95B2]">{contact.phone}</p>
-                          </div>
-                        </div>
+                  {isLoadingContacts ? (
+                    <div className="flex w-full items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
+                    </div>
+                  ) : contacts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <Users className="h-12 w-12 text-[#E6EAFA] mb-4" />
+                      <p className="text-[14px] font-medium text-[#8F95B2]">No contacts found.</p>
+                    </div>
+                  ) : filteredContacts.length === 0 ? (
+                    <div className="flex w-full justify-center py-8">
+                      <p className="text-[13px] text-[#8F95B2]">No contacts match your search.</p>
+                    </div>
+                  ) : (
+                    filteredContacts.map((contact) => {
+                      const isSelected = selectedMembers.includes(contact.id);
+                      return (
                         <div
-                          className={cn(
-                            "h-5 w-5 rounded-full border flex items-center justify-center transition-colors",
-                            isSelected
-                              ? "bg-[#3B58F5] border-[#3B58F5]"
-                              : "border-[#D0D4E4]"
-                          )}
+                          key={contact.id}
+                          onClick={() => toggleMember(contact.id)}
+                          className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F8FAFC] cursor-pointer transition-colors"
                         >
-                          {isSelected && <Check className="h-3 w-3 text-white stroke-[3]" />}
+                          <div className="flex items-center gap-4">
+                            {contact.avatarUrl ? (
+                              <img 
+                                src={contact.avatarUrl} 
+                                alt={contact.name}
+                                className="h-10 w-10 rounded-full object-cover bg-white border border-[#E6EAFA]"
+                              />
+                            ) : (
+                              <div className={cn("h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold text-[14px]", contact.color)}>
+                                {contact.initials}
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-[15px] font-bold text-[#1D2A54]">{contact.name}</p>
+                              {contact.phone && <p className="text-[12px] text-[#8F95B2]">{contact.phone}</p>}
+                            </div>
+                          </div>
+                          <div
+                            className={cn(
+                              "h-5 w-5 rounded-full border flex items-center justify-center transition-colors",
+                              isSelected
+                                ? "bg-[#3B58F5] border-[#3B58F5]"
+                                : "border-[#D0D4E4]"
+                            )}
+                          >
+                            {isSelected && <Check className="h-3 w-3 text-white stroke-[3]" />}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
