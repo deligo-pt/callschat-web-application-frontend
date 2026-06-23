@@ -23,7 +23,7 @@ const formatDuration = (seconds: number) => {
 };
 
 const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolean, setIsMaximized: (v: boolean) => void }) => {
-  const { activeCall, hangupCall } = useCallContext();
+  const { activeCall, hangupCall, leaveGroupCall } = useCallContext();
   const remoteParticipants = useRemoteParticipants();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const [duration, setDuration] = useState(0);
@@ -201,7 +201,14 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
         {/* End Call Button */}
         <div className="flex flex-col items-center gap-2">
           <button
-            onClick={() => activeCall && hangupCall(activeCall.callId)}
+            onClick={() => {
+              if (activeCall?.isGroup) {
+                // For group calls, roomName often holds the groupId or we fallback to callId
+                leaveGroupCall && leaveGroupCall(activeCall.roomName || activeCall.callId);
+              } else {
+                activeCall && hangupCall(activeCall.callId);
+              }
+            }}
             className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white transition-all hover:bg-red-600 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
           >
             <PhoneOff className="h-6 w-6" fill="currentColor" />
@@ -215,7 +222,7 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
 };
 
 export const ActiveCallRoom = () => {
-  const { activeCall, hangupCall } = useCallContext();
+  const { activeCall, hangupCall, leaveGroupCall } = useCallContext();
   const [isMaximized, setIsMaximized] = useState(false);
 
   if (!activeCall) return null;
@@ -236,7 +243,13 @@ export const ActiveCallRoom = () => {
           token={activeCall.token}
           serverUrl={activeCall.serverUrl}
           connect={true}
-          onDisconnected={() => hangupCall(activeCall.callId)}
+          onDisconnected={() => {
+            if (activeCall.isGroup) {
+              leaveGroupCall && leaveGroupCall(activeCall.roomName || activeCall.callId);
+            } else {
+              hangupCall(activeCall.callId);
+            }
+          }}
           className="flex-1 w-full h-full"
         >
           <CustomCallLayout isMaximized={isMaximized} setIsMaximized={setIsMaximized} />

@@ -15,6 +15,7 @@ export interface CallContextType {
   cancelOutgoingCall: () => void;
   startGroupCall: (groupId: string, callType: 'AUDIO' | 'VIDEO') => void;
   joinGroupCall: (groupId: string) => void;
+  leaveGroupCall: (groupId: string) => void;
 }
 
 export const CallContext = createContext<CallContextType | null>(null);

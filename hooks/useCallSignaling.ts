@@ -6,6 +6,8 @@ export interface IncomingCall {
   callerId: string;
   callType: 'AUDIO' | 'VIDEO';
   roomName: string; // backend also sends roomName in the incoming payload
+  isGroup?: boolean;
+  groupId?: string;
 }
 
 export interface ActiveCall {
@@ -14,6 +16,7 @@ export interface ActiveCall {
   serverUrl: string;
   roomName: string;
   callType: 'AUDIO' | 'VIDEO';
+  isGroup?: boolean;
 }
 
 export interface OutgoingCall {
@@ -87,9 +90,19 @@ export const useCallSignaling = () => {
     socket.on('call:unavailable', handleCallUnavailable);
     socket.on('call:error', handleCallError);
 
-    const handleGroupCallActive = (payload: { groupId: string }) => {
+    const handleGroupCallActive = (payload: { groupId: string; callId: string; callType: 'AUDIO' | 'VIDEO'; roomName: string; startedBy: string }) => {
       console.log('[Call] Group call active in:', payload.groupId);
       setActiveGroupCalls(prev => prev.includes(payload.groupId) ? prev : [...prev, payload.groupId]);
+      
+      // Ring the user!
+      setIncomingCall({
+        callId: payload.callId,
+        callerId: payload.startedBy,
+        callType: payload.callType,
+        roomName: payload.roomName,
+        isGroup: true,
+        groupId: payload.groupId
+      });
     };
 
     const handleGroupCallEnded = (payload: { groupId: string }) => {
@@ -141,10 +154,12 @@ export const useCallSignaling = () => {
     socket.emit('call:accept', { callId, roomName });
   }, [socket]);
 
-  const rejectCall = useCallback((callId: string, roomName: string) => {
+  const rejectCall = useCallback((callId: string, roomName: string, isGroup?: boolean) => {
     if (!socket) return;
     console.log('[Call] Rejecting call', callId);
-    socket.emit('call:reject', { callId, roomName });
+    if (!isGroup) {
+      socket.emit('call:reject', { callId, roomName });
+    }
     setIncomingCall(null);
   }, [socket]);
 
@@ -178,11 +193,12 @@ export const useCallSignaling = () => {
     socket.emit('group:call_start', { groupId, callType }, (response: any) => {
       if (response?.success && response?.token) {
         setActiveCall({
-          callId: response.callId,
+          callId: response.callId || groupId, // fallback if backend doesn't return callId
           token: response.token,
           serverUrl: response.livekitUrl,
           roomName: response.roomName,
           callType,
+          isGroup: true,
         });
       }
     });
@@ -196,14 +212,22 @@ export const useCallSignaling = () => {
         // Active group calls don't explicitly pass callType down, 
         // we can default to VIDEO for UI layout. The user can disable their camera.
         setActiveCall({
-          callId: response.callId,
+          callId: response.callId || groupId,
           token: response.token,
           serverUrl: response.livekitUrl,
           roomName: response.roomName,
           callType: 'VIDEO',
+          isGroup: true,
         });
       }
     });
+  }, [socket]);
+
+  const leaveGroupCall = useCallback((groupId: string) => {
+    if (!socket) return;
+    console.log('[Call] Leaving group call for', groupId);
+    socket.emit('group:call_leave', { groupId });
+    setActiveCall(null);
   }, [socket]);
 
   return {
@@ -218,5 +242,6 @@ export const useCallSignaling = () => {
     cancelOutgoingCall,
     startGroupCall,
     joinGroupCall,
+    leaveGroupCall,
   };
 };

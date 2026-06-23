@@ -6,7 +6,7 @@ import { useCallContext } from "@/components/providers/CallContext";
 import { cn } from "@/lib/utils";
 
 export const IncomingCallModal = () => {
-  const { incomingCall, acceptCall, rejectCall } = useCallContext();
+  const { incomingCall, acceptCall, rejectCall, joinGroupCall } = useCallContext();
   const [callerName, setCallerName] = useState<string>("");
   const [callerAvatar, setCallerAvatar] = useState<string>("");
 
@@ -63,7 +63,7 @@ export const IncomingCallModal = () => {
         {/* Top Header */}
         <div className="flex w-full items-center justify-center mb-10 z-10">
           <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold tracking-wider uppercase backdrop-blur-md border border-white/5 shadow-sm">
-            Incoming {incomingCall.callType.toLowerCase()} call
+            Incoming {incomingCall.isGroup ? "Group" : ""} {incomingCall.callType.toLowerCase()} call
           </span>
         </div>
 
@@ -87,7 +87,7 @@ export const IncomingCallModal = () => {
             {displayName}
           </h2>
           <p className="mt-1.5 text-sm font-medium text-white/60">
-            CallsChat Call
+            {incomingCall.isGroup ? "Group Call" : "CallsChat Call"}
           </p>
         </div>
         
@@ -97,7 +97,7 @@ export const IncomingCallModal = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                rejectCall(incomingCall.callId, incomingCall.roomName);
+                rejectCall(incomingCall.callId, incomingCall.roomName, incomingCall.isGroup);
               }}
               className="group flex h-14 w-14 items-center justify-center rounded-full bg-red-500 transition-all hover:bg-red-600 hover:scale-105 active:scale-95 shadow-lg shadow-red-500/30"
               aria-label="Decline Call"
@@ -111,7 +111,12 @@ export const IncomingCallModal = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                acceptCall(incomingCall.callId, incomingCall.roomName);
+                if (incomingCall.isGroup && incomingCall.groupId) {
+                  joinGroupCall(incomingCall.groupId);
+                  rejectCall(incomingCall.callId, incomingCall.roomName, true); // Dismiss modal
+                } else {
+                  acceptCall(incomingCall.callId, incomingCall.roomName);
+                }
               }}
               className="group flex h-16 w-16 items-center justify-center rounded-full bg-[#22C55E] transition-all hover:bg-[#16A34A] hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(34,197,94,0.4)] animate-bounce"
               aria-label="Accept Call"
