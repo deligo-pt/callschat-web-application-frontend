@@ -25,6 +25,26 @@ export const groupService = {
     }
   },
 
+  async fetchGroupDetails(groupId: string): Promise<{ success: boolean; data?: any }> {
+    try {
+      const response = await apiClient.get(`/groups/${groupId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch group details for ${groupId}`, error);
+      return { success: false };
+    }
+  },
+
+  async fetchGroupMembers(groupId: string): Promise<{ success: boolean; data?: { members: any[]; total: number; requesterRole: string } }> {
+    try {
+      const response = await apiClient.get(`/groups/${groupId}/members`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch group members for ${groupId}`, error);
+      return { success: false };
+    }
+  },
+
   async createGroup(data: {
     name: string;
     description?: string;

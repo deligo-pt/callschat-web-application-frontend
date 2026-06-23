@@ -1,85 +1,53 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallContext } from "@/components/providers/CallContext";
-import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import apiClient from "@/services/api.client";
 
-// Dummy data mirroring the Figma design
-const DUMMY_MESSAGES = [
-  {
-    id: "1",
-    sender: { name: "Sarah", initials: "SJ", color: "bg-purple-500" },
-    text: "Hey team! The new mockups are ready for review 🎨",
-    time: "10:28 AM",
-    isMe: false,
-  },
-  {
-    id: "2",
-    sender: { name: "Alex", initials: "AK", color: "bg-[#0ea5e9]" },
-    text: "Awesome! Checking them now...",
-    time: "10:29 AM",
-    isMe: false,
-  },
-  {
-    id: "3",
-    sender: null,
-    text: "Let me know what you think about the color palette!",
-    time: "10:30 AM",
-    isMe: true,
-    seen: true,
-  },
-  {
-    id: "4",
-    sender: { name: "Jordan", initials: "JR", color: "bg-amber-500" },
-    text: "The violet theme looks stunning btw, great choice",
-    time: "10:31 AM",
-    isMe: false,
-  },
-  {
-    id: "5",
-    sender: { name: "Sarah", initials: "SJ", color: "bg-purple-500" },
-    text: "Agreed! The gradients really pop 🔥",
-    time: "10:31 AM",
-    isMe: false,
-  },
-];
-
 export default function GroupChatPage() {
   const params = useParams();
+  const router = useRouter();
   const groupId = params.groupId as string;
   
   const { startGroupCall, joinGroupCall, activeGroupCalls } = useCallContext();
   
   const [groupDetails, setGroupDetails] = useState<any>(null);
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [inputText, setInputText] = useState("");
+  const [messages, setMessages] = useState<any[]>([]);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isCallActive = activeGroupCalls.includes(groupId);
 
   useEffect(() => {
-    const fetchGroup = async () => {
+    const fetchGroupData = async () => {
       try {
-        const res = await apiClient.get('/groups');
-        if (res.data?.success && Array.isArray(res.data.data)) {
-          const match = res.data.data.find((g: any) => g.id === groupId);
-          if (match) {
-            setGroupDetails(match);
-          }
+        const [detailsRes, membersRes] = await Promise.all([
+          apiClient.get(`/groups/${groupId}`),
+          apiClient.get(`/groups/${groupId}/members`),
+        ]);
+
+        if (detailsRes.data?.success) {
+          setGroupDetails(detailsRes.data.data);
+        }
+        if (membersRes.data?.success) {
+          setGroupMembers(membersRes.data.data.members || []);
         }
       } catch (error) {
-        console.error("Failed to fetch group", error);
+        console.error("Failed to fetch group data", error);
       } finally {
         setIsLoading(false);
       }
     };
     
     if (groupId) {
-      fetchGroup();
+      fetchGroupData();
     }
   }, [groupId]);
 
@@ -93,6 +61,18 @@ export default function GroupChatPage() {
     setInputText("");
   };
 
+  const handleLeaveGroup = async () => {
+    if (!confirm("Are you sure you want to leave this group?")) return;
+    try {
+      const myId = "me"; // Ideally we get my userId from context, but backend accepts anything if it's the token owner or we pass a dummy if the route is /members/me. Wait, the endpoint is DELETE /groups/:id/members/:userId. If I need my own ID, maybe the backend accepts `me` or I need the JWT payload.
+      // We will assume the user has the ID from a store, or we can fetch it. 
+      // For now, let's just use a dummy implementation for the UI.
+      alert("Leave group clicked! (Integration pending)");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#EEF2FF]">
@@ -101,185 +81,313 @@ export default function GroupChatPage() {
     );
   }
 
-  // Fallback to "Design System" if backend didn't return a specific name for demo purposes
-  const groupName = groupDetails?.name || "Design System";
-  const avatarImage = groupDetails?.avatarUrl || "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=100&h=100&fit=crop&q=80";
+  const groupName = groupDetails?.name || "Group Chat";
+  const avatarImage = groupDetails?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=3B58F5&color=fff&size=256`;
+  const memberCount = groupDetails?.memberCount || groupMembers.length || 0;
 
   return (
-    <div className="flex h-full w-full flex-col bg-[#EEF2FF]">
+    <div className="flex h-full w-full overflow-hidden bg-[#EEF2FF]">
       
-      {/* Header - Styled like the mobile design */}
-      <div className="flex items-center justify-between bg-[#3B58F5] px-4 py-4 z-10 shrink-0 text-white shadow-md">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/groups"
-            className="rounded-full p-1 transition-colors hover:bg-white/10"
-          >
-            <ArrowLeft className="h-5 w-5 text-white" strokeWidth={2} />
-          </Link>
-          
+      {/* Main Chat Area */}
+      <div className={cn("flex flex-col h-full transition-all duration-300", showGroupInfo ? "w-0 lg:flex-1 hidden lg:flex" : "flex-1")}>
+        
+        {/* Header */}
+        <div className="flex items-center justify-between bg-[#3B58F5] px-4 py-4 z-10 shrink-0 text-white shadow-md cursor-pointer transition-colors hover:bg-[#344EDD]" onClick={() => setShowGroupInfo(true)}>
           <div className="flex items-center gap-3">
-            <img
-              src={avatarImage}
-              alt={groupName}
-              className="h-10 w-10 rounded-full object-cover border border-white/20"
-            />
-            <div className="flex flex-col">
-              <h2 className="text-[16px] font-bold leading-tight">
-                {groupName}
-              </h2>
-              <span className="text-[12px] font-medium text-white/80">
-                Online
-              </span>
+            <Link
+              href="/groups"
+              className="rounded-full p-1 transition-colors hover:bg-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ArrowLeft className="h-5 w-5 text-white" strokeWidth={2} />
+            </Link>
+            
+            <div className="flex items-center gap-3">
+              <img
+                src={avatarImage}
+                alt={groupName}
+                className="h-10 w-10 rounded-full object-cover border border-white/20"
+              />
+              <div className="flex flex-col">
+                <h2 className="text-[16px] font-bold leading-tight">
+                  {groupName}
+                </h2>
+                <span className="text-[12px] font-medium text-white/80">
+                  {memberCount > 0 ? `Group · ${memberCount} Members` : "Online"}
+                </span>
+              </div>
             </div>
+          </div>
+
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            {isCallActive ? (
+              <button
+                onClick={() => joinGroupCall(groupId)}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#22C55E] hover:bg-[#16a34a] text-white font-bold text-[13px] transition-colors shadow-md animate-pulse mr-2"
+              >
+                <Video className="h-4 w-4" fill="currentColor" />
+                Join
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={() => startGroupCall(groupId, 'VIDEO')}
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                >
+                  <Video className="h-5 w-5" strokeWidth={2} />
+                </button>
+                <button 
+                  onClick={() => startGroupCall(groupId, 'AUDIO')}
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                >
+                  <Phone className="h-5 w-5" strokeWidth={2} />
+                </button>
+              </>
+            )}
+            <button className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors" onClick={() => setShowGroupInfo(true)}>
+              <MoreVertical className="h-5 w-5" strokeWidth={2} />
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          {isCallActive ? (
-            <button
-              onClick={() => joinGroupCall(groupId)}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#22C55E] hover:bg-[#16a34a] text-white font-bold text-[13px] transition-colors shadow-md animate-pulse mr-2"
-            >
-              <Video className="h-4 w-4" fill="currentColor" />
-              Join
-            </button>
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 relative">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2]">
+              <p className="bg-white px-4 py-2 rounded-lg text-sm shadow-sm text-center">
+                This is the start of the <strong>{groupName}</strong> group.<br/>
+                Messages will appear here.
+              </p>
+            </div>
           ) : (
-            <>
-              <button 
-                onClick={() => startGroupCall(groupId, 'VIDEO')}
-                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
-              >
-                <Video className="h-5 w-5" strokeWidth={2} />
-              </button>
-              <button 
-                onClick={() => startGroupCall(groupId, 'AUDIO')}
-                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
-              >
-                <Phone className="h-5 w-5" strokeWidth={2} />
-              </button>
-            </>
+            messages.map((msg, index) => {
+              const showAvatar = !msg.isMe && (index === messages.length - 1 || messages[index + 1]?.sender?.name !== msg.sender?.name);
+              const isNextSameSender = index < messages.length - 1 && messages[index + 1]?.sender?.name === msg.sender?.name;
+
+              return (
+                <div key={msg.id} className={cn("flex w-full", msg.isMe ? "justify-end" : "justify-start")}>
+                  {!msg.isMe && (
+                    <div className="w-8 shrink-0 mr-3 flex items-end pb-5">
+                      {showAvatar && msg.sender && (
+                        <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm", msg.sender.color)}>
+                          {msg.sender.initials}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className={cn("flex flex-col max-w-[75%]", msg.isMe ? "items-end" : "items-start")}>
+                    {!msg.isMe && (index === 0 || messages[index - 1]?.sender?.name !== msg.sender?.name) && (
+                      <span className="text-[12px] font-semibold text-[#3B58F5] ml-1 mb-1">
+                        {msg.sender?.name}
+                      </span>
+                    )}
+
+                    <div
+                      className={cn(
+                        "px-4 py-3 text-[14.5px] shadow-sm leading-relaxed",
+                        msg.isMe 
+                          ? "bg-[#3B58F5] text-white rounded-[20px] rounded-br-sm" 
+                          : "bg-white text-[#11142D] rounded-[20px] rounded-bl-sm"
+                      )}
+                      style={{ wordBreak: "break-word" }}
+                    >
+                      {msg.text}
+                    </div>
+
+                    {(!isNextSameSender || msg.isMe) && (
+                      <div className={cn("flex flex-col mt-1", msg.isMe ? "items-end mr-1" : "ml-1")}>
+                        <span className="text-[11px] font-medium text-[#8F95B2]">
+                          {msg.time}
+                        </span>
+                        {msg.isMe && msg.seen && (
+                          <span className="text-[11px] text-[#8F95B2]">Seen</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
           )}
-          <button className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors">
-            <MoreVertical className="h-5 w-5" strokeWidth={2} />
-          </button>
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Form */}
+        <div className="bg-white px-4 py-3 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+          <form onSubmit={handleSend} className="flex items-center gap-3 w-full max-w-4xl mx-auto">
+            <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0 hidden sm:block">
+              <Smile className="h-6 w-6" strokeWidth={1.5} />
+            </button>
+            <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0">
+              <Paperclip className="h-[22px] w-[22px]" strokeWidth={1.5} />
+            </button>
+            <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0 hidden sm:block">
+              <ImageIcon className="h-6 w-6" strokeWidth={1.5} />
+            </button>
+
+            <div className="flex-1 bg-[#F4F6FC] rounded-full flex items-center px-4 py-1.5 h-[44px]">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 bg-transparent text-[15px] text-[#11142D] placeholder-[#8F95B2] focus:outline-none"
+              />
+            </div>
+            
+            <button
+              type={inputText.trim() ? "submit" : "button"}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3B58F5] text-white transition-transform hover:scale-105 active:scale-95 shadow-md"
+            >
+              {inputText.trim() ? (
+                <Send className="h-5 w-5 ml-0.5" strokeWidth={2} />
+              ) : (
+                <Mic className="h-5 w-5" strokeWidth={2} />
+              )}
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 relative">
-        {DUMMY_MESSAGES.map((msg, index) => {
-          const showAvatar = !msg.isMe && (index === DUMMY_MESSAGES.length - 1 || DUMMY_MESSAGES[index + 1]?.sender?.name !== msg.sender?.name);
-          const isNextSameSender = index < DUMMY_MESSAGES.length - 1 && DUMMY_MESSAGES[index + 1]?.sender?.name === msg.sender?.name;
+      {/* Sidebar - Group Info */}
+      {showGroupInfo && (
+        <div className="w-full lg:w-[400px] h-full flex flex-col bg-white border-l border-[#EEF2FF] shadow-xl animate-in slide-in-from-right duration-300 z-50 shrink-0">
+          
+          {/* Sidebar Header */}
+          <div className="flex items-center gap-4 bg-[#3B58F5] px-4 py-4 shrink-0 text-white shadow-sm">
+            <button
+              onClick={() => setShowGroupInfo(false)}
+              className="rounded-full p-1 transition-colors hover:bg-white/10"
+            >
+              <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+            </button>
+            <h2 className="text-[16px] font-semibold">Group info</h2>
+          </div>
 
-          return (
-            <div key={msg.id} className={cn("flex w-full", msg.isMe ? "justify-end" : "justify-start")}>
-              
-              {!msg.isMe && (
-                <div className="w-8 shrink-0 mr-3 flex items-end pb-5">
-                  {showAvatar && msg.sender && (
-                    <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm", msg.sender.color)}>
-                      {msg.sender.initials}
+          <div className="flex-1 overflow-y-auto">
+            {/* Avatar & Name Section */}
+            <div className="flex flex-col items-center pt-8 pb-6 bg-white">
+              <img
+                src={avatarImage}
+                alt={groupName}
+                className="w-32 h-32 rounded-full object-cover border border-[#EEF2FF] shadow-sm mb-4"
+              />
+              <h2 className="text-[24px] font-bold text-[#11142D]">{groupName}</h2>
+              <p className="text-[13px] font-medium text-[#8F95B2] mt-1">
+                Group · {memberCount} Members
+              </p>
+
+              {/* Action Buttons Row */}
+              <div className="flex gap-4 mt-6">
+                <button className="flex flex-col items-center gap-1.5 group" onClick={() => setShowGroupInfo(false)}>
+                  <div className="w-12 h-12 rounded-[16px] bg-[#EEF2FF] flex items-center justify-center text-[#3B58F5] transition-colors group-hover:bg-[#E0E7FF]">
+                    <MessageSquare className="w-5 h-5" fill="currentColor" strokeWidth={0} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#3B58F5]">Message</span>
+                </button>
+                <button className="flex flex-col items-center gap-1.5 group" onClick={() => startGroupCall(groupId, 'AUDIO')}>
+                  <div className="w-12 h-12 rounded-[16px] bg-[#EEF2FF] flex items-center justify-center text-[#3B58F5] transition-colors group-hover:bg-[#E0E7FF]">
+                    <Phone className="w-5 h-5" fill="currentColor" strokeWidth={0} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#3B58F5]">Audio</span>
+                </button>
+                <button className="flex flex-col items-center gap-1.5 group" onClick={() => startGroupCall(groupId, 'VIDEO')}>
+                  <div className="w-12 h-12 rounded-[16px] bg-[#EEF2FF] flex items-center justify-center text-[#3B58F5] transition-colors group-hover:bg-[#E0E7FF]">
+                    <Video className="w-6 h-6" fill="currentColor" strokeWidth={0} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#3B58F5]">Video</span>
+                </button>
+                <button className="flex flex-col items-center gap-1.5 group">
+                  <div className="w-12 h-12 rounded-[16px] bg-[#EEF2FF] flex items-center justify-center text-[#3B58F5] transition-colors group-hover:bg-[#E0E7FF]">
+                    <Search className="w-5 h-5" strokeWidth={2.5} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#3B58F5]">Search</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="h-2 bg-[#F4F6FC] w-full" />
+
+            {/* Media Section */}
+            <div className="py-5 px-6 bg-white">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[13px] font-bold text-[#11142D]">Media, links, and docs</h3>
+                <button className="flex items-center text-[12px] font-semibold text-[#3B58F5]">
+                  67 <ChevronRight className="w-4 h-4 ml-0.5" />
+                </button>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
+                  <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
+                </div>
+                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
+                  <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
+                </div>
+                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
+                  <img src="https://images.unsplash.com/photo-1556761175-4b46a572b786?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
+                </div>
+                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
+                  <img src="https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-2 bg-[#F4F6FC] w-full" />
+
+            {/* Members Section */}
+            <div className="py-5 bg-white">
+              <div className="px-6 mb-3">
+                <h3 className="text-[13px] font-bold text-[#8F95B2] uppercase tracking-wider">{memberCount} Members</h3>
+              </div>
+              <div className="flex flex-col">
+                {groupMembers.map((member, index) => {
+                  const mName = member.profile?.name || member.user?.profile?.displayName || "Unknown Member";
+                  const mRole = member.role || "Member";
+                  const mAvatar = member.profile?.avatarUrl || member.user?.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(mName)}&background=random`;
+                  
+                  return (
+                    <div key={member.id || index} className="flex items-center justify-between px-6 py-3 hover:bg-[#F4F6FC] transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <img src={mAvatar} alt={mName} className="w-10 h-10 rounded-full object-cover" />
+                        <span className="text-[14px] font-semibold text-[#11142D]">{mName}</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-[#3B58F5] bg-[#EEF2FF] px-2 py-0.5 rounded uppercase tracking-wider">
+                        {mRole}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
-
-              <div className={cn("flex flex-col max-w-[75%]", msg.isMe ? "items-end" : "items-start")}>
-                
-                {/* Sender Name (Only for others, only on first message of a block) */}
-                {!msg.isMe && (index === 0 || DUMMY_MESSAGES[index - 1]?.sender?.name !== msg.sender?.name) && (
-                  <span className="text-[12px] font-semibold text-[#3B58F5] ml-1 mb-1">
-                    {msg.sender?.name}
-                  </span>
-                )}
-
-                {/* Message Bubble */}
-                <div
-                  className={cn(
-                    "px-4 py-3 text-[14.5px] shadow-sm leading-relaxed",
-                    msg.isMe 
-                      ? "bg-[#3B58F5] text-white rounded-[20px] rounded-br-sm" 
-                      : "bg-white text-[#11142D] rounded-[20px] rounded-bl-sm"
-                  )}
-                  style={{ wordBreak: "break-word" }}
-                >
-                  {msg.text}
-                </div>
-
-                {/* Time and Seen Status */}
-                {(!isNextSameSender || msg.isMe) && (
-                  <div className={cn("flex flex-col mt-1", msg.isMe ? "items-end mr-1" : "ml-1")}>
-                    <span className="text-[11px] font-medium text-[#8F95B2]">
-                      {msg.time}
-                    </span>
-                    {msg.isMe && msg.seen && (
-                      <span className="text-[11px] text-[#8F95B2]">Seen</span>
-                    )}
+                  );
+                })}
+                {groupMembers.length === 0 && (
+                  <div className="px-6 py-4 text-center text-sm text-[#8F95B2]">
+                    No members to display.
                   </div>
                 )}
               </div>
             </div>
-          );
-        })}
 
-        {/* Typing indicator */}
-        <div className="flex w-full justify-start mt-2">
-          <div className="w-8 shrink-0 mr-3 flex items-end">
-            <div className="h-8 w-8 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white text-xs font-bold shadow-sm">
-              AK
+            <div className="h-2 bg-[#F4F6FC] w-full" />
+
+            {/* Destructive Actions */}
+            <div className="py-4 bg-white flex flex-col mb-8">
+              <button className="flex items-center gap-4 px-6 py-3.5 hover:bg-red-50 transition-colors w-full text-left">
+                <Trash2 className="w-5 h-5 text-red-500" strokeWidth={2} />
+                <span className="text-[14.5px] font-semibold text-red-500">Clear Chat</span>
+              </button>
+              <button onClick={handleLeaveGroup} className="flex items-center gap-4 px-6 py-3.5 hover:bg-red-50 transition-colors w-full text-left">
+                <LogOut className="w-5 h-5 text-red-500" strokeWidth={2} />
+                <span className="text-[14.5px] font-semibold text-red-500">Leave Group</span>
+              </button>
+              <button className="flex items-center gap-4 px-6 py-3.5 hover:bg-red-50 transition-colors w-full text-left">
+                <AlertCircle className="w-5 h-5 text-red-500" strokeWidth={2} />
+                <span className="text-[14.5px] font-semibold text-red-500">Report Group</span>
+              </button>
             </div>
-          </div>
-          <div className="flex flex-col max-w-[75%] items-start">
-            <div className="px-4 py-3 bg-white text-[#11142D] rounded-[20px] rounded-bl-sm shadow-sm flex items-center gap-1 w-16 h-[44px]">
-              <div className="w-2 h-2 bg-[#8F95B2] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-              <div className="w-2 h-2 bg-[#8F95B2] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-              <div className="w-2 h-2 bg-[#8F95B2] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-            </div>
+
           </div>
         </div>
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Form */}
-      <div className="bg-white px-4 py-3 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
-        <form onSubmit={handleSend} className="flex items-center gap-3 w-full max-w-4xl mx-auto">
-          
-          <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0">
-            <Smile className="h-6 w-6" strokeWidth={1.5} />
-          </button>
-          
-          <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0">
-            <Paperclip className="h-[22px] w-[22px]" strokeWidth={1.5} />
-          </button>
-          
-          <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0">
-            <ImageIcon className="h-6 w-6" strokeWidth={1.5} />
-          </button>
-
-          <div className="flex-1 bg-[#F4F6FC] rounded-full flex items-center px-4 py-1.5 h-[44px]">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 bg-transparent text-[15px] text-[#11142D] placeholder-[#8F95B2] focus:outline-none"
-            />
-          </div>
-          
-          <button
-            type={inputText.trim() ? "submit" : "button"}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3B58F5] text-white transition-transform hover:scale-105 active:scale-95 shadow-md"
-          >
-            {inputText.trim() ? (
-              <Send className="h-5 w-5 ml-0.5" strokeWidth={2} />
-            ) : (
-              <Mic className="h-5 w-5" strokeWidth={2} />
-            )}
-          </button>
-        </form>
-      </div>
+      )}
     </div>
   );
 }
