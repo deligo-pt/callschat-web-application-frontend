@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { groupService } from "@/services/group.service";
 
 interface Contact {
   id: string;
@@ -17,7 +19,9 @@ interface Contact {
 const COLORS = ["bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-pink-500", "bg-emerald-500"];
 
 export default function CreateGroupPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Step 1 State
   const [groupName, setGroupName] = useState("");
@@ -98,6 +102,39 @@ export default function CreateGroupPage() {
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     (c.phone && c.phone.includes(searchQuery))
   );
+
+  const handleCreateGroup = async () => {
+    setIsCreating(true);
+    try {
+      // Step 1: Create the group
+      const groupRes = await groupService.createGroup({
+        name: groupName,
+        description: description,
+        isPublic: false,
+        maxMembers: 50,
+      });
+
+      if (!groupRes.success || !groupRes.data) {
+        console.error("Failed to create group:", groupRes.error);
+        setIsCreating(false);
+        return;
+      }
+
+      const groupId = groupRes.data.id;
+
+      // Step 2: Add selected members
+      // Using Promise.all to add them concurrently for speed
+      await Promise.all(
+        selectedMembers.map((userId) => groupService.addMember(groupId, userId))
+      );
+
+      // Redirect to groups list (or the newly created group page)
+      router.push(`/groups`);
+    } catch (err) {
+      console.error("Error creating group:", err);
+      setIsCreating(false);
+    }
+  };
 
   return (
     <div className="flex h-full w-full flex-col items-center bg-[#F8FAFC] overflow-y-auto">
@@ -372,13 +409,26 @@ export default function CreateGroupPage() {
           <button
             onClick={() => {
               if (step < 3) handleNext();
-              else console.log("Creating group...", { groupName, description, selectedMembers, privacyEnabled });
+              else handleCreateGroup();
             }}
-            disabled={(step === 1 && !groupName.trim()) || (step === 2 && selectedMembers.length === 0)}
+            disabled={
+              (step === 1 && !groupName.trim()) || 
+              (step === 2 && selectedMembers.length === 0) ||
+              isCreating
+            }
             className="flex items-center gap-2 px-8 py-3 rounded-xl bg-[#3B58F5] text-white font-semibold text-[14px] hover:bg-[#2542E5] disabled:opacity-50 disabled:hover:bg-[#3B58F5] transition-colors"
           >
-            {step === 3 ? "Create Group" : "Next"}
-            {step < 3 && <ArrowLeft className="h-4 w-4 rotate-180" />}
+            {isCreating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                {step === 3 ? "Create Group" : "Next"}
+                {step < 3 && <ArrowLeft className="h-4 w-4 rotate-180" />}
+              </>
+            )}
           </button>
         </div>
       </div>
