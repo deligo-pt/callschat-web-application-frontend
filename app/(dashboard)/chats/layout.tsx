@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { chatService } from "@/services/chat.service";
 import { motion } from "framer-motion";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
 interface Conversation {
   id: string;
@@ -163,8 +164,6 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  const notificationsCount = 0;
-
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
     const now = new Date();
@@ -207,12 +206,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                 <div className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#FFA500]" />
               </button>
 
-              <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
-                <Bell className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
-                {notificationsCount > 0 && (
-                  <div className="absolute right-2 top-2 h-2 w-2 rounded-full border border-white bg-red-500" />
-                )}
-              </button>
+              <NotificationDropdown />
             </div>
           </div>
 

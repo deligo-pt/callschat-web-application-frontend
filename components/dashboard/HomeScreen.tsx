@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
 // --- Types for Real-Time Data ---
 interface ActiveUser {
@@ -122,12 +123,7 @@ export default function HomeScreen() {
               </button>
               
               {/* Notification Bell */}
-              <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
-                <Bell className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
-                {notificationsCount > 0 && (
-                  <div className="absolute right-2 top-2 h-2 w-2 rounded-full border border-white bg-red-500" />
-                )}
-              </button>
+              <NotificationDropdown />
             </div>
           </div>
 
