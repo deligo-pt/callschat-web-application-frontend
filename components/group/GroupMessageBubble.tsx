@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
 
 interface GroupMessageBubbleProps {
   msg: {
@@ -34,43 +35,45 @@ export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, is
   const renderMedia = () => {
     if (!msg.mediaUrl) return null;
 
-    switch (msg.mediaType) {
-      case "image":
-        return (
-          <img
-            src={msg.mediaUrl}
-            alt="Attached Image"
-            className="rounded-lg max-w-sm w-full cursor-pointer object-cover mb-1"
-          />
-        );
-      case "video":
-        return (
-          <video
-            src={msg.mediaUrl}
-            controls
-            className="rounded-lg max-w-sm w-full max-h-[300px] mb-1"
-          />
-        );
-      case "audio":
-        return (
-          <audio
-            src={msg.mediaUrl}
-            controls
-            className="w-full max-w-[250px] mb-1"
-          />
-        );
-      default:
-        return (
-          <a
-            href={msg.mediaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block text-blue-500 underline mb-1"
-          >
-            📎 Download Attachment
-          </a>
-        );
+    const mediaKey = `media-${msg.id}-${msg.mediaUrl}`;
+
+    if (msg.mediaType?.startsWith("image")) {
+      return (
+        <img
+          key={mediaKey}
+          src={msg.mediaUrl}
+          alt="Attached Image"
+          className="rounded-lg max-w-sm w-full cursor-pointer object-cover mb-1"
+        />
+      );
     }
+
+    if (msg.mediaType?.startsWith("video")) {
+      return (
+        <video
+          key={mediaKey}
+          src={msg.mediaUrl}
+          controls
+          className="rounded-lg max-w-sm w-full max-h-[300px] mb-1"
+        />
+      );
+    }
+
+    if (msg.mediaType?.startsWith("audio") || msg.mediaType === "audio") {
+      return <VoiceMessagePlayer key={`voice-${msg.id}`} src={msg.mediaUrl} messageId={msg.id} isMe={isMe} />;
+    }
+
+    return (
+      <a
+        key={mediaKey}
+        href={msg.mediaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block text-blue-500 underline mb-1"
+      >
+        📎 Download Attachment
+      </a>
+    );
   };
 
   return (

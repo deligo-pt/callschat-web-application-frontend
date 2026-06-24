@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
 
 interface MessageBubbleProps {
   msg: {
@@ -20,46 +21,67 @@ export function MessageBubble({ msg, isMe, showTail }: MessageBubbleProps) {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  const isVoice =
+    msg.mediaUrl && (msg.mediaType?.startsWith("audio") || msg.mediaType === "audio");
+
+  // Voice messages skip the text-bubble wrapper entirely
+  if (isVoice) {
+    return (
+      <div className={cn("flex w-full z-10 flex-col mb-1", isMe ? "items-end" : "items-start")}>
+        <VoiceMessagePlayer
+          key={`voice-${msg.id}`}
+          src={msg.mediaUrl!}
+          messageId={msg.id}
+          isMe={isMe}
+        />
+        <div className={cn("flex items-center gap-1 mt-1 px-1", isMe ? "justify-end text-gray-500" : "justify-start text-gray-500")}>
+          <span className="text-[11px] font-medium">
+            {formatTime(msg.createdAt)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const renderMedia = () => {
     if (!msg.mediaUrl) return null;
 
-    switch (msg.mediaType) {
-      case "image":
-        return (
-          <img
-            src={msg.mediaUrl}
-            alt="Attached Image"
-            className="rounded-lg max-w-sm w-full cursor-pointer object-cover mb-1"
-          />
-        );
-      case "video":
-        return (
-          <video
-            src={msg.mediaUrl}
-            controls
-            className="rounded-lg max-w-sm w-full max-h-[300px] mb-1"
-          />
-        );
-      case "audio":
-        return (
-          <audio
-            src={msg.mediaUrl}
-            controls
-            className="w-full max-w-[250px] mb-1"
-          />
-        );
-      default:
-        return (
-          <a
-            href={msg.mediaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block text-blue-500 underline mb-1"
-          >
-            📎 Download Attachment
-          </a>
-        );
+    const mediaKey = `media-${msg.id}-${msg.mediaUrl}`;
+
+    if (msg.mediaType?.startsWith("image")) {
+      return (
+        <img
+          key={mediaKey}
+          src={msg.mediaUrl}
+          alt="Attached Image"
+          className="rounded-lg max-w-sm w-full cursor-pointer object-cover mb-1"
+        />
+      );
     }
+
+    if (msg.mediaType?.startsWith("video")) {
+      return (
+        <video
+          key={mediaKey}
+          src={msg.mediaUrl}
+          controls
+          className="rounded-lg max-w-sm w-full max-h-[300px] mb-1"
+        />
+      );
+    }
+
+    // Fallback: downloadable link
+    return (
+      <a
+        key={mediaKey}
+        href={msg.mediaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block text-blue-500 underline mb-1"
+      >
+        📎 Download Attachment
+      </a>
+    );
   };
 
   return (

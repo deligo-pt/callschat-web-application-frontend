@@ -109,6 +109,19 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           if (Array.isArray(rawMessages)) {
             const decryptedHistory = await Promise.all(
               rawMessages.map(async (msg: any) => {
+                // Media-only message — skip decryption, return as-is
+                if (!msg.ciphertext || !msg.nonce) {
+                  return {
+                    id: msg.id,
+                    conversationId: msg.conversationId,
+                    senderId: msg.senderId,
+                    text: "",
+                    createdAt: msg.createdAt,
+                    mediaUrl: msg.mediaUrl,
+                    mediaType: msg.mediaType,
+                  };
+                }
+
                 try {
                   const targetUserId = msg.senderId === currentUserId ? activePeerId : msg.senderId;
                   
@@ -132,7 +145,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     );
                   } catch (err) {
                     console.warn(`[History] Decryption failed for msg ${msg.id}, trying latest key...`);
-                    // Fallback: fetch the latest key for the target user in case it changed
                     try {
                       const res = await chatService.fetchRecipientKey(targetUserId);
                       let latestKey = pubKeyToUse;

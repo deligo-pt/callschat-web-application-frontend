@@ -13,16 +13,52 @@ export function useMediaCapture() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // --- Audio Logic ---
+  // --- Task 1: Dynamic MIME Type Resolver ---
+  // Browsers support different audio codecs. We probe in priority order:
+  //   1. audio/webm;codecs=opus – Chrome, Firefox, Edge
+  //   2. audio/mp4              – Safari, iOS (AAC codec)
+  //   3. audio/ogg;codecs=opus  – Firefox (alternative)
+  //   4. audio/webm             – Generic WebM fallback
+  //   5. ''                     – Let the browser pick its default
+  const getSupportedAudioMimeType = (): string => {
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/webm',
+    ];
+    for (const type of types) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+    return '';
+  };
+
+  // Derive a safe file extension from the MIME type string
+  const getExtensionForMime = (mimeType: string): string => {
+    if (mimeType.startsWith('audio/mp4')) return 'mp4';
+    if (mimeType.startsWith('audio/ogg')) return 'ogg';
+    return 'webm'; // covers audio/webm and browser default
+  };
+
+  // --- Task 2: Rewritten Recording Logic ---
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+      const mimeType = getSupportedAudioMimeType();
+
+      // Only pass mimeType if the browser confirmed it's supported; otherwise
+      // let MediaRecorder pick its own default to avoid NotSupportedError.
+      const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
+      const mediaRecorder = new MediaRecorder(stream, options);
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
@@ -42,24 +78,40 @@ export function useMediaCapture() {
 
   const stopRecording = useCallback((): Promise<File | null> => {
     return new Promise((resolve) => {
-      if (!mediaRecorderRef.current) {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder) {
         resolve(null);
         return;
       }
 
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
-        
-        // Cleanup stream tracks
-        mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+      // Capture the MIME type *before* stopping; after stop the recorder
+      // state may be cleared in some browser implementations.
+      const chosenMimeType = recorder.mimeType || 'audio/webm';
+
+      recorder.onstop = () => {
+        // Build the Blob with the exact same MIME type that was used during
+        // recording. This guarantees the container format matches the encoded
+        // data, which is the root cause of playback failures.
+        const audioBlob = new Blob(audioChunksRef.current, { type: chosenMimeType });
+
+        const ext = getExtensionForMime(chosenMimeType);
+        const audioFile = new File(
+          [audioBlob],
+          `audio_${Date.now()}.${ext}`,
+          { type: chosenMimeType }
+        );
+
+        // Cleanup stream tracks so the mic indicator disappears
+        recorder.stream.getTracks().forEach((track) => track.stop());
+
         setIsRecording(false);
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         setRecordingDuration(0);
+
         resolve(audioFile);
       };
 
-      mediaRecorderRef.current.stop();
+      recorder.stop();
     });
   }, []);
 
@@ -126,10 +178,10 @@ export function useMediaCapture() {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+        mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
       }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, []);

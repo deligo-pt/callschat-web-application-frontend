@@ -172,93 +172,69 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
       if (payload.groupId !== groupId) return;
 
-      const gKey = groupKeyRef.current;
-      if (!gKey) {
-        console.error("⚠️ [Socket] Missing group key — cannot decrypt incoming message");
-        return;
-      }
+      // Helper to append a message, deduplicating by ID
+      const appendMessage = (msg: GroupMessage) => {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
 
-      if (payload.ciphertext && payload.nonce) {
-        try {
-          const text = await decryptGroupMessage(
-            payload.ciphertext,
-            payload.nonce,
-            gKey
-          );
-
-          setMessages((prev) => {
-            const hasRealId = prev.some((m) => m.id === payload.id);
-            if (hasRealId) return prev;
-
+          // Replace an optimistic placeholder from this user if present
+          if (msg.senderId === currentUserIdRef.current) {
             const optimisticIdx = prev.map((m) => m.id).lastIndexOf(
               prev.slice().reverse().find((m) => m.id.startsWith("optimistic-"))?.id ?? ""
             );
-            
-            if (optimisticIdx !== -1 && payload.senderId === currentUserIdRef.current) {
+            if (optimisticIdx !== -1) {
               const updated = [...prev];
-              updated[optimisticIdx] = {
-                id: payload.id,
-                groupId: payload.groupId,
-                senderId: payload.senderId,
-                text,
-                createdAt: payload.createdAt || new Date().toISOString(),
-                mediaUrl: payload.mediaUrl,
-                mediaType: payload.mediaType,
-                sender: payload.sender,
-              };
+              updated[optimisticIdx] = msg;
               return updated;
             }
+          }
 
-            return [
-              ...prev,
-              {
-                id: payload.id || Date.now().toString(),
-                groupId: payload.groupId,
-                senderId: payload.senderId,
-                text,
-                createdAt: payload.createdAt || new Date().toISOString(),
-                mediaUrl: payload.mediaUrl,
-                mediaType: payload.mediaType,
-                sender: payload.sender,
-              },
-            ];
-          });
-        } catch (err) {
-          console.error("❌ [Socket] Failed to decrypt group message:", err);
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === payload.id)) return prev;
-            return [
-              ...prev,
-              {
-                id: payload.id || Date.now().toString(),
-                groupId: payload.groupId,
-                senderId: payload.senderId || "unknown",
-                text: "🔒 Encrypted group message (Decryption Failed)",
-                createdAt: payload.createdAt || new Date().toISOString(),
-                mediaUrl: payload.mediaUrl,
-                mediaType: payload.mediaType,
-                sender: payload.sender,
-              },
-            ];
-          });
+          return [...prev, msg];
+        });
+      };
+
+      const baseMsg: GroupMessage = {
+        id: payload.id || Date.now().toString(),
+        groupId: payload.groupId,
+        senderId: payload.senderId || "unknown",
+        text: "",
+        createdAt: payload.createdAt || new Date().toISOString(),
+        mediaUrl: payload.mediaUrl ?? undefined,
+        mediaType: payload.mediaType ?? undefined,
+        sender: payload.sender,
+      };
+
+      // Case 1: Pure media message — no ciphertext, skip decryption entirely
+      if (!payload.ciphertext && !payload.nonce) {
+        if (payload.mediaUrl || payload.mediaType) {
+          appendMessage(baseMsg);
         }
-      } else if (payload.mediaUrl || payload.mediaType) {
-        // Media-only message without text
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === payload.id)) return prev;
-          return [
-            ...prev,
-            {
-              id: payload.id || Date.now().toString(),
-              groupId: payload.groupId,
-              senderId: payload.senderId || "unknown",
-              text: "",
-              createdAt: payload.createdAt || new Date().toISOString(),
-              mediaUrl: payload.mediaUrl,
-              mediaType: payload.mediaType,
-              sender: payload.sender,
-            },
-          ];
+        return;
+      }
+
+      // Case 2: Has ciphertext — need group key to decrypt
+      const gKey = groupKeyRef.current;
+      if (!gKey) {
+        console.warn("⚠️ [Socket] Missing group key — cannot decrypt incoming message. Rendering media only.");
+        // Still render the media if present rather than silently dropping
+        if (payload.mediaUrl) {
+          appendMessage(baseMsg);
+        }
+        return;
+      }
+
+      try {
+        const text = await decryptGroupMessage(
+          payload.ciphertext,
+          payload.nonce,
+          gKey
+        );
+        appendMessage({ ...baseMsg, text });
+      } catch (err) {
+        console.error("❌ [Socket] Failed to decrypt group message:", err);
+        appendMessage({
+          ...baseMsg,
+          text: payload.mediaUrl ? "" : "🔒 Encrypted group message (Decryption Failed)",
         });
       }
     };
