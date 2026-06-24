@@ -123,4 +123,16 @@ export const groupService = {
       return { success: false, error: error.response?.data?.message || "Failed to upload media" };
     }
   },
+
+  async fetchGroupMedia(groupId: string, page: number = 1): Promise<{ success: boolean; data?: any }> {
+    try {
+      const response = await apiClient.get(`/groups/${groupId}/media`, {
+        params: { page, limit: 50 },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch group media for ${groupId}`, error);
+      return { success: false };
+    }
+  },
 };

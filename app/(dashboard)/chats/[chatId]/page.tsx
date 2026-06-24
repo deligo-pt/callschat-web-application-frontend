@@ -11,6 +11,8 @@ import { useCallContext } from "@/components/providers/CallContext";
 import { ChatOptionsMenu } from "@/components/chat/ChatOptionsMenu";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
+import { MediaGallery } from "@/components/chat/MediaGallery";
+import { Images } from "lucide-react";
 
 function parseJwt(token: string) {
   try {
@@ -52,6 +54,7 @@ export default function ChatRoomPage() {
   const [recipientId, setRecipientId] = useState<string>(recipientIdFromQuery);
   const [isInitializing, setIsInitializing] = useState(true);
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -241,7 +244,11 @@ export default function ChatRoomPage() {
             <Phone className="h-5 w-5" strokeWidth={2} />
           </button>
           {recipientId && (
-            <ChatOptionsMenu conversationId={conversationId} peerId={recipientId} />
+            <ChatOptionsMenu 
+              conversationId={conversationId} 
+              peerId={recipientId} 
+              onMediaInfoClick={() => setGalleryOpen(true)}
+            />
           )}
         </div>
       </div>
@@ -289,6 +296,13 @@ export default function ChatRoomPage() {
 
       {/* Input Form */}
       <ChatInput onSend={handleSend} isReady={isReady} isUploading={isUploading} />
+
+      {/* Media Gallery Sidebar */}
+      <MediaGallery 
+        conversationId={conversationId} 
+        open={galleryOpen} 
+        onOpenChange={setGalleryOpen} 
+      />
     </div>
   );
 }

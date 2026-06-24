@@ -25,9 +25,10 @@ import { ChatActionModals } from "./ChatActionModals";
 export interface ChatOptionsMenuProps {
   conversationId: string;
   peerId: string;
+  onMediaInfoClick?: () => void;
 }
 
-export function ChatOptionsMenu({ conversationId, peerId }: ChatOptionsMenuProps) {
+export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick }: ChatOptionsMenuProps) {
   const [isClearChatOpen, setIsClearChatOpen] = useState(false);
   const [isBlockUserOpen, setIsBlockUserOpen] = useState(false);
 
@@ -103,7 +104,10 @@ export function ChatOptionsMenu({ conversationId, peerId }: ChatOptionsMenuProps
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />
 
-          <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
+          <DropdownMenuItem 
+            className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]"
+            onClick={onMediaInfoClick}
+          >
             <ImageIcon className="h-[18px] w-[18px] text-[#3B58F5]" strokeWidth={2.5} />
             <span className="text-[14.5px]">Media Info</span>
           </DropdownMenuItem>

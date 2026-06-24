@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { GroupInput } from "@/components/group/GroupInput";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
+import { MediaGallery } from "@/components/chat/MediaGallery";
 
 function parseJwt(token: string) {
   try {
@@ -63,6 +64,10 @@ export default function GroupChatPage() {
   const [isRemoveMemberDialogOpen, setIsRemoveMemberDialogOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<{ id: string, name: string } | null>(null);
   const [isRemovingMember, setIsRemovingMember] = useState(false);
+  
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [recentMedia, setRecentMedia] = useState<any[]>([]);
+  const [totalMedia, setTotalMedia] = useState<number>(0);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -104,9 +109,10 @@ export default function GroupChatPage() {
   useEffect(() => {
     const fetchGroupData = async () => {
       try {
-        const [detailsRes, membersRes] = await Promise.all([
+        const [detailsRes, membersRes, mediaRes] = await Promise.all([
           apiClient.get(`/groups/${groupId}`),
           apiClient.get(`/groups/${groupId}/members`),
+          groupService.fetchGroupMedia(groupId, 1),
         ]);
 
         if (detailsRes.data?.success) {
@@ -114,6 +120,10 @@ export default function GroupChatPage() {
         }
         if (membersRes.data?.success) {
           setGroupMembers(membersRes.data.data.members || []);
+        }
+        if (mediaRes?.success && mediaRes?.data) {
+          setRecentMedia(mediaRes.data.media || []);
+          setTotalMedia(mediaRes.data.total || 0);
         }
       } catch (error) {
         console.error("Failed to fetch group data", error);
@@ -448,23 +458,34 @@ export default function GroupChatPage() {
             <div className="py-5 px-6 bg-white">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[13px] font-bold text-[#11142D]">Media, links, and docs</h3>
-                <button className="flex items-center text-[12px] font-semibold text-[#3B58F5]">
-                  67 <ChevronRight className="w-4 h-4 ml-0.5" />
+                <button 
+                  onClick={() => setGalleryOpen(true)}
+                  className="flex items-center text-[12px] font-semibold text-[#3B58F5] hover:underline"
+                >
+                  {totalMedia > 0 ? totalMedia : ""} <ChevronRight className="w-4 h-4 ml-0.5" />
                 </button>
               </div>
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
-                  <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
-                </div>
-                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
-                  <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
-                </div>
-                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
-                  <img src="https://images.unsplash.com/photo-1556761175-4b46a572b786?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
-                </div>
-                <div className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF]">
-                  <img src="https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=150&h=150&fit=crop" className="w-full h-full object-cover" alt="Media" />
-                </div>
+                {recentMedia.length === 0 ? (
+                  <div className="text-xs text-[#8F95B2] italic">No media shared yet.</div>
+                ) : (
+                  recentMedia.filter(m => m.mediaType?.startsWith('image/') || m.mediaType?.startsWith('video/') || m.mediaType === 'image' || m.mediaType === 'video').slice(0, 4).map((m) => (
+                    <div key={m.id} className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF] relative group cursor-pointer" onClick={() => setGalleryOpen(true)}>
+                      {m.mediaType?.includes('video') ? (
+                        <>
+                          <video src={m.mediaUrl} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <div className="w-6 h-6 rounded-full bg-white/80 flex items-center justify-center">
+                              <div className="w-0 h-0 border-t-[4px] border-t-transparent border-l-[6px] border-l-[#3B58F5] border-b-[4px] border-b-transparent ml-0.5" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img src={m.mediaUrl} className="w-full h-full object-cover" alt="Media" />
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -658,6 +679,13 @@ export default function GroupChatPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Media Gallery Sidebar */}
+      <MediaGallery 
+        conversationId={groupId} 
+        open={galleryOpen} 
+        onOpenChange={setGalleryOpen} 
+        isGroup={true}
+      />
     </div>
   );
 }

@@ -50,4 +50,11 @@ export const chatService = {
     });
     return response.data;
   },
+
+  fetchConversationMedia: async (conversationId: string, page: number = 1) => {
+    const response = await apiClient.get(`/conversations/${conversationId}/media`, {
+      params: { page, limit: 50 },
+    });
+    return response.data;
+  },
 };
