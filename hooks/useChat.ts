@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
-import { playNotificationSound } from "@/utils/sounds";
 
 export interface ChatMessage {
   id: string;
@@ -236,11 +235,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       const currentUser = currentUserIdRef.current;
       const peerUser = activePeerIdRef.current;
       const senderId = payload.senderId || payload.sender?.id;
-
-      // Play sound if we received a message from someone else
-      if (senderId && senderId !== currentUser) {
-        playNotificationSound("message");
-      }
 
       const privKey = myPrivateKeyRef.current;
       const pubKey = recipientPublicKeyRef.current;

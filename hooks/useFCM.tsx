@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
 import { messaging } from '@/lib/firebase';
 import NotificationService from '@/services/notification.service';
@@ -10,6 +10,17 @@ import React from 'react';
 export const useFCM = () => {
   const pathname = usePathname();
   const router = useRouter();
+
+  // Use refs so the onMessage closure always has the latest path without re-running the effect
+  const currentPathRef = useRef(pathname);
+  useEffect(() => {
+    currentPathRef.current = pathname;
+  }, [pathname]);
+
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   useEffect(() => {
     const setupFCM = async () => {
@@ -66,49 +77,53 @@ export const useFCM = () => {
 
         // Call Interception: bypass the standard toast and trigger our full-screen Ringing UI
         if (type === 'CALL') {
-          // Check if it's already active via sockets by giving sockets a tiny bit of priority,
-          // but we can just trigger the fallback event and let the CallSignaling hook handle deduplication.
           playNotificationSound('call');
           window.dispatchEvent(new CustomEvent('fcm:incoming_call', { detail: data }));
           return;
         }
 
-        // The Mute Check
-        if (type === 'CHAT' && pathname === `/chats/${routeId}`) {
-          playNotificationSound('message');
-          return;
-        }
-        if (type === 'GROUP' && pathname === `/groups/${routeId}`) {
-          playNotificationSound('message');
-          return;
-        }
-
-        // Custom Toast for other pages
-        playNotificationSound('message');
+        const currentPath = currentPathRef.current;
+        const messageRoute = type === 'GROUP' 
+          ? `/groups/${routeId}` 
+          : `/chats/${routeId}`;
         
-        if (payload.notification) {
-          const title = payload.notification.title || 'New Message';
-          const body = payload.notification.body || '';
+        const isCurrentlyInThisChat = currentPath === messageRoute;
+
+        if (isCurrentlyInThisChat) {
+          // The user is actively staring at this exact conversation.
+          // Do NOT show a toast. Just play a soft in-chat pop.
+          playNotificationSound('message');
+        } else {
+          // The user is somewhere else in the application.
+          // Play the alert sound
+          playNotificationSound('message');
+          
+          const title = payload.notification?.title || 'New Message';
+          const body = payload.notification?.body || '';
           const senderAvatar = data.senderAvatar;
 
-          toast(title, {
-            description: body,
-            icon: senderAvatar ? React.createElement('img', { src: senderAvatar, alt: 'avatar', className: 'w-8 h-8 rounded-full object-cover' }) : undefined,
-            action: {
-              label: 'Open',
-              onClick: () => {
-                if (type === 'CHAT') router.push(`/chats/${routeId}`);
-                else if (type === 'GROUP') router.push(`/groups/${routeId}`);
-                else router.push('/');
-              }
-            },
-            classNames: {
-              toast: 'group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
-              title: 'group-[.toast]:font-semibold',
-              description: 'group-[.toast]:text-muted-foreground',
-              actionButton: 'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
-            }
-          });
+          // Trigger a custom sonner toast
+          toast.custom((t) => (
+            <div 
+              className="flex items-center gap-3 p-4 bg-background border border-border shadow-lg rounded-xl cursor-pointer hover:bg-muted/50 transition-colors w-[356px]"
+              onClick={() => {
+                toast.dismiss(t);
+                routerRef.current.push(messageRoute);
+              }}
+            >
+              {senderAvatar ? (
+                <img src={senderAvatar} alt="avatar" className="w-10 h-10 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary/10 shrink-0 flex items-center justify-center">
+                  <span className="text-primary font-semibold">{title.charAt(0)}</span>
+                </div>
+              )}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <span className="font-semibold text-foreground text-sm truncate">{title}</span>
+                <span className="text-muted-foreground text-sm line-clamp-2">{body}</span>
+              </div>
+            </div>
+          ));
         }
       });
 
@@ -117,5 +132,5 @@ export const useFCM = () => {
         unsubscribe();
       };
     }
-  }, [pathname, router]);
+  }, []); // Empty dependency array prevents re-registering FCM on every navigation!
 };
