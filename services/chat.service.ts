@@ -39,4 +39,15 @@ export const chatService = {
     const response = await apiClient.get('/conversations');
     return response.data;
   },
+
+  uploadMedia: async (conversationId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post(`/conversations/${conversationId}/upload`, formData, {
+      headers: {
+        'Content-Type': undefined, // Allow browser to set the multipart/form-data boundary
+      },
+    });
+    return response.data;
+  },
 };

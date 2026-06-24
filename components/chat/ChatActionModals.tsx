@@ -1,0 +1,124 @@
+import React, { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import apiClient from "@/services/api.client";
+
+export interface ChatActionModalsProps {
+  conversationId: string;
+  peerId: string;
+  isClearChatOpen: boolean;
+  setIsClearChatOpen: (v: boolean) => void;
+  isBlockUserOpen: boolean;
+  setIsBlockUserOpen: (v: boolean) => void;
+  onClearSuccess?: () => void;
+  onBlockSuccess?: () => void;
+}
+
+export function ChatActionModals({
+  conversationId,
+  peerId,
+  isClearChatOpen,
+  setIsClearChatOpen,
+  isBlockUserOpen,
+  setIsBlockUserOpen,
+  onClearSuccess,
+  onBlockSuccess,
+}: ChatActionModalsProps) {
+  const [isClearing, setIsClearing] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
+
+  const handleClearChat = async () => {
+    setIsClearing(true);
+    try {
+      // TODO: Implement actual API call when backend endpoint is ready
+      // await apiClient.delete(`/conversations/${conversationId}/messages`);
+      await new Promise((resolve) => setTimeout(resolve, 800)); // Mock network delay
+      toast.success("Chat history cleared successfully.");
+      setIsClearChatOpen(false);
+      onClearSuccess?.();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.response?.data?.message || "Failed to clear chat history.");
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    setIsBlocking(true);
+    try {
+      // TODO: Implement actual API call when backend endpoint is ready
+      // await apiClient.post(`/users/block`, { targetUserId: peerId });
+      await new Promise((resolve) => setTimeout(resolve, 800)); // Mock network delay
+      toast.success("Contact blocked successfully.");
+      setIsBlockUserOpen(false);
+      onBlockSuccess?.();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.response?.data?.message || "Failed to block user.");
+    } finally {
+      setIsBlocking(false);
+    }
+  };
+
+  return (
+    <>
+      <AlertDialog open={isClearChatOpen} onOpenChange={setIsClearChatOpen}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear chat history?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove all messages for you. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isClearing}
+              onClick={(e) => {
+                e.preventDefault();
+                handleClearChat();
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {isClearing ? "Clearing..." : "Clear Chat"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isBlockUserOpen} onOpenChange={setIsBlockUserOpen}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Block this contact?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They will no longer be able to send you messages or call you.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBlocking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isBlocking}
+              onClick={(e) => {
+                e.preventDefault();
+                handleBlockUser();
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {isBlocking ? "Blocking..." : "Block User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

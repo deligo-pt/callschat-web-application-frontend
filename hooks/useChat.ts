@@ -9,6 +9,8 @@ export interface ChatMessage {
   senderId: string;
   text: string;
   createdAt: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio' | 'document' | null;
 }
 
 export const useChat = (conversationId: string, currentUserId: string, activePeerId: string) => {
@@ -16,6 +18,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
   const [myPrivateKey, setMyPrivateKey] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Use refs so the receive handler always has the latest key values
   // without needing to re-register every time they change
@@ -148,6 +151,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     senderId: msg.senderId,
                     text,
                     createdAt: msg.createdAt,
+                    mediaUrl: msg.mediaUrl,
+                    mediaType: msg.mediaType,
                   };
                 } catch {
                   return {
@@ -156,6 +161,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     senderId: msg.senderId,
                     text: "🔒 Encrypted Message",
                     createdAt: msg.createdAt,
+                    mediaUrl: msg.mediaUrl,
+                    mediaType: msg.mediaType,
                   };
                 }
               })
@@ -307,6 +314,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 senderId: payload.senderId,
                 text,
                 createdAt: payload.createdAt || new Date().toISOString(),
+                mediaUrl: payload.mediaUrl,
+                mediaType: payload.mediaType,
               };
               return updated;
             }
@@ -319,6 +328,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 senderId: senderId,
                 text,
                 createdAt: payload.createdAt || new Date().toISOString(),
+                mediaUrl: payload.mediaUrl,
+                mediaType: payload.mediaType,
               },
             ];
           });
@@ -338,30 +349,26 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 senderId: fallbackSenderId,
                 text: "🔒 Encrypted message (Decryption Failed)",
                 createdAt: payload.createdAt || new Date().toISOString(),
+                mediaUrl: payload.mediaUrl,
+                mediaType: payload.mediaType,
               },
             ];
           });
         }
       } else if (payload.mediaType || payload.mediaUrl) {
-        // Media-only messages
+        // Media-only messages (no text)
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
-          const mediaLabel =
-            payload.mediaType === "image"
-              ? "📷 Photo"
-              : payload.mediaType === "video"
-              ? "🎥 Video"
-              : payload.mediaType === "audio"
-              ? "🎤 Voice message"
-              : "📎 Media";
           return [
             ...prev,
             {
               id: payload.id || Date.now().toString(),
               conversationId: payload.conversationId,
               senderId: payload.senderId || payload.sender?.id || "unknown",
-              text: mediaLabel,
+              text: "",
               createdAt: payload.createdAt || new Date().toISOString(),
+              mediaUrl: payload.mediaUrl,
+              mediaType: payload.mediaType,
             },
           ];
         });
@@ -383,7 +390,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (text: string, currentUserId: string) => {
+    async (text: string, currentUserId: string, file: File | null = null) => {
       if (!socket || !isConnected || !myPrivateKey || !recipientPublicKey || !conversationId) {
         console.error("Cannot send: missing keys, socket, or conversationId");
         return;
@@ -397,36 +404,59 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           id: optimisticId,
           conversationId,
           senderId: currentUserId,
-          text,
+          text: file ? "Uploading media..." : text,
           createdAt: new Date().toISOString(),
+          // We don't have the mediaUrl yet for optimistic update
         },
       ]);
 
       try {
-        let pubKeyToUse = recipientPublicKey;
-        try {
-          const res = await chatService.fetchRecipientKey(activePeerId);
-          if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-            pubKeyToUse = res.data[res.data.length - 1].publicKey;
-          } else if (res?.success && res?.data?.publicKey) {
-            pubKeyToUse = res.data.publicKey;
+        let mediaUrl;
+        let mediaType;
+        
+        if (file) {
+          setIsUploading(true);
+          const uploadRes = await chatService.uploadMedia(conversationId, file);
+          if (uploadRes.success) {
+            mediaUrl = uploadRes.data.mediaUrl;
+            mediaType = uploadRes.data.mediaType;
+            
+            // Update the optimistic message to show the media preview (if it's local URL we could use ObjectURL, but we just wait for real msg)
           }
-        } catch (e) {
-          console.warn("Failed to fetch latest key before sending, using cached", e);
+          setIsUploading(false);
         }
 
-        const { ciphertext, nonce } = await encryptMessage(
-          text,
-          pubKeyToUse,
-          myPrivateKey
-        );
+        let ciphertext, nonce;
+        if (text) {
+          let pubKeyToUse = recipientPublicKey;
+          try {
+            const res = await chatService.fetchRecipientKey(activePeerId);
+            if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+              pubKeyToUse = res.data[res.data.length - 1].publicKey;
+            } else if (res?.success && res?.data?.publicKey) {
+              pubKeyToUse = res.data.publicKey;
+            }
+          } catch (e) {
+            console.warn("Failed to fetch latest key before sending, using cached", e);
+          }
 
-        const payload = { conversationId, ciphertext, nonce };
+          const encrypted = await encryptMessage(text, pubKeyToUse, myPrivateKey);
+          ciphertext = encrypted.ciphertext;
+          nonce = encrypted.nonce;
+        }
+
+        const payload = { conversationId, ciphertext, nonce, mediaUrl, mediaType };
         socket.emit("chat:send_message", payload);
+        
+        // Remove optimistic message if no text, as server will echo it back
+        if (!text) {
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        }
       } catch (err) {
         console.error("Failed to encrypt and send message:", err);
         // Roll back optimistic update on failure
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        setIsUploading(false);
       }
     },
     [socket, isConnected, conversationId, myPrivateKey, recipientPublicKey, activePeerId]
@@ -435,6 +465,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   return {
     messages,
     sendMessage,
+    isUploading,
     isReady: !!(myPrivateKey && recipientPublicKey && isConnected && conversationId),
   };
 };

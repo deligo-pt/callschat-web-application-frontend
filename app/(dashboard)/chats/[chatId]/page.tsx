@@ -8,6 +8,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { useCallContext } from "@/components/providers/CallContext";
+import { ChatOptionsMenu } from "@/components/chat/ChatOptionsMenu";
+import { MessageBubble } from "@/components/chat/MessageBubble";
+import { ChatInput } from "@/components/chat/ChatInput";
 
 function parseJwt(token: string) {
   try {
@@ -47,7 +50,6 @@ export default function ChatRoomPage() {
 
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [recipientId, setRecipientId] = useState<string>(recipientIdFromQuery);
-  const [inputText, setInputText] = useState("");
   const [isInitializing, setIsInitializing] = useState(true);
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
 
@@ -162,30 +164,15 @@ export default function ChatRoomPage() {
     init();
   }, [conversationId, recipientIdFromQuery]);
 
-  const { messages, sendMessage, isReady } = useChat(conversationId, currentUserId, recipientId);
+  const { messages, sendMessage, isReady, isUploading } = useChat(conversationId, currentUserId, recipientId);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || !currentUserId) return;
-
-    sendMessage(inputText, currentUserId);
-    setInputText("");
-  };
-
-  const formatTime = (dateString: string) => {
-    const d = new Date(dateString);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend(e as unknown as React.FormEvent);
-    }
+  const handleSend = (text: string, file: File | null) => {
+    if (!currentUserId) return;
+    sendMessage(text, currentUserId, file);
   };
 
   if (!conversationId) {
@@ -258,9 +245,9 @@ export default function ChatRoomPage() {
           >
             <Video className="h-5 w-5" strokeWidth={2} />
           </button>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors">
-            <MoreVertical className="h-5 w-5" strokeWidth={2} />
-          </button>
+          {recipientId && (
+            <ChatOptionsMenu conversationId={conversationId} peerId={recipientId} />
+          )}
         </div>
       </div>
 
@@ -290,84 +277,15 @@ export default function ChatRoomPage() {
         ) : (
           messages.map((msg, index) => {
             const isMe = msg.senderId === currentUserId;
-            const showTail =
-              index === 0 || messages[index - 1].senderId !== msg.senderId;
+            const showTail = index === 0 || messages[index - 1].senderId !== msg.senderId;
 
             return (
-              <div
+              <MessageBubble
                 key={msg.id}
-                className={cn("flex w-full z-10", isMe ? "justify-end" : "justify-start")}
-              >
-                <div
-                  className={cn(
-                    "relative max-w-[75%] px-3.5 py-2 text-[14.5px] shadow-sm flex flex-col group",
-                    isMe ? "bg-[#DCF8C6] text-[#111B21]" : "bg-white text-[#111B21]",
-                    isMe ? "rounded-l-xl rounded-br-xl" : "rounded-r-xl rounded-bl-xl",
-                    showTail && isMe ? "rounded-tr-none" : "",
-                    showTail && !isMe ? "rounded-tl-none" : ""
-                  )}
-                >
-                  {/* Message Tail SVG */}
-                  {showTail && isMe && (
-                    <svg
-                      viewBox="0 0 8 13"
-                      width="8"
-                      height="13"
-                      className="absolute top-0 -right-[8px] text-[#DCF8C6]"
-                    >
-                      <path
-                        opacity="1"
-                        fill="currentColor"
-                        d="M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z"
-                      />
-                    </svg>
-                  )}
-                  {showTail && !isMe && (
-                    <svg
-                      viewBox="0 0 8 13"
-                      width="8"
-                      height="13"
-                      className="absolute top-0 -left-[8px] text-white"
-                    >
-                      <path
-                        opacity="1"
-                        fill="currentColor"
-                        d="M1.533 3.568 8 12.193V1H2.812C1.042 1 .474 2.156 1.533 3.568z"
-                      />
-                    </svg>
-                  )}
-
-                  <span
-                    className="leading-snug pr-10 whitespace-pre-wrap"
-                    style={{ wordBreak: "break-word" }}
-                  >
-                    {msg.text}
-                  </span>
-
-                  <div className="absolute bottom-1 right-2 flex items-center gap-1">
-                    <span className="text-[10px] text-gray-500">
-                      {formatTime(msg.createdAt)}
-                    </span>
-                    {isMe && (
-                      <svg
-                        viewBox="0 0 16 15"
-                        width="16"
-                        height="15"
-                        className="text-[#53bdeb]"
-                      >
-                        <path
-                          fill="currentColor"
-                          d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.199c.143.13.36.125.498-.011l5.3-6.974a.418.418 0 0 0-.106-.54z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M11.51 3.316l-.478-.372a.365.365 0 0 0-.51.063L5.166 9.879a.32.32 0 0 1-.484.033L2.01 7.489a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l3.052 2.776c.143.13.36.125.498-.011l5.3-6.974a.418.418 0 0 0-.106-.54z"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-              </div>
+                msg={msg}
+                isMe={isMe}
+                showTail={showTail}
+              />
             );
           })
         )}
@@ -375,33 +293,7 @@ export default function ChatRoomPage() {
       </div>
 
       {/* Input Form */}
-      <div className="bg-[#F0F2F5] px-4 py-3 shrink-0">
-        <form onSubmit={handleSend} className="flex items-end gap-3">
-          <div className="flex-1 bg-white rounded-xl flex items-center px-4 py-2 shadow-sm min-h-[44px]">
-            <textarea
-              value={inputText}
-              onChange={(e) => {
-                setInputText(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-              }}
-              onKeyDown={handleKeyDown}
-              disabled={!isReady}
-              placeholder={isReady ? "Type a message" : "Setting up encryption..."}
-              className="flex-1 bg-transparent text-[15px] text-[#111B21] placeholder-[#8F95B2] focus:outline-none resize-none overflow-y-auto min-h-[24px] py-1"
-              rows={1}
-              style={{ maxHeight: "120px" }}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!isReady || !inputText.trim()}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00A884] text-white transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-sm"
-          >
-            <Send className="h-5 w-5 ml-1" strokeWidth={2} />
-          </button>
-        </form>
-      </div>
+      <ChatInput onSend={handleSend} isReady={isReady} isUploading={isUploading} />
     </div>
   );
 }
