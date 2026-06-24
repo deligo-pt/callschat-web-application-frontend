@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '@/components/providers/SocketProvider';
+import { playNotificationSound } from '@/utils/sounds';
 
 export interface IncomingCall {
   callId: string;
@@ -52,6 +53,23 @@ export const useCallSignaling = () => {
   const [outgoingGroupCall, setOutgoingGroupCall] = useState<OutgoingGroupCall | null>(null);
   const [activeGroupCalls, setActiveGroupCalls] = useState<string[]>([]);
   const pendingCancelRef = useRef<boolean>(false);
+  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopRingtone = useCallback(() => {
+    if (ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current.currentTime = 0;
+      ringtoneRef.current = null;
+    }
+  }, []);
+
+  const playRingtone = useCallback(() => {
+    stopRingtone();
+    const audio = playNotificationSound('call');
+    if (audio) {
+      ringtoneRef.current = audio as HTMLAudioElement;
+    }
+  }, [stopRingtone]);
 
   useEffect(() => {
     if (!socket) return;
@@ -63,11 +81,13 @@ export const useCallSignaling = () => {
 
     const handleIncomingCall = (payload: IncomingCall) => {
       console.log('[Call] Incoming call received:', payload);
+      playRingtone();
       setIncomingCall(payload);
     };
 
     const handleCallConnected = (payload: any) => {
       console.log('[Call] Call connected, joining LiveKit room:', payload);
+      stopRingtone();
       setIncomingCall(null);
       setOutgoingCall(null);
       setActiveCall({
@@ -81,6 +101,7 @@ export const useCallSignaling = () => {
 
     const handleCallEnded = (payload?: unknown) => {
       console.log('[Call] Call ended/missed/rejected:', payload);
+      stopRingtone();
       setIncomingCall(null);
       setOutgoingCall(null);
       setActiveCall(null);
@@ -88,6 +109,7 @@ export const useCallSignaling = () => {
 
     const handleCallUnavailable = (payload?: unknown) => {
       console.warn('[Call] User unavailable:', payload);
+      stopRingtone();
       setIncomingCall(null);
       setOutgoingCall(null);
       setActiveCall(null);
@@ -95,6 +117,7 @@ export const useCallSignaling = () => {
 
     const handleCallError = (payload?: unknown) => {
       console.error('[Call] Call error:', payload);
+      stopRingtone();
       setIncomingCall(null);
       setOutgoingCall(null);
       setActiveCall(null);
@@ -110,6 +133,7 @@ export const useCallSignaling = () => {
 
     const handleGroupCallActive = (payload: { groupId: string; callId: string; callType: 'AUDIO' | 'VIDEO'; roomName: string; startedBy: string }) => {
       console.log('[Call] Group call active in:', payload.groupId);
+      stopRingtone();
       setActiveGroupCalls(prev => prev.includes(payload.groupId) ? prev : [...prev, payload.groupId]);
       
       // If we are currently ringing OUTGOING for this exact group, it means someone answered!
@@ -132,17 +156,20 @@ export const useCallSignaling = () => {
 
     const handleGroupCallIncoming = (payload: IncomingGroupCall) => {
       console.log('[Call] Incoming group call:', payload);
+      playRingtone();
       setIncomingGroupCall(payload);
     };
 
     const handleGroupCallTerminated = (payload: { groupId: string }) => {
       console.log('[Call] Group call terminated/missed in:', payload.groupId);
+      stopRingtone();
       setIncomingGroupCall(prev => prev?.groupId === payload.groupId ? null : prev);
       setOutgoingGroupCall(prev => prev?.groupId === payload.groupId ? null : prev);
     };
 
     const handleGroupCallEnded = (payload: { groupId: string }) => {
       console.log('[Call] Group call ended in:', payload.groupId);
+      stopRingtone();
       setActiveGroupCalls(prev => prev.filter(id => id !== payload.groupId));
     };
 
@@ -151,6 +178,30 @@ export const useCallSignaling = () => {
     socket.on('group:call_missed', handleGroupCallTerminated);
     socket.on('group:call_terminated', handleGroupCallTerminated);
     socket.on('group:call_ended', handleGroupCallEnded);
+
+    // FCM Fallback Handler
+    const handleFCMCall = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const data = customEvent.detail;
+      
+      console.log('[Call] FCM incoming call fallback triggered:', data);
+      
+      // Prevent deduplication if already ringing via sockets
+      setIncomingCall((prev) => {
+        if (prev && prev.callId === data.callId) return prev;
+        
+        return {
+          callId: data.callId || data.routeId,
+          callerId: data.callerId || data.routeId,
+          callType: data.callType || 'VIDEO',
+          roomName: data.roomName || data.callId || data.routeId,
+          isGroup: data.isGroup === 'true' || data.type === 'GROUP_CALL',
+          groupId: data.groupId || (data.isGroup === 'true' ? data.routeId : undefined),
+        };
+      });
+    };
+
+    window.addEventListener('fcm:incoming_call', handleFCMCall);
 
     return () => {
       socket.off('call:incoming', handleIncomingCall);
@@ -165,6 +216,7 @@ export const useCallSignaling = () => {
       socket.off('group:call_missed', handleGroupCallTerminated);
       socket.off('group:call_terminated', handleGroupCallTerminated);
       socket.off('group:call_ended', handleGroupCallEnded);
+      window.removeEventListener('fcm:incoming_call', handleFCMCall);
     };
   }, [socket]);
 

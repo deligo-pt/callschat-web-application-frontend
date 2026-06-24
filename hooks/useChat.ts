@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
+import { playNotificationSound } from "@/utils/sounds";
 
 export interface ChatMessage {
   id: string;
@@ -232,6 +233,15 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         return;
       }
 
+      const currentUser = currentUserIdRef.current;
+      const peerUser = activePeerIdRef.current;
+      const senderId = payload.senderId || payload.sender?.id;
+
+      // Play sound if we received a message from someone else
+      if (senderId && senderId !== currentUser) {
+        playNotificationSound("message");
+      }
+
       const privKey = myPrivateKeyRef.current;
       const pubKey = recipientPublicKeyRef.current;
 
@@ -246,12 +256,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
       if (payload.ciphertext && payload.nonce) {
         try {
-          const currentUser = currentUserIdRef.current;
-          const peerUser = activePeerIdRef.current;
-          
-          // Defensively extract senderId from payload, handling nested objects if backend sends populated data
-          const senderId = payload.senderId || payload.sender?.id;
-          
           if (!senderId) {
             console.error("❌ [Socket] Malformed payload: missing senderId. Cannot determine decryption key.", payload);
             throw new Error("Missing senderId in payload");

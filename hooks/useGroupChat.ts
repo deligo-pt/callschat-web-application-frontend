@@ -3,6 +3,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { groupService } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
 import { encryptGroupMessage, decryptGroupMessage, decryptMessage } from "@/utils/crypto";
+import { playNotificationSound } from "@/utils/sounds";
 
 export interface GroupMessage {
   id: string;
@@ -172,6 +173,13 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
       if (payload.groupId !== groupId) return;
 
+      const senderId = payload.senderId || payload.sender?.id || "unknown";
+      
+      // Play sound if we received a message from someone else
+      if (senderId !== currentUserIdRef.current) {
+        playNotificationSound("message");
+      }
+
       // Helper to append a message, deduplicating by ID
       const appendMessage = (msg: GroupMessage) => {
         setMessages((prev) => {
@@ -196,7 +204,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       const baseMsg: GroupMessage = {
         id: payload.id || Date.now().toString(),
         groupId: payload.groupId,
-        senderId: payload.senderId || "unknown",
+        senderId,
         text: "",
         createdAt: payload.createdAt || new Date().toISOString(),
         mediaUrl: payload.mediaUrl ?? undefined,
