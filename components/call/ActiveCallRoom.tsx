@@ -1,218 +1,151 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   LiveKitRoom, 
   RoomAudioRenderer,
   useLocalParticipant,
-  useRemoteParticipants,
   useTracks,
-  VideoTrack
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import "@livekit/components-styles";
 import { useCallContext } from "@/components/providers/CallContext";
-import { Maximize, Minimize, Mic, MicOff, Video, VideoOff, Volume2, VolumeX, PhoneOff, ArrowLeft, UserPlus, MoreVertical } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ArrowLeft, UserPlus, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ParticipantTile } from "./ParticipantTile";
 
-// Formatting helper for call duration
-const formatDuration = (seconds: number) => {
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-  const s = (seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-};
-
-const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolean, setIsMaximized: (v: boolean) => void }) => {
+const CustomCallLayout = () => {
   const { activeCall, hangupCall, leaveGroupCall } = useCallContext();
-  const remoteParticipants = useRemoteParticipants();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
-  const [duration, setDuration] = useState(0);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
 
-  // Timer
-  useEffect(() => {
+  // Dynamic Grid Engine: Fetch all active camera and screenshare tracks with placeholders
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false }
+    ],
+    { onlySubscribed: false }
+  );
+
+  // Auto-scaling grid algorithm
+  let gridClass = "grid gap-3 w-full h-full pb-32 pt-24 px-4 transition-all duration-300";
+  
+  if (tracks.length === 1) {
+    // 1 Participant: Full screen card viewport
+    gridClass += " grid-cols-1 grid-rows-1";
+  } else if (tracks.length === 2) {
+    // 2 Participants: Vertical split on mobile, horizontal on desktop
+    gridClass += " grid-cols-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1";
+  } else if (tracks.length <= 4) {
+    // 3 to 4 Participants: Uniform 2x2 grid
+    gridClass += " grid-cols-2 grid-rows-2";
+  } else {
+    // 5+ Participants: Strict 3-column mosaic grid with scrolling boundaries
+    gridClass += " grid-cols-2 md:grid-cols-3 auto-rows-[minmax(200px,1fr)] overflow-y-auto";
+  }
+
+  // Duration formatting (mock timer for the header, could be synced with actual call start)
+  const [duration, setDuration] = React.useState(0);
+  React.useEffect(() => {
     const timer = setInterval(() => setDuration(d => d + 1), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const remoteParticipant = remoteParticipants[0];
-  
-  // Use useTracks to ensure reactivity when tracks are published/unpublished
-  const cameraTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }]);
-  const remoteTrackRef = cameraTracks.find((t) => t.participant.identity !== localParticipant.identity);
-  const localTrackRef = cameraTracks.find((t) => t.participant.identity === localParticipant.identity);
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
-  const isVideoMode = activeCall?.callType === 'VIDEO' || isCameraEnabled || remoteParticipant?.isCameraEnabled;
-
-  // Avatar generator
-  const remoteName = activeCall?.roomName?.split('_')[0] || "Unknown User"; // fallback logic
-  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(remoteName)}&background=3B58F5&color=fff&size=256`;
+  const handleEndCall = () => {
+    if (activeCall?.isGroup && leaveGroupCall) {
+      leaveGroupCall(activeCall.callId);
+    } else if (activeCall) {
+      hangupCall(activeCall.callId);
+    }
+  };
 
   return (
-    <div className={cn(
-      "relative flex flex-col w-full h-full overflow-hidden transition-colors duration-500",
-      isVideoMode ? "bg-black" : "bg-[#1D2A54]"
-    )}>
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0A0F24]">
       
-      {/* Video Background Layer */}
-      {isVideoMode && (
-        <div className="absolute inset-0 z-0">
-          {remoteParticipant ? (
-            remoteTrackRef ? (
-              <VideoTrack 
-                trackRef={remoteTrackRef as any} 
-                className="w-full h-full object-cover" 
-              />
-            ) : (
-              // Remote joined but video is off
-              <div className="w-full h-full flex flex-col items-center justify-center bg-[#1D2A54]">
-                 <img src={avatarUrl} alt={remoteName} className="h-44 w-44 rounded-full object-cover border-4 border-[#3B58F5]" />
-              </div>
-            )
-          ) : localTrackRef ? (
-            // Remote hasn't joined, show local video full screen
-            <VideoTrack 
-              trackRef={localTrackRef as any} 
-              className="w-full h-full object-cover scale-x-[-1]" 
-            />
-          ) : null}
-
-          <div className="absolute inset-0 bg-black/20" /> {/* Subtle overlay */}
-          
-          {/* Overlay text if waiting for remote participant */}
-          {!remoteParticipant && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <span className="text-white text-lg font-medium tracking-wide drop-shadow-lg">
-                Calling...
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Top Header Layer */}
-      <div className="absolute top-0 left-0 w-full z-10 flex items-center justify-between p-6 pointer-events-auto">
+      <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/60 to-transparent">
         <button 
-          onClick={() => setIsMaximized(!isMaximized)}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-black/20 backdrop-blur-md text-white transition-all hover:bg-black/40 border border-white/10"
+          onClick={handleEndCall}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[#3B58F5] transition-all hover:bg-white/20 backdrop-blur-md"
         >
-          {isMaximized ? <Minimize className="h-6 w-6" /> : <Maximize className="h-6 w-6" />}
+          <ArrowLeft className="h-5 w-5" />
         </button>
 
-        <div className="flex gap-4">
-          <button className="flex h-12 w-12 items-center justify-center rounded-full bg-black/20 backdrop-blur-md text-white transition-all hover:bg-black/40 border border-white/10">
-            <UserPlus className="h-5 w-5" />
+        <div className="flex flex-col items-center">
+          <h2 className="text-sm font-bold tracking-wide text-[#3B58F5]">
+            Call
+          </h2>
+          <p className="text-xs font-semibold text-[#3B58F5]">
+            {formatDuration(duration)}
+          </p>
+        </div>
+
+        <div className="flex gap-2 md:gap-4">
+          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[#3B58F5] transition-all hover:bg-white/20 backdrop-blur-md">
+            <UserPlus className="h-4 w-4" />
           </button>
-          <button className="flex h-12 w-12 items-center justify-center rounded-full bg-black/20 backdrop-blur-md text-white transition-all hover:bg-black/40 border border-white/10">
-            <MoreVertical className="h-5 w-5" />
+          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[#3B58F5] transition-all hover:bg-white/20 backdrop-blur-md">
+            <MoreVertical className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Center Audio Layout Layer (Only visible in Audio Mode) */}
-      {!isVideoMode && (
-        <div className="absolute inset-0 z-0 flex flex-col items-center justify-center mt-[-10vh]">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-20" style={{ animationDuration: '3s' }} />
-            <div className="absolute -inset-8 rounded-full border border-[#3B58F5]/30 animate-pulse" />
-            <img 
-              src={avatarUrl} 
-              alt={remoteName}
-              className="relative h-44 w-44 rounded-full object-cover border-4 border-[#3B58F5] shadow-[0_0_60px_rgba(59,88,245,0.4)]"
-            />
-          </div>
-          
-          <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">
-            {remoteName}
-          </h2>
-          <p className="text-lg font-medium text-white/70 tracking-widest">
-            {formatDuration(duration)}
-          </p>
-        </div>
-      )}
-
-      {/* Video Mode Top Center Info */}
-      {isVideoMode && (
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center text-center drop-shadow-lg">
-           <h2 className="text-xl font-bold text-white drop-shadow-md tracking-wide">
-            {remoteName}
-          </h2>
-          <p className="text-sm font-medium text-white/90 drop-shadow-md">
-            {formatDuration(duration)}
-          </p>
-        </div>
-      )}
-
-      {/* Local Video Picture-in-Picture (Only in Video Mode when remote has joined) */}
-      {isVideoMode && remoteParticipant && localTrackRef && (
-        <div className="absolute bottom-36 right-6 z-20 w-32 h-44 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-800 transition-all hover:scale-105">
-          <VideoTrack 
-            trackRef={localTrackRef as any} 
-            className="w-full h-full object-cover scale-x-[-1]" 
+      {/* Dynamic Grid Layer */}
+      <div className={cn("absolute inset-0 z-0", gridClass)}>
+        {tracks.map((trackRef, idx) => (
+          <ParticipantTile 
+            key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} 
+            trackRef={trackRef} 
           />
-        </div>
-      )}
+        ))}
+      </div>
 
-      {/* Bottom Action Pill Control Bar */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center justify-between gap-2 px-6 py-4 rounded-[2rem] bg-[#1D2A54]/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] min-w-[340px]">
+      {/* Floating Overlay Control Dock */}
+      <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center justify-center gap-6 rounded-[2rem] bg-[#111936]/80 px-8 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl border border-white/5">
         
-        {/* Video Toggle */}
-        <div className="flex flex-col items-center gap-2">
+        {/* Toggle Camera */}
+        <div className="flex flex-col items-center gap-1.5">
           <button
             onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
             className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-full transition-all",
-              isCameraEnabled ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/10 text-white/50 hover:bg-white/20"
+              "flex h-14 w-14 items-center justify-center rounded-full transition-all duration-300",
+              isCameraEnabled ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30" : "bg-white/10 text-white/60 hover:bg-white/20"
             )}
           >
             {isCameraEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
           </button>
-          <span className="text-[10px] font-medium text-white/60">Video</span>
+          <span className="text-[11px] font-medium text-white/50">Video</span>
         </div>
 
-        {/* Mic Toggle */}
-        <div className="flex flex-col items-center gap-2">
+        {/* Toggle Mic */}
+        <div className="flex flex-col items-center gap-1.5">
           <button
             onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
             className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-full transition-all shadow-lg",
-              isMicrophoneEnabled ? "bg-[#3B58F5] text-white hover:bg-[#2a44d4]" : "bg-white/10 text-white/50 hover:bg-white/20"
+              "flex h-14 w-14 items-center justify-center rounded-full transition-all duration-300",
+              isMicrophoneEnabled ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30" : "bg-white/10 text-white/60 hover:bg-white/20"
             )}
           >
             {isMicrophoneEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
           </button>
-          <span className="text-[10px] font-medium text-white/60">Mic</span>
-        </div>
-
-        {/* Speaker Toggle (UI only for now, WebRTC handles routing via browser mostly) */}
-        <div className="flex flex-col items-center gap-2">
-          <button
-            onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-            className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-full transition-all",
-              isSpeakerOn ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/10 text-white/50 hover:bg-white/20"
-            )}
-          >
-            {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <VolumeX className="h-6 w-6" />}
-          </button>
-          <span className="text-[10px] font-medium text-white/60">Speaker</span>
+          <span className="text-[11px] font-medium text-white/50">Mic</span>
         </div>
 
         {/* End Call Button */}
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-1.5 ml-2">
           <button
-            onClick={() => {
-              if (activeCall?.isGroup) {
-                leaveGroupCall && leaveGroupCall(activeCall.callId);
-              } else {
-                activeCall && hangupCall(activeCall.callId);
-              }
-            }}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white transition-all hover:bg-red-600 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
+            onClick={handleEndCall}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white transition-all duration-300 hover:scale-105 hover:bg-red-600 active:scale-95 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
           >
             <PhoneOff className="h-6 w-6" fill="currentColor" />
           </button>
-          <span className="text-[10px] font-medium text-red-400">End</span>
+          <span className="text-[11px] font-medium text-red-400">End</span>
         </div>
 
       </div>
@@ -222,39 +155,32 @@ const CustomCallLayout = ({ isMaximized, setIsMaximized }: { isMaximized: boolea
 
 export const ActiveCallRoom = () => {
   const { activeCall, hangupCall, leaveGroupCall } = useCallContext();
-  const [isMaximized, setIsMaximized] = useState(false);
 
   if (!activeCall) return null;
 
+  const handleDisconnect = () => {
+    if (activeCall.isGroup && leaveGroupCall) {
+      leaveGroupCall(activeCall.callId);
+    } else {
+      hangupCall(activeCall.callId);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md pointer-events-auto">
-      <div 
-        className={cn(
-          "relative overflow-hidden shadow-2xl transition-all duration-500 flex flex-col",
-          isMaximized 
-            ? "w-full h-full rounded-none" 
-            : "w-[95vw] h-[85vh] max-w-[1400px] max-h-[900px] rounded-[2.5rem] border border-white/10 shadow-[0_0_80px_rgba(0,0,0,0.6)]"
-        )}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black pointer-events-auto">
+      <LiveKitRoom
+        video={activeCall.callType === 'VIDEO'}
+        audio={true}
+        token={activeCall.token}
+        serverUrl={activeCall.serverUrl}
+        connect={true}
+        onDisconnected={handleDisconnect}
+        className="w-full h-full"
       >
-        <LiveKitRoom
-          video={activeCall.callType === 'VIDEO'}
-          audio={true}
-          token={activeCall.token}
-          serverUrl={activeCall.serverUrl}
-          connect={true}
-          onDisconnected={() => {
-            if (activeCall.isGroup) {
-              leaveGroupCall && leaveGroupCall(activeCall.callId);
-            } else {
-              hangupCall(activeCall.callId);
-            }
-          }}
-          className="flex-1 w-full h-full"
-        >
-          <CustomCallLayout isMaximized={isMaximized} setIsMaximized={setIsMaximized} />
-          <RoomAudioRenderer />
-        </LiveKitRoom>
-      </div>
+        <CustomCallLayout />
+        {/* System Integrity Control: Audio Renderer */}
+        <RoomAudioRenderer />
+      </LiveKitRoom>
     </div>
   );
 };

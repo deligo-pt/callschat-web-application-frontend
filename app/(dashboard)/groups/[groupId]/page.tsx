@@ -11,6 +11,11 @@ import apiClient from "@/services/api.client";
 import { useGroupChat } from "@/hooks/useGroupChat";
 import { encryptMessage } from "@/utils/crypto";
 import { chatService } from "@/services/chat.service";
+import { groupService } from "@/services/group.service";
+import { useSocket } from "@/components/providers/SocketProvider";
+import { toast } from "sonner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 function parseJwt(token: string) {
   try {
@@ -37,6 +42,7 @@ export default function GroupChatPage() {
   const groupId = params.groupId as string;
   
   const { startGroupCall, joinGroupCall, activeGroupCalls } = useCallContext();
+  const { socket } = useSocket();
   
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
@@ -49,6 +55,13 @@ export default function GroupChatPage() {
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
   const [isAddingMember, setIsAddingMember] = useState(false);
+
+  const [isLeaveGroupDialogOpen, setIsLeaveGroupDialogOpen] = useState(false);
+  const [isLeavingGroup, setIsLeavingGroup] = useState(false);
+
+  const [isRemoveMemberDialogOpen, setIsRemoveMemberDialogOpen] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string, name: string } | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -63,6 +76,29 @@ export default function GroupChatPage() {
   const { messages, sendMessage, isReady, error, getGroupKey } = useGroupChat(groupId, currentUserId);
 
   const isCallActive = activeGroupCalls.includes(groupId);
+
+  // Socket Synchronization for Phase 4
+  useEffect(() => {
+    if (!socket || !groupId || !currentUserId) return;
+
+    const handleMemberRemoved = (payload: { groupId: string, userId: string }) => {
+      if (payload.groupId !== groupId) return;
+      
+      if (payload.userId === currentUserId) {
+        toast.error("You were removed from the group by an admin.");
+        router.push("/chats");
+      } else {
+        setGroupMembers(prev => prev.filter(m => m.userId !== payload.userId && m.user?.id !== payload.userId));
+        toast.info("A member was removed from the group");
+      }
+    };
+
+    socket.on("group:member_removed", handleMemberRemoved);
+
+    return () => {
+      socket.off("group:member_removed", handleMemberRemoved);
+    };
+  }, [socket, groupId, currentUserId, router]);
 
   useEffect(() => {
     const fetchGroupData = async () => {
@@ -172,14 +208,44 @@ export default function GroupChatPage() {
     setInputText("");
   };
 
-  const handleLeaveGroup = async () => {
-    if (!confirm("Are you sure you want to leave this group?")) return;
+  const executeLeaveGroup = async () => {
+    setIsLeavingGroup(true);
     try {
       if (!currentUserId) return;
-      await apiClient.delete(`/groups/${groupId}/members/${currentUserId}`);
-      router.push("/groups");
-    } catch (e) {
+      const res = await groupService.removeMember(groupId, currentUserId);
+      if (res.success || res.data) {
+        toast.success("You have left the group");
+        router.push("/chats");
+      } else {
+        toast.error(res.error || "Failed to leave group");
+      }
+    } catch (e: any) {
       console.error(e);
+      toast.error(e.response?.data?.message || "An error occurred while leaving the group");
+    } finally {
+      setIsLeavingGroup(false);
+      setIsLeaveGroupDialogOpen(false);
+    }
+  };
+
+  const executeRemoveMember = async () => {
+    if (!memberToRemove) return;
+    setIsRemovingMember(true);
+    try {
+      const res = await groupService.removeMember(groupId, memberToRemove.id);
+      if (res.success || res.data) {
+        toast.success(`${memberToRemove.name} removed from the group`);
+        setGroupMembers(prev => prev.filter(m => m.userId !== memberToRemove.id && m.user?.id !== memberToRemove.id));
+      } else {
+        toast.error(res.error || "Failed to remove member");
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.response?.data?.message || "An error occurred while removing the member");
+    } finally {
+      setIsRemovingMember(false);
+      setIsRemoveMemberDialogOpen(false);
+      setMemberToRemove(null);
     }
   };
 
@@ -258,9 +324,24 @@ export default function GroupChatPage() {
                 </button>
               </>
             )}
-            <button className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors" onClick={() => setShowGroupInfo(true)}>
-              <MoreVertical className="h-5 w-5" strokeWidth={2} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors">
+                  <MoreVertical className="h-5 w-5" strokeWidth={2} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white text-[#11142D] border border-[#EEF2FF] shadow-xl">
+                <DropdownMenuItem onClick={() => setShowGroupInfo(true)} className="cursor-pointer font-medium hover:bg-[#F4F6FC]">
+                  Group Info
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setIsLeaveGroupDialogOpen(true)}
+                  className="cursor-pointer font-medium text-red-500 focus:bg-red-50 focus:text-red-600 hover:bg-red-50 hover:text-red-600"
+                >
+                  Leave Group
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -492,9 +573,24 @@ export default function GroupChatPage() {
                         <img src={mAvatar} alt={mName} className="w-10 h-10 rounded-full object-cover" />
                         <span className="text-[14px] font-semibold text-[#11142D]">{mName}</span>
                       </div>
-                      <span className="text-[11px] font-bold text-[#3B58F5] bg-[#EEF2FF] px-2 py-0.5 rounded uppercase tracking-wider">
-                        {mRole}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-[#3B58F5] bg-[#EEF2FF] px-2 py-0.5 rounded uppercase tracking-wider">
+                          {mRole}
+                        </span>
+                        {isAdmin && member.userId !== currentUserId && member.user?.id !== currentUserId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMemberToRemove({ id: member.userId || member.user?.id, name: mName });
+                              setIsRemoveMemberDialogOpen(true);
+                            }}
+                            className="text-[#8F95B2] hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
+                            title="Remove Member"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -514,7 +610,7 @@ export default function GroupChatPage() {
                 <Trash2 className="w-5 h-5 text-red-500" strokeWidth={2} />
                 <span className="text-[14.5px] font-semibold text-red-500">Clear Chat</span>
               </button>
-              <button onClick={handleLeaveGroup} className="flex items-center gap-4 px-6 py-3.5 hover:bg-red-50 transition-colors w-full text-left">
+              <button onClick={() => setIsLeaveGroupDialogOpen(true)} className="flex items-center gap-4 px-6 py-3.5 hover:bg-red-50 transition-colors w-full text-left">
                 <LogOut className="w-5 h-5 text-red-500" strokeWidth={2} />
                 <span className="text-[14.5px] font-semibold text-red-500">Leave Group</span>
               </button>
@@ -588,6 +684,57 @@ export default function GroupChatPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Leave Group Alert Dialog */}
+      <AlertDialog open={isLeaveGroupDialogOpen} onOpenChange={setIsLeaveGroupDialogOpen}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave this group? You will no longer receive messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLeavingGroup}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                executeLeaveGroup();
+              }}
+              disabled={isLeavingGroup}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {isLeavingGroup ? "Leaving..." : "Leave Group"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Member Alert Dialog */}
+      <AlertDialog open={isRemoveMemberDialogOpen} onOpenChange={setIsRemoveMemberDialogOpen}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {memberToRemove?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They will be removed from the group and will no longer see new messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingMember}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                executeRemoveMember();
+              }}
+              disabled={isRemovingMember}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {isRemovingMember ? "Removing..." : "Remove Member"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
