@@ -3,13 +3,13 @@ import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, S
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
 
-interface ChatInputProps {
+interface GroupInputProps {
   onSend: (text: string, file: File | null) => void;
   isReady: boolean;
   isUploading: boolean;
 }
 
-export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
+export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,7 +82,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
   };
 
   return (
-    <div className="bg-white px-4 py-3 shrink-0 relative border-t border-gray-100">
+    <div className="bg-white px-4 py-3 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)] relative z-20">
       {/* Camera Modal */}
       {isCameraOpen && (
         <div className="absolute bottom-full left-4 mb-2 bg-black rounded-xl overflow-hidden shadow-xl z-50 border border-gray-800">
@@ -95,6 +95,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
           <div className="relative">
             <video ref={videoRef} autoPlay playsInline muted className="w-[320px] h-[240px] object-cover" />
             <button
+              type="button"
               onClick={handleCapturePhoto}
               className="absolute bottom-4 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white border-4 border-gray-300 hover:scale-105 transition-transform"
             />
@@ -104,7 +105,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
 
       {/* File Preview */}
       {selectedFile && (
-        <div className="mb-3 flex items-center bg-white rounded-lg p-2 shadow-sm border border-gray-200 max-w-sm">
+        <div className="mb-3 mx-auto max-w-4xl flex items-center bg-white rounded-lg p-2 shadow-sm border border-gray-200">
           <div className="flex-1 flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 bg-blue-50 rounded flex items-center justify-center shrink-0">
               {selectedFile.type.startsWith("image/") ? (
@@ -135,7 +136,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
         </div>
       )}
 
-      <form onSubmit={handleSend} className="flex items-end gap-2">
+      <form onSubmit={handleSend} className="flex items-end gap-3 w-full max-w-4xl mx-auto">
         {/* Hidden File Input */}
         <input
           type="file"
@@ -151,7 +152,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
             <button
               type="button"
               disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-[#6B7280] hover:text-[#254BCC] transition-colors disabled:opacity-50"
+              className="flex items-center justify-center text-[#8F95B2] hover:text-[#3B58F5] transition-colors disabled:opacity-50 hidden sm:block"
             >
               <Smile className="h-[22px] w-[22px]" strokeWidth={1.5} />
             </button>
@@ -159,7 +160,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-[#6B7280] hover:text-[#254BCC] transition-colors disabled:opacity-50"
+              className="flex items-center justify-center text-[#8F95B2] hover:text-[#3B58F5] transition-colors disabled:opacity-50"
             >
               <Paperclip className="h-[22px] w-[22px]" strokeWidth={1.5} />
             </button>
@@ -167,14 +168,14 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
               type="button"
               onClick={() => (isCameraOpen ? stopCamera() : startCamera())}
               disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-[#6B7280] hover:text-[#254BCC] transition-colors disabled:opacity-50 pr-1"
+              className="flex items-center justify-center text-[#8F95B2] hover:text-[#3B58F5] transition-colors disabled:opacity-50 pr-1 hidden sm:block"
             >
               <ImageIcon className="h-[22px] w-[22px]" strokeWidth={1.5} />
             </button>
           </div>
         )}
 
-        <div className="flex-1 bg-[#F3F4F6] rounded-full flex items-center px-5 py-2 shadow-sm min-h-[44px]">
+        <div className="flex-1 bg-[#F4F6FC] rounded-[24px] flex items-center px-5 py-2 shadow-sm min-h-[44px]">
           {isRecording ? (
             <div className="flex-1 flex items-center gap-3 h-6">
               <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
@@ -194,7 +195,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
               }}
               onKeyDown={handleKeyDown}
               disabled={!isReady || isUploading}
-              placeholder={isReady ? "Type a message" : "Setting up encryption..."}
+              placeholder={isReady ? "Type a message..." : "Setting up encryption..."}
               className="flex-1 bg-transparent text-[15px] text-[#111B21] placeholder-[#8F95B2] focus:outline-none resize-none overflow-y-auto min-h-[24px] py-1 disabled:opacity-70"
               rows={1}
               style={{ maxHeight: "120px" }}
@@ -210,7 +211,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
             disabled={!isReady}
             className={cn(
               "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-md mb-0.5",
-              isRecording ? "bg-red-500 text-white" : "bg-[#254BCC] text-white"
+              isRecording ? "bg-red-500 text-white" : "bg-[#3B58F5] text-white"
             )}
           >
             {isRecording ? (
@@ -224,7 +225,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
           <button
             type="submit"
             disabled={!isReady || isUploading || (!inputText.trim() && !selectedFile)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#254BCC] text-white transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-md mb-0.5"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3B58F5] text-white transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-md mb-0.5"
           >
             {isUploading ? (
               <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.5} />

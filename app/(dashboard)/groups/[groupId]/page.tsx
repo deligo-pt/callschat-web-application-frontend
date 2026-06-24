@@ -16,6 +16,8 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { GroupInput } from "@/components/group/GroupInput";
+import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
 
 function parseJwt(token: string) {
   try {
@@ -47,7 +49,6 @@ export default function GroupChatPage() {
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [inputText, setInputText] = useState("");
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +74,7 @@ export default function GroupChatPage() {
     }
   }, []);
 
-  const { messages, sendMessage, isReady, error, getGroupKey } = useGroupChat(groupId, currentUserId);
+  const { messages, sendMessage, isReady, error, getGroupKey, isUploading } = useGroupChat(groupId, currentUserId);
 
   const isCallActive = activeGroupCalls.includes(groupId);
 
@@ -201,11 +202,9 @@ export default function GroupChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || !isReady) return;
-    sendMessage(inputText);
-    setInputText("");
+  const handleSend = (text: string, file: File | null) => {
+    if (!isReady) return;
+    sendMessage(text, file);
   };
 
   const executeLeaveGroup = async () => {
@@ -364,59 +363,17 @@ export default function GroupChatPage() {
               const isMe = msg.senderId === currentUserId;
               const showAvatar = !isMe && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
               const isNextSameSender = index < messages.length - 1 && messages[index + 1]?.senderId === msg.senderId;
+              const isFirstFromSender = index === 0 || messages[index - 1]?.senderId !== msg.senderId;
               
-              const senderName = msg.sender?.profile?.displayName || "Unknown";
-              const senderInitials = senderName.charAt(0).toUpperCase();
-              
-              const formatTime = (dateString: string) => {
-                const d = new Date(dateString);
-                return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-              };
-
               return (
-                <div key={msg.id} className={cn("flex w-full", isMe ? "justify-end" : "justify-start")}>
-                  {!isMe && (
-                    <div className="w-8 shrink-0 mr-3 flex items-end pb-5">
-                      {showAvatar && (
-                        <div className="h-8 w-8 rounded-full flex items-center justify-center bg-[#3B58F5] text-white text-xs font-bold shadow-sm">
-                          {msg.sender?.profile?.avatarUrl ? (
-                            <img src={msg.sender.profile.avatarUrl} className="h-full w-full rounded-full object-cover" alt={senderName} />
-                          ) : (
-                            senderInitials
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
-                    {!isMe && (index === 0 || messages[index - 1]?.senderId !== msg.senderId) && (
-                      <span className="text-[12px] font-semibold text-[#3B58F5] ml-1 mb-1">
-                        {senderName}
-                      </span>
-                    )}
-
-                    <div
-                      className={cn(
-                        "px-4 py-3 text-[14.5px] shadow-sm leading-relaxed",
-                        isMe 
-                          ? "bg-[#3B58F5] text-white rounded-[20px] rounded-br-sm" 
-                          : "bg-white text-[#11142D] rounded-[20px] rounded-bl-sm"
-                      )}
-                      style={{ wordBreak: "break-word" }}
-                    >
-                      {msg.text}
-                    </div>
-
-                    {(!isNextSameSender || isMe) && (
-                      <div className={cn("flex flex-col mt-1", isMe ? "items-end mr-1" : "ml-1")}>
-                        <span className="text-[11px] font-medium text-[#8F95B2]">
-                          {formatTime(msg.createdAt)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <GroupMessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  isMe={isMe}
+                  showAvatar={showAvatar}
+                  isNextSameSender={isNextSameSender}
+                  isFirstFromSender={isFirstFromSender}
+                />
               );
             })
           )}
@@ -425,41 +382,7 @@ export default function GroupChatPage() {
         </div>
 
         {/* Input Form */}
-        <div className="bg-white px-4 py-3 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
-          <form onSubmit={handleSend} className="flex items-center gap-3 w-full max-w-4xl mx-auto">
-            <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0 hidden sm:block">
-              <Smile className="h-6 w-6" strokeWidth={1.5} />
-            </button>
-            <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0">
-              <Paperclip className="h-[22px] w-[22px]" strokeWidth={1.5} />
-            </button>
-            <button type="button" className="text-[#8F95B2] hover:text-[#3B58F5] transition-colors shrink-0 hidden sm:block">
-              <ImageIcon className="h-6 w-6" strokeWidth={1.5} />
-            </button>
-
-            <div className="flex-1 bg-[#F4F6FC] rounded-full flex items-center px-4 py-1.5 h-[44px]">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 bg-transparent text-[15px] text-[#11142D] placeholder-[#8F95B2] focus:outline-none"
-              />
-            </div>
-            
-            <button
-              type={inputText.trim() && isReady ? "submit" : "button"}
-              disabled={!isReady}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3B58F5] text-white transition-transform hover:scale-105 active:scale-95 shadow-md disabled:opacity-50 disabled:hover:scale-100"
-            >
-              {inputText.trim() && isReady ? (
-                <Send className="h-5 w-5 ml-0.5" strokeWidth={2} />
-              ) : (
-                <Mic className="h-5 w-5" strokeWidth={2} />
-              )}
-            </button>
-          </form>
-        </div>
+        <GroupInput onSend={handleSend} isReady={isReady} isUploading={isUploading} />
       </div>
 
       {/* Sidebar - Group Info */}

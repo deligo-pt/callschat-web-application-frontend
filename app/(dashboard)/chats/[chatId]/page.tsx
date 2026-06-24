@@ -186,42 +186,37 @@ export default function ChatRoomPage() {
   return (
     <div className="flex h-full w-full flex-col bg-[#F8FAFC]">
       {/* Header */}
-      <div className="flex items-center justify-between bg-white px-6 py-4 border-b border-[#E6EAFA] shadow-sm z-10 shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between bg-[#254BCC] px-4 py-3 shadow-md z-20 shrink-0 text-white">
+        <div className="flex items-center gap-3">
           <Link
             href="/chats"
-            className="md:hidden rounded-full p-1.5 transition-colors hover:bg-[#F4F6FC]"
+            className="md:hidden rounded-full p-2 transition-colors hover:bg-white/10"
           >
-            <ArrowLeft className="h-5 w-5 text-[#8F95B2]" strokeWidth={2.5} />
+            <ArrowLeft className="h-6 w-6 text-white" strokeWidth={2.5} />
           </Link>
           <div className="flex items-center gap-3">
-            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E6EAFA]">
+            <div className={cn("relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E6EAFA]", recipient?.isOnline && "border-[2.5px] border-[#22C55E] p-[2px]")}>
               {recipient?.avatarUrl ? (
                 <img
                   src={recipient.avatarUrl}
                   alt={recipient.name}
-                  className="h-10 w-10 rounded-full object-cover"
+                  className="h-full w-full rounded-full object-cover"
                 />
               ) : (
                 <div className="text-[#8F95B2] font-bold">
                   {recipient?.name?.charAt(0) || "U"}
                 </div>
               )}
-              {recipient?.isOnline && (
-                <div className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#22C55E]" />
-              )}
             </div>
             <div className="flex flex-col">
-              <h2 className="text-[15px] font-bold text-[#1D2A54]">
+              <h2 className="text-[17px] font-bold text-white tracking-tight">
                 {recipient?.name || "Loading..."}
               </h2>
-              <span className="flex items-center gap-1 text-[12px] font-medium text-[#8F95B2]">
+              <span className="flex items-center gap-1 text-[13px] font-medium text-white/80">
                 {isInitializing ? (
                   "Connecting..."
                 ) : isReady ? (
-                  <>
-                    <Lock className="h-3 w-3 text-[#22C55E]" /> E2E Encrypted
-                  </>
+                  "Online"
                 ) : (
                   "Establishing secure connection..."
                 )}
@@ -230,20 +225,20 @@ export default function ChatRoomPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => recipientId && initiateCall(recipientId, 'AUDIO', recipient?.name, recipient?.avatarUrl)}
-            disabled={!recipientId}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors disabled:opacity-50"
-          >
-            <Phone className="h-5 w-5" strokeWidth={2} />
-          </button>
+        <div className="flex items-center gap-1">
           <button 
             onClick={() => recipientId && initiateCall(recipientId, 'VIDEO', recipient?.name, recipient?.avatarUrl)}
             disabled={!recipientId}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-[#8F95B2] hover:bg-[#F4F6FC] transition-colors disabled:opacity-50"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
           >
             <Video className="h-5 w-5" strokeWidth={2} />
+          </button>
+          <button 
+            onClick={() => recipientId && initiateCall(recipientId, 'AUDIO', recipient?.name, recipient?.avatarUrl)}
+            disabled={!recipientId}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            <Phone className="h-5 w-5" strokeWidth={2} />
           </button>
           {recipientId && (
             <ChatOptionsMenu conversationId={conversationId} peerId={recipientId} />

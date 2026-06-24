@@ -106,4 +106,21 @@ export const groupService = {
       return { success: false, error: error.response?.data?.message || 'Failed to remove member' };
     }
   },
+
+  async uploadGroupMedia(groupId: string, file: File): Promise<{ success: boolean; data?: { mediaUrl: string; mediaType: string }; error?: string }> {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await apiClient.post(`/groups/${groupId}/upload`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to upload media for group ${groupId}`, error);
+      return { success: false, error: error.response?.data?.message || "Failed to upload media" };
+    }
+  },
 };
