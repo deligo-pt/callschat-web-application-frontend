@@ -149,9 +149,14 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
 
                 if ((loginData.success || loginRes.ok) && accessToken) {
                   localStorage.setItem("accessToken", accessToken);
+                  document.cookie = `accessToken=${accessToken}; path=/; max-age=2592000`;
                   if (refreshToken) {
                     localStorage.setItem("refreshToken", refreshToken);
+                    document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
                   }
+                  
+                  // Ensure storage is written before routing
+                  await new Promise(resolve => setTimeout(resolve, 50));
                   router.push("/chats");
                 } else {
                   toast.error(loginData.message || loginData.data?.message || "Failed to finalize login.");
@@ -185,7 +190,14 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
 
                 if ((loginData.success || loginRes.ok) && accessToken) {
                   localStorage.setItem("accessToken", accessToken);
-                  if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+                  document.cookie = `accessToken=${accessToken}; path=/; max-age=2592000`;
+                  if (refreshToken) {
+                    localStorage.setItem("refreshToken", refreshToken);
+                    document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
+                  }
+                  
+                  // Ensure storage is written before routing
+                  await new Promise(resolve => setTimeout(resolve, 50));
                   router.push("/chats");
                 } else {
                   toast.error(`Login failed: ${loginData.message || JSON.stringify(loginData)}`);
@@ -218,9 +230,14 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
 
               if ((registerData.success || registerRes.ok) && accessToken) {
                 localStorage.setItem("accessToken", accessToken);
+                document.cookie = `accessToken=${accessToken}; path=/; max-age=2592000`;
                 if (refreshToken) {
                   localStorage.setItem("refreshToken", refreshToken);
+                  document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
                 }
+                
+                // Ensure storage is written before routing
+                await new Promise(resolve => setTimeout(resolve, 50));
                 router.push("/setup-profile");
               } else {
                 toast.error(`Register failed: ${registerData.message || JSON.stringify(registerData)}`);

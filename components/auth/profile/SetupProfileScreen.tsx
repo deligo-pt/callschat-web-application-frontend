@@ -3,10 +3,10 @@
 import * as React from "react";
 import { ChevronLeft, User, Camera, Info, X, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import apiClient from "@/services/api.client";
 
 export default function SetupProfileScreen() {
   const router = useRouter();
@@ -14,21 +14,9 @@ export default function SetupProfileScreen() {
   const [lastName, setLastName] = React.useState("");
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = React.useState(false);
   const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
-  const [registrationToken, setRegistrationToken] = React.useState<string | null>(null);
   
   const [isPending, startTransition] = React.useTransition();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    // Initial mount check for registration token
-    const token = sessionStorage.getItem("registrationToken");
-    if (!token) {
-      toast.error("Session expired or missing. Please verify your phone number again.");
-      router.replace("/login");
-    } else {
-      setRegistrationToken(token);
-    }
-  }, [router]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,61 +42,37 @@ export default function SetupProfileScreen() {
   };
 
   const handleRegister = () => {
-    if (!firstName) return;
-
-    // Use registrationToken, or fall back to accessToken if the backend unified them
-    const token = registrationToken || localStorage.getItem("accessToken");
-    if (!token) {
-      toast.error("Authentication token missing. Please verify again.");
+    if (!firstName || !lastName) {
+      toast.error("Please enter both First Name and Last Name");
       return;
     }
 
     startTransition(async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-        
         const formData = new FormData();
         formData.append("firstName", firstName.trim());
-        if (lastName) formData.append("lastName", lastName.trim());
+        formData.append("lastName", lastName.trim());
 
-        // Send 'profileImage' as specified by the user
+        // Send 'profileImage' or 'avatar' as expected. Usually backend expects 'profileImage' based on previous code.
+        // Prompt says "(e.g., avatar or profileImage)". Let's use 'profileImage' since it was there before.
         if (fileInputRef.current?.files?.[0]) {
           formData.append("profileImage", fileInputRef.current.files[0]);
         }
 
-        const res = await fetch(`${baseUrl}/user/profile/setup`, {
-          method: "PATCH",
-          headers: { 
-            "Authorization": `Bearer ${token}`
-            // Note: Omit Content-Type when sending FormData so browser sets the multipart boundary
-          },
-          body: formData
+        const res = await apiClient.patch("/user/profile/setup", formData, {
+          headers: {
+             "Content-Type": undefined // Ensure browser sets the multipart boundary
+          }
         });
         
-        const data = await res.json();
-        
-        // Handle successful profile setup
-        if (data.success || res.ok) {
+        if (res.data.success || res.status === 200 || res.status === 201) {
           toast.success("Profile updated successfully!");
-          
-          // If the setup route returns permanent tokens (like replacing the registrationToken)
-          if (data.data?.accessToken) {
-            localStorage.setItem("accessToken", data.data.accessToken);
-            localStorage.setItem("refreshToken", data.data.refreshToken);
-          } else if (data.accessToken) {
-            localStorage.setItem("accessToken", data.accessToken);
-            localStorage.setItem("refreshToken", data.refreshToken);
-          }
-          
-          // Clear temporary registration token
-          sessionStorage.removeItem("registrationToken");
-          
-          router.push("/home"); // Redirecting to home/dashboard since it's now updated
+          router.push("/chats");
         } else {
-          toast.error(data.message || data.data?.message || "Failed to setup profile.");
+          toast.error(res.data?.message || "Failed to setup profile.");
         }
-      } catch (err) {
-        toast.error("Network error. Please try again.");
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || err.message || "Network error. Please try again.");
       }
     });
   };
@@ -218,10 +182,10 @@ export default function SetupProfileScreen() {
 
           <button
             onClick={handleRegister}
-            disabled={!firstName || isPending}
+            disabled={!firstName || !lastName || isPending}
             className={cn(
               "mt-8 w-full rounded-[1rem] py-[18px] text-[15px] font-bold transition-all duration-300",
-              firstName && !isPending
+              firstName && lastName && !isPending
                 ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/25 hover:bg-[#2C48B8] active:scale-[0.98]" 
                 : "cursor-not-allowed bg-[#B5C7FE] text-white"
             )}
@@ -230,12 +194,12 @@ export default function SetupProfileScreen() {
           </button>
 
           <div className="mt-auto pb-8 pt-6">
-            <Link 
-              href="#" 
-              className="text-[14px] font-semibold text-[#3B58F5] hover:underline transition-colors"
+            <button
+              onClick={() => router.push("/chats")}
+              className="text-[14px] font-semibold text-[#8F95B2] hover:text-[#3B58F5] transition-colors"
             >
               Skip for now
-            </Link>
+            </button>
           </div>
         </div>
 
