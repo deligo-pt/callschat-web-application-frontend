@@ -1,73 +1,88 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Search, User } from "lucide-react";
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Search, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCallContext } from "@/components/providers/CallContext";
+import { CallService, CallHistoryItem } from "@/services/call.service";
 
-interface Contact {
-  id: string;
-  name: string;
-  avatarUrl: string;
-  isOnline: boolean;
+function formatCallTime(dateStr: string) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) return `Today, ${timeStr}`;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+}
+
+function formatDuration(seconds: number | null) {
+  if (!seconds || seconds <= 0) return "";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs}s`;
 }
 
 export default function CallsPage() {
   const [filter, setFilter] = useState<"all" | "missed">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [calls, setCalls] = useState<CallHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { initiateCall } = useCallContext();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { initiateCall, startGroupCall } = useCallContext();
 
   useEffect(() => {
-    const fetchContacts = async () => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        try {
+          const payload = JSON.parse(window.atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+          setCurrentUserId(payload.sub || payload.id || null);
+        } catch {}
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setIsLoading(true);
       try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-        const contactsRes = await fetch(`${baseUrl}/contacts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const contactsData = await contactsRes.json();
-        
-        let usersArray: any[] = [];
-        if (contactsData.success && Array.isArray(contactsData.data)) {
-          usersArray = contactsData.data;
-        } else if (Array.isArray(contactsData)) {
-          usersArray = contactsData;
-        } else if (contactsData.data && Array.isArray(contactsData.data.contacts)) {
-          usersArray = contactsData.data.contacts;
+        const res = await CallService.getCallHistory(1, 50);
+        if (res && Array.isArray(res.calls)) {
+          setCalls(res.calls);
         }
-
-        const mappedUsers = usersArray.map((u: any) => {
-          const userProfile = u.addressee?.profile || u.contact?.profile || u.profile || {};
-          const userId = u.addressee?.id || u.contact?.id || u.id;
-          const displayName = u.customName || userProfile.displayName || userProfile.username || "Unknown";
-          return {
-            id: userId,
-            name: displayName,
-            avatarUrl: userProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff`,
-            isOnline: userProfile.isOnline || false,
-          };
-        });
-        // Deduplicate contacts by user ID to prevent React key errors for mutual contacts
-        const uniqueContacts = Array.from(new Map(mappedUsers.map((item: any) => [item.id, item])).values());
-        setContacts(uniqueContacts as Contact[]);
       } catch (err) {
-        console.error("Failed to fetch contacts", err);
+        console.error("Failed to fetch call history", err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchContacts();
+    fetchHistory();
   }, []);
 
-  const filteredContacts = contacts.filter(contact => {
-    // For now, "Missed" will be empty because we're just rendering active contacts
-    if (filter === "missed") return false;
-    if (searchQuery && !contact.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+  const filteredCalls = calls.filter((call) => {
+    if (filter === "missed" && call.status !== "MISSED") return false;
+    
+    if (searchQuery) {
+      const isGroup = Boolean(call.groupId);
+      const peer = isGroup
+        ? null
+        : call.callerId === currentUserId
+          ? call.receiver
+          : call.initiator;
+
+      const name = isGroup ? call.groupName || "Group Call" : peer?.displayName || "";
+      if (!name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    }
     return true;
   });
 
@@ -120,59 +135,133 @@ export default function CallsPage() {
               <div className="flex items-center justify-center py-10">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#3B58F5] border-t-transparent" />
               </div>
-            ) : filteredContacts.length === 0 ? (
+            ) : filteredCalls.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
                 <p className="text-[14px] font-medium text-[#8F95B2]">
-                  {filter === "missed" ? "No missed calls." : "No contacts found."}
+                  {filter === "missed" ? "No missed calls." : "No call history found."}
                 </p>
               </div>
             ) : (
-              filteredContacts.map((contact) => (
-                <div key={contact.id} className="group relative flex w-full items-center justify-between px-6 py-3.5 transition-colors hover:bg-[#F4F7FE]">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <img src={contact.avatarUrl} alt={contact.name} className="h-[48px] w-[48px] rounded-full object-cover" />
-                      {contact.isOnline && (
-                        <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#22C55E]" />
-                      )}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[15px] font-bold text-[#1D2A54]">
-                        {contact.name}
-                      </span>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[13px] font-medium text-[#8F95B2]">
-                          Available to call
+              filteredCalls.map((call) => {
+                const isGroup = Boolean(call.groupId);
+                const peer = isGroup
+                  ? null
+                  : call.callerId === currentUserId
+                    ? call.receiver
+                    : call.initiator;
+
+                const displayName = isGroup
+                  ? call.groupName || "Group Call"
+                  : peer?.displayName || "Unknown";
+
+                const avatarUrl = isGroup
+                  ? call.groupAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff`
+                  : peer?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff`;
+
+                const isIncoming = call.callerId !== currentUserId;
+                const isMissed = call.status === "MISSED";
+
+                const getCallStatusDisplay = () => {
+                  if (isMissed) {
+                    return {
+                      icon: PhoneMissed,
+                      color: "text-[#EF4444]",
+                      text: isIncoming ? "Missed call" : "Unanswered",
+                    };
+                  }
+                  if (call.status === "DECLINED") {
+                    return {
+                      icon: isIncoming ? PhoneIncoming : PhoneOutgoing,
+                      color: "text-[#64748B]",
+                      text: "Declined",
+                    };
+                  }
+                  if (isIncoming) {
+                    return {
+                      icon: PhoneIncoming,
+                      color: "text-[#22C55E]",
+                      text: `Incoming${call.durationSeconds ? ` • ${formatDuration(call.durationSeconds)}` : ""}`,
+                    };
+                  }
+                  return {
+                    icon: PhoneOutgoing,
+                    color: "text-[#3B58F5]",
+                    text: `Outgoing${call.durationSeconds ? ` • ${formatDuration(call.durationSeconds)}` : ""}`,
+                  };
+                };
+
+                const statusInfo = getCallStatusDisplay();
+                const StatusIcon = statusInfo.icon;
+
+                return (
+                  <div key={call.id} className="group relative flex w-full items-center justify-between px-6 py-3.5 transition-colors hover:bg-[#F4F7FE]">
+                    <div className="flex items-center gap-4 min-w-0 pr-2">
+                      <div className="relative shrink-0">
+                        <img src={avatarUrl} alt={displayName} className="h-[48px] w-[48px] rounded-full object-cover bg-gray-100" />
+                        {!isGroup && peer?.isOnline && (
+                          <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#22C55E]" />
+                        )}
+                        {isGroup && (
+                          <div className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-[#3B58F5] text-white">
+                            <Users className="h-2.5 w-2.5" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[15px] font-bold text-[#1D2A54] truncate">
+                          {displayName}
                         </span>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[13px] font-medium">
+                          <StatusIcon className={cn("h-3.5 w-3.5 shrink-0", statusInfo.color)} />
+                          <span className={cn("truncate", statusInfo.color)}>
+                            {statusInfo.text}
+                          </span>
+                          <span className="text-[#CBD5E1] shrink-0">•</span>
+                          <span className="text-[#8F95B2] shrink-0 text-[12px]">
+                            {formatCallTime(call.createdAt)}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button 
+                        onClick={() => {
+                          if (isGroup && call.groupId) {
+                            startGroupCall(call.groupId, "AUDIO");
+                          } else if (peer) {
+                            initiateCall(peer.id, "AUDIO", peer.displayName, peer.avatarUrl || undefined);
+                          }
+                        }}
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF2FF] text-[#3B58F5] transition-colors hover:bg-[#3B58F5] hover:text-white shadow-sm"
+                        title="Audio Call"
+                      >
+                        <Phone className="h-5 w-5" />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (isGroup && call.groupId) {
+                            startGroupCall(call.groupId, "VIDEO");
+                          } else if (peer) {
+                            initiateCall(peer.id, "VIDEO", peer.displayName, peer.avatarUrl || undefined);
+                          }
+                        }}
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF2FF] text-[#3B58F5] transition-colors hover:bg-[#3B58F5] hover:text-white shadow-sm"
+                        title="Video Call"
+                      >
+                        <Video className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => initiateCall(contact.id, "AUDIO")}
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF2FF] text-[#3B58F5] transition-colors hover:bg-[#3B58F5] hover:text-white shadow-sm"
-                      title="Audio Call"
-                    >
-                      <Phone className="h-5 w-5" />
-                    </button>
-                    <button 
-                      onClick={() => initiateCall(contact.id, "VIDEO")}
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF2FF] text-[#3B58F5] transition-colors hover:bg-[#3B58F5] hover:text-white shadow-sm"
-                      title="Video Call"
-                    >
-                      <Video className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
       </div>
 
-      {/* Main Content Area (Placeholder for Web UI similar to WhatsApp Web) */}
+      {/* Main Content Area */}
       <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-[#F8FAFC]">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-xl shadow-blue-500/5 mb-6">
           <Phone className="h-10 w-10 text-[#3B58F5]" strokeWidth={1.5} />
