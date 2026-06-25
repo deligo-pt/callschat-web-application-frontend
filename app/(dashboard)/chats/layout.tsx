@@ -9,6 +9,8 @@ import { chatService } from "@/services/chat.service";
 import { motion } from "framer-motion";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { decryptMessage } from "@/utils/crypto";
+import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
+import { usePresence } from "@/context/PresenceContext";
 
 interface Conversation {
   id: string;
@@ -27,18 +29,9 @@ interface Conversation {
   } | null;
 }
 
-interface ActiveUser {
-  id: string;
-  name: string;
-  avatarUrl: string;
-  isOnline: boolean;
-  conversationId?: string;
-}
-
 export default function ChatsLayout({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
@@ -47,6 +40,9 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
   const pathname = usePathname();
   const router = useRouter();
+
+  // Real-time presence — comes from the global PresenceProvider.
+  const { isUserOnline } = usePresence();
 
   const isRootChatsPage = pathname === "/chats";
 
@@ -84,36 +80,6 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
       if (convsRes?.success && Array.isArray(convsRes?.data)) {
         setConversations(convsRes.data);
       }
-
-      // Also fetch contacts for the "Active Now" section
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-      const contactsRes = await fetch(`${baseUrl}/contacts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const contactsData = await contactsRes.json();
-      let usersArray: any[] = [];
-      if (contactsData.success && Array.isArray(contactsData.data)) {
-        usersArray = contactsData.data;
-      } else if (Array.isArray(contactsData)) {
-        usersArray = contactsData;
-      } else if (contactsData.data && Array.isArray(contactsData.data.contacts)) {
-        usersArray = contactsData.data.contacts;
-      }
-
-      if (usersArray.length > 0) {
-        const mappedUsers = usersArray.map((u: any) => {
-          const userProfile = u.addressee?.profile || u.contact?.profile || u.profile || {};
-          const userId = u.addressee?.id || u.contact?.id || u.id;
-          const displayName = u.customName || userProfile.displayName || userProfile.username || "Unknown";
-          return {
-            id: userId,
-            name: displayName,
-            avatarUrl: userProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=F4F6FC&color=3B58F5`,
-            isOnline: userProfile.isOnline || false,
-          };
-        });
-        setActiveUsers(mappedUsers);
-      }
     } catch (error) {
       console.error("Failed to fetch chat data", error);
     } finally {
@@ -125,21 +91,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     fetchData();
   }, [fetchData]);
 
-  // When a user clicks on a contact in Active Now, initiate/get conversation and navigate
-  const handleContactClick = async (userId: string) => {
-    try {
-      const res = await chatService.initiateConversation(userId);
-      const convId = res?.data?.conversationId || res?.conversationId;
-      if (convId) {
-        // Navigate using the conversationId as the chatId
-        router.push(`/chats/${convId}?recipientId=${userId}`);
-        // Refresh conversations list
-        fetchData();
-      }
-    } catch (err) {
-      console.error("Failed to initiate conversation", err);
-    }
-  };
+
 
   const handleDeleteConversation = async (conversationId: string) => {
     setIsDeleting(true);
@@ -268,10 +220,10 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
               Chats
             </h1>
             <div className="flex items-center gap-3">
-              <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
+              <Link href="/chats/favorites" className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
                 <Star className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
                 <div className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#FFA500]" />
-              </button>
+              </Link>
 
               <NotificationDropdown />
             </div>
@@ -293,46 +245,10 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
         {/* Scrollable List Area */}
         <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide md:pb-6">
 
-          {/* Active Now Section */}
-          {activeUsers.length > 0 && (
-            <div className="mt-2 px-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[14px] font-bold text-[#1D2A54]">Active Now</h2>
-              </div>
-
-              <div className="mt-4 flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                {isLoading ? (
-                  <div className="flex w-full items-center justify-center py-4">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#3B58F5] border-t-transparent" />
-                  </div>
-                ) : (
-                  activeUsers.map((user) => (
-                    <button
-                      key={user.id}
-                      onClick={() => handleContactClick(user.id)}
-                      className="relative flex shrink-0 flex-col items-center"
-                    >
-                      <div
-                        className={cn(
-                          "relative rounded-full border-[2.5px] p-0.5 transition-transform hover:scale-105 cursor-pointer",
-                          user.isOnline ? "border-[#22C55E]" : "border-[#E6EAFA]"
-                        )}
-                      >
-                        <img
-                          src={user.avatarUrl}
-                          alt={user.name}
-                          className="h-[52px] w-[52px] rounded-full object-cover bg-white"
-                        />
-                      </div>
-                      <span className="mt-1.5 text-[11px] font-medium text-[#8F95B2]">
-                        {user.name.split(" ")[0]}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+          {/* Active Now Section — rendered by the PresenceProvider-backed tray.
+               It self-hides when no contacts are online, so no conditional
+               wrapper is needed here. */}
+          <ActiveNowTray />
 
           {/* Conversations List */}
           <div className="mt-6">
@@ -375,15 +291,18 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                           isActive ? "bg-[#EEF2FF]" : "hover:bg-[#F4F7FE]"
                         )}
                       >
-                        {/* Avatar */}
+                        {/* Avatar with real-time presence badge */}
                         <div className="relative shrink-0">
                           <img
                             src={avatarUrl}
                             alt={conv.otherUserName}
                             className="h-[54px] w-[54px] rounded-full object-cover bg-[#F4F6FC]"
                           />
-                          {conv.otherUserOnline && (
-                            <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#22C55E]" />
+                          {/* Prefer the live Redis presence check; fall back to the
+                               static Prisma field for newly-opened pages before
+                               the socket has emitted its first events. */}
+                          {(isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline) && (
+                            <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
                           )}
                         </div>
 

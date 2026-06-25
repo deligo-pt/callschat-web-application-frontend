@@ -12,16 +12,28 @@ export interface GroupItem {
   memberCount: number;
   myRole: string;
   joinedAt: string;
+  isFavourite?: boolean;
 }
 
 export const groupService = {
-  async fetchMyGroups(): Promise<{ success: boolean; data: GroupItem[] }> {
+  async fetchMyGroups(favourite?: boolean): Promise<{ success: boolean; data: GroupItem[] }> {
     try {
-      const response = await apiClient.get('/groups');
+      const params = favourite !== undefined ? { favourite } : {};
+      const response = await apiClient.get('/groups', { params });
       return response.data;
     } catch (error) {
       console.error('Failed to fetch groups', error);
       return { success: false, data: [] };
+    }
+  },
+
+  async toggleFavourite(groupId: string, isFavourite: boolean): Promise<{ success: boolean }> {
+    try {
+      const response = await apiClient.patch(`/groups/${groupId}/favourite`, { isFavourite });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to toggle favourite for group ${groupId}`, error);
+      return { success: false };
     }
   },
 

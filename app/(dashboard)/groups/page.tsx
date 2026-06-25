@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, Search, Lock, Users, Plus, Loader2, MessageSquare, MoreVertical, Trash2 } from "lucide-react";
+import { ArrowLeft, Search, Lock, Users, Plus, Loader2, MessageSquare, MoreVertical, Trash2, Star } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { groupService, GroupItem } from "@/services/group.service";
+import { toast } from "sonner";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
@@ -54,6 +55,21 @@ export default function GroupsPage() {
     } finally {
       setIsDeleting(false);
       setGroupToDelete(null);
+    }
+  };
+
+  const handleToggleFavourite = async (groupId: string, currentStatus: boolean) => {
+    // Optimistic UI update
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, isFavourite: !currentStatus } : g));
+    
+    // API Call
+    const res = await groupService.toggleFavourite(groupId, !currentStatus);
+    if (!res.success) {
+      toast.error(`Failed to ${!currentStatus ? 'add to' : 'remove from'} favorites`);
+      // Rollback
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, isFavourite: currentStatus } : g));
+    } else {
+      toast.success(`Group ${!currentStatus ? 'added to' : 'removed from'} favorites`);
     }
   };
 
@@ -223,8 +239,21 @@ export default function GroupsPage() {
 
                       {/* Dropdown Menu */}
                       {menuOpenForId === group.id && (
-                        <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-[#E6EAFA] py-1 z-50">
-                          {group.myRole === 'ADMIN' ? (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-[#E6EAFA] py-1 z-50">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleToggleFavourite(group.id, !!group.isFavourite);
+                              setMenuOpenForId(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-[13px] font-semibold text-[#1D2A54] hover:bg-[#F4F6FC] flex items-center gap-2"
+                          >
+                            <Star className={cn("h-4 w-4", group.isFavourite ? "fill-[#FFA500] text-[#FFA500]" : "text-[#8F95B2]")} />
+                            {group.isFavourite ? "Remove from Favorites" : "Add to Favorites"}
+                          </button>
+
+                          {group.myRole === 'ADMIN' && (
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
@@ -232,15 +261,11 @@ export default function GroupsPage() {
                                 setGroupToDelete(group.id);
                                 setMenuOpenForId(null);
                               }}
-                              className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                              className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2 border-t border-[#F4F6FC]"
                             >
                               <Trash2 className="h-4 w-4" />
                               Delete Group
                             </button>
-                          ) : (
-                            <div className="w-full px-4 py-2 text-left text-[13px] font-semibold text-[#8F95B2] italic">
-                              Admin only
-                            </div>
                           )}
                         </div>
                       )}

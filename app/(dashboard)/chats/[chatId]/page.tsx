@@ -13,6 +13,7 @@ import { MessageBubble } from "@/components/chat/MessageBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MediaGallery } from "@/components/chat/MediaGallery";
 import { Images } from "lucide-react";
+import { usePresence } from "@/context/PresenceContext";
 
 function parseJwt(token: string) {
   try {
@@ -44,6 +45,7 @@ export default function ChatRoomPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const { initiateCall } = useCallContext();
+  const { isUserOnline } = usePresence();
 
   // The route param is now the CONVERSATION ID
   const conversationId = params.chatId as string;
@@ -197,35 +199,51 @@ export default function ChatRoomPage() {
           >
             <ArrowLeft className="h-6 w-6 text-white" strokeWidth={2.5} />
           </Link>
-          <div className="flex items-center gap-3">
-            <div className={cn("relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E6EAFA]", recipient?.isOnline && "border-[2.5px] border-[#22C55E] p-[2px]")}>
-              {recipient?.avatarUrl ? (
-                <img
-                  src={recipient.avatarUrl}
-                  alt={recipient.name}
-                  className="h-full w-full rounded-full object-cover"
-                />
-              ) : (
-                <div className="text-[#8F95B2] font-bold">
-                  {recipient?.name?.charAt(0) || "U"}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col">
-              <h2 className="text-[17px] font-bold text-white tracking-tight">
-                {recipient?.name || "Loading..."}
-              </h2>
-              <span className="flex items-center gap-1 text-[13px] font-medium text-white/80">
-                {isInitializing ? (
-                  "Connecting..."
-                ) : isReady ? (
-                  "Online"
-                ) : (
-                  "Establishing secure connection..."
-                )}
-              </span>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E6EAFA]",
+            // Use live presence check; fall back to static Prisma flag on initial
+            // render before the first socket event has arrived.
+            (isUserOnline(recipientId) || recipient?.isOnline)
+              ? "border-[2.5px] border-emerald-400 p-[2px]"
+              : "",
+          )}>
+            {recipient?.avatarUrl ? (
+              <img
+                src={recipient.avatarUrl}
+                alt={recipient.name}
+                className="h-full w-full rounded-full object-cover"
+              />
+            ) : (
+              <div className="text-[#8F95B2] font-bold">
+                {recipient?.name?.charAt(0) || "U"}
+              </div>
+            )}
+            {/* Absolute green badge on the avatar itself */}
+            {(isUserOnline(recipientId) || recipient?.isOnline) && (
+              <span
+                aria-hidden="true"
+                className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#254BCC] bg-emerald-400"
+              />
+            )}
           </div>
+          <div className="flex flex-col">
+            <h2 className="text-[17px] font-bold text-white tracking-tight">
+              {recipient?.name || "Loading..."}
+            </h2>
+            {/* Live presence sub-label */}
+            {isInitializing ? (
+              <span className="text-[12px] font-medium text-white/70">Connecting...</span>
+            ) : isUserOnline(recipientId) || recipient?.isOnline ? (
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Active now
+              </span>
+            ) : (
+              <span className="text-[12px] font-medium text-white/50">Offline</span>
+            )}
+          </div>
+        </div>
         </div>
 
         <div className="flex items-center gap-1">

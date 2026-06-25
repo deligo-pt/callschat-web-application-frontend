@@ -7,6 +7,7 @@ import { MessageSquare, PhoneCall, Users, Contact, UserCircle2 } from "lucide-re
 import { cn } from "@/lib/utils";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { CallProvider } from "@/components/providers/CallProvider";
+import { PresenceProvider } from "@/context/PresenceContext";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,6 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SocketProvider>
       <CallProvider>
+      <PresenceProvider>
       <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
       {/* Persistent Left Sidebar - Desktop First */}
       <nav className="hidden md:flex h-full w-[88px] flex-col items-center border-r border-[#E6EAFA] bg-white py-6 shadow-sm z-20">
@@ -113,6 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Link>
       </nav>
     </div>
+      </PresenceProvider>
       </CallProvider>
     </SocketProvider>
   );
