@@ -333,24 +333,13 @@ export default function GroupChatPage() {
                 </button>
               </>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors">
-                  <MoreVertical className="h-5 w-5" strokeWidth={2} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-white text-[#11142D] border border-[#EEF2FF] shadow-xl">
-                <DropdownMenuItem onClick={() => setShowGroupInfo(true)} className="cursor-pointer font-medium hover:bg-[#F4F6FC]">
-                  Group Info
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setIsLeaveGroupDialogOpen(true)}
-                  className="cursor-pointer font-medium text-red-500 focus:bg-red-50 focus:text-red-600 hover:bg-red-50 hover:text-red-600"
-                >
-                  Leave Group
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <button 
+              onClick={() => setShowGroupInfo(true)} 
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+              title="Group Info"
+            >
+              <MoreVertical className="h-5 w-5" strokeWidth={2} />
+            </button>
           </div>
         </div>
 

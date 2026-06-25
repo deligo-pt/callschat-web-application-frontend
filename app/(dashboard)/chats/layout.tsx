@@ -19,6 +19,7 @@ interface Conversation {
   otherUserName: string;
   otherUserAvatar: string | null;
   otherUserOnline: boolean;
+  unreadCount?: number;
   lastMessage: {
     id: string;
     senderId: string;
@@ -320,11 +321,16 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                           </p>
                         </div>
 
-                        {/* Time */}
+                        {/* Time & Unread Count */}
                         <div className="flex flex-col items-end justify-center gap-1.5 shrink-0">
                           <span className="text-[11px] font-semibold text-[#8F95B2]">
                             {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : formatTime(conv.updatedAt)}
                           </span>
+                          {conv.unreadCount && conv.unreadCount > 0 ? (
+                            <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3B58F5] px-1 text-[10px] font-bold text-white shadow-sm">
+                              {conv.unreadCount}
+                            </div>
+                          ) : null}
                         </div>
                       </Link>
 

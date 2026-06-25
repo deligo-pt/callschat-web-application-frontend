@@ -51,7 +51,9 @@ export default function CallsPage() {
             isOnline: userProfile.isOnline || false,
           };
         });
-        setContacts(mappedUsers);
+        // Deduplicate contacts by user ID to prevent React key errors for mutual contacts
+        const uniqueContacts = Array.from(new Map(mappedUsers.map((item: any) => [item.id, item])).values());
+        setContacts(uniqueContacts as Contact[]);
       } catch (err) {
         console.error("Failed to fetch contacts", err);
       } finally {

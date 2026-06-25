@@ -7,36 +7,9 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { AppNotification } from "@/services/notification.service";
+import { NotificationItem } from "./NotificationItem";
 
-// Simple relative time formatter
-function getRelativeTime(dateString: string) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return "Just now";
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours}h ago`;
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 7) return `${diffInDays}d ago`;
-  return date.toLocaleDateString();
-}
-
-// Fallback icon based on type
-function getFallbackIcon(type: AppNotification["type"]) {
-  switch (type) {
-    case "MESSAGE":
-      return <MessageSquare className="h-5 w-5 text-blue-500" />;
-    case "CALL_MISSED":
-      return <PhoneMissed className="h-5 w-5 text-red-500" />;
-    case "GROUP_INVITE":
-      return <Users className="h-5 w-5 text-green-500" />;
-    default:
-      return <Info className="h-5 w-5 text-gray-500" />;
-  }
-}
 
 export function NotificationDropdown() {
   const {
@@ -49,6 +22,9 @@ export function NotificationDropdown() {
     loadMore,
     handleMarkAsRead,
     handleMarkAllAsRead,
+    handleAcceptContact,
+    processingIds,
+    actionTakenIds,
   } = useNotifications();
   const [open, setOpen] = React.useState(false);
   const router = useRouter();
@@ -63,30 +39,7 @@ export function NotificationDropdown() {
     }
   };
 
-  const onNotificationClick = (notification: AppNotification) => {
-    if (!notification.isRead) {
-      handleMarkAsRead(notification.id);
-    }
-    
-    setOpen(false);
 
-    if (notification.routeId) {
-      switch (notification.type) {
-        case "MESSAGE":
-          router.push(`/chats/${notification.routeId}`);
-          break;
-        case "GROUP_INVITE":
-          router.push(`/groups/${notification.routeId}`);
-          break;
-        case "CALL_MISSED":
-          // Maybe navigate to calls log or just stay
-          router.push(`/calls`);
-          break;
-        default:
-          break;
-      }
-    }
-  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -154,63 +107,17 @@ export function NotificationDropdown() {
               <p className="font-medium text-sm">No notifications found.</p>
             </div>
           ) : (
-            notifications.map((notification) => {
-              const issuerName =
-                notification.issuer?.profile?.displayName || "Someone";
-              const avatarUrl = notification.issuer?.profile?.avatarUrl;
-
-              return (
-                <div
-                  key={notification.id}
-                  onClick={() => onNotificationClick(notification)}
-                  className={cn(
-                    "flex items-start gap-4 p-4 border-b border-border/50 cursor-pointer transition-colors hover:bg-muted/50",
-                    !notification.isRead ? "bg-blue-50/30" : ""
-                  )}
-                >
-                  {/* Avatar or Fallback */}
-                  <div className="shrink-0 relative">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt={issuerName}
-                        className="h-12 w-12 rounded-full object-cover border border-border"
-                      />
-                    ) : (
-                      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center border border-border">
-                        {getFallbackIcon(notification.type)}
-                      </div>
-                    )}
-                    {/* Tiny type icon badge overlay */}
-                    {avatarUrl && (
-                      <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-background flex items-center justify-center shadow-sm border border-border/50">
-                        <div className="scale-[0.6]">
-                          {getFallbackIcon(notification.type)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 flex flex-col pt-1">
-                    <p className="text-sm text-foreground leading-tight">
-                      <span className="font-bold">{issuerName}</span>{" "}
-                      {notification.content.replace(issuerName, "").trim()}
-                    </p>
-                    <span className="text-xs font-medium text-muted-foreground mt-1.5">
-                      {getRelativeTime(notification.createdAt)}
-                    </span>
-                  </div>
-
-                  {/* Unread Dot */}
-                  {!notification.isRead && (
-                    <div className="shrink-0 pt-2 pl-2">
-                      <div className="w-3 h-3 rounded-full bg-blue-500 shadow-sm" />
-                    </div>
-                  )}
-                </div>
-              );
-            })
+            notifications.map((notification) => (
+              <NotificationItem
+                key={notification.id}
+                notification={notification}
+                onMarkAsRead={handleMarkAsRead}
+                onCloseDropdown={() => setOpen(false)}
+                onAcceptContact={handleAcceptContact}
+                isProcessing={processingIds.has(notification.id)}
+                isResolved={actionTakenIds.has(notification.id)}
+              />
+            ))
           )}
 
           {isLoading && (

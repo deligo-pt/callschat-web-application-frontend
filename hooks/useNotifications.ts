@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import NotificationService, { AppNotification } from '@/services/notification.service';
 import { messaging } from '@/lib/firebase';
 import { onMessage } from 'firebase/messaging';
+import { useSocket } from '@/components/providers/SocketProvider';
+import { playNotificationSound } from '@/utils/sounds';
+import { toast } from 'sonner';
+import { ContactService } from '@/services/contact.service';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -10,6 +14,10 @@ export function useNotifications() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  
+  // States for handling inline mutual contact actions
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  const [actionTakenIds, setActionTakenIds] = useState<Set<string>>(new Set());
 
   // Ref to track if we've initialized the first fetch to prevent strict mode double fetching
   const initialized = useRef(false);
@@ -48,60 +56,33 @@ export function useNotifications() {
     }
   }, [isLoading, hasMore, page, filter, fetchNotifications]);
 
-  // Live FCM Updates
+  const { socket } = useSocket();
+
+  // Live Socket.IO Updates
   useEffect(() => {
-    if (!messaging) return;
+    if (!socket) return;
 
-    const unsubscribe = onMessage(messaging, (payload) => {
-      const data = payload.data || {};
-      const type = data.type; // 'chat_message', 'CALL' etc.
-      
-      // Determine the routeId and AppNotification type based on the FCM data
-      let appType: AppNotification['type'] = 'SYSTEM';
-      let routeId: string | null = null;
-
-      if (type === 'chat_message') {
-        appType = 'MESSAGE';
-        routeId = data.conversationId || null;
-      } else if (type === 'CALL') {
-        appType = 'CALL_MISSED'; // Assuming call pushes might be missed calls or we generalize
-        routeId = data.routeId || null;
-      } else if (type === 'GROUP') {
-        appType = 'MESSAGE';
-        routeId = data.routeId || null;
-      }
-
-      const tempId = `live-${Date.now()}`;
-      
-      const newNotification: AppNotification = {
-        id: tempId,
-        userId: 'me', // doesn't matter for local state
-        issuerId: data.senderId || null,
-        type: appType,
-        content: payload.notification?.body || 'New notification',
-        routeId,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        issuer: {
-          id: data.senderId || tempId,
-          profile: {
-            displayName: payload.notification?.title || 'Someone',
-            username: 'user',
-            avatarUrl: data.senderAvatar || null,
-          }
-        }
-      };
-
-      // Optimistically add to state if it matches the current filter
+    const handleNewNotification = (notification: AppNotification) => {
+      // 3. Optimistically unshift the new notification
       if (filter === 'all' || filter === 'unread') {
-        setNotifications((prev) => [newNotification, ...prev]);
+        setNotifications((prev) => [notification, ...prev]);
       }
       
+      // Increment unread count instantly
       setUnreadCount((prev) => prev + 1);
-    });
+      
+      // Play sound
+      playNotificationSound('message');
+    };
 
-    return () => unsubscribe();
-  }, [filter]);
+    // 2. Listen for the event
+    socket.on('notification:new', handleNewNotification);
+
+    // 4. Cleanup listener
+    return () => {
+      socket.off('notification:new', handleNewNotification);
+    };
+  }, [socket, filter]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -135,6 +116,49 @@ export function useNotifications() {
     }
   };
 
+  const handleAcceptContact = async (notificationId: string, issuerId: string) => {
+    try {
+      // Optimistically mark as read
+      handleMarkAsRead(notificationId);
+      
+      // Set loading state for this specific notification
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(notificationId);
+        return newSet;
+      });
+
+      await ContactService.addMutualContact(issuerId);
+      
+      toast.success('Contact added!');
+      
+      // Flag as resolved to hide the button
+      setActionTakenIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(notificationId);
+        return newSet;
+      });
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        toast.info('User is already in your contacts.');
+        setActionTakenIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(notificationId);
+          return newSet;
+        });
+      } else {
+        toast.error('Failed to add contact.');
+        console.error(error);
+      }
+    } finally {
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(notificationId);
+        return newSet;
+      });
+    }
+  };
+
   return {
     notifications,
     unreadCount,
@@ -145,5 +169,8 @@ export function useNotifications() {
     loadMore,
     handleMarkAsRead,
     handleMarkAllAsRead,
+    handleAcceptContact,
+    processingIds,
+    actionTakenIds,
   };
 }

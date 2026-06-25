@@ -14,5 +14,10 @@ export const ContactService = {
   toggleFavourite: async (contactId: string, isFavourite: boolean) => {
     const response = await apiClient.patch(`/contacts/${contactId}/favourite`, { isFavourite });
     return response.data;
+  },
+
+  addMutualContact: async (targetId: string) => {
+    const response = await apiClient.post(`/contacts/add-back/${targetId}`);
+    return response.data;
   }
 };

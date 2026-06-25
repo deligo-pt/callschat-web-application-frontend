@@ -13,7 +13,7 @@ export interface AppNotification {
   id: string;
   userId: string;
   issuerId: string | null;
-  type: 'MESSAGE' | 'CALL_MISSED' | 'CONTACT_REQUEST' | 'SYSTEM' | 'GROUP_INVITE';
+  type: 'MESSAGE' | 'CALL_MISSED' | 'CONTACT_ADDED' | 'GROUP_ADDED' | 'GROUP_REMOVED';
   content: string;
   routeId: string | null;
   isRead: boolean;
