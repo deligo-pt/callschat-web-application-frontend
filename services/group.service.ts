@@ -119,6 +119,16 @@ export const groupService = {
     }
   },
 
+  async updateMemberRole(groupId: string, memberUserId: string, role: "ADMIN" | "MEMBER"): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const response = await apiClient.patch(`/groups/${groupId}/members/${memberUserId}/role`, { role });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to update role for member ${memberUserId} in group ${groupId}`, error);
+      return { success: false, error: error.response?.data?.message || 'Failed to update member role' };
+    }
+  },
+
   async uploadGroupMedia(groupId: string, file: File): Promise<{ success: boolean; data?: { mediaUrl: string; mediaType: string }; error?: string }> {
     try {
       const formData = new FormData();

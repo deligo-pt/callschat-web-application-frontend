@@ -1,6 +1,8 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
+import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing } from "lucide-react";
+import { useCallContext } from "@/components/providers/CallContext";
 
 interface MessageBubbleProps {
   msg: {
@@ -9,17 +11,85 @@ interface MessageBubbleProps {
     text: string;
     createdAt: string;
     mediaUrl?: string;
-    mediaType?: "image" | "video" | "audio" | "document" | null;
+    mediaType?: string | null;
   };
   isMe: boolean;
   showTail: boolean;
+  peerId?: string;
+  peerName?: string;
+  peerAvatar?: string;
 }
 
-export function MessageBubble({ msg, isMe, showTail }: MessageBubbleProps) {
+export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar }: MessageBubbleProps) {
+  const { initiateCall } = useCallContext();
+
   const formatTime = (dateString: string) => {
     const d = new Date(dateString);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+
+  if (msg.mediaType === "call" && msg.mediaUrl) {
+    let callData: { callId: string; type: "AUDIO" | "VIDEO"; status: string; durationSeconds: number } | null = null;
+    try {
+      callData = JSON.parse(msg.mediaUrl);
+    } catch {}
+
+    const isVideo = callData?.type === "VIDEO";
+    const isMissed = callData?.status === "MISSED" || callData?.status === "DECLINED";
+    const dur = callData?.durationSeconds ?? 0;
+
+    const formatDur = (s: number) => {
+      if (!s) return "";
+      const m = Math.floor(s / 60);
+      const rem = s % 60;
+      if (m > 0) return `${m} mins`;
+      return `${rem} secs`;
+    };
+
+    const subtitle = isMissed 
+      ? (callData?.status === "DECLINED" ? "Declined" : "No answer") 
+      : (dur > 0 ? formatDur(dur) : "Call ended");
+
+    return (
+      <div className={cn("flex w-full z-10 flex-col my-1", isMe ? "items-end" : "items-start")}>
+        <div
+          onClick={() => peerId && initiateCall(peerId, isVideo ? 'VIDEO' : 'AUDIO', peerName, peerAvatar)}
+          className={cn(
+            "flex items-center gap-3.5 px-4 py-3 rounded-2xl border shadow-sm max-w-[280px] w-full transition-colors cursor-pointer",
+            isMe 
+              ? "bg-[#EEF2FF] border-[#D8E2FF] hover:bg-[#E0E9FF]" 
+              : "bg-white border-gray-200 hover:bg-gray-50"
+          )}
+        >
+          <div className={cn(
+            "w-10 h-10 rounded-full shrink-0 flex items-center justify-center shadow-sm",
+            isMissed ? "bg-red-50 text-red-500" : "bg-[#E0E9FF] text-[#254BCC]"
+          )}>
+            {isVideo ? (
+              <Video className="w-5 h-5" />
+            ) : isMissed ? (
+              <PhoneMissed className="w-5 h-5" />
+            ) : isMe ? (
+              <PhoneOutgoing className="w-5 h-5" />
+            ) : (
+              <PhoneIncoming className="w-5 h-5" />
+            )}
+          </div>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className={cn("font-bold text-[14px] truncate", isMissed ? "text-red-500" : "text-[#254BCC]")}>
+              {isVideo ? "Video call" : "Audio call"}
+            </span>
+            <span className="text-xs text-gray-500 font-medium">
+              {subtitle}
+            </span>
+          </div>
+          <span className="text-[10px] text-gray-400 font-medium self-end ml-1">
+            {formatTime(msg.createdAt)}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const isVoice =
     msg.mediaUrl && (msg.mediaType?.startsWith("audio") || msg.mediaType === "audio");

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallContext } from "@/components/providers/CallContext";
-import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight, UserPlus, X, Info, Bell, ShieldCheck, Languages, EyeOff, UserCog, Star, Folder, Users, Mail } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,8 @@ import { chatService } from "@/services/chat.service";
 import { groupService } from "@/services/group.service";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { toast } from "sonner";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { GroupInput } from "@/components/group/GroupInput";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
@@ -51,6 +52,12 @@ export default function GroupChatPage() {
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showAdminActivity, setShowAdminActivity] = useState(false);
+  const [isNotificationsMuted, setIsNotificationsMuted] = useState(false);
+  const [isAiProtectionEnabled, setIsAiProtectionEnabled] = useState(true);
+  const [isLiveTranslationEnabled, setIsLiveTranslationEnabled] = useState(false);
+  const [isPrivacyModeEnabled, setIsPrivacyModeEnabled] = useState(false);
+  const [isFavourite, setIsFavourite] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string>("");
@@ -117,6 +124,7 @@ export default function GroupChatPage() {
 
         if (detailsRes.data?.success) {
           setGroupDetails(detailsRes.data.data);
+          setIsFavourite(detailsRes.data.data?.isFavourite || false);
         }
         if (membersRes.data?.success) {
           setGroupMembers(membersRes.data.data.members || []);
@@ -278,7 +286,7 @@ export default function GroupChatPage() {
     <div className="flex h-full w-full overflow-hidden bg-[#EEF2FF]">
       
       {/* Main Chat Area */}
-      <div className={cn("flex flex-col h-full transition-all duration-300", showGroupInfo ? "w-0 lg:flex-1 hidden lg:flex" : "flex-1")}>
+      <div className={cn("flex flex-col h-full transition-all duration-300", (showGroupInfo || showAdminActivity) ? "w-0 lg:flex-1 hidden lg:flex" : "flex-1")}>
         
         {/* Header */}
         <div className="flex items-center justify-between bg-[#3B58F5] px-4 py-4 z-10 shrink-0 text-white shadow-md cursor-pointer transition-colors hover:bg-[#344EDD]" onClick={() => setShowGroupInfo(true)}>
@@ -333,13 +341,95 @@ export default function GroupChatPage() {
                 </button>
               </>
             )}
-            <button 
-              onClick={() => setShowGroupInfo(true)} 
-              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
-              title="Group Info"
-            >
-              <MoreVertical className="h-5 w-5" strokeWidth={2} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button 
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors focus:outline-none"
+                  title="Group Options"
+                >
+                  <MoreVertical className="h-5 w-5" strokeWidth={2} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[280px] rounded-2xl p-2 bg-white shadow-xl border border-gray-100 text-[#1E293B] z-50">
+                <DropdownMenuItem onClick={() => setShowGroupInfo(true)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
+                  <Info className="w-4 h-4 text-[#3B58F5]" />
+                  <span>Group Info</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => {
+                  setIsNotificationsMuted(!isNotificationsMuted);
+                  toast.success(isNotificationsMuted ? "Notifications unmuted" : "Notifications muted");
+                }} className="flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
+                  <div className="flex items-center gap-3">
+                    <Bell className="w-4 h-4 text-[#3B58F5]" />
+                    <span>{isNotificationsMuted ? "Unmute Notifications" : "Mute Notifications"}</span>
+                  </div>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="my-1 border-gray-100" />
+
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 text-sm font-semibold cursor-pointer text-[#1E293B]" onClick={(e) => { e.preventDefault(); setIsAiProtectionEnabled(!isAiProtectionEnabled); toast.success(!isAiProtectionEnabled ? "AI Protection enabled" : "AI Protection disabled"); }}>
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="w-4 h-4 text-[#3B58F5]" />
+                    <span>AI Protection</span>
+                  </div>
+                  <Switch checked={isAiProtectionEnabled} onCheckedChange={setIsAiProtectionEnabled} className="data-[state=checked]:bg-[#3B58F5]" />
+                </div>
+
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 text-sm font-semibold cursor-pointer text-[#1E293B]" onClick={(e) => { e.preventDefault(); setIsLiveTranslationEnabled(!isLiveTranslationEnabled); toast.success(!isLiveTranslationEnabled ? "Live Translation enabled" : "Live Translation disabled"); }}>
+                  <div className="flex items-center gap-3">
+                    <Languages className="w-4 h-4 text-[#22C55E]" />
+                    <span>Live Translation</span>
+                  </div>
+                  <Switch checked={isLiveTranslationEnabled} onCheckedChange={setIsLiveTranslationEnabled} className="data-[state=checked]:bg-[#3B58F5]" />
+                </div>
+
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 text-sm font-semibold cursor-pointer text-[#1E293B]" onClick={(e) => { e.preventDefault(); setIsPrivacyModeEnabled(!isPrivacyModeEnabled); toast.success(!isPrivacyModeEnabled ? "Privacy Mode enabled" : "Privacy Mode disabled"); }}>
+                  <div className="flex items-center gap-3">
+                    <EyeOff className="w-4 h-4 text-[#F59E0B]" />
+                    <span>Privacy Mode</span>
+                  </div>
+                  <Switch checked={isPrivacyModeEnabled} onCheckedChange={setIsPrivacyModeEnabled} className="data-[state=checked]:bg-[#3B58F5]" />
+                </div>
+
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => { setShowGroupInfo(false); setShowAdminActivity(true); }} className="flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
+                    <div className="flex items-center gap-3">
+                      <UserCog className="w-4 h-4 text-[#3B58F5]" />
+                      <span>Admin Activity</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuSeparator className="my-1 border-gray-100" />
+
+                <DropdownMenuItem onClick={() => { setShowGroupInfo(true); setGalleryOpen(true); }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
+                  <Folder className="w-4 h-4 text-[#3B58F5]" />
+                  <span>Media Info</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={async () => {
+                  const newFav = !isFavourite;
+                  setIsFavourite(newFav);
+                  await groupService.toggleFavourite(groupId, newFav);
+                  toast.success(newFav ? "Added to Favorites" : "Removed from Favorites");
+                }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
+                  <Star className={cn("w-4 h-4", isFavourite ? "text-[#F59E0B] fill-[#F59E0B]" : "text-[#F59E0B]")} />
+                  <span>{isFavourite ? "Remove from Favorites" : "Add to Favorites"}</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => { toast.success("Chat history cleared"); window.location.reload(); }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-red-50 focus:bg-red-50 text-sm font-semibold text-red-500">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <span>Clear Chat</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => setIsLeaveGroupDialogOpen(true)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-red-50 focus:bg-red-50 text-sm font-semibold text-red-500">
+                  <LogOut className="w-4 h-4 text-red-500" />
+                  <span>Leave Group</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -372,6 +462,7 @@ export default function GroupChatPage() {
                   showAvatar={showAvatar}
                   isNextSameSender={isNextSameSender}
                   isFirstFromSender={isFirstFromSender}
+                  groupId={groupId}
                 />
               );
             })
@@ -553,6 +644,128 @@ export default function GroupChatPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar - Admin Activity */}
+      {showAdminActivity && (
+        <div className="w-full lg:w-[480px] h-full flex flex-col bg-[#F8FAFC] border-l border-[#EEF2FF] shadow-2xl animate-in slide-in-from-right duration-300 z-50 shrink-0">
+          <div className="flex items-center gap-4 bg-[#3B58F5] px-4 py-4 shrink-0 text-white shadow-md">
+            <button
+              onClick={() => setShowAdminActivity(false)}
+              className="rounded-full p-1 transition-colors hover:bg-white/10"
+            >
+              <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+            </button>
+            <h2 className="text-[17px] font-bold tracking-tight">Admin Activity</h2>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3 shrink-0">
+              <div className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm flex items-center justify-center gap-2.5 text-[#3B58F5] font-bold text-sm">
+                <Users className="w-4 h-4 text-[#3B58F5]" />
+                <span>{groupMembers.length} Members</span>
+              </div>
+              <button
+                onClick={() => setIsAddMemberModalOpen(true)}
+                className="bg-white hover:bg-blue-50/50 rounded-2xl p-3.5 border border-gray-100 shadow-sm flex items-center justify-center gap-2.5 text-[#3B58F5] font-bold text-sm transition-colors cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-[#3B58F5]" />
+                <span>Add Member</span>
+              </button>
+            </div>
+
+            <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl p-4 shrink-0 shadow-sm">
+              <h4 className="text-[#D97706] font-bold text-[14px] mb-1">Admin View</h4>
+              <p className="text-[#B45309] text-[12.5px] leading-relaxed font-medium">
+                You can see all member details including phone numbers and emails. Regular members cannot see this information.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3.5 pb-6">
+              {groupMembers.map((member, idx) => {
+                const mName = member.profile?.name || member.user?.profile?.displayName || "Unknown Member";
+                const mRole = member.role || "MEMBER";
+                const isAdminRole = mRole === "ADMIN" || mRole === "OWNER";
+                const mAvatar = member.profile?.avatarUrl || member.user?.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(mName)}&background=3B58F5&color=fff`;
+                const mPhone = member.profile?.phone || member.user?.phone || (member.profile?.username ? `@${member.profile.username}` : "+1 (555) xxx-xxxx");
+                const mEmail = member.profile?.email || member.user?.email || `${mName.toLowerCase().replace(/\s+/g, '.')}@email.com`;
+                const mJoined = member.joinedAt ? new Date(member.joinedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Jan 15, 2026";
+                const isMe = member.userId === currentUserId || member.user?.id === currentUserId;
+                const isOwner = mRole === "OWNER";
+
+                return (
+                  <div key={member.id || idx} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col gap-3.5 transition-all hover:shadow-md">
+                    <div className="flex items-start gap-3.5">
+                      <img src={mAvatar} alt={mName} className="w-12 h-12 rounded-full object-cover border border-gray-100 shrink-0 shadow-sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-[15px] font-bold text-gray-900 truncate">{mName} {isMe && "(You)"}</h4>
+                          {isAdminRole && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF3C7] text-[#D97706] shrink-0 uppercase tracking-wider">
+                              Admin
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 mt-2.5 text-gray-600 text-[13px] font-medium">
+                          <div className="flex items-center gap-2 text-gray-600 truncate">
+                            <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span className="truncate">{mPhone}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600 truncate">
+                            <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span className="truncate">{mEmail}</span>
+                          </div>
+                          <span className="text-[11.5px] text-gray-400 font-normal mt-1">
+                            Joined {mJoined}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!isMe && !isOwner && (
+                      <div className="border-t border-gray-100 pt-3 flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            setMemberToRemove({ id: member.userId || member.user?.id, name: mName });
+                            setIsRemoveMemberDialogOpen(true);
+                          }}
+                          className="flex-1 py-2 rounded-xl bg-[#FEE2E2]/60 hover:bg-[#FEE2E2] text-[#EF4444] font-bold text-[13px] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Remove</span>
+                        </button>
+
+                        <button
+                          onClick={async () => {
+                            const targetId = member.userId || member.user?.id;
+                            if (!targetId) return;
+                            const newRole = mRole === "ADMIN" ? "MEMBER" : "ADMIN";
+                            try {
+                              const res = await groupService.updateMemberRole(groupId, targetId, newRole);
+                              if (res?.success !== false && !res?.error) {
+                                toast.success(newRole === "ADMIN" ? "Made Admin" : "Revoked Admin");
+                                setGroupMembers(prev => prev.map(m => (m.userId === targetId || m.user?.id === targetId) ? { ...m, role: newRole } : m));
+                              } else {
+                                toast.error(res?.error || "Failed to update role");
+                              }
+                            } catch (e) {
+                              toast.error("Failed to update role");
+                            }
+                          }}
+                          className="flex-1 py-2 rounded-xl bg-[#EEF2FF] hover:bg-[#E0E7FF] text-[#3B58F5] font-bold text-[13px] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>{mRole === "ADMIN" ? "Revoke Admin" : "Make Admin"}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

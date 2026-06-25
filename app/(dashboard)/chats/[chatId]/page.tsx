@@ -305,6 +305,9 @@ export default function ChatRoomPage() {
                 msg={msg}
                 isMe={isMe}
                 showTail={showTail}
+                peerId={recipientId}
+                peerName={recipient?.name}
+                peerAvatar={recipient?.avatarUrl}
               />
             );
           })
