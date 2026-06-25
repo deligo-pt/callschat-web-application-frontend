@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { chatService } from "@/services/chat.service";
 import { motion } from "framer-motion";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { decryptMessage } from "@/utils/crypto";
 
 interface Conversation {
   id: string;
@@ -43,6 +44,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
   const pathname = usePathname();
   const router = useRouter();
 
@@ -164,6 +166,65 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     }
   };
 
+  // --- Decrypt Last Messages ---
+  useEffect(() => {
+    const decryptPreviews = async () => {
+      if (!currentUserId || conversations.length === 0) return;
+      
+      const privKeyName = `privateKey_${currentUserId}`;
+      let myPrivateKey = localStorage.getItem(privKeyName);
+      if (!myPrivateKey) {
+        myPrivateKey = localStorage.getItem("privateKey"); // fallback
+      }
+      if (!myPrivateKey) return;
+
+      const newPreviews = { ...decryptedPreviews };
+      let hasChanges = false;
+      const pubKeyCache: Record<string, string> = {};
+
+      for (const conv of conversations) {
+        const msg = conv.lastMessage;
+        if (!msg || !msg.ciphertext || !msg.nonce) continue;
+        if (newPreviews[conv.id]) continue; // Already decrypted
+        if (msg.mediaType) continue; // Media handled differently
+
+        try {
+          const targetUserId = msg.senderId === currentUserId ? conv.otherUserId : msg.senderId;
+          if (!targetUserId) continue;
+
+          let pubKeyToUse = pubKeyCache[targetUserId];
+          if (!pubKeyToUse) {
+            const res = await chatService.fetchRecipientKey(targetUserId);
+            if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+              pubKeyToUse = res.data[res.data.length - 1].publicKey;
+            } else if (res?.success && res?.data?.publicKey) {
+              pubKeyToUse = res.data.publicKey;
+            }
+            if (pubKeyToUse) {
+              pubKeyCache[targetUserId] = pubKeyToUse;
+            }
+          }
+
+          if (pubKeyToUse) {
+            const text = await decryptMessage(msg.ciphertext, msg.nonce, pubKeyToUse, myPrivateKey);
+            newPreviews[conv.id] = text;
+            hasChanges = true;
+          }
+        } catch (err) {
+          console.error(`Failed to decrypt preview for conv ${conv.id}`, err);
+          newPreviews[conv.id] = "🔒 Decryption Failed";
+          hasChanges = true;
+        }
+      }
+
+      if (hasChanges) {
+        setDecryptedPreviews(newPreviews);
+      }
+    };
+
+    decryptPreviews();
+  }, [conversations, currentUserId, decryptedPreviews]);
+
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
     const now = new Date();
@@ -178,6 +239,12 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     if (msg.mediaType === "image") return "📷 Photo";
     if (msg.mediaType === "video") return "🎥 Video";
     if (msg.mediaType === "audio") return "🎤 Voice message";
+    if (msg.mediaType === "document") return "📄 Document";
+    
+    if (decryptedPreviews[conv.id]) {
+      return decryptedPreviews[conv.id];
+    }
+    
     return "🔒 Encrypted message";
   };
 

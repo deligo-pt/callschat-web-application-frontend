@@ -2,24 +2,15 @@
 
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, MessageSquare, Phone, Search, Users, Video, Plus, X } from "lucide-react";
+import { ArrowLeft, MessageSquare, Phone, Search, Users, Video, Plus, X, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { chatService } from "@/services/chat.service";
-
-interface Contact {
-  id: string;
-  userId: string;
-  name: string;
-  phone: string;
-  avatarUrl: string | null;
-}
+import { useContacts, type Contact } from "@/hooks/useContacts";
 
 export default function ContactsPage() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { contacts, isLoading, searchQuery, setSearchQuery, fetchContacts, handleToggleFavourite } = useContacts();
 
   // Add Contact Modal State
   const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
@@ -28,53 +19,7 @@ export default function ContactsPage() {
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [addContactError, setAddContactError] = useState("");
 
-  const fetchContacts = async () => {
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
 
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-      const res = await fetch(`${baseUrl}/contacts`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-      
-      const data = await res.json();
-      let contactsArray = [];
-      if (data.success && Array.isArray(data.data)) {
-        contactsArray = data.data;
-      } else if (Array.isArray(data)) {
-        contactsArray = data;
-      } else if (data.data && Array.isArray(data.data.contacts)) {
-        contactsArray = data.data.contacts;
-      }
-
-      const mappedContacts = contactsArray.map((u: any) => ({
-        id: u.id,
-        userId: u.addressee?.id || u.userId || u.id,
-        name: u.customName || u.addressee?.profile?.displayName || u.profile?.displayName || u.profile?.username || "Unknown",
-        phone: u.contact?.phone || u.phoneNumber || u.phone || "No phone number",
-        avatarUrl: u.addressee?.profile?.avatarUrl || u.profile?.avatarUrl || null
-      }));
-      
-      // Sort alphabetically
-      mappedContacts.sort((a: Contact, b: Contact) => a.name.localeCompare(b.name));
-      setContacts(mappedContacts);
-    } catch (error) {
-      console.error("Failed to fetch contacts", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchContacts();
-  }, []);
 
   const handleStartChat = async (targetUserId: string) => {
     try {
@@ -276,6 +221,22 @@ export default function ContactsPage() {
 
                         {/* Action Buttons */}
                         <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleToggleFavourite(contact.id, contact.isFavourite);
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-110"
+                            title={contact.isFavourite ? "Remove from favourites" : "Add to favourites"}
+                          >
+                            {contact.isFavourite ? (
+                              <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                            ) : (
+                              <Star className="w-5 h-5 text-muted-foreground hover:text-yellow-400 transition-colors" />
+                            )}
+                          </button>
+                          
                           <button 
                             onClick={(e) => {
                               e.preventDefault();
