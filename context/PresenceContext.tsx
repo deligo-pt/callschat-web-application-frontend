@@ -118,17 +118,34 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     if (!socket) return;
 
     const handleUserOnline = ({ userId }: { userId: string }) => {
-      // Add to the fast-lookup set.
+      // 1. Always add to the fast-lookup set immediately so badges update.
       const next = new Set(onlineIdsRef.current);
       next.add(userId);
       commitOnlineIds(next);
 
-      // If the user is already in the activeUsers array (profile known), nothing
-      // to do.  If not, we intentionally omit a profile fetch — the badge on
-      // the chat list will reflect their status on next render.  The tray will
-      // update with full profile data on the next page load or when user:offline
-      // is followed by user:online after a fresh hydration.
-      // This keeps the socket handler synchronous and allocation-free.
+      // 2. If this user isn't in the tray yet (they came online AFTER page
+      //    load so the initial REST call missed them), re-fetch the full list
+      //    to pull in their name + avatar for the Active Now tray.
+      setActiveUsers((prev) => {
+        const alreadyInTray = prev.some((u) => u.id === userId);
+        if (!alreadyInTray) {
+          // Fire the refresh asynchronously; when it resolves the tray
+          // will re-render with the new user included.
+          getActiveUsers().then((freshList) => {
+            setActiveUsers(freshList);
+            // Also sync onlineIds with the freshly fetched set so the two
+            // sources of truth stay consistent.
+            const freshIds = new Set(freshList.map((u) => u.id));
+            // Merge: keep any IDs already tracked via socket that may not
+            // yet be in the REST response due to propagation delay.
+            onlineIdsRef.current.forEach((id) => freshIds.add(id));
+            commitOnlineIds(freshIds);
+          }).catch((err) => {
+            console.error("[Presence] Re-fetch on user:online failed:", err);
+          });
+        }
+        return prev; // return prev unchanged for now; async update follows
+      });
     };
 
     const handleUserOffline = ({ userId }: { userId: string }) => {

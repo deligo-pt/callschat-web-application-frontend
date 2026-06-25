@@ -253,7 +253,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
           {/* Conversations List */}
           <div className="mt-6">
             <div className="px-6 mb-2">
-              <h2 className="text-[14px] font-bold text-[#1D2A54]">Recent</h2>
+              <h2 className="text-[14px] font-bold text-[#3B58F5]">Message</h2>
             </div>
 
             {isLoading ? (
@@ -291,19 +291,22 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                           isActive ? "bg-[#EEF2FF]" : "hover:bg-[#F4F7FE]"
                         )}
                       >
-                        {/* Avatar with real-time presence badge */}
+                        {/* Avatar — green ring = online, plain = offline */}
                         <div className="relative shrink-0">
-                          <img
-                            src={avatarUrl}
-                            alt={conv.otherUserName}
-                            className="h-[54px] w-[54px] rounded-full object-cover bg-[#F4F6FC]"
-                          />
-                          {/* Prefer the live Redis presence check; fall back to the
-                               static Prisma field for newly-opened pages before
-                               the socket has emitted its first events. */}
-                          {(isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline) && (
-                            <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
-                          )}
+                          <div
+                            className={cn(
+                              "rounded-full",
+                              (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline)
+                                ? "border-[3px] border-emerald-500 p-[2px] bg-white"
+                                : ""
+                            )}
+                          >
+                            <img
+                              src={avatarUrl}
+                              alt={conv.otherUserName}
+                              className="h-[52px] w-[52px] rounded-full object-cover bg-[#F4F6FC]"
+                            />
+                          </div>
                         </div>
 
                         {/* Content */}
