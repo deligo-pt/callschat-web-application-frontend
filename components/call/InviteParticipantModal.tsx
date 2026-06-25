@@ -77,38 +77,57 @@ export const InviteParticipantModal = ({
   useEffect(() => {
     if (!socket) return;
 
-    const handleCallError = (payload: { code?: string; message?: string }) => {
-      // If the error code is INVITE_FAILED we surface it to the button that sent it.
-      // Since Socket.IO doesn't carry which contactId caused it, we reset ALL
-      // "ringing" states and surface a toast.
-      if (payload?.code === "INVITE_FAILED" || payload?.message) {
-        const message = payload.message || "Failed to reach this person.";
-        toast.error(message);
+    const handleCallError = (payload: { code?: string; message?: string; targetId?: string }) => {
+      // Reset "ringing" state on INVITE_FAILED (contact error) or INVITE_TIMEOUT
+      // (45 s elapsed, no answer — WhatsApp-style ring timeout).
+      const isInviteError =
+        payload?.code === "INVITE_FAILED" ||
+        payload?.code === "INVITE_TIMEOUT";
 
-        setInviteStates((prev) => {
-          const next = { ...prev };
-          for (const id of Object.keys(next)) {
-            if (next[id].status === "ringing") {
-              next[id] = { status: "error", errorMessage: message };
-            }
-          }
-          return next;
-        });
+      if (isInviteError || payload?.message) {
+        const message =
+          payload.code === "INVITE_TIMEOUT"
+            ? "No answer. The invite ring timed out."
+            : (payload.message || "Failed to reach this person.");
 
-        // Auto-reset error buttons after 4 s
-        const timeout = setTimeout(() => {
+        if (payload.code === "INVITE_TIMEOUT") {
+          // Timeout is informational — no error toast, just silently reset
           setInviteStates((prev) => {
             const next = { ...prev };
             for (const id of Object.keys(next)) {
-              if (next[id].status === "error") {
+              if (next[id].status === "ringing") {
                 next[id] = { status: "idle" };
               }
             }
             return next;
           });
-        }, 4000);
+        } else {
+          toast.error(message);
+          setInviteStates((prev) => {
+            const next = { ...prev };
+            for (const id of Object.keys(next)) {
+              if (next[id].status === "ringing") {
+                next[id] = { status: "error", errorMessage: message };
+              }
+            }
+            return next;
+          });
 
-        errorTimeouts.current["_last"] = timeout;
+          // Auto-reset error buttons after 4 s
+          const timeout = setTimeout(() => {
+            setInviteStates((prev) => {
+              const next = { ...prev };
+              for (const id of Object.keys(next)) {
+                if (next[id].status === "error") {
+                  next[id] = { status: "idle" };
+                }
+              }
+              return next;
+            });
+          }, 4000);
+
+          errorTimeouts.current["_last"] = timeout;
+        }
       }
     };
 
@@ -138,16 +157,18 @@ export const InviteParticipantModal = ({
         { targetId, roomId, callType },
       );
 
-      // Auto-transition "ringing" → "sent" after 2 s if no error arrived.
-      // A real ACK would be cleaner but the backend emits no positive ack.
+      // WhatsApp-style: keep the button in "Ringing…" state for up to 45 s.
+      // The backend fires call:error { code: INVITE_TIMEOUT } after 45 s if the
+      // target doesn't answer.  That event (handled above) resets the button.
+      // We also set a local 46 s safety-net here in case the socket event is lost.
       const sentTimeout = setTimeout(() => {
         setInviteStates((prev) => {
           if (prev[targetId]?.status === "ringing") {
-            return { ...prev, [targetId]: { status: "sent" } };
+            return { ...prev, [targetId]: { status: "idle" } };
           }
           return prev;
         });
-      }, 2000);
+      }, 46_000);
 
       errorTimeouts.current[targetId] = sentTimeout;
     },
@@ -287,17 +308,16 @@ export const InviteParticipantModal = ({
                       )}
                     </div>
 
-                    {/* Name + status */}
+                    {/* Name + online indicator */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white truncate">
                         {contact.name}
                       </p>
-                      <p className={cn(
-                        "text-xs font-medium",
-                        contact.isOnline ? "text-emerald-400" : "text-white/30",
-                      )}>
-                        {contact.isOnline ? "Online" : "Offline"}
-                      </p>
+                      {contact.isOnline && (
+                        <p className="text-xs font-medium text-emerald-400">
+                          Online
+                        </p>
+                      )}
                     </div>
 
                     {/* Invite button */}
@@ -314,7 +334,7 @@ export const InviteParticipantModal = ({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-white/5">
           <p className="text-xs text-white/25 text-center">
-            Contacts already in the call are hidden · Offline users cannot be invited
+            Contacts already in the call are hidden · Invite rings for up to 45 s
           </p>
         </div>
       </DialogContent>

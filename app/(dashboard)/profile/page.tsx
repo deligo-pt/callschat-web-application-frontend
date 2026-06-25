@@ -175,6 +175,7 @@ export default function ProfilePage() {
       // Always clear local session
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
+      document.cookie = "accessToken=; path=/; max-age=0";
       toast.success("Logged out successfully");
       router.push("/login");
     }

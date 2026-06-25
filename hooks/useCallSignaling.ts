@@ -145,6 +145,17 @@ export const useCallSignaling = () => {
 
     const handleCallError = (payload: { code?: string; message?: string } | unknown) => {
       console.error('[Call] Call error:', payload);
+
+      const code = (payload as { code?: string })?.code;
+
+      // INVITE_TIMEOUT / INVITE_FAILED are informational events for the
+      // InviteParticipantModal only — they must NOT disturb the active call UI,
+      // stop any ringtone, or clear outgoing/incoming call state.  The modal
+      // has its own call:error listener that handles these codes.
+      if (code === 'INVITE_TIMEOUT' || code === 'INVITE_FAILED') {
+        return;
+      }
+
       stopRingtone();
       // IMPORTANT: Do NOT clear activeCall on call:error.
       //
@@ -158,17 +169,17 @@ export const useCallSignaling = () => {
       // call:rejected) are handled by handleCallEnded above.
       //
       // The InviteParticipantModal has its own call:error listener for
-      // INVITE_FAILED errors — it does NOT rely on this handler.
+      // INVITE_FAILED / INVITE_TIMEOUT errors — it does NOT rely on this handler.
       setOutgoingCall(null);
       setIncomingCall(null);
       // Only clear activeCall if the error code explicitly signals call failure
       // (e.g. INITIATE_FAILED before any room was joined).  A connected call
       // should survive any error that doesn't come via call:ended.
-      const code = (payload as { code?: string })?.code;
       if (code === 'INITIATE_FAILED' || code === 'ACCEPT_FAILED') {
         setActiveCall(null);
       }
     };
+
 
     socket.on('call:incoming', handleIncomingCall);
     socket.on('call:connected', handleCallConnected);
