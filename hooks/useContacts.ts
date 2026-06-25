@@ -9,6 +9,7 @@ export interface Contact {
   phone: string;
   avatarUrl: string | null;
   isFavourite: boolean;
+  isOnline: boolean;
 }
 
 export function useContacts() {
@@ -35,7 +36,8 @@ export function useContacts() {
         name: u.customName || u.addressee?.profile?.displayName || u.profile?.displayName || u.profile?.username || "Unknown",
         phone: u.contact?.phone || u.phoneNumber || u.phone || "No phone number",
         avatarUrl: u.addressee?.profile?.avatarUrl || u.profile?.avatarUrl || null,
-        isFavourite: u.isFavourite || false
+        isFavourite: u.isFavourite || false,
+        isOnline: u.addressee?.profile?.isOnline || u.contact?.profile?.isOnline || u.profile?.isOnline || false
       }));
       
       // Deduplicate by userId to prevent rendering the same person twice for mutual contacts
