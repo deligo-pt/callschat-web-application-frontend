@@ -76,7 +76,7 @@ export default function Navbar() {
                     >
                         Download
                     </Button>
-                    <Link href="/register">
+                    <Link href="/chats">
                         <Button
                             variant="outline"
                             className="rounded-xl border-primary text-primary px-6 py-2.5 text-base font-medium shadow-md transition-all duration-200 hover:bg-primary/10"
@@ -141,7 +141,7 @@ export default function Navbar() {
                                 >
                                     Download
                                 </Button>
-                                <Link href="/register" className="w-full" onClick={() => setIsOpen(false)}>
+                                <Link href="/chats" className="w-full" onClick={() => setIsOpen(false)}>
                                     <Button
                                         variant="outline"
                                         className="w-full rounded-xl border-primary text-primary py-3 text-center font-medium shadow-md hover:bg-primary/10"
