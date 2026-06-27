@@ -57,4 +57,13 @@ export const chatService = {
     });
     return response.data;
   },
+
+  markConversationAsRead: async (conversationId: string) => {
+    try {
+      const response = await apiClient.patch(`/notifications/read-by-route/${conversationId}`);
+      return response.data;
+    } catch {
+      // Fire-and-forget: a badge-clear failure must not break the chat UI
+    }
+  },
 };

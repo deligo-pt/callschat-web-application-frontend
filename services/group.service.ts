@@ -9,6 +9,7 @@ export interface GroupItem {
   maxMembers: number;
   createdBy: string;
   createdAt: string;
+  updatedAt: string;
   memberCount: number;
   myRole: string;
   joinedAt: string;

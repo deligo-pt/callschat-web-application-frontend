@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut, Briefcase, User, RefreshCw, X, Building2, Globe, MapPin, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -12,6 +12,8 @@ interface UserProfileData {
   id: string;
   phone: string;
   email: string | null;
+  accountType?: string;
+  currentMode?: string;
   profile: {
     displayName: string;
     username: string;
@@ -45,6 +47,88 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Business Mode & Switching State
+  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
+  const [showBusinessModal, setShowBusinessModal] = useState(false);
+  const [businessForm, setBusinessForm] = useState({
+    companyName: "",
+    category: "Technology",
+    description: "",
+    website: "",
+    address: "",
+  });
+
+  const handleSwitchMode = async (targetMode: "PERSONAL" | "BUSINESS") => {
+    setIsSwitchingMode(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return;
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+      const res = await fetch(`${baseUrl}/business/switch-mode`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ mode: targetMode })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Switched to ${targetMode === "BUSINESS" ? "Business" : "Personal"} Mode!`);
+        setUserData((prev) => prev ? { ...prev, currentMode: targetMode } : null);
+      } else {
+        if (res.status === 403 || data.error?.message?.toLowerCase().includes("set up a business profile") || data.message?.toLowerCase().includes("set up a business profile")) {
+          toast.info("Please set up your Business Profile first to switch mode.");
+          setShowBusinessModal(true);
+        } else {
+          toast.error(data.error?.message || data.message || "Failed to switch mode");
+        }
+      }
+    } catch (err) {
+      toast.error("Network error while switching mode");
+    } finally {
+      setIsSwitchingMode(false);
+    }
+  };
+
+  const handleCreateBusinessProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessForm.companyName.trim()) {
+      toast.error("Company Name is required");
+      return;
+    }
+    setIsSwitchingMode(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return;
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+      const res = await fetch(`${baseUrl}/business/setup`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(businessForm)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Business Profile created successfully! Switched to Business Mode.");
+        setShowBusinessModal(false);
+        setUserData((prev) => prev ? { ...prev, accountType: "BUSINESS", currentMode: "BUSINESS" } : null);
+      } else {
+        toast.error(data.error?.message || data.message || "Failed to set up business profile");
+      }
+    } catch (err) {
+      toast.error("Network error while setting up business profile");
+    } finally {
+      setIsSwitchingMode(false);
+    }
+  };
 
   // Fetch initial profile data
   useEffect(() => {
@@ -195,7 +279,20 @@ export default function ProfilePage() {
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
           </button>
-          <h1 className="text-[18px] font-bold">Profile</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[18px] font-bold">Profile</h1>
+            {userData?.accountType && (
+              <span className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-sm",
+                userData.accountType === "BUSINESS" 
+                  ? "bg-purple-500/30 text-purple-100 border border-purple-400/30" 
+                  : "bg-white/20 text-blue-100 border border-white/20"
+              )}>
+                {userData.accountType === "BUSINESS" ? <Briefcase className="h-3 w-3" /> : <User className="h-3 w-3" />}
+                {userData.accountType}
+              </span>
+            )}
+          </div>
           
           <button 
              onClick={handleLogout}
@@ -243,6 +340,68 @@ export default function ProfilePage() {
                   accept="image/jpeg,image/png,image/webp" 
                   className="hidden" 
                 />
+              </div>
+
+              {/* Account Interface Mode Segmented Card */}
+              <div className="mt-6 w-full rounded-3xl border border-[#E6EAFA] bg-[#F4F6FC] p-4 shadow-sm">
+                <div className="flex items-center justify-between px-1 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-extrabold text-[#1D2A54]">Active Interface Mode</span>
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" title="Active" />
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#8F95B2]">
+                    Type: <strong className="text-[#3B58F5] uppercase font-extrabold">{userData?.accountType || "PERSONAL"}</strong>
+                  </span>
+                </div>
+
+                {/* Segmented Control */}
+                <div className="relative flex w-full rounded-2xl bg-[#E6EAFA]/70 p-1.5 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if ((userData?.currentMode || userData?.accountType) !== "PERSONAL") {
+                        handleSwitchMode("PERSONAL");
+                      }
+                    }}
+                    disabled={isSwitchingMode}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-bold transition-all duration-200 cursor-pointer select-none",
+                      (userData?.currentMode || userData?.accountType) !== "BUSINESS"
+                        ? "bg-white text-[#3B58F5] shadow-md shadow-[#3B58F5]/10 scale-[1.01]"
+                        : "text-[#64748B] hover:text-[#1E293B] hover:bg-white/40"
+                    )}
+                  >
+                    {isSwitchingMode && (userData?.currentMode || userData?.accountType) !== "BUSINESS" ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-[#3B58F5]" />
+                    ) : (
+                      <User className="h-4 w-4" strokeWidth={2.5} />
+                    )}
+                    Personal Mode
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if ((userData?.currentMode || userData?.accountType) !== "BUSINESS") {
+                        handleSwitchMode("BUSINESS");
+                      }
+                    }}
+                    disabled={isSwitchingMode}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-bold transition-all duration-200 cursor-pointer select-none",
+                      (userData?.currentMode || userData?.accountType) === "BUSINESS"
+                        ? "bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white shadow-md shadow-purple-500/25 scale-[1.01]"
+                        : "text-[#64748B] hover:text-[#1E293B] hover:bg-white/40"
+                    )}
+                  >
+                    {isSwitchingMode && (userData?.currentMode || userData?.accountType) === "BUSINESS" ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    ) : (
+                      <Briefcase className="h-4 w-4" strokeWidth={2.5} />
+                    )}
+                    Business Mode
+                  </button>
+                </div>
               </div>
 
               {/* Form Fields */}
@@ -380,6 +539,126 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Setup Business Profile Modal */}
+      {showBusinessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl transition-all animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="relative bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] p-6 text-white">
+              <button
+                onClick={() => setShowBusinessModal(false)}
+                className="absolute right-4 top-4 rounded-full bg-white/10 p-1.5 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md">
+                  <Briefcase className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-[18px] font-bold">Create Business Profile</h3>
+                  <p className="text-[13px] text-purple-100">Unlock professional features & tools</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateBusinessProfile} className="p-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[13px] font-bold text-[#1D2A54] flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4 text-[#8B5CF6]" />
+                  Company Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={businessForm.companyName}
+                  onChange={(e) => setBusinessForm({ ...businessForm, companyName: e.target.value })}
+                  placeholder="e.g. Acme Corp"
+                  className="h-[46px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#8B5CF6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B5CF6]/50 transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[13px] font-bold text-[#1D2A54] flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-[#8B5CF6]" />
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={businessForm.category}
+                  onChange={(e) => setBusinessForm({ ...businessForm, category: e.target.value })}
+                  className="h-[46px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#8B5CF6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B5CF6]/50 transition-colors"
+                >
+                  <option value="Technology">Technology & Software</option>
+                  <option value="Retail">Retail & E-commerce</option>
+                  <option value="Healthcare">Healthcare & Wellness</option>
+                  <option value="Consulting">Consulting & Agency</option>
+                  <option value="Education">Education & Training</option>
+                  <option value="Other">Other Business</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[13px] font-bold text-[#1D2A54] flex items-center gap-1.5">
+                  <Globe className="h-4 w-4 text-[#8B5CF6]" />
+                  Website (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={businessForm.website}
+                  onChange={(e) => setBusinessForm({ ...businessForm, website: e.target.value })}
+                  placeholder="https://example.com"
+                  className="h-[46px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#8B5CF6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B5CF6]/50 transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[13px] font-bold text-[#1D2A54] flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-[#8B5CF6]" />
+                  Address (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={businessForm.address}
+                  onChange={(e) => setBusinessForm({ ...businessForm, address: e.target.value })}
+                  placeholder="City, Country or Street Address"
+                  className="h-[46px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#8B5CF6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B5CF6]/50 transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[13px] font-bold text-[#1D2A54]">Description (Optional)</label>
+                <textarea
+                  rows={2}
+                  value={businessForm.description}
+                  onChange={(e) => setBusinessForm({ ...businessForm, description: e.target.value })}
+                  placeholder="Briefly describe what your business does..."
+                  className="w-full resize-none rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] p-3 text-[14px] font-semibold text-[#11142D] focus:border-[#8B5CF6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B5CF6]/50 transition-colors"
+                />
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBusinessModal(false)}
+                  className="flex-1 rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] py-3 text-[14px] font-bold text-[#8F95B2] hover:bg-[#E6EAFA] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSwitchingMode}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] py-3 text-[14px] font-bold text-white shadow-lg shadow-purple-500/25 hover:from-[#7C3AED] hover:to-[#5B21B6] transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {isSwitchingMode ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Create & Switch
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

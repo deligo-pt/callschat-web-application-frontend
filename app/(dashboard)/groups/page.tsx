@@ -16,6 +16,8 @@ export default function GroupsPage() {
   const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Tracks the last time user read each group conversation (from localStorage)
+  const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -33,6 +35,26 @@ export default function GroupsPage() {
 
     fetchGroups();
   }, []);
+
+  // Load the last-read map from localStorage for unread badge calculation
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("lastReadMap");
+      if (raw) setLastReadMap(JSON.parse(raw));
+    } catch {
+      // ignore parse errors
+    }
+  }, []);
+
+  /**
+   * Returns true if the group has had activity (updatedAt) more recent than the
+   * user's last read timestamp — meaning there are likely unread messages.
+   */
+  const hasUnreadGroup = (group: GroupItem): boolean => {
+    const lastReadAt = lastReadMap[group.id];
+    if (!lastReadAt) return false; // never opened = unknown, don't show badge for new groups
+    return new Date(group.updatedAt) > new Date(lastReadAt);
+  };
 
   const handleDeleteGroup = async (groupId: string) => {
     setIsDeleting(true);
@@ -205,9 +227,16 @@ export default function GroupsPage() {
                           <h3 className="text-[16px] font-bold text-[#1D2A54] truncate pr-2">
                             {group.name}
                           </h3>
-                          <span className="text-[11px] font-semibold text-[#8F95B2] shrink-0">
-                            {formatTime(group.createdAt)}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[11px] font-semibold text-[#8F95B2]">
+                              {formatTime(group.createdAt)}
+                            </span>
+                            {hasUnreadGroup(group) && (
+                              <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3B58F5] px-1 text-[10px] font-bold text-white shadow-sm">
+                                ●
+                              </div>
+                            )}
+                          </div>
                         </div>
                         
                         <div className="flex items-center justify-between gap-4">

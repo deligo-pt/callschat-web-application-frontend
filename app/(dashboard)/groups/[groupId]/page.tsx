@@ -220,6 +220,23 @@ export default function GroupChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Mark group as read: write the current timestamp to localStorage so the
+  // groups list page can show/hide the unread badge.
+  useEffect(() => {
+    if (!groupId) return;
+    const now = new Date().toISOString();
+    try {
+      const raw = localStorage.getItem("lastReadMap");
+      const map: Record<string, string> = raw ? JSON.parse(raw) : {};
+      map[groupId] = now;
+      localStorage.setItem("lastReadMap", JSON.stringify(map));
+    } catch {
+      // ignore storage errors
+    }
+    // Also clear DB-level notification badge (fire-and-forget)
+    void chatService.markConversationAsRead(groupId);
+  }, [groupId]);
+
   const handleSend = (text: string, file: File | null) => {
     if (!isReady) return;
     sendMessage(text, file);

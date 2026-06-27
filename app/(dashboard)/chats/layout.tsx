@@ -39,6 +39,8 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
+  // Tracks the last time the user read each conversation (persisted to localStorage)
+  const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
   const pathname = usePathname();
   const router = useRouter();
 
@@ -91,6 +93,33 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Load the last-read timestamps from localStorage so unread badges survive page refreshes.
+  // Re-runs when pathname changes so the sidebar picks up writes made by the child page.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("lastReadMap");
+      if (raw) setLastReadMap(JSON.parse(raw));
+    } catch {
+      // ignore parse errors
+    }
+  }, [pathname]);
+
+  /**
+   * Returns true when the conversation has an unread last message.
+   * A message is considered unread when:
+   *   - its senderId is NOT the current user (we never count our own messages), AND
+   *   - its createdAt is AFTER the lastRead timestamp stored in localStorage (or no
+   *     lastRead record exists at all, meaning the conversation has never been opened).
+   */
+  const hasUnread = useCallback((conv: Conversation): boolean => {
+    if (!conv.lastMessage) return false;
+    if (conv.lastMessage.senderId === currentUserId) return false;
+    const lastReadAt = lastReadMap[conv.id];
+    if (!lastReadAt) return true; // never opened → treat as unread
+    return new Date(conv.lastMessage.createdAt) > new Date(lastReadAt);
+  }, [currentUserId, lastReadMap]);
+
 
 
 
@@ -326,9 +355,10 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                           <span className="text-[11px] font-semibold text-[#8F95B2]">
                             {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : formatTime(conv.updatedAt)}
                           </span>
-                          {conv.unreadCount && conv.unreadCount > 0 ? (
+                          {/* Show badge only when not currently viewing this conversation */}
+                          {!isActive && hasUnread(conv) ? (
                             <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3B58F5] px-1 text-[10px] font-bold text-white shadow-sm">
-                              {conv.unreadCount}
+                              {conv.unreadCount && conv.unreadCount > 0 ? conv.unreadCount : "●"}
                             </div>
                           ) : null}
                         </div>

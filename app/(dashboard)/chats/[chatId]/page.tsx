@@ -175,6 +175,24 @@ export default function ChatRoomPage() {
     scrollToBottom();
   }, [messages]);
 
+  // Mark conversation as read: write the current timestamp to localStorage so the
+  // sidebar's hasUnread() helper knows messages up to now have been seen.
+  // Also call the backend endpoint so the DB notification count stays consistent.
+  useEffect(() => {
+    if (!conversationId) return;
+    const now = new Date().toISOString();
+    try {
+      const raw = localStorage.getItem("lastReadMap");
+      const map: Record<string, string> = raw ? JSON.parse(raw) : {};
+      map[conversationId] = now;
+      localStorage.setItem("lastReadMap", JSON.stringify(map));
+    } catch {
+      // ignore storage errors
+    }
+    // Backend call (fire-and-forget) for DB-level notification clearing
+    void chatService.markConversationAsRead(conversationId);
+  }, [conversationId]);
+
   const handleSend = (text: string, file: File | null) => {
     if (!currentUserId) return;
     sendMessage(text, currentUserId, file);
