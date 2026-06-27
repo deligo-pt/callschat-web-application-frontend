@@ -1,46 +1,30 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  ShieldCheck, 
-  Users, 
-  TerminalSquare, 
-  ArrowLeft, 
-  ShieldAlert, 
-  Lock, 
+import { Button } from "@/components/ui/button";
+import { UserProvider, useUser } from "@/context/UserContext";
+import { cn } from "@/lib/utils";
+import {
+  ArrowLeft,
+  LayoutDashboard,
   Menu,
+  ShieldCheck,
+  TerminalSquare,
+  Users,
   X
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { UserProvider, useUser } from "@/context/UserContext";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { redirect, usePathname } from "next/navigation";
+import React, { useState } from "react";
 
 function AdminShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, isLoading } = useUser();
-  const [adminOverride, setAdminOverride] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedOverride = localStorage.getItem("admin_override") === "true";
-      setAdminOverride(savedOverride);
-    }
-  }, []);
-
-  const enableDevAdminMode = () => {
-    localStorage.setItem("admin_override", "true");
-    setAdminOverride(true);
-  };
-
   const navItems = [
-    { name: "Dashboard Overview", href: "/admin", icon: LayoutDashboard },
-    { name: "Business Verification Queue", href: "/admin/verifications", icon: ShieldCheck, badge: "18" },
-    { name: "User Moderation & Safety", href: "/admin/users", icon: Users },
+    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { name: "Verifications", href: "/admin/verifications", icon: ShieldCheck, badge: "18" },
+    { name: "User Management", href: "/admin/users", icon: Users },
     { name: "System Logs", href: "/admin/logs", icon: TerminalSquare },
   ];
 
@@ -49,45 +33,18 @@ function AdminShellContent({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full items-center justify-center bg-[#0B0F19] text-white">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-          <p className="text-sm font-medium text-slate-400">Verifying Administrative Privileges...</p>
+          <p className="text-sm font-medium text-slate-400">Verifying Admin Privileges...</p>
         </div>
       </div>
     );
   }
 
   // Access Control Guard
-  const isAuthorized = user?.role === "ADMIN" || user?.accountType === "ADMIN" || adminOverride || !user?.role;
-
-  if (!isAuthorized) {
-    return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#0B0F19] px-4 text-white">
-        <div className="flex max-w-md flex-col items-center text-center rounded-2xl border border-slate-800 bg-[#111827] p-8 shadow-2xl">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 text-red-500 mb-6">
-            <Lock className="h-8 w-8" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Access Restricted</h1>
-          <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-            This administrative back-office interface is restricted to users with active <span className="font-semibold text-rose-400">ADMIN</span> roles. Your current session lacks necessary clearance.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 w-full">
-            <Button
-              onClick={() => router.push("/")}
-              variant="outline"
-              className="w-full border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" /> Return to Homepage
-            </Button>
-            <Button
-              onClick={enableDevAdminMode}
-              className="w-full bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-600/20"
-            >
-              <ShieldAlert className="mr-2 h-4 w-4" /> Dev Mode: Simulate Admin Role
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+  if (!user || user.role !== "ADMIN") {
+    redirect("/");
   }
+
+  const adminName = user.profile?.displayName || user.phone || "Admin";
 
   return (
     <div className="flex h-screen w-full bg-[#0F172A] text-slate-100 overflow-hidden font-sans">
@@ -100,7 +57,7 @@ function AdminShellContent({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-bold tracking-wider uppercase text-slate-100">CallsChat</span>
-            <span className="text-[10px] font-semibold text-indigo-400 tracking-widest uppercase">Super Admin</span>
+            <span className="text-[10px] font-semibold text-indigo-400 tracking-widest uppercase">Admin</span>
           </div>
         </div>
 
@@ -188,11 +145,11 @@ function AdminShellContent({ children }: { children: React.ReactNode }) {
 
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 font-bold text-sm">
-                {user?.profile?.displayName?.[0] || "A"}
+                {adminName[0].toUpperCase()}
               </div>
               <div className="hidden sm:flex flex-col text-right">
                 <span className="text-xs font-bold text-slate-200 leading-tight">
-                  {user?.profile?.displayName || "System Administrator"}
+                  {adminName}
                 </span>
                 <span className="text-[10px] font-mono text-slate-400">
                   ID: {user?.id?.slice(0, 8) || "ADM-8821"}
@@ -207,7 +164,7 @@ function AdminShellContent({ children }: { children: React.ReactNode }) {
           <div className="md:hidden absolute top-16 left-0 w-full bg-[#0B0F19] border-b border-slate-800 p-4 z-40 shadow-xl">
             <nav className="flex flex-col gap-2">
               {navItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
                 const Icon = item.icon;
                 return (
                   <Link

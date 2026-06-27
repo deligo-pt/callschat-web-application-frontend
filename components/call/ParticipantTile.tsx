@@ -31,7 +31,7 @@ export function ParticipantTile({ trackRef }: ParticipantTileProps) {
       {/* Video or Fallback Avatar */}
       {isVideoOn ? (
         <VideoTrack
-          trackRef={trackRef}
+          trackRef={trackRef as any}
           className="h-full w-full object-cover"
         />
       ) : (
