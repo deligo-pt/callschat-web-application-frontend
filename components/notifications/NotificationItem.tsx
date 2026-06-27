@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 
 interface NotificationItemProps {
   notification: AppNotification;
-  onMarkAsRead: (id: string) => void;
+  onMarkAsRead: (id: string) => Promise<void>;
   onCloseDropdown: () => void;
+  onAcceptContact: (notificationId: string, issuerId: string) => Promise<void>;
+  isProcessing: boolean;
+  isResolved: boolean;
 }
 
 function getRelativeTimeShort(dateString: string) {

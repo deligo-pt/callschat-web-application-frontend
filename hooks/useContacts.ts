@@ -41,10 +41,10 @@ export function useContacts() {
       }));
       
       // Deduplicate by userId to prevent rendering the same person twice for mutual contacts
-      const uniqueContacts = Array.from(new Map(mappedContacts.map((c: Contact) => [c.userId, c])).values());
+      const uniqueContacts = Array.from(new Map<string, Contact>(mappedContacts.map((c: Contact) => [c.userId, c])).values());
       
       // Sort alphabetically
-      uniqueContacts.sort((a: Contact, b: Contact) => a.name.localeCompare(b.name));
+      uniqueContacts.sort((a, b) => a.name.localeCompare(b.name));
       setContacts(uniqueContacts);
     } catch (error) {
       console.error("Failed to fetch contacts", error);
