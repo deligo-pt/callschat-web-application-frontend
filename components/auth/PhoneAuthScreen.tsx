@@ -1,13 +1,14 @@
 "use client";
 
-import * as React from "react";
-import { MessageCircle, ChevronDown, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArrowRight, ChevronDown, ChevronLeft, Globe, Lock, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Input from "react-phone-number-input/input";
-import { getCountries, getCountryCallingCode } from "react-phone-number-input";
+import * as React from "react";
 import type { Country } from "react-phone-number-input";
+import { getCountries, getCountryCallingCode } from "react-phone-number-input";
+import Input from "react-phone-number-input/input";
 import { toast } from "sonner";
 
 interface PhoneAuthScreenProps {
@@ -36,11 +37,8 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   // OTP Step State
   const [otp, setOtp] = React.useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = React.useState(60);
-  // Capture the exact phone string sent to the backend for OTP request
-  // so verify uses the IDENTICAL string (prevents backend key mismatch)
   const [sentPhoneNumber, setSentPhoneNumber] = React.useState("");
 
-  // Handle dropdown outside click
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -51,7 +49,6 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle OTP countdown timer
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
     if (step === "OTP") {
@@ -73,7 +70,6 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   const handleRequestOTP = () => {
     if (!phoneNumber) return;
     
-    // Normalise: remove all whitespace, ensure leading +
     const sanitizedPhone = phoneNumber.replace(/\s+/g, "").trim();
     if (!sanitizedPhone) return;
 
@@ -89,7 +85,6 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
         
         const data = await res.json();
         if (data.success) {
-          // ✅ Freeze the exact string the backend stored the OTP against
           setSentPhoneNumber(sanitizedPhone);
           toast.success("OTP sent successfully!");
           setStep("OTP");
@@ -105,7 +100,6 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
 
   const handleVerifyOTP = () => {
     const otpString = otp.join("").trim();
-    // ✅ Use the EXACT phone string that was sent to /otp/request
     if (otpString.length !== 6 || !sentPhoneNumber) return;
 
     startTransition(async () => {
@@ -120,18 +114,15 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
         
         const responseData = await res.json();
         
-        // Extract from data wrapper if it exists, otherwise use root level
         const token = responseData.data?.registrationToken || responseData.registrationToken;
         const isExistingUser = responseData.data?.isExistingUser !== undefined 
           ? responseData.data.isExistingUser 
           : responseData.isExistingUser;
 
         if (responseData.success && token) {
-          
           if (type === "login") {
             if (isExistingUser) {
               toast.success("Verification successful!");
-              // Branch A: Existing User -> Background call to Login Route
               try {
                 const loginRes = await fetch(`${baseUrl}/auth/login`, {
                   method: "POST",
@@ -155,7 +146,6 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                     document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
                   }
                   
-                  // Ensure storage is written before routing
                   await new Promise(resolve => setTimeout(resolve, 50));
                   router.push("/chats");
                 } else {
@@ -170,10 +160,8 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
             }
           } else {
             // type === "signup"
-            
             if (isExistingUser) {
               toast.info("You already have an account! Logging you in...");
-              
               try {
                 const loginRes = await fetch(`${baseUrl}/auth/login`, {
                   method: "POST",
@@ -196,7 +184,6 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                     document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
                   }
                   
-                  // Ensure storage is written before routing
                   await new Promise(resolve => setTimeout(resolve, 50));
                   router.push("/chats");
                 } else {
@@ -223,30 +210,29 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                   })
                 });
               
-              const registerData = await registerRes.json();
-              
-              const accessToken = registerData.data?.tokens?.accessToken || registerData.data?.accessToken || registerData.accessToken;
-              const refreshToken = registerData.data?.tokens?.refreshToken || registerData.data?.refreshToken || registerData.refreshToken;
-
-              if ((registerData.success || registerRes.ok) && accessToken) {
-                localStorage.setItem("accessToken", accessToken);
-                document.cookie = `accessToken=${accessToken}; path=/; max-age=2592000`;
-                if (refreshToken) {
-                  localStorage.setItem("refreshToken", refreshToken);
-                  document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
-                }
+                const registerData = await registerRes.json();
                 
-                // Ensure storage is written before routing
-                await new Promise(resolve => setTimeout(resolve, 50));
-                router.push("/setup-profile");
-              } else {
-                toast.error(`Register failed: ${registerData.message || JSON.stringify(registerData)}`);
+                const accessToken = registerData.data?.tokens?.accessToken || registerData.data?.accessToken || registerData.accessToken;
+                const refreshToken = registerData.data?.tokens?.refreshToken || registerData.data?.refreshToken || registerData.refreshToken;
+
+                if ((registerData.success || registerRes.ok) && accessToken) {
+                  localStorage.setItem("accessToken", accessToken);
+                  document.cookie = `accessToken=${accessToken}; path=/; max-age=2592000`;
+                  if (refreshToken) {
+                    localStorage.setItem("refreshToken", refreshToken);
+                    document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
+                  }
+                  
+                  await new Promise(resolve => setTimeout(resolve, 50));
+                  router.push("/setup-profile");
+                } else {
+                  toast.error(`Register failed: ${registerData.message || JSON.stringify(registerData)}`);
+                }
+              } catch (err) {
+                toast.error(`Network error: ${err}`);
               }
-            } catch (err) {
-              toast.error(`Network error: ${err}`);
             }
           }
-        }
         } else {
           const errMsg = responseData.error?.message || responseData.message || JSON.stringify(responseData);
           toast.error(`Verification failed: ${errMsg}`);
@@ -295,198 +281,289 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   };
 
   const isLogin = type === "login";
-  const title = isLogin ? "Welcome Back" : "Create Account";
-  const subtitle = isLogin ? "Log in to continue" : "Join CallsChat today";
-  const sheetTitle = isLogin ? "Enter your number" : "Enter your phone number";
-  const sheetSubtitle = isLogin 
-    ? "We'll send you a verification code via SMS" 
-    : "Make sure this number can receive SMS. You'll receive your activation code through it.";
-  const buttonText = isLogin ? "Send verification code" : "Continue";
+  const title = isLogin ? "Sign in to your account" : "Create your CallsChat account";
+  const subtitle = isLogin 
+    ? "Enter your phone number to access your encrypted messaging workspace." 
+    : "Join our privacy-first communication platform in under a minute.";
   const isOtpComplete = otp.every((digit) => digit.length === 1) && !!sentPhoneNumber;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-100 sm:p-6">
-      {/* Mobile constraint container */}
-      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-gradient-to-br from-[#4A72FF] to-[#1D3BB5] shadow-2xl sm:h-[851px] sm:w-[412px] sm:rounded-[2.5rem]">
+    <div className="flex min-h-screen w-full bg-[#F8FAFC] font-sans">
+      {/* Web Split-Screen Container */}
+      <div className="flex w-full min-h-screen">
         
-        {step === "OTP" && (
-          <button 
-            onClick={() => {
-              setStep("PHONE");
-              setOtp(["", "", "", "", "", ""]);
-            }}
-            className="absolute left-6 top-16 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
-          >
-            <ChevronLeft className="mr-0.5 h-5 w-5 text-white" strokeWidth={2.5} />
-          </button>
-        )}
+        {/* Left Brand Showcase Column (Hidden on mobile/tablet, shown on lg screens) */}
+        <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between bg-gradient-to-br from-[#0A2540] via-[#102A63] to-[#1A62E8] p-12 text-white relative overflow-hidden">
+          {/* Background Decorative Glows */}
+          <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-12 right-12 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
 
-        {/* Top Section (Blue Gradient) */}
-        <div className={cn("flex flex-col items-center justify-center pb-12 transition-all", step === "OTP" ? "pt-24" : "pt-20")}>
-          {step === "PHONE" ? (
-            <>
-              <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[1.25rem] border border-white/10 bg-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md">
-                <MessageCircle className="h-9 w-9 text-white" strokeWidth={1.5} />
-              </div>
-              <h1 className="text-[28px] font-bold tracking-tight text-white">{title}</h1>
-              <p className="mt-1.5 text-[14px] font-medium text-white/80">{subtitle}</p>
-            </>
-          ) : (
-            <>
-              <h1 className="text-[26px] font-bold tracking-tight text-white">Verification code</h1>
-              <p className="mt-3 text-center text-[13px] font-medium leading-[1.6] text-white/80">
-                We sent a 6-digit code to<br />
-                <span className="font-semibold text-white">{phoneNumber}</span>
-              </p>
-            </>
-          )}
-        </div>
+          {/* Top Logo & Brand */}
+          <Link href="/" className="flex items-center gap-3 relative z-10">
+            <Image src="/call_chats_logo.png" height={56} width={56} alt="CallsChat Logo" priority className="drop-shadow-md" />
+            <span className="text-2xl font-extrabold tracking-tight text-white">
+              Calls<span className="text-[#1AC1F2]">Chat</span>
+            </span>
+          </Link>
 
-        {/* Bottom Sheet Area */}
-        <div className={cn("relative flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-8 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]", step === "OTP" ? "items-center pt-12" : "pt-10")}>
-          
-          {step === "PHONE" ? (
-            <>
-              <h2 className="mb-2 text-[22px] font-bold tracking-tight text-[#11142D]">{sheetTitle}</h2>
-              <p className="mb-8 text-[14px] font-medium text-[#8F95B2]">{sheetSubtitle}</p>
+          {/* Center Showcase Content */}
+          <div className="my-auto max-w-lg relative z-10 space-y-8 py-12">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold backdrop-blur-md border border-white/15 text-[#1AC1F2]">
+              <Sparkles className="h-3.5 w-3.5" /> Next-Gen Privacy First Communication
+            </div>
+            
+            <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight">
+              Connect securely <br />
+              <span className="bg-gradient-to-r from-blue-300 via-[#1AC1F2] to-indigo-200 bg-clip-text text-transparent">
+                without exposing phone numbers.
+              </span>
+            </h1>
+            
+            <p className="text-base text-blue-100/90 leading-relaxed font-normal">
+              CallsChat uses unique CallsChat IDs and military-grade encryption so you can message, voice call, and run live translations in absolute privacy.
+            </p>
 
-              <div className="flex flex-col gap-2.5">
-                <label className="text-[13px] font-semibold text-[#1D2A54]">Phone number</label>
-                <div className="flex items-center gap-3">
-                  
-                  {/* Custom Country Code Selector */}
-                  <div className="relative" ref={dropdownRef}>
-                    <button
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className="flex h-[52px] w-[96px] items-center justify-between rounded-[1rem] border border-[#AEC0ED] bg-[#EEF2FB] px-3 transition-colors focus:border-[#3B58F5] focus:outline-none hover:border-[#8E9FCD]"
-                    >
-                      <div className="flex items-center gap-2 text-[15px] font-semibold text-[#1D2A54]">
-                        <span className="text-[18px]">{getFlagEmoji(selectedCountry)}</span>
-                        <span>+{getCountryCallingCode(selectedCountry)}</span>
-                      </div>
-                      <ChevronDown className="h-3.5 w-3.5 text-[#8F95B2]" strokeWidth={2.5} />
-                    </button>
-
-                    {isDropdownOpen && (
-                      <div className="absolute left-0 top-[60px] z-50 flex max-h-[240px] w-[180px] flex-col overflow-y-auto rounded-[1rem] bg-white py-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-100">
-                        {countries.map((country) => (
-                          <button
-                            key={country}
-                            onClick={() => {
-                              setSelectedCountry(country);
-                              setIsDropdownOpen(false);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[14px] font-semibold text-[#11142D] transition-colors hover:bg-[#F7F9FC]"
-                          >
-                            <span className="text-[16px]">{getFlagEmoji(country)}</span>
-                            <span>+{getCountryCallingCode(country)}</span>
-                            <span className="ml-auto text-[13px] font-medium text-[#8F95B2]">{country}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <Input
-                    country={selectedCountry}
-                    value={phoneNumber}
-                    onChange={setPhoneNumber}
-                    placeholder="000 000 0000"
-                    disabled={isPending}
-                    className="flex h-[52px] flex-1 rounded-[1rem] border border-[#AEC0ED] bg-[#EEF2FB] px-4 text-[16px] font-semibold tracking-wide text-[#1D2A54] placeholder-[#A0A6C0] transition-colors focus:border-[#3B58F5] focus:outline-none hover:border-[#8E9FCD]"
-                  />
+            <div className="grid grid-cols-1 gap-4 pt-4">
+              <div className="flex items-center gap-3.5 rounded-2xl bg-white/5 p-4 backdrop-blur-sm border border-white/10">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 text-[#1AC1F2]">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Zero Public Number Exposure</h4>
+                  <p className="text-xs text-blue-200/80">Your phone number stays strictly private by default.</p>
                 </div>
               </div>
 
-              {isLogin ? (
-                <p className="mt-8 px-2 text-center text-[12px] font-medium leading-[1.6] text-[#8F95B2]">
-                  By continuing you agree to our <Link href="#" className="font-semibold text-[#3B58F5] hover:underline">Terms of Service</Link> and <Link href="#" className="font-semibold text-[#3B58F5] hover:underline">Privacy Policy</Link>
-                </p>
-              ) : (
-                <div className="mt-8 h-[38px] w-full" />
-              )}
+              <div className="flex items-center gap-3.5 rounded-2xl bg-white/5 p-4 backdrop-blur-sm border border-white/10">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Real-Time Live Translation</h4>
+                  <p className="text-xs text-blue-200/80">Break language barriers across voice calls instantly.</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-              <button
-                onClick={handleRequestOTP}
-                disabled={!phoneNumber || isPending}
-                className={cn(
-                  "mt-8 w-full rounded-[1rem] py-[18px] text-[15px] font-bold transition-all duration-300",
-                  phoneNumber && !isPending
-                    ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/25 hover:bg-[#2C48B8] active:scale-[0.98]" 
-                    : "cursor-not-allowed bg-[#B5C7FE] text-white"
-                )}
-              >
-                {isPending ? "Sending..." : buttonText}
-              </button>
+          {/* Bottom Trust Badge */}
+          <div className="relative z-10 flex items-center justify-between border-t border-white/15 pt-6 text-xs text-blue-200/80">
+            <span className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-[#1AC1F2]" /> Available in multiple countries
+            </span>
+            <span>© 2026 CallsChat LLC</span>
+          </div>
+        </div>
 
-              <div className="mt-auto pb-8 pt-6 text-center text-[14px] font-medium text-[#8F95B2]">
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-                <Link 
-                  href={isLogin ? "/signup" : "/login"} 
-                  className="font-bold text-[#3B58F5] hover:underline transition-colors"
+        {/* Right Authentication Form Column */}
+        <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-12 lg:w-7/12 xl:w-1/2 lg:px-20 xl:px-28 bg-white relative">
+          
+          {/* Top navigation for mobile / back trigger */}
+          <div className="absolute top-6 left-6 sm:left-12 flex items-center justify-between w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)]">
+            <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-[#102A63] hover:text-primary transition-colors">
+              <ChevronLeft className="h-4 w-4" /> Return to Homepage
+            </Link>
+            
+            <div className="lg:hidden flex items-center gap-2">
+              <Image src="/call_chats_logo.png" height={36} width={36} alt="Logo" />
+              <span className="font-bold text-lg text-[#0A2540]">CallsChat</span>
+            </div>
+          </div>
+
+          <div className="mx-auto w-full max-w-md space-y-8 my-auto pt-8">
+            
+            {/* Header section */}
+            <div className="space-y-2">
+              {step === "OTP" && (
+                <button 
+                  onClick={() => {
+                    setStep("PHONE");
+                    setOtp(["", "", "", "", "", ""]);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline mb-2"
                 >
-                  {isLogin ? "Sign Up" : "Login"}
-                </Link>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="mb-6 text-[13px] font-medium text-[#8F95B2]">Enter the code below</p>
+                  <ChevronLeft className="h-3.5 w-3.5" /> Change phone number
+                </button>
+              )}
               
-              <div className="mb-8 flex justify-center gap-2 sm:gap-3">
-                {otp.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    id={`otp-${idx}`}
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={1}
-                    value={digit}
-                    disabled={isPending}
-                    onChange={(e) => handleOtpChange(idx, e.target.value)}
-                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    onPaste={handleOtpPaste}
-                    className="flex h-[52px] w-[46px] sm:h-[60px] sm:w-[50px] rounded-[1rem] border border-[#AEC0ED] bg-[#EEF2FB] text-center text-[22px] font-bold text-[#1D2A54] transition-colors focus:border-[#3B58F5] focus:outline-none hover:border-[#8E9FCD]"
-                  />
-                ))}
-              </div>
-
-              <button
-                onClick={handleVerifyOTP}
-                disabled={!isOtpComplete || isPending}
-                className={cn(
-                  "w-full rounded-[1rem] py-[18px] text-[15px] font-bold transition-all duration-300",
-                  isOtpComplete && !isPending
-                    ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/25 hover:bg-[#2C48B8] active:scale-[0.98]" 
-                    : "cursor-not-allowed bg-[#B5C7FE] text-white"
-                )}
-              >
-                {isPending ? "Verifying..." : "Verify & Continue"}
-              </button>
-
-              <p className="mt-6 text-[13px] font-medium text-[#8F95B2]">
-                {timer > 0 ? (
+              <h2 className="text-3xl font-extrabold tracking-tight text-[#0A2540]">
+                {step === "PHONE" ? title : "Verify your identity"}
+              </h2>
+              <p className="text-sm text-[#64748B] leading-relaxed">
+                {step === "PHONE" ? subtitle : (
                   <>
-                    This code will expire in <span className="font-bold text-[#3B58F5]">{timer}s</span>
-                  </>
-                ) : (
-                  <>
-                    Didn't receive the code?{" "}
-                    <button 
-                      onClick={handleRequestOTP}
-                      disabled={isPending}
-                      className="font-bold text-[#3B58F5] hover:underline"
-                    >
-                      Resend Code
-                    </button>
+                    We sent a 6-digit one-time security code via SMS to <span className="font-bold text-[#0A2540]">+{getCountryCallingCode(selectedCountry)} {phoneNumber}</span>.
                   </>
                 )}
               </p>
-            </>
-          )}
+            </div>
 
+            {/* Form Section */}
+            {step === "PHONE" ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#334155]">
+                    Mobile Phone Number
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {/* Country Code Selector */}
+                    <div className="relative" ref={dropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        className="flex h-14 w-28 items-center justify-between rounded-xl border border-slate-300 bg-slate-50 px-3.5 transition-all focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 hover:border-slate-400"
+                      >
+                        <div className="flex items-center gap-2 font-semibold text-slate-800">
+                          <span className="text-xl">{getFlagEmoji(selectedCountry)}</span>
+                          <span className="text-sm">+{getCountryCallingCode(selectedCountry)}</span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-slate-500" />
+                      </button>
+
+                      {isDropdownOpen && (
+                        <div className="absolute left-0 top-16 z-50 flex max-h-60 w-64 flex-col overflow-y-auto rounded-xl bg-white py-2 shadow-2xl border border-slate-200">
+                          {countries.map((country) => (
+                            <button
+                              key={country}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCountry(country);
+                                setIsDropdownOpen(false);
+                              }}
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-primary"
+                            >
+                              <span className="text-lg">{getFlagEmoji(country)}</span>
+                              <span>+{getCountryCallingCode(country)}</span>
+                              <span className="ml-auto text-xs font-medium text-slate-400 truncate max-w-[110px]">{country}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <Input
+                      country={selectedCountry}
+                      value={phoneNumber}
+                      onChange={setPhoneNumber}
+                      placeholder="Enter phone number"
+                      disabled={isPending}
+                      className="flex h-14 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-4 text-base font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-slate-400"
+                    />
+                  </div>
+                  <p className="text-[12px] text-slate-500 pt-1 flex items-center gap-1.5">
+                    <Lock className="h-3 w-3 text-slate-400" /> Your phone number is used exclusively for secure OTP verification.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRequestOTP}
+                  disabled={!phoneNumber || isPending}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 rounded-xl h-14 text-base font-bold transition-all duration-200 shadow-md",
+                    phoneNumber && !isPending
+                      ? "bg-primary text-white shadow-blue-500/25 hover:bg-primary/90 hover:shadow-lg active:scale-[0.99]"
+                      : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
+                  )}
+                >
+                  {isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Sending code...
+                    </span>
+                  ) : (
+                    <>
+                      {isLogin ? "Send Login Code" : "Send Activation Code"} <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+
+                <div className="pt-4 border-t border-slate-100 text-center text-sm font-medium text-slate-600">
+                  {isLogin ? "Don't have an account? " : "Already have an account? "}
+                  <Link
+                    href={isLogin ? "/signup" : "/login"}
+                    className="font-bold text-primary hover:underline transition-colors ml-1"
+                  >
+                    {isLogin ? "Create account" : "Sign in"}
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              /* OTP Verification Step */
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#334155]">
+                    One-Time Verification Code
+                  </label>
+                  <div className="flex justify-between gap-2 sm:gap-3">
+                    {otp.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        id={`otp-${idx}`}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        value={digit}
+                        disabled={isPending}
+                        onChange={(e) => handleOtpChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        onPaste={handleOtpPaste}
+                        className="h-14 w-12 sm:h-16 sm:w-14 rounded-xl border border-slate-300 bg-slate-50 text-center text-2xl font-extrabold text-slate-800 transition-all focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-slate-400"
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleVerifyOTP}
+                  disabled={!isOtpComplete || isPending}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 rounded-xl h-14 text-base font-bold transition-all duration-200 shadow-md",
+                    isOtpComplete && !isPending
+                      ? "bg-primary text-white shadow-blue-500/25 hover:bg-primary/90 hover:shadow-lg active:scale-[0.99]"
+                      : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
+                  )}
+                >
+                  {isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Verifying code...
+                    </span>
+                  ) : (
+                    "Verify & Access Workspace"
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between pt-2 text-sm text-slate-600">
+                  <span>Didn't receive SMS?</span>
+                  {timer > 0 ? (
+                    <span className="font-mono font-semibold text-slate-400">Resend in {timer}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRequestOTP}
+                      disabled={isPending}
+                      className="font-bold text-primary hover:underline"
+                    >
+                      Resend Code Now
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Terms Footer */}
+            <p className="text-center text-xs text-slate-400 pt-6">
+              By proceeding, you agree to our{" "}
+              <Link href="#" className="underline hover:text-slate-600">Terms of Service</Link> &{" "}
+              <Link href="#" className="underline hover:text-slate-600">Privacy Policy</Link>.
+            </p>
+
+          </div>
         </div>
+
       </div>
     </div>
   );

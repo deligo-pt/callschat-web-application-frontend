@@ -7,6 +7,7 @@ export interface UserProfileData {
   id: string;
   phone: string;
   email: string | null;
+  role?: string;
   accountType?: string;
   currentMode?: 'PERSONAL' | 'BUSINESS';
   profile?: {
