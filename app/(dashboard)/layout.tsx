@@ -3,14 +3,17 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, PhoneCall, Users, Contact, UserCircle2 } from "lucide-react";
+import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { CallProvider } from "@/components/providers/CallProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
+import { UserProvider, useUser } from "@/context/UserContext";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { currentMode } = useUser();
+  const isBusiness = currentMode === "BUSINESS";
 
   const navItems = [
     { name: "Chats", href: "/chats", icon: MessageSquare },
@@ -20,16 +23,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <SocketProvider>
-      <CallProvider>
-      <PresenceProvider>
-      <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
+    <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
       {/* Persistent Left Sidebar - Desktop First */}
       <nav className="hidden md:flex h-full w-[88px] flex-col items-center border-r border-[#E6EAFA] bg-white py-6 shadow-sm z-20">
-        <div className="mb-8">
+        <div className="mb-6">
           {/* Logo */}
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#4A72FF] to-[#1D3BB5] shadow-lg shadow-[#3B58F5]/20">
-            <MessageSquare className="h-6 w-6 text-white" strokeWidth={2.5} />
+          <div className={cn(
+            "flex h-12 w-12 items-center justify-center rounded-xl shadow-lg transition-all duration-300 relative",
+            isBusiness 
+              ? "bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] shadow-purple-500/25" 
+              : "bg-gradient-to-br from-[#4A72FF] to-[#1D3BB5] shadow-[#3B58F5]/20"
+          )}>
+            {isBusiness ? (
+              <Briefcase className="h-6 w-6 text-white" strokeWidth={2.5} />
+            ) : (
+              <MessageSquare className="h-6 w-6 text-white" strokeWidth={2.5} />
+            )}
+            {isBusiness && (
+              <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[8px] font-extrabold text-purple-600 shadow-xs">
+                B
+              </span>
+            )}
           </div>
         </div>
 
@@ -46,14 +60,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 {/* Active Indicator Bar */}
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-r-full bg-[#3B58F5]" />
+                  <div className={cn(
+                    "absolute left-0 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-r-full transition-colors",
+                    isBusiness ? "bg-[#8B5CF6]" : "bg-[#3B58F5]"
+                  )} />
                 )}
                 
                 <div 
                   className={cn(
                     "flex h-12 w-12 items-center justify-center rounded-[1.25rem] transition-all duration-300",
                     isActive 
-                      ? "bg-[#EEF2FB] text-[#3B58F5] shadow-sm" 
+                      ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] shadow-sm" : "bg-[#EEF2FB] text-[#3B58F5] shadow-sm")
                       : "text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54]"
                   )}
                 >
@@ -68,12 +85,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="mt-auto w-full mb-4">
           <Link href="/profile" className="flex w-full items-center justify-center py-3">
             <div className={cn(
-              "flex h-12 w-12 items-center justify-center rounded-[1.25rem] transition-all duration-300",
+              "flex h-12 w-12 items-center justify-center rounded-[1.25rem] transition-all duration-300 relative",
               pathname.startsWith("/profile")
-                ? "bg-[#EEF2FB] text-[#3B58F5] shadow-sm" 
+                ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] shadow-sm" : "bg-[#EEF2FB] text-[#3B58F5] shadow-sm")
                 : "text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54]"
             )}>
               <UserCircle2 className="h-[24px] w-[24px]" strokeWidth={pathname.startsWith("/profile") ? 2.5 : 2} />
+              {isBusiness && (
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
+              )}
             </div>
           </Link>
         </div>
@@ -94,11 +114,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link key={item.name} href={item.href} className="flex flex-col items-center gap-1.5">
               <div className="relative">
                 <Icon 
-                  className={cn("h-6 w-6 transition-colors", isActive ? "text-[#3B58F5]" : "text-[#A0A6C0] hover:text-[#3B58F5]")} 
+                  className={cn("h-6 w-6 transition-colors", isActive ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0] hover:text-[#3B58F5]")} 
                   strokeWidth={isActive ? 2.5 : 2} 
                 />
               </div>
-              <span className={cn("text-[10px] font-bold", isActive ? "text-[#3B58F5]" : "text-[#A0A6C0]")}>
+              <span className={cn("text-[10px] font-bold", isActive ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0]")}>
                 {item.name}
               </span>
             </Link>
@@ -106,17 +126,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         })}
         <Link href="/profile" className="flex flex-col items-center gap-1.5">
           <UserCircle2 
-            className={cn("h-6 w-6 transition-colors", pathname.startsWith("/profile") ? "text-[#3B58F5]" : "text-[#A0A6C0] hover:text-[#3B58F5]")} 
+            className={cn("h-6 w-6 transition-colors", pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0] hover:text-[#3B58F5]")} 
             strokeWidth={pathname.startsWith("/profile") ? 2.5 : 2} 
           />
-          <span className={cn("text-[10px] font-bold", pathname.startsWith("/profile") ? "text-[#3B58F5]" : "text-[#A0A6C0]")}>
+          <span className={cn("text-[10px] font-bold", pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0]")}>
             Profile
           </span>
         </Link>
       </nav>
     </div>
-      </PresenceProvider>
-      </CallProvider>
-    </SocketProvider>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <UserProvider>
+      <SocketProvider>
+        <CallProvider>
+          <PresenceProvider>
+            <DashboardNavContent>
+              {children}
+            </DashboardNavContent>
+          </PresenceProvider>
+        </CallProvider>
+      </SocketProvider>
+    </UserProvider>
   );
 }
