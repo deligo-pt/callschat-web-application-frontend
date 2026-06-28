@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import apiClient from "@/services/api.client";
 import { BusinessService, BusinessProfileData } from "@/services/business.service";
+import { WorkspaceService, WorkspaceData } from "@/services/workspace.service";
 
 export interface UserProfileData {
   id: string;
@@ -27,6 +28,9 @@ interface UserContextType {
   setUser: React.Dispatch<React.SetStateAction<UserProfileData | null>>;
   businessProfile: BusinessProfileData | null;
   refetchBusinessProfile: () => Promise<void>;
+  workspace: WorkspaceData | null | undefined;
+  setWorkspace: React.Dispatch<React.SetStateAction<WorkspaceData | null | undefined>>;
+  refetchWorkspace: () => Promise<void>;
   currentMode: 'PERSONAL' | 'BUSINESS';
   updateCurrentMode: (mode: 'PERSONAL' | 'BUSINESS') => void;
   switchWorkspaceMode: (targetMode: 'PERSONAL' | 'BUSINESS') => Promise<void>;
@@ -40,6 +44,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfileData | null>(null);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfileData | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceData | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentMode, setCurrentModeState] = useState<'PERSONAL' | 'BUSINESS'>('PERSONAL');
   const [isSwitchingMode, setIsSwitchingMode] = useState<boolean>(false);
@@ -52,6 +57,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch {
       setBusinessProfile(null);
+    }
+  };
+
+  const fetchWorkspace = async () => {
+    try {
+      const res = await WorkspaceService.getMyWorkspace();
+      if (res?.success) {
+        setWorkspace(res.data);
+      } else {
+        setWorkspace(null);
+      }
+    } catch {
+      setWorkspace(null);
     }
   };
 
@@ -75,6 +93,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setUser((prev) => (prev ? { ...prev, currentMode: targetMode } : null));
       await fetchBusinessProfile();
+      await fetchWorkspace();
     } catch (error) {
       console.error("Failed to switch workspace mode:", error);
       throw error;
@@ -119,6 +138,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     fetchUser();
     fetchBusinessProfile();
+    fetchWorkspace();
   }, []);
 
   return (
@@ -128,6 +148,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser,
         businessProfile,
         refetchBusinessProfile: fetchBusinessProfile,
+        workspace,
+        setWorkspace,
+        refetchWorkspace: fetchWorkspace,
         currentMode,
         updateCurrentMode,
         switchWorkspaceMode,

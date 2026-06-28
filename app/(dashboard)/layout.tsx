@@ -14,8 +14,15 @@ import { WorkspaceSwitcher } from "@/components/navigation/WorkspaceSwitcher";
 function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentMode, businessProfile } = useUser();
+  const { currentMode, businessProfile, workspace, isLoading } = useUser();
   const isBusiness = currentMode === "BUSINESS";
+  const isOnboarding = pathname === "/business/onboarding";
+
+  useEffect(() => {
+    if (!isLoading && isBusiness && workspace === null && !isOnboarding) {
+      router.replace("/business/onboarding");
+    }
+  }, [isLoading, isBusiness, workspace, isOnboarding, router]);
 
   useEffect(() => {
     const handleWorkspaceChange = (e: any) => {
@@ -43,6 +50,16 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     { name: "Groups", href: "/groups", icon: Users },
     { name: "Contacts", href: "/contacts", icon: Contact },
   ];
+
+  if (isOnboarding) {
+    return (
+      <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
+        <main className="flex flex-1 h-full overflow-hidden relative w-full">
+          {children}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
