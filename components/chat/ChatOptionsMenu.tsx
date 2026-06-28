@@ -26,9 +26,10 @@ export interface ChatOptionsMenuProps {
   conversationId: string;
   peerId: string;
   onMediaInfoClick?: () => void;
+  onClearSuccess?: () => void;
 }
 
-export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick }: ChatOptionsMenuProps) {
+export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick, onClearSuccess }: ChatOptionsMenuProps) {
   const [isClearChatOpen, setIsClearChatOpen] = useState(false);
   const [isBlockUserOpen, setIsBlockUserOpen] = useState(false);
 
@@ -144,6 +145,7 @@ export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick }: Ch
         setIsClearChatOpen={setIsClearChatOpen}
         isBlockUserOpen={isBlockUserOpen}
         setIsBlockUserOpen={setIsBlockUserOpen}
+        onClearSuccess={onClearSuccess}
       />
     </>
   );

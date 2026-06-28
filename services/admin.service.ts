@@ -42,12 +42,26 @@ export interface AnalyticsResponse {
 
 export interface PendingBusinessVerification {
   id: string;
+  verificationRequestId?: string;
+  businessId?: string;
   userId: string;
   companyName: string;
+  category?: string | null;
   industry?: string | null;
   businessEmail?: string | null;
   taxId?: string | null;
+  description?: string | null;
+  website?: string | null;
+  address?: string | null;
+  documentUrl?: string | null;
+  status?: string;
+  submittedAt?: string | Date;
   createdAt: string | Date;
+  userInfo?: {
+    phone: string;
+    email?: string | null;
+    displayName?: string | null;
+  } | null;
 }
 
 export interface PendingVerificationsResponse {

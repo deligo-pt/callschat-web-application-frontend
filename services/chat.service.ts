@@ -66,4 +66,9 @@ export const chatService = {
       // Fire-and-forget: a badge-clear failure must not break the chat UI
     }
   },
+
+  clearChat: async (conversationId: string) => {
+    const response = await apiClient.delete(`/chats/${conversationId}/clear`);
+    return response.data;
+  },
 };

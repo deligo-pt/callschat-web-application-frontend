@@ -169,7 +169,7 @@ export default function ChatRoomPage() {
     init();
   }, [conversationId, recipientIdFromQuery]);
 
-  const { messages, sendMessage, isReady, isUploading } = useChat(conversationId, currentUserId, recipientId);
+  const { messages, sendMessage, clearMessages, isReady, isUploading } = useChat(conversationId, currentUserId, recipientId);
 
   useEffect(() => {
     scrollToBottom();
@@ -284,6 +284,7 @@ export default function ChatRoomPage() {
               conversationId={conversationId} 
               peerId={recipientId} 
               onMediaInfoClick={() => setGalleryOpen(true)}
+              onClearSuccess={clearMessages}
             />
           )}
         </div>

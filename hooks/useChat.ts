@@ -474,6 +474,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
   return {
     messages,
+    setMessages,
+    clearMessages: () => setMessages([]),
     sendMessage,
     isUploading,
     isReady: !!(myPrivateKey && recipientPublicKey && isConnected && conversationId),

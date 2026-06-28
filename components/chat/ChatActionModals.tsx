@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import apiClient from "@/services/api.client";
+import { chatService } from "@/services/chat.service";
 
 export interface ChatActionModalsProps {
   conversationId: string;
@@ -39,12 +40,12 @@ export function ChatActionModals({
   const handleClearChat = async () => {
     setIsClearing(true);
     try {
-      // TODO: Implement actual API call when backend endpoint is ready
-      // await apiClient.delete(`/conversations/${conversationId}/messages`);
-      await new Promise((resolve) => setTimeout(resolve, 800)); // Mock network delay
-      toast.success("Chat history cleared successfully.");
-      setIsClearChatOpen(false);
+      // Optimistic UI: immediately wipe the messages on the screen
       onClearSuccess?.();
+      setIsClearChatOpen(false);
+
+      await chatService.clearChat(conversationId);
+      toast.success("Chat cleared successfully");
     } catch (e: any) {
       console.error(e);
       toast.error(e.response?.data?.message || "Failed to clear chat history.");
@@ -77,7 +78,7 @@ export function ChatActionModals({
           <AlertDialogHeader>
             <AlertDialogTitle>Clear chat history?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove all messages for you. This cannot be undone.
+              Are you sure you want to clear this chat? This action cannot be undone on your end.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

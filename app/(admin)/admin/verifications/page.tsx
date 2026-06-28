@@ -23,9 +23,24 @@ import {
   ShieldAlert,
   ShieldCheck,
   XCircle,
+  FileText,
+  ExternalLink,
+  Phone,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import adminService, { PendingBusinessVerification } from "@/services/admin.service";
+
+function formatCloudinaryDocLinks(url: string) {
+  if (!url) return { viewUrl: "", downloadUrl: "" };
+  const isPdf = url.toLowerCase().endsWith(".pdf");
+  // For PDFs uploaded under /image/upload/, direct browser rendering is restricted by Cloudinary security rules.
+  // Converting .pdf to .jpg renders Page 1 cleanly in browser tabs.
+  // Inserting fl_attachment forces downloading the actual original PDF.
+  const viewUrl = isPdf ? url.replace(/\.pdf$/i, ".jpg") : url;
+  const downloadUrl = url.includes("/upload/") ? url.replace("/upload/", "/upload/fl_attachment/") : url;
+  return { viewUrl, downloadUrl };
+}
 
 export default function VerificationsQueuePage() {
   const [verifications, setVerifications] = useState<PendingBusinessVerification[]>([]);
@@ -191,21 +206,62 @@ export default function VerificationsQueuePage() {
 
                     {/* Business Category */}
                     <TableCell className="py-4 px-4 align-middle">
-                      <span className="inline-flex items-center rounded-md bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-300 border border-slate-700/60">
-                        {item.industry || "General Enterprise"}
-                      </span>
-                      {item.businessEmail && (
-                        <div className="text-[11px] text-slate-400 mt-1 truncate max-w-[180px]">
-                          {item.businessEmail}
-                        </div>
-                      )}
+                      <div className="flex flex-col gap-1.5 items-start">
+                        <span className="inline-flex items-center rounded-md bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-300 border border-slate-700/60">
+                          {item.industry || item.category || "General Enterprise"}
+                        </span>
+                        {(item.businessEmail || item.userInfo?.email) && (
+                          <div className="text-[11px] text-slate-400 truncate max-w-[180px]" title={item.businessEmail || item.userInfo?.email || undefined}>
+                            {item.businessEmail || item.userInfo?.email}
+                          </div>
+                        )}
+                        {item.userInfo?.phone && (
+                          <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                            <Phone className="h-3 w-3 text-slate-500 shrink-0" />
+                            <span>{item.userInfo.phone}</span>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
 
-                    {/* Submission Date */}
+                    {/* Submission Date & Document */}
                     <TableCell className="py-4 px-4 align-middle whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                        <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                        <span>{formatDate(item.createdAt)}</span>
+                      <div className="flex flex-col gap-2 items-start">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                          <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                          <span>{formatDate(item.createdAt)}</span>
+                        </div>
+                        {item.documentUrl ? (
+                          (() => {
+                            const { viewUrl, downloadUrl } = formatCloudinaryDocLinks(item.documentUrl);
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <a
+                                  href={viewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 px-2.5 py-1 text-[11px] font-bold text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-colors"
+                                  title="View document preview"
+                                >
+                                  <FileText className="h-3 w-3" />
+                                  View Doc
+                                  <ExternalLink className="h-2.5 w-2.5 ml-0.5 opacity-70" />
+                                </a>
+                                <a
+                                  href={downloadUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center rounded-lg bg-slate-800 p-1.5 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors"
+                                  title="Download Original PDF/File"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </a>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-[11px] italic text-slate-500">No doc uploaded</span>
+                        )}
                       </div>
                     </TableCell>
 
