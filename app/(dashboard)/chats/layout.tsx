@@ -12,6 +12,7 @@ import { decryptMessage } from "@/utils/crypto";
 import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
 import { usePresence } from "@/context/PresenceContext";
 import { useUser } from "@/context/UserContext";
+import { useSocket } from "@/components/providers/SocketProvider";
 
 interface Conversation {
   id: string;
@@ -48,6 +49,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   // Real-time presence — comes from the global PresenceProvider.
   const { isUserOnline } = usePresence();
   const { currentMode } = useUser();
+  const { socket } = useSocket();
 
   const isRootChatsPage = pathname === "/chats";
 
@@ -114,7 +116,30 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     } catch {
       // ignore parse errors
     }
-  }, [pathname]);
+    fetchData();
+  }, [pathname, fetchData]);
+
+  // Subscribe socket to all active conversation rooms so real-time updates reach the sidebar
+  useEffect(() => {
+    if (!socket || conversations.length === 0) return;
+    conversations.forEach((conv) => {
+      socket.emit("chat:join_room", { conversationId: conv.id });
+    });
+  }, [socket, conversations]);
+
+  // Listen for real-time incoming or sent messages to auto-update the most recent message in the sidebar
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMessageUpdate = () => {
+      fetchData();
+    };
+
+    socket.on("chat:receive_message", handleMessageUpdate);
+    return () => {
+      socket.off("chat:receive_message", handleMessageUpdate);
+    };
+  }, [socket, fetchData]);
 
   /**
    * Returns true when the conversation has an unread last message.
