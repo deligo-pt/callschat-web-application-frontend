@@ -11,6 +11,7 @@ import { NotificationDropdown } from "@/components/notifications/NotificationDro
 import { decryptMessage } from "@/utils/crypto";
 import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
 import { usePresence } from "@/context/PresenceContext";
+import { useUser } from "@/context/UserContext";
 
 interface Conversation {
   id: string;
@@ -46,6 +47,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
 
   // Real-time presence — comes from the global PresenceProvider.
   const { isUserOnline } = usePresence();
+  const { currentMode } = useUser();
 
   const isRootChatsPage = pathname === "/chats";
 
@@ -92,7 +94,16 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+
+    const handleWorkspaceChange = () => {
+      setIsLoading(true);
+      fetchData();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("workspaceModeChanged", handleWorkspaceChange);
+      return () => window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
+    }
+  }, [fetchData, currentMode]);
 
   // Load the last-read timestamps from localStorage so unread badges survive page refreshes.
   // Re-runs when pathname changes so the sidebar picks up writes made by the child page.

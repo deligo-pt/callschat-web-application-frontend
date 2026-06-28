@@ -46,6 +46,15 @@ export function useNotifications() {
   useEffect(() => {
     setPage(1);
     fetchNotifications(1, filter, false);
+
+    const handleWorkspaceChange = () => {
+      setPage(1);
+      fetchNotifications(1, filter, false);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('workspaceModeChanged', handleWorkspaceChange);
+      return () => window.removeEventListener('workspaceModeChanged', handleWorkspaceChange);
+    }
   }, [filter, fetchNotifications]);
 
   const loadMore = useCallback(() => {

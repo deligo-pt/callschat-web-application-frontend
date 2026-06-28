@@ -6,10 +6,12 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { groupService, GroupItem } from "@/services/group.service";
 import { toast } from "sonner";
+import { useUser } from "@/context/UserContext";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
 export default function GroupsPage() {
+  const { currentMode } = useUser();
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +36,16 @@ export default function GroupsPage() {
     };
 
     fetchGroups();
-  }, []);
+
+    const handleWorkspaceChange = () => {
+      setIsLoading(true);
+      fetchGroups();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("workspaceModeChanged", handleWorkspaceChange);
+      return () => window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
+    }
+  }, [currentMode]);
 
   // Load the last-read map from localStorage for unread badge calculation
   useEffect(() => {

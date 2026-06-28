@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import apiClient from "@/services/api.client";
+import { BusinessService, BusinessProfileData } from "@/services/business.service";
 
 export interface UserProfileData {
   id: string;
@@ -24,8 +25,12 @@ export interface UserProfileData {
 interface UserContextType {
   user: UserProfileData | null;
   setUser: React.Dispatch<React.SetStateAction<UserProfileData | null>>;
+  businessProfile: BusinessProfileData | null;
+  refetchBusinessProfile: () => Promise<void>;
   currentMode: 'PERSONAL' | 'BUSINESS';
   updateCurrentMode: (mode: 'PERSONAL' | 'BUSINESS') => void;
+  switchWorkspaceMode: (targetMode: 'PERSONAL' | 'BUSINESS') => Promise<void>;
+  isSwitchingMode: boolean;
   isLoading: boolean;
   refetchUser: () => Promise<void>;
 }
@@ -34,8 +39,21 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfileData | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfileData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentMode, setCurrentModeState] = useState<'PERSONAL' | 'BUSINESS'>('PERSONAL');
+  const [isSwitchingMode, setIsSwitchingMode] = useState<boolean>(false);
+
+  const fetchBusinessProfile = async () => {
+    try {
+      const res = await BusinessService.getProfile();
+      if (res?.success) {
+        setBusinessProfile(res.data);
+      }
+    } catch {
+      setBusinessProfile(null);
+    }
+  };
 
   const updateCurrentMode = (mode: 'PERSONAL' | 'BUSINESS') => {
     setCurrentModeState(mode);
@@ -43,6 +61,26 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem("currentMode", mode);
     }
     setUser((prev) => (prev ? { ...prev, currentMode: mode } : null));
+  };
+
+  const switchWorkspaceMode = async (targetMode: 'PERSONAL' | 'BUSINESS') => {
+    if (targetMode === currentMode || isSwitchingMode) return;
+    setIsSwitchingMode(true);
+    try {
+      await BusinessService.switchMode(targetMode);
+      setCurrentModeState(targetMode);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("currentMode", targetMode);
+        window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: targetMode } }));
+      }
+      setUser((prev) => (prev ? { ...prev, currentMode: targetMode } : null));
+      await fetchBusinessProfile();
+    } catch (error) {
+      console.error("Failed to switch workspace mode:", error);
+      throw error;
+    } finally {
+      setIsSwitchingMode(false);
+    }
   };
 
   const fetchUser = async () => {
@@ -80,6 +118,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentModeState(savedMode);
     }
     fetchUser();
+    fetchBusinessProfile();
   }, []);
 
   return (
@@ -87,8 +126,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         setUser,
+        businessProfile,
+        refetchBusinessProfile: fetchBusinessProfile,
         currentMode,
         updateCurrentMode,
+        switchWorkspaceMode,
+        isSwitchingMode,
         isLoading,
         refetchUser: fetchUser,
       }}

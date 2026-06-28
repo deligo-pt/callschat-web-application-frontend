@@ -1,21 +1,43 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Zap, Settings, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { CallProvider } from "@/components/providers/CallProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
 import { UserProvider, useUser } from "@/context/UserContext";
+import { WorkspaceSwitcher } from "@/components/navigation/WorkspaceSwitcher";
 
 function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentMode } = useUser();
+  const router = useRouter();
+  const { currentMode, businessProfile } = useUser();
   const isBusiness = currentMode === "BUSINESS";
 
-  const navItems = [
+  useEffect(() => {
+    const handleWorkspaceChange = (e: any) => {
+      if (e?.detail?.mode === 'BUSINESS') {
+        router.push('/business/dashboard');
+      } else if (e?.detail?.mode === 'PERSONAL') {
+        router.push('/chats');
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('workspaceModeChanged', handleWorkspaceChange);
+      return () => window.removeEventListener('workspaceModeChanged', handleWorkspaceChange);
+    }
+  }, [router]);
+
+  const navItems = isBusiness ? [
+    { name: "Dashboard", href: "/business/dashboard", icon: LayoutDashboard },
+    { name: "Chats", href: "/chats", icon: MessageSquare },
+    { name: "Teams", href: "/groups", icon: Users },
+    { name: "Analytics", href: "/business/analytics", icon: BarChart3 },
+    { name: "Settings", href: "/business/settings", icon: Settings },
+  ] : [
     { name: "Chats", href: "/chats", icon: MessageSquare },
     { name: "Calls", href: "/calls", icon: PhoneCall },
     { name: "Groups", href: "/groups", icon: Users },
@@ -44,10 +66,19 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
                 B
               </span>
             )}
+            {isBusiness && businessProfile?.isVerified && (
+              <span title="Verified Business" className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-xs">
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#3B58F5] fill-[#3B58F5]" />
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col items-center gap-2 w-full mt-4">
+        <div className="mb-4">
+          <WorkspaceSwitcher compact={true} />
+        </div>
+
+        <div className="flex flex-1 flex-col items-center gap-2 w-full mt-2">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
@@ -105,7 +136,11 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile Bottom Navigation Bar (Hidden on Desktop) */}
-      <nav className="absolute bottom-0 left-0 flex w-full items-center justify-between bg-white/90 backdrop-blur-md px-6 pb-8 pt-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] border-t border-[#F4F6FC] md:hidden z-20">
+      <nav className="absolute bottom-0 left-0 flex w-full items-center justify-between bg-white/95 backdrop-blur-md px-4 pb-8 pt-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] border-t border-[#F4F6FC] md:hidden z-20">
+        <div className="flex flex-col items-center gap-1">
+          <WorkspaceSwitcher compact={true} className="h-9 w-9" />
+          <span className="text-[9px] font-bold text-[#8F95B2]">Mode</span>
+        </div>
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;

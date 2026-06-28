@@ -1,156 +1,173 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
-} from "@/components/ui/alert-dialog";
-import { 
-  Search, 
-  Filter, 
-  ShieldAlert, 
-  UserX, 
-  UserCheck, 
-  AlertTriangle, 
-  Flag, 
-  Briefcase, 
-  UserCircle, 
-  Globe, 
-  ShieldCheck, 
-  Lock
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Search,
+  Filter,
+  ShieldAlert,
+  UserCheck,
+  UserX,
+  Loader2,
+  Phone,
+  Briefcase,
+  UserCircle,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-
-interface ModerationUser {
-  id: string;
-  username: string;
-  email: string;
-  phone: string;
-  accountType: "PERSONAL" | "BUSINESS";
-  currentMode: "PERSONAL" | "BUSINESS";
-  status: "ACTIVE" | "SUSPENDED" | "BANNED";
-  reportCount: number;
-  riskScore: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  country: string;
-  lastActive: string;
-}
+import adminService, { ManagedUser, GetUsersParams } from "@/services/admin.service";
 
 export default function UserModerationPage() {
-  const [users, setUsers] = useState<ModerationUser[]>([
-    {
-      id: "USR-882190",
-      username: "technova_admin",
-      email: "founder@technova.io",
-      phone: "+1 (555) 019-2831",
-      accountType: "BUSINESS",
-      currentMode: "BUSINESS",
-      status: "ACTIVE",
-      reportCount: 0,
-      riskScore: "LOW",
-      country: "United States",
-      lastActive: "10 mins ago",
-    },
-    {
-      id: "USR-441920",
-      username: "crypto_king99",
-      email: "spammer@airdrop.net",
-      phone: "+44 7911 123456",
-      accountType: "PERSONAL",
-      currentMode: "PERSONAL",
-      status: "ACTIVE",
-      reportCount: 14,
-      riskScore: "CRITICAL",
-      country: "United Kingdom",
-      lastActive: "Just now",
-    },
-    {
-      id: "USR-771234",
-      username: "sarah_connor",
-      email: "sarah.c@gmail.com",
-      phone: "+1 (555) 382-9102",
-      accountType: "PERSONAL",
-      currentMode: "PERSONAL",
-      status: "ACTIVE",
-      reportCount: 1,
-      riskScore: "LOW",
-      country: "Canada",
-      lastActive: "2 hours ago",
-    },
-    {
-      id: "USR-339102",
-      username: "greenleaf_cafe",
-      email: "hello@greenleafcafe.com",
-      phone: "+1 (555) 991-0023",
-      accountType: "BUSINESS",
-      currentMode: "PERSONAL",
-      status: "SUSPENDED",
-      reportCount: 5,
-      riskScore: "HIGH",
-      country: "United States",
-      lastActive: "3 days ago",
-    },
-    {
-      id: "USR-102938",
-      username: "alex_murphy",
-      email: "amurphy@ocp.com",
-      phone: "+1 (555) 441-9920",
-      accountType: "PERSONAL",
-      currentMode: "PERSONAL",
-      status: "ACTIVE",
-      reportCount: 0,
-      riskScore: "LOW",
-      country: "United States",
-      lastActive: "5 mins ago",
-    },
-  ]);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [filterType, setFilterType] = useState<"ALL" | "PERSONAL" | "BUSINESS">("ALL");
-  const [filterStatus, setFilterStatus] = useState<"ALL" | "ACTIVE" | "SUSPENDED">("ALL");
+  const [filterActive, setFilterActive] = useState<"ALL" | "true" | "false">("ALL");
 
-  const [confirmUser, setConfirmUser] = useState<ModerationUser | null>(null);
-  const [targetAction, setTargetAction] = useState<"SUSPEND" | "ACTIVATE" | "BAN">("SUSPEND");
+  // Action & Modal States
+  const [processingIds, setProcessingIds] = useState<Record<string, boolean>>({});
+  const [suspendModalUser, setSuspendModalUser] = useState<ManagedUser | null>(null);
+  const [suspensionReason, setSuspensionReason] = useState<string>("POLICY_VIOLATION");
+  const [suspensionDescription, setSuspensionDescription] = useState<string>("");
+  const [isSubmittingSuspension, setIsSubmittingSuspension] = useState<boolean>(false);
 
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch = 
-      u.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.username.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesType = filterType === "ALL" || u.accountType === filterType;
-    const matchesStatus = filterStatus === "ALL" || u.status === filterStatus;
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    return matchesSearch && matchesType && matchesStatus;
-  });
+  // Fetch Users
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params: GetUsersParams = {
+        page: 1,
+        limit: 50,
+      };
 
-  const triggerConfirmation = (user: ModerationUser, action: "SUSPEND" | "ACTIVATE" | "BAN") => {
-    setConfirmUser(user);
-    setTargetAction(action);
+      if (debouncedSearch.trim()) {
+        params.search = debouncedSearch.trim();
+      }
+      if (filterType !== "ALL") {
+        params.accountType = filterType;
+      }
+      if (filterActive !== "ALL") {
+        params.isActive = filterActive === "true";
+      }
+
+      const response = await adminService.getUsers(params);
+      if (response && response.success) {
+        setUsers(response.data || []);
+        setTotalUsers(response.pagination?.total || (response.data || []).length);
+      }
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      toast.error("Failed to load user directory.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedSearch, filterType, filterActive]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Activate Flow
+  const handleActivate = async (user: ManagedUser) => {
+    setProcessingIds((prev) => ({ ...prev, [user.id]: true }));
+    try {
+      await adminService.updateUserState(user.id, true);
+
+      // Optimistically update local state
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, isActive: true } : u))
+      );
+
+      toast.success("User account activated successfully!", {
+        description: `Full platform access restored for ${user.phoneNumber}.`,
+      });
+    } catch (error) {
+      console.error("Failed to activate user:", error);
+      toast.error("Failed to activate user account.");
+    } finally {
+      setProcessingIds((prev) => ({ ...prev, [user.id]: false }));
+    }
   };
 
-  const executeStatusChange = () => {
-    if (!confirmUser) return;
-    
-    const newStatus = targetAction === "ACTIVATE" ? "ACTIVE" : targetAction === "SUSPEND" ? "SUSPENDED" : "BANNED";
-    
-    setUsers((prev) =>
-      prev.map((u) => (u.id === confirmUser.id ? { ...u, status: newStatus } : u))
-    );
+  // Suspend Flow Submit
+  const handleSuspendSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suspendModalUser) return;
 
-    if (newStatus === "ACTIVE") {
-      toast.success(`Account Activated`, { description: `User ${confirmUser.username} (${confirmUser.id}) restored to full platform access.` });
-    } else {
-      toast.error(`Account ${newStatus === "SUSPENDED" ? "Suspended" : "Banned"}`, { description: `User ${confirmUser.username} has been restricted immediately.` });
+    if (!suspensionDescription.trim()) {
+      toast.error("Please provide a brief description explaining the suspension.");
+      return;
     }
 
-    setConfirmUser(null);
+    setIsSubmittingSuspension(true);
+    const userId = suspendModalUser.id;
+    const phone = suspendModalUser.phoneNumber;
+
+    try {
+      await adminService.suspendUser(userId, suspensionReason, suspensionDescription);
+
+      // Optimistically update local state
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, isActive: false } : u))
+      );
+
+      toast.success("User suspended immediately.", {
+        description: `All active sessions and socket connections dropped for ${phone}.`,
+      });
+
+      // Close modal and reset
+      setSuspendModalUser(null);
+      setSuspensionDescription("");
+      setSuspensionReason("POLICY_VIOLATION");
+    } catch (error) {
+      console.error("Failed to suspend user:", error);
+      toast.error("Failed to execute suspension command.");
+    } finally {
+      setIsSubmittingSuspension(false);
+    }
+  };
+
+  const formatDate = (dateStr: string | Date) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return String(dateStr);
+    }
   };
 
   return (
@@ -158,23 +175,30 @@ export default function UserModerationPage() {
       {/* Header Banner */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-6">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl flex items-center gap-2.5">
-            User Moderation Matrix
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+              User Management Matrix
+            </h1>
+            {!isLoading && (
+              <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-bold text-indigo-400 border border-indigo-500/30">
+                {totalUsers} Total
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-slate-400">
-            Trust & Safety control center. Search users, review flags, and execute instant suspensions.
+            Trust & Safety command center. Filter directory, monitor status, and enforce instantaneous suspensions.
           </p>
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
+      {/* PHASE 1: Search & Filter Control Bar */}
       <div className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-[#111827] p-4 shadow-xl md:flex-row md:items-center md:justify-between">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
-            placeholder="Search by User ID, email, or username..."
+            placeholder="Search by phone number..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-10 pr-4 py-2 text-xs font-medium text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
@@ -199,209 +223,249 @@ export default function UserModerationPage() {
             <option value="BUSINESS">Business</option>
           </select>
 
-          {/* Status Filter */}
+          {/* Active Status Filter */}
           <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
+            value={filterActive}
+            onChange={(e) => setFilterActive(e.target.value as any)}
             className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 focus:border-indigo-500 focus:outline-none cursor-pointer"
           >
             <option value="ALL">Status: All</option>
-            <option value="ACTIVE">Active</option>
-            <option value="SUSPENDED">Suspended</option>
+            <option value="true">Active Only</option>
+            <option value="false">Suspended Only</option>
           </select>
         </div>
       </div>
 
-      {/* Dense User Data Table */}
+      {/* PHASE 2: The Data Table */}
       <div className="rounded-xl border border-slate-800 bg-[#111827] shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <th className="py-3.5 px-4">User Profile & ID</th>
-                <th className="py-3.5 px-4">Account Type & Mode</th>
-                <th className="py-3.5 px-4">Flags & Risk Score</th>
-                <th className="py-3.5 px-4">Report Count</th>
-                <th className="py-3.5 px-4">Account Status</th>
-                <th className="py-3.5 px-4 text-right">Suspension Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/80">
-              {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500 text-xs">
-                    No users matching your criteria were found.
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map((u) => (
-                  <tr key={u.id} className="transition-colors hover:bg-slate-800/40">
-                    {/* User Profile & ID */}
-                    <td className="py-3.5 px-4 align-middle">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mb-3" />
+            <p className="text-sm font-medium">Loading user matrix...</p>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/80 mb-3 border border-slate-700">
+              <Phone className="h-6 w-6 text-slate-500" />
+            </div>
+            <h3 className="text-base font-bold text-slate-200">No Users Found</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Try adjusting your search query or filter parameters.
+            </p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader className="bg-slate-900/60 border-b border-slate-800">
+              <TableRow className="hover:bg-transparent border-slate-800">
+                <TableHead className="py-3.5 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Phone Number
+                </TableHead>
+                <TableHead className="py-3.5 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Account Type
+                </TableHead>
+                <TableHead className="py-3.5 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Active Status
+                </TableHead>
+                <TableHead className="py-3.5 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Join Date
+                </TableHead>
+                <TableHead className="py-3.5 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 text-right">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-800/80">
+              {users.map((user) => {
+                const isProcessing = processingIds[user.id] || false;
+                return (
+                  <TableRow
+                    key={user.id}
+                    className="transition-colors hover:bg-slate-800/40 border-slate-800/80"
+                  >
+                    {/* Phone Number & ID */}
+                    <TableCell className="py-4 px-4 align-middle">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-indigo-400 font-bold text-xs border border-slate-700">
-                          {u.username[0].toUpperCase()}
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-indigo-400 border border-slate-700 font-mono text-xs font-bold shadow-inner">
+                          <Phone className="h-4 w-4" />
                         </div>
                         <div>
-                          <div className="font-bold text-slate-100 text-sm flex items-center gap-1.5">
-                            @{u.username}
-                            <span className="font-mono text-[11px] text-slate-400">({u.id})</span>
+                          <div className="font-bold text-slate-100 text-sm font-mono flex items-center gap-1.5">
+                            {user.phoneNumber}
                           </div>
-                          <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
-                            <span>{u.email}</span>
-                            <span>·</span>
-                            <span className="flex items-center gap-1 text-slate-500">
-                              <Globe className="h-3 w-3" /> {u.country}
-                            </span>
+                          <div className="text-xs text-slate-500 font-mono mt-0.5">
+                            ID: {user.id}
                           </div>
                         </div>
                       </div>
-                    </td>
+                    </TableCell>
 
-                    {/* Account Type & Active Mode */}
-                    <td className="py-3.5 px-4 align-middle">
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center gap-1 w-fit rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-300 border border-slate-700">
-                          {u.accountType === "BUSINESS" ? <Briefcase className="h-3 w-3 text-purple-400" /> : <UserCircle className="h-3 w-3 text-indigo-400" />}
-                          Type: {u.accountType}
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          Active Mode: <span className="font-bold text-slate-300">{u.currentMode}</span>
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Flags & Risk Score */}
-                    <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                      {u.riskScore === "LOW" && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                          Low Risk
-                        </span>
-                      )}
-                      {u.riskScore === "MEDIUM" && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
-                          Medium Risk
-                        </span>
-                      )}
-                      {(u.riskScore === "HIGH" || u.riskScore === "CRITICAL") && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-500/40 animate-pulse">
-                          <AlertTriangle className="h-3 w-3" /> {u.riskScore} RISK
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Report Count */}
-                    <td className="py-3.5 px-4 align-middle">
-                      {u.reportCount === 0 ? (
-                        <span className="text-xs text-slate-500 font-medium">0 reports</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-500/30">
-                          <Flag className="h-3 w-3 fill-rose-400/20" /> {u.reportCount} Reports
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Account Status */}
-                    <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                      {u.status === "ACTIVE" && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active
-                        </span>
-                      )}
-                      {u.status === "SUSPENDED" && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                          <span className="h-2 w-2 rounded-full bg-amber-500" /> Suspended
-                        </span>
-                      )}
-                      {u.status === "BANNED" && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400">
-                          <span className="h-2 w-2 rounded-full bg-rose-500" /> Banned
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Suspension Actions (Button group with confirmation triggers) */}
-                    <td className="py-3.5 px-4 align-middle text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-2">
-                        {u.status === "ACTIVE" ? (
-                          <>
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              onClick={() => triggerConfirmation(u, "SUSPEND")}
-                              className="border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 font-bold px-2.5"
-                            >
-                              <Lock className="mr-1 h-3 w-3" /> Suspend
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant="destructive"
-                              onClick={() => triggerConfirmation(u, "BAN")}
-                              className="bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 font-bold px-2.5"
-                            >
-                              <UserX className="mr-1 h-3 w-3" /> Ban
-                            </Button>
-                          </>
+                    {/* Account Type */}
+                    <TableCell className="py-4 px-4 align-middle">
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700/60 uppercase">
+                        {user.accountType === "BUSINESS" ? (
+                          <Briefcase className="h-3.5 w-3.5 text-purple-400" />
                         ) : (
-                          <Button
-                            size="xs"
-                            onClick={() => triggerConfirmation(u, "ACTIVATE")}
-                            className="bg-emerald-600 text-white hover:bg-emerald-500 font-bold px-3 shadow-xs"
-                          >
-                            <UserCheck className="mr-1 h-3 w-3" /> Restore Access
-                          </Button>
+                          <UserCircle className="h-3.5 w-3.5 text-indigo-400" />
                         )}
+                        {user.accountType}
+                      </span>
+                    </TableCell>
+
+                    {/* Active Status (Green / Red Badge) */}
+                    <TableCell className="py-4 px-4 align-middle whitespace-nowrap">
+                      {user.isActive ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 px-3 py-1 text-xs font-bold text-rose-400 border border-rose-500/30 animate-pulse">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Suspended
+                        </span>
+                      )}
+                    </TableCell>
+
+                    {/* Join Date */}
+                    <TableCell className="py-4 px-4 align-middle whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                        <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                        <span>{formatDate(user.createdAt)}</span>
                       </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </TableCell>
+
+                    {/* PHASE 3: Suspension / Activation Actions */}
+                    <TableCell className="py-4 px-4 align-middle text-right whitespace-nowrap">
+                      {user.isActive ? (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={isProcessing}
+                          onClick={() => {
+                            setSuspendModalUser(user);
+                            setSuspensionReason("POLICY_VIOLATION");
+                            setSuspensionDescription("");
+                          }}
+                          className="font-bold px-3.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition-all shadow-sm"
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          ) : (
+                            <UserX className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          Suspend
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          disabled={isProcessing}
+                          onClick={() => handleActivate(user)}
+                          className="bg-emerald-600 text-white hover:bg-emerald-500 font-bold px-3.5 shadow-sm transition-all"
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          ) : (
+                            <UserCheck className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          Activate
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
-      {/* Confirmation Dialog to prevent accidental clicks */}
-      <AlertDialog open={!!confirmUser} onOpenChange={(open) => !open && setConfirmUser(null)}>
-        <AlertDialogContent className="border-slate-800 bg-[#111827] text-slate-100 p-6 shadow-2xl max-w-md">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-500/10 text-rose-500">
-                <ShieldAlert className="h-5 w-5" />
+      {/* PHASE 3: Suspension Modal Dialog */}
+      <Dialog
+        open={!!suspendModalUser}
+        onOpenChange={(open) => {
+          if (!open && !isSubmittingSuspension) {
+            setSuspendModalUser(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md border-slate-800 bg-[#111827] text-slate-100 p-6 shadow-2xl">
+          <form onSubmit={handleSuspendSubmit}>
+            <DialogHeader>
+              <div className="flex items-center gap-2.5 text-rose-500 mb-1">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-500/10 border border-rose-500/20">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+                <DialogTitle className="text-lg font-bold text-white">
+                  Suspend User Account
+                </DialogTitle>
               </div>
-              <AlertDialogTitle className="text-lg font-bold text-white">
-                Confirm Enforcement Action
-              </AlertDialogTitle>
+              <DialogDescription className="text-xs text-slate-400 leading-relaxed pt-1">
+                Enforcing immediate suspension on <span className="font-mono font-bold text-slate-200">{suspendModalUser?.phoneNumber}</span> ({suspendModalUser?.id}). All active sockets will be disconnected instantly.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-4">
+              {/* Reason Dropdown */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Violation Category
+                </label>
+                <select
+                  value={suspensionReason}
+                  onChange={(e) => setSuspensionReason(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white focus:border-indigo-500 focus:outline-none"
+                >
+                  <option value="POLICY_VIOLATION">Terms & Policy Violation</option>
+                  <option value="SPAM">Spam / Automated Messaging</option>
+                  <option value="HARASSMENT">Harassment or Abuse</option>
+                  <option value="FAKE_ACCOUNT">Impersonation / Fake Identity</option>
+                  <option value="OTHER">Other Compliance Risk</option>
+                </select>
+              </div>
+
+              {/* Description Textarea */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Incident Description
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Provide specific details regarding this enforcement action..."
+                  value={suspensionDescription}
+                  onChange={(e) => setSuspensionDescription(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none resize-none"
+                />
+              </div>
             </div>
-            <AlertDialogDescription className="text-xs text-slate-400 leading-relaxed pt-2">
-              Are you sure you want to execute a <span className="font-bold text-rose-400 uppercase">{targetAction}</span> command on user <span className="font-bold text-slate-200">@{confirmUser?.username}</span> ({confirmUser?.id})?
-              {targetAction !== "ACTIVATE" && (
-                <span className="block mt-2 font-medium text-amber-400/90">
-                  This action will instantly terminate any active WebSocket connections and block login attempts.
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="border-t border-slate-800 pt-4 mt-2">
-            <AlertDialogCancel 
-              onClick={() => setConfirmUser(null)}
-              className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800"
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={executeStatusChange}
-              className={
-                targetAction === "ACTIVATE"
-                  ? "bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
-                  : "bg-rose-600 hover:bg-rose-500 text-white font-bold"
-              }
-            >
-              Confirm & Execute
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
+            <DialogFooter className="flex items-center justify-between sm:justify-end gap-2 border-t border-slate-800 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSubmittingSuspension}
+                onClick={() => setSuspendModalUser(null)}
+                className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                size="sm"
+                disabled={isSubmittingSuspension}
+                className="bg-rose-600 text-white hover:bg-rose-500 font-bold px-4"
+              >
+                {isSubmittingSuspension ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Confirm Suspension
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

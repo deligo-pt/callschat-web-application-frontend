@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 
 import { groupService, GroupItem } from "@/services/group.service";
 import { toast } from "sonner";
+import { useUser } from "@/context/UserContext";
 
 export default function FavoritesPage() {
   const router = useRouter();
+  const { currentMode } = useUser();
   const { contacts, handleToggleFavourite } = useContacts();
 
   // Filter only favourite contacts
@@ -33,7 +35,16 @@ export default function FavoritesPage() {
       }
     };
     fetchFavoriteGroups();
-  }, []);
+
+    const handleWorkspaceChange = () => {
+      setIsLoadingGroups(true);
+      fetchFavoriteGroups();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("workspaceModeChanged", handleWorkspaceChange);
+      return () => window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
+    }
+  }, [currentMode]);
 
   const handleToggleFavouriteGroup = async (group: GroupItem) => {
     // Optimistic UI update
