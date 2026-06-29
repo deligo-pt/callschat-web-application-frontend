@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, Smile } from "lucide-react";
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
+import { useQuickReply, QuickReplyDropdown } from "@/components/business/QuickReplyMenu";
 
 interface ChatInputProps {
   onSend: (text: string, file: File | null) => void;
@@ -40,7 +41,15 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
     }
   };
 
+  const quickReply = useQuickReply({
+    text: inputText,
+    onTextChange: setInputText,
+  });
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (quickReply.handleKeyDown(e)) {
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -174,7 +183,14 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
           </div>
         )}
 
-        <div className="flex-1 bg-[#F3F4F6] rounded-full flex items-center px-5 py-2 shadow-sm min-h-[44px]">
+        <div className="flex-1 bg-[#F3F4F6] rounded-full flex items-center px-5 py-2 shadow-sm min-h-[44px] relative">
+          <QuickReplyDropdown
+            isOpen={quickReply.isOpen}
+            replies={quickReply.filteredReplies}
+            selectedIndex={quickReply.selectedIndex}
+            onSelect={quickReply.selectReply}
+            onHover={quickReply.setSelectedIndex}
+          />
           {isRecording ? (
             <div className="flex-1 flex items-center gap-3 h-6">
               <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import apiClient from "@/services/api.client";
 import { BusinessService, BusinessProfileData } from "@/services/business.service";
 import { WorkspaceService, WorkspaceData } from "@/services/workspace.service";
+import { AutomationService, QuickReply } from "@/services/automation.service";
 
 export interface UserProfileData {
   id: string;
@@ -37,6 +38,8 @@ interface UserContextType {
   isSwitchingMode: boolean;
   isLoading: boolean;
   refetchUser: () => Promise<void>;
+  quickReplies: QuickReply[];
+  refetchQuickReplies: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -48,6 +51,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentMode, setCurrentModeState] = useState<'PERSONAL' | 'BUSINESS'>('PERSONAL');
   const [isSwitchingMode, setIsSwitchingMode] = useState<boolean>(false);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
 
   const fetchBusinessProfile = async () => {
     try {
@@ -72,6 +76,27 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setWorkspace(null);
     }
   };
+
+  const fetchQuickReplies = async () => {
+    try {
+      const res = await AutomationService.getAutomations();
+      if (res?.success && res.data?.quickReplies) {
+        setQuickReplies(res.data.quickReplies);
+      } else {
+        setQuickReplies([]);
+      }
+    } catch {
+      setQuickReplies([]);
+    }
+  };
+
+  useEffect(() => {
+    if (workspace?.id && currentMode === 'BUSINESS') {
+      fetchQuickReplies();
+    } else if (currentMode === 'PERSONAL') {
+      setQuickReplies([]);
+    }
+  }, [workspace?.id, currentMode]);
 
   const updateCurrentMode = (mode: 'PERSONAL' | 'BUSINESS') => {
     setCurrentModeState(mode);
@@ -157,6 +182,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSwitchingMode,
         isLoading,
         refetchUser: fetchUser,
+        quickReplies,
+        refetchQuickReplies: fetchQuickReplies,
       }}
     >
       {children}

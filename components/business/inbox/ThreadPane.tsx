@@ -6,6 +6,7 @@ import { Loader2, MessageSquare, Lock, Send, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Ticket } from "@/services/support.service";
 import type { ThreadMessage } from "@/app/(dashboard)/business/inbox/page";
+import { useQuickReply, QuickReplyDropdown } from "@/components/business/QuickReplyMenu";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -140,7 +141,16 @@ export function ThreadPane({
 }: ThreadPaneProps) {
   const isNote = composeMode === "note";
 
+  const quickReply = useQuickReply({
+    text: composeText,
+    onTextChange: onComposeTextChange,
+    disabled: isNote,
+  });
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (quickReply.handleKeyDown(e)) {
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSend();
@@ -281,7 +291,14 @@ export function ThreadPane({
           </div>
 
           {/* Textarea + Send */}
-          <div className="flex items-end gap-2 px-4 pb-4 pt-2">
+          <div className="flex items-end gap-2 px-4 pb-4 pt-2 relative">
+            <QuickReplyDropdown
+              isOpen={quickReply.isOpen}
+              replies={quickReply.filteredReplies}
+              selectedIndex={quickReply.selectedIndex}
+              onSelect={quickReply.selectReply}
+              onHover={quickReply.setSelectedIndex}
+            />
             <textarea
               value={composeText}
               onChange={(e) => onComposeTextChange(e.target.value)}

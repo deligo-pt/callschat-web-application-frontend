@@ -20,7 +20,7 @@ export default function BusinessDashboardPage() {
   const quickActions = [
     { title: "Open Client Chats", desc: "View all business customer threads", icon: MessageSquare, href: "/chats", color: "from-purple-600 to-indigo-600" },
     { title: "Manage Team Groups", desc: "Collaborate securely with internal staff", icon: Users, href: "/groups", color: "from-blue-600 to-cyan-600" },
-    { title: "Quick Replies", desc: "Edit automated message responses", icon: Zap, href: "/business/quick-replies", color: "from-emerald-600 to-teal-600" },
+    { title: "Automations & Quick Replies", desc: "Manage auto-replies and agent shortcuts", icon: Zap, href: "/business/automations", color: "from-emerald-600 to-teal-600" },
     { title: "Identity & Verification", desc: "Upload compliance docs & settings", icon: Settings, href: "/business/settings", color: "from-amber-600 to-orange-600" },
   ];
 
