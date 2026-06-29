@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Zap, Settings, CheckCircle2 } from "lucide-react";
+import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Inbox, Settings, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { CallProvider } from "@/components/providers/CallProvider";
@@ -40,6 +40,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
 
   const navItems = isBusiness ? [
     { name: "Dashboard", href: "/business/dashboard", icon: LayoutDashboard },
+    { name: "Inbox", href: "/business/inbox", icon: Inbox },
     { name: "Chats", href: "/chats", icon: MessageSquare },
     { name: "Teams", href: "/groups", icon: Users },
     { name: "Analytics", href: "/business/analytics", icon: BarChart3 },

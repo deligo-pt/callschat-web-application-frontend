@@ -19,7 +19,7 @@ interface WorkspaceSwitcherProps {
 }
 
 export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitcherProps) {
-  const { currentMode, switchWorkspaceMode, isSwitchingMode, businessProfile } = useUser();
+  const { currentMode, switchWorkspaceMode, isSwitchingMode, businessProfile, workspace } = useUser();
   const isBusiness = currentMode === "BUSINESS";
   const isVerified = businessProfile?.isVerified;
 
@@ -45,7 +45,7 @@ export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitch
               : "bg-[#EEF2FB] text-[#3B58F5] hover:bg-[#E2EAF8] shadow-sm",
             className
           )}
-          title={`Active Workspace: ${isBusiness ? (businessProfile?.companyName || "Business") + (isVerified ? " (Verified)" : "") : "Personal"}`}
+          title={`Active Workspace: ${isBusiness ? (businessProfile?.companyName || workspace?.name || "Business") + (isVerified ? " (Verified)" : "") : "Personal"}`}
         >
           {isSwitchingMode ? (
             <Loader2 className="h-5 w-5 animate-spin text-current" />
@@ -58,7 +58,7 @@ export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitch
           {!compact && (
             <div className="flex flex-col items-start overflow-hidden text-left">
               <span className="text-[12px] font-bold tracking-tight truncate leading-tight flex items-center gap-1">
-                {isBusiness ? businessProfile?.companyName || "Business" : "Personal"}
+                {isBusiness ? businessProfile?.companyName || workspace?.name || "Business" : "Personal"}
                 {isBusiness && isVerified && <CheckCircle2 className="h-3 w-3 text-[#3B58F5] fill-[#3B58F5]" />}
               </span>
               <span className="text-[10px] font-medium opacity-75 truncate leading-tight">
@@ -128,7 +128,7 @@ export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitch
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <span className="text-[14px] leading-tight flex items-center gap-1.5">
-              {businessProfile?.companyName || "Business"}
+              {businessProfile?.companyName || workspace?.name || "Business"}
               {isVerified && <CheckCircle2 className="h-3.5 w-3.5 text-[#3B58F5] fill-[#3B58F5]" />}
             </span>
             <span className={cn("text-[11px] font-normal mt-0.5 truncate", isBusiness ? "text-[#8B5CF6]/80" : "text-[#8F95B2]")}>

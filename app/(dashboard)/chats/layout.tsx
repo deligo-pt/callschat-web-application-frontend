@@ -13,6 +13,7 @@ import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
 import { usePresence } from "@/context/PresenceContext";
 import { useUser } from "@/context/UserContext";
 import { useSocket } from "@/components/providers/SocketProvider";
+import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 
 interface Conversation {
   id: string;
@@ -279,165 +280,171 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
           !isRootChatsPage && "hidden md:flex"
         )}
       >
-        {/* Header Area */}
-        <div className="flex flex-col px-6 pt-8 pb-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-[28px] font-extrabold tracking-tight text-[#11142D]">
-              Chats
-            </h1>
-            <div className="flex items-center gap-3">
-              <Link href="/chats/favorites" className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
-                <Star className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
-                <div className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#FFA500]" />
-              </Link>
+        {currentMode === "BUSINESS" ? (
+          <BusinessSidebar />
+        ) : (
+          <>
+            {/* Header Area */}
+            <div className="flex flex-col px-6 pt-8 pb-4">
+              <div className="flex items-center justify-between">
+                <h1 className="text-[28px] font-extrabold tracking-tight text-[#11142D]">
+                  Chats
+                </h1>
+                <div className="flex items-center gap-3">
+                  <Link href="/chats/favorites" className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
+                    <Star className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
+                    <div className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#FFA500]" />
+                  </Link>
 
-              <NotificationDropdown />
-            </div>
-          </div>
+                  <NotificationDropdown />
+                </div>
+              </div>
 
-          {/* Search Bar */}
-          <div className="mt-6 relative">
-            <Search className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8F95B2]" />
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-[48px] w-full rounded-2xl bg-[#F4F6FC] pl-11 pr-4 text-[14px] font-medium text-[#11142D] placeholder-[#8F95B2] focus:outline-none focus:ring-1 focus:ring-[#3B58F5]/50"
-            />
-          </div>
-        </div>
-
-        {/* Scrollable List Area */}
-        <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide md:pb-6">
-
-          {/* Active Now Section — rendered by the PresenceProvider-backed tray.
-               It self-hides when no contacts are online, so no conditional
-               wrapper is needed here. */}
-          <ActiveNowTray />
-
-          {/* Conversations List */}
-          <div className="mt-6">
-            <div className="px-6 mb-2">
-              <h2 className="text-[14px] font-bold text-[#3B58F5]">Message</h2>
+              {/* Search Bar */}
+              <div className="mt-6 relative">
+                <Search className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8F95B2]" />
+                <input
+                  type="text"
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-[48px] w-full rounded-2xl bg-[#F4F6FC] pl-11 pr-4 text-[14px] font-medium text-[#11142D] placeholder-[#8F95B2] focus:outline-none focus:ring-1 focus:ring-[#3B58F5]/50"
+                />
+              </div>
             </div>
 
-            {isLoading ? (
-              <div className="flex items-center justify-center py-10">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#3B58F5] border-t-transparent" />
-              </div>
-            ) : filteredConversations.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                <MessageSquare className="h-10 w-10 text-[#E6EAFA] mb-3" />
-                <p className="text-[13px] font-medium text-[#8F95B2]">
-                  No conversations yet. Tap an active contact above to start chatting securely.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col">
-                {filteredConversations.map((conv, index) => {
-                  const isActive = pathname === `/chats/${conv.id}`;
-                  const avatarUrl =
-                    conv.otherUserAvatar ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=F4F6FC&color=3B58F5`;
+            {/* Scrollable List Area */}
+            <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide md:pb-6">
 
-                  return (
-                    <motion.div
-                      key={conv.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.04 }}
-                      className="relative group"
-                      onMouseLeave={() => setMenuOpenForId(null)}
-                    >
-                      <Link
-                        href={`/chats/${conv.id}?recipientId=${conv.otherUserId}`}
-                        className={cn(
-                          "flex w-full items-center gap-4 px-6 py-3.5 transition-colors",
-                          isActive ? "bg-[#EEF2FF]" : "hover:bg-[#F4F7FE]"
-                        )}
-                      >
-                        {/* Avatar — green ring = online, plain = offline */}
-                        <div className="relative shrink-0">
-                          <div
+              {/* Active Now Section — rendered by the PresenceProvider-backed tray.
+                   It self-hides when no contacts are online, so no conditional
+                   wrapper is needed here. */}
+              <ActiveNowTray />
+
+              {/* Conversations List */}
+              <div className="mt-6">
+                <div className="px-6 mb-2">
+                  <h2 className="text-[14px] font-bold text-[#3B58F5]">Message</h2>
+                </div>
+
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#3B58F5] border-t-transparent" />
+                  </div>
+                ) : filteredConversations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                    <MessageSquare className="h-10 w-10 text-[#E6EAFA] mb-3" />
+                    <p className="text-[13px] font-medium text-[#8F95B2]">
+                      No conversations yet. Tap an active contact above to start chatting securely.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {filteredConversations.map((conv, index) => {
+                      const isActive = pathname === `/chats/${conv.id}`;
+                      const avatarUrl =
+                        conv.otherUserAvatar ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=F4F6FC&color=3B58F5`;
+
+                      return (
+                        <motion.div
+                          key={conv.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.04 }}
+                          className="relative group"
+                          onMouseLeave={() => setMenuOpenForId(null)}
+                        >
+                          <Link
+                            href={`/chats/${conv.id}?recipientId=${conv.otherUserId}`}
                             className={cn(
-                              "rounded-full",
-                              (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline)
-                                ? "border-[3px] border-emerald-500 p-[2px] bg-white"
-                                : ""
+                              "flex w-full items-center gap-4 px-6 py-3.5 transition-colors",
+                              isActive ? "bg-[#EEF2FF]" : "hover:bg-[#F4F7FE]"
                             )}
                           >
-                            <img
-                              src={avatarUrl}
-                              alt={conv.otherUserName}
-                              className="h-[52px] w-[52px] rounded-full object-cover bg-[#F4F6FC]"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex flex-1 flex-col items-start overflow-hidden">
-                          <h3 className="text-[15px] font-bold text-[#1D2A54]">
-                            {conv.otherUserName}
-                          </h3>
-                          <p className="mt-0.5 w-full truncate text-left text-[13px] font-medium text-[#8F95B2] flex items-center gap-1">
-                            <Lock className="h-3 w-3 shrink-0 text-[#8F95B2]" />
-                            {getLastMessagePreview(conv)}
-                          </p>
-                        </div>
-
-                        {/* Time & Unread Count */}
-                        <div className="flex flex-col items-end justify-center gap-1.5 shrink-0">
-                          <span className="text-[11px] font-semibold text-[#8F95B2]">
-                            {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : formatTime(conv.updatedAt)}
-                          </span>
-                          {/* Show badge only when not currently viewing this conversation */}
-                          {!isActive && hasUnread(conv) ? (
-                            <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3B58F5] px-1 text-[10px] font-bold text-white shadow-sm">
-                              {conv.unreadCount && conv.unreadCount > 0 ? conv.unreadCount : "●"}
+                            {/* Avatar — green ring = online, plain = offline */}
+                            <div className="relative shrink-0">
+                              <div
+                                className={cn(
+                                  "rounded-full",
+                                  (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline)
+                                    ? "border-[3px] border-emerald-500 p-[2px] bg-white"
+                                    : ""
+                                )}
+                              >
+                                <img
+                                  src={avatarUrl}
+                                  alt={conv.otherUserName}
+                                  className="h-[52px] w-[52px] rounded-full object-cover bg-[#F4F6FC]"
+                                />
+                              </div>
                             </div>
-                          ) : null}
-                        </div>
-                      </Link>
 
-                      {/* Context Menu Button */}
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                        <button 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setMenuOpenForId(menuOpenForId === conv.id ? null : conv.id);
-                          }}
-                          className="p-1.5 rounded-full hover:bg-black/5 text-[#8F95B2] hover:text-[#1D2A54]"
-                        >
-                          <MoreVertical className="h-5 w-5" />
-                        </button>
+                            {/* Content */}
+                            <div className="flex flex-1 flex-col items-start overflow-hidden">
+                              <h3 className="text-[15px] font-bold text-[#1D2A54]">
+                                {conv.otherUserName}
+                              </h3>
+                              <p className="mt-0.5 w-full truncate text-left text-[13px] font-medium text-[#8F95B2] flex items-center gap-1">
+                                <Lock className="h-3 w-3 shrink-0 text-[#8F95B2]" />
+                                {getLastMessagePreview(conv)}
+                              </p>
+                            </div>
 
-                        {/* Dropdown Menu */}
-                        {menuOpenForId === conv.id && (
-                          <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-[#E6EAFA] py-1 z-50">
-                            <button
+                            {/* Time & Unread Count */}
+                            <div className="flex flex-col items-end justify-center gap-1.5 shrink-0">
+                              <span className="text-[11px] font-semibold text-[#8F95B2]">
+                                {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : formatTime(conv.updatedAt)}
+                              </span>
+                              {/* Show badge only when not currently viewing this conversation */}
+                              {!isActive && hasUnread(conv) ? (
+                                <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3B58F5] px-1 text-[10px] font-bold text-white shadow-sm">
+                                  {conv.unreadCount && conv.unreadCount > 0 ? conv.unreadCount : "●"}
+                                </div>
+                              ) : null}
+                            </div>
+                          </Link>
+
+                          {/* Context Menu Button */}
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <button 
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                setConversationToDelete(conv.id);
-                                setMenuOpenForId(null);
+                                setMenuOpenForId(menuOpenForId === conv.id ? null : conv.id);
                               }}
-                              className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                              className="p-1.5 rounded-full hover:bg-black/5 text-[#8F95B2] hover:text-[#1D2A54]"
                             >
-                              <Trash2 className="h-4 w-4" />
-                              Delete
+                              <MoreVertical className="h-5 w-5" />
                             </button>
+
+                            {/* Dropdown Menu */}
+                            {menuOpenForId === conv.id && (
+                              <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-[#E6EAFA] py-1 z-50">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setConversationToDelete(conv.id);
+                                    setMenuOpenForId(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Main Content Area */}
