@@ -7,6 +7,10 @@ import { ChannelHeader } from "@/components/chat/ChannelHeader";
 import { useUser } from "@/context/UserContext";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { ChannelService, type ChannelMessageData } from "@/services/channel.service";
+import { toast } from "sonner";
+import { CollaborationService } from "@/services/collaboration.service";
+import { ProductivitySidebar } from "@/components/business/ProductivitySidebar";
+import { ScheduleSendPopover } from "@/components/business/ScheduleSendPopover";
 
 function ChatsContent() {
   const router = useRouter();
@@ -121,10 +125,34 @@ function ChatsContent() {
     }
   };
 
+  const handleScheduleMessage = async (scheduledForIso: string) => {
+    if (!messageText.trim() || !channelId || !workspace?.id) {
+      toast.error("Please enter message text to schedule");
+      return false;
+    }
+    try {
+      const res = await CollaborationService.scheduleMessage({
+        content: messageText.trim(),
+        scheduledFor: scheduledForIso,
+        channelId,
+        workspaceId: workspace.id,
+      });
+      if (res.success) {
+        toast.success("Message scheduled successfully");
+        setMessageText("");
+        return true;
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to schedule message");
+    }
+    return false;
+  };
+
   if (currentMode === "BUSINESS" && channelId) {
     return (
-      <div className="flex h-full w-full flex-col bg-[#F8FAFC]">
-        <ChannelHeader
+      <div className="flex h-full w-full overflow-hidden bg-[#F8FAFC]">
+        <div className="flex flex-1 flex-col h-full overflow-hidden">
+          <ChannelHeader
           channelId={channelId}
           channelName={channelName}
           channelDescription={channelDesc}
@@ -189,6 +217,10 @@ function ChatsContent() {
             <button type="button" className="text-[#8F95B2] hover:text-[#11142D] transition-colors">
               <Smile className="h-4 w-4" />
             </button>
+            <ScheduleSendPopover
+              disabled={!messageText.trim()}
+              onSchedule={handleScheduleMessage}
+            />
             <button
               type="submit"
               disabled={!messageText.trim()}
@@ -199,6 +231,10 @@ function ChatsContent() {
           </form>
         </div>
       </div>
+      {workspace?.id && (
+        <ProductivitySidebar workspaceId={workspace.id} channelId={channelId} />
+      )}
+    </div>
     );
   }
 

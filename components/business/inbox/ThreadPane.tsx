@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 import { Ticket } from "@/services/support.service";
 import type { ThreadMessage } from "@/app/(dashboard)/business/inbox/page";
 import { useQuickReply, QuickReplyDropdown } from "@/components/business/QuickReplyMenu";
+import { toast } from "sonner";
+import { CollaborationService } from "@/services/collaboration.service";
+import { ScheduleSendPopover } from "@/components/business/ScheduleSendPopover";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -155,6 +158,29 @@ export function ThreadPane({
       e.preventDefault();
       onSend();
     }
+  };
+
+  const handleScheduleMessage = async (scheduledForIso: string) => {
+    if (!composeText.trim() || !ticket?.id || !ticket?.workspaceId) {
+      toast.error("Please enter message text to schedule");
+      return false;
+    }
+    try {
+      const res = await CollaborationService.scheduleMessage({
+        content: composeText.trim(),
+        scheduledFor: scheduledForIso,
+        ticketId: ticket.id,
+        workspaceId: ticket.workspaceId,
+      });
+      if (res.success) {
+        toast.success("Message scheduled successfully");
+        onComposeTextChange("");
+        return true;
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to schedule message");
+    }
+    return false;
   };
 
   return (
@@ -316,6 +342,12 @@ export function ThreadPane({
                   : "border-[#E6EAFA] bg-[#F8FAFC] text-[#1D2A54] placeholder-[#8F95B2] focus:border-purple-400 focus:ring-purple-300/20"
               )}
             />
+            {!isNote && (
+              <ScheduleSendPopover
+                disabled={!composeText.trim() || submitting}
+                onSchedule={handleScheduleMessage}
+              />
+            )}
             <button
               onClick={onSend}
               disabled={!composeText.trim() || submitting}
