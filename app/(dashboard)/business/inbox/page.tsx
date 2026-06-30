@@ -7,6 +7,8 @@ import { useUser } from "@/context/UserContext";
 import { TicketListPane } from "@/components/business/inbox/TicketListPane";
 import { ThreadPane } from "@/components/business/inbox/ThreadPane";
 import { MetaPane } from "@/components/business/inbox/MetaPane";
+import { decryptMessage } from "@/utils/crypto";
+import { chatService } from "@/services/chat.service";
 
 // ---------------------------------------------------------------------------
 // Types shared across panes
@@ -16,6 +18,53 @@ export type InboxFilter = "all" | "unassigned" | "mine" | "closed";
 export type ThreadMessage =
   | { kind: "note"; data: InternalNote }
   | { kind: "message"; data: { id: string; senderId: string; ciphertext: string | null; mediaType: string | null; createdAt: string } };
+
+async function tryDecrypt(
+  ciphertext: string | null,
+  nonce?: string | null,
+  peerUserId?: string,
+  currentUserId?: string
+): Promise<string> {
+  if (!ciphertext) return "";
+  if (!nonce || !peerUserId) return ciphertext;
+  
+  let myPriv = null;
+  if (typeof window !== "undefined") {
+    if (currentUserId) {
+      myPriv = localStorage.getItem(`privateKey_${currentUserId}`);
+    }
+    if (!myPriv) {
+      myPriv = localStorage.getItem("privateKey");
+    }
+    if (!myPriv) {
+      myPriv = localStorage.getItem("chat_private_key");
+    }
+  }
+  if (!myPriv) return ciphertext;
+
+  try {
+    const res = await chatService.fetchRecipientKey(peerUserId);
+    let pubKeys: string[] = [];
+    if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+      pubKeys = res.data.map((item: any) => item.publicKey).reverse();
+    } else if (res?.success && res?.data?.publicKey) {
+      pubKeys = [res.data.publicKey];
+    }
+
+    for (const pubKey of pubKeys) {
+      if (!pubKey) continue;
+      try {
+        const decrypted = await decryptMessage(ciphertext, nonce, pubKey, myPriv);
+        if (decrypted) return decrypted;
+      } catch {
+        // try next public key
+      }
+    }
+  } catch (e) {
+    console.warn("Decryption error in tryDecrypt:", e);
+  }
+  return ciphertext;
+}
 
 // ---------------------------------------------------------------------------
 // Page
@@ -59,6 +108,17 @@ export default function InboxPage() {
         if (activeFilter === "unassigned") {
           data = data.filter((t) => t.assignedAgentId === null && t.status !== "CLOSED");
         }
+        for (const t of data) {
+          if (t.lastMessage?.ciphertext) {
+            const peerId = t.lastMessage.senderId === user?.id ? t.customerId : t.lastMessage.senderId;
+            t.lastMessage.ciphertext = await tryDecrypt(
+              t.lastMessage.ciphertext,
+              (t.lastMessage as any).nonce,
+              peerId,
+              user?.id
+            );
+          }
+        }
         setTickets(data);
       }
     } catch {
@@ -79,10 +139,57 @@ export default function InboxPage() {
     setThreadLoading(true);
     setComposeMode("reply");
     setComposeText("");
-    // A real implementation would fetch ticket messages here.
-    // For now we simulate a brief load then show empty state.
-    const t = setTimeout(() => setThreadLoading(false), 600);
-    return () => clearTimeout(t);
+
+    let isMounted = true;
+    const loadThread = async () => {
+      try {
+        const res = await SupportService.getTicketMessages(activeTicketId);
+        if (res.success && isMounted) {
+          const items: ThreadMessage[] = [];
+          for (const item of res.data) {
+            if (item.type === "note") {
+              items.push({
+                kind: "note",
+                data: {
+                  id: item.id,
+                  ticketId: activeTicketId,
+                  authorId: item.senderId,
+                  content: item.content,
+                  createdAt: item.createdAt,
+                },
+              });
+            } else {
+              const ticketCustId = tickets.find((t: Ticket) => t.id === activeTicketId)?.customerId;
+              const peerId = item.senderId === user?.id ? ticketCustId : item.senderId;
+              const decryptedText = await tryDecrypt(
+                item.ciphertext,
+                item.nonce,
+                peerId,
+                user?.id
+              );
+              items.push({
+                kind: "message",
+                data: {
+                  id: item.id,
+                  senderId: item.senderId,
+                  ciphertext: decryptedText,
+                  mediaType: item.mediaType,
+                  createdAt: item.createdAt,
+                },
+              });
+            }
+          }
+          setThread(items);
+        }
+      } catch (err) {
+        console.error("Failed to fetch ticket messages", err);
+      } finally {
+        if (isMounted) setThreadLoading(false);
+      }
+    };
+
+    loadThread();
+    return () => { isMounted = false; };
   }, [activeTicketId]);
 
   // Scroll to thread bottom when new messages arrive
@@ -195,7 +302,9 @@ export default function InboxPage() {
         setThread((prev) => prev.filter((m) => !(m.kind === "note" && m.data.id === optimisticNote.id)));
       }
     } else {
-      // Public reply — placeholder (would call chat socket/emitter)
+      // Agent reply — use the dedicated replyToTicket endpoint.
+      // The backend resolves the linked conversation and delivers
+      // the message directly into the customer's chat thread.
       const optimisticMsg: ThreadMessage = {
         kind: "message",
         data: {
@@ -207,7 +316,36 @@ export default function InboxPage() {
         },
       };
       setThread((prev) => [...prev, optimisticMsg]);
-      toast.info("Reply sent (connect to chat socket for real delivery).");
+
+      try {
+        const res = await SupportService.replyToTicket(activeTicketId, text);
+        if (res.success) {
+          // Replace the optimistic placeholder with the confirmed message
+          setThread((prev) =>
+            prev.map((m) =>
+              m.kind === "message" && m.data.id === optimisticMsg.data.id
+                ? {
+                    kind: "message",
+                    data: {
+                      id: res.data.id,
+                      senderId: res.data.senderId,
+                      ciphertext: res.data.ciphertext ?? text,
+                      mediaType: null,
+                      createdAt: res.data.createdAt,
+                    },
+                  }
+                : m
+            )
+          );
+          toast.success("Reply sent.");
+        }
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error?.message || "Failed to send reply.");
+        // Roll back the optimistic message on failure
+        setThread((prev) =>
+          prev.filter((m) => !(m.kind === "message" && m.data.id === optimisticMsg.data.id))
+        );
+      }
     }
     setSubmitting(false);
   }, [composeText, composeMode, activeTicketId, user?.id]);

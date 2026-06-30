@@ -25,6 +25,8 @@ export interface ChannelMessageData {
   senderName: string;
   senderAvatar: string | null;
   content: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
   createdAt: string;
 }
 

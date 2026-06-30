@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2 } from "lucide-react";
+import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { chatService } from "@/services/chat.service";
@@ -14,6 +14,9 @@ import { usePresence } from "@/context/PresenceContext";
 import { useUser } from "@/context/UserContext";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { BusinessSidebar } from "@/components/business/BusinessSidebar";
+import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
+import { NewMessageModal } from "@/components/chat/NewMessageModal";
+import { Building2 } from "lucide-react";
 
 interface Conversation {
   id: string;
@@ -41,6 +44,8 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExploreOpen, setIsExploreOpen] = useState(false);
+  const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
   // Tracks the last time the user read each conversation (persisted to localStorage)
   const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
@@ -290,7 +295,16 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                 <h1 className="text-[28px] font-extrabold tracking-tight text-[#11142D]">
                   Chats
                 </h1>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  {/* Compose / New Message Button */}
+                  <button
+                    onClick={() => setIsNewMessageOpen(true)}
+                    title="New Message"
+                    className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA] hover:border-[#3B58F5]/30"
+                  >
+                    <PenSquare className="h-[18px] w-[18px] text-[#3B58F5]" strokeWidth={2.2} />
+                  </button>
+
                   <Link href="/chats/favorites" className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
                     <Star className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
                     <div className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#FFA500]" />
@@ -323,8 +337,16 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
 
               {/* Conversations List */}
               <div className="mt-6">
-                <div className="px-6 mb-2">
-                  <h2 className="text-[14px] font-bold text-[#3B58F5]">Message</h2>
+                <div className="px-6 mb-2 flex items-center justify-between">
+                  <h2 className="text-[14px] font-bold text-[#3B58F5]">Messages</h2>
+                  <button
+                    onClick={() => setIsExploreOpen(true)}
+                    className="text-xs font-extrabold text-[#3B58F5] hover:underline flex items-center gap-1.5 focus:outline-none"
+                    title="Explore Official Businesses"
+                  >
+                    <Building2 className="h-3.5 w-3.5" />
+                    <span>Businesses</span>
+                  </button>
                 </div>
 
                 {isLoading ? (
@@ -491,6 +513,11 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
           </motion.div>
         </div>
       )}
+
+      <ExploreBusinessesModal isOpen={isExploreOpen} onClose={() => setIsExploreOpen(false)} />
+
+      {/* New Message / Business Discovery Command Palette */}
+      <NewMessageModal isOpen={isNewMessageOpen} onClose={() => setIsNewMessageOpen(false)} />
     </div>
   );
 }

@@ -22,6 +22,8 @@ import { usePresence } from "@/context/PresenceContext";
 import { ChannelService, type ChannelData } from "@/services/channel.service";
 import { chatService } from "@/services/chat.service";
 import { CreateChannelModal } from "./CreateChannelModal";
+import { InviteMemberModal } from "./InviteMemberModal";
+import { UserPlus } from "lucide-react";
 
 interface Conversation {
   id: string;
@@ -51,6 +53,7 @@ export function BusinessSidebar() {
 
   // Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const fetchChannels = useCallback(async () => {
     if (!workspace?.id) {
@@ -267,14 +270,32 @@ export function BusinessSidebar() {
         </div>
       </div>
 
+      {/* Footer Action - Invite Members */}
+      <div className="p-4 border-t border-white/10 shrink-0">
+        <button
+          onClick={() => setIsInviteModalOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10"
+        >
+          <UserPlus className="h-4 w-4" />
+          Invite Members
+        </button>
+      </div>
+
       {/* Channel Creation Modal */}
       {workspace?.id && (
-        <CreateChannelModal
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          workspaceId={workspace.id}
-          onChannelCreated={fetchChannels}
-        />
+        <>
+          <CreateChannelModal
+            isOpen={isCreateModalOpen}
+            onClose={() => setIsCreateModalOpen(false)}
+            workspaceId={workspace.id}
+            onChannelCreated={fetchChannels}
+          />
+          <InviteMemberModal
+            isOpen={isInviteModalOpen}
+            onClose={() => setIsInviteModalOpen(false)}
+            workspaceId={workspace.id}
+          />
+        </>
       )}
     </div>
   );

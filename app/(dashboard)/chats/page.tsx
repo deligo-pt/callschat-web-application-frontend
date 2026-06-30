@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense, useState, useEffect, useRef } from "react";
-import { MessageSquare, Hash, Send, Paperclip, Smile, Loader2 } from "lucide-react";
+import { MessageSquare, Hash, Send, Paperclip, Smile, Loader2, Building2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChannelHeader } from "@/components/chat/ChannelHeader";
 import { useUser } from "@/context/UserContext";
@@ -11,15 +11,19 @@ import { toast } from "sonner";
 import { CollaborationService } from "@/services/collaboration.service";
 import { ProductivitySidebar } from "@/components/business/ProductivitySidebar";
 import { ScheduleSendPopover } from "@/components/business/ScheduleSendPopover";
+import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
+import { ChannelInput } from "@/components/business/ChannelInput";
+import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
+import { HuddleOverlay } from "@/components/business/HuddleOverlay";
 
 function ChatsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentMode, user, workspace } = useUser();
   const { socket, isConnected } = useSocket();
-  const [messageText, setMessageText] = useState("");
-  const [messages, setMessages] = useState<Array<{ id: string; sender: string; text: string; time: string; avatar?: string | null }>>([]);
+  const [messages, setMessages] = useState<Array<{ id: string; sender: string; text: string; time: string; avatar?: string | null; mediaUrl?: string | null; mediaType?: string | null }>>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isExploreOpen, setIsExploreOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const channelId = searchParams.get("channelId");
@@ -50,6 +54,8 @@ function ChatsContent() {
             text: m.content,
             time: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             avatar: m.senderAvatar,
+            mediaUrl: m.mediaUrl,
+            mediaType: m.mediaType,
           }));
           setMessages(formatted);
         }
@@ -86,6 +92,8 @@ function ChatsContent() {
             text: newMsg.content,
             time: new Date(newMsg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             avatar: newMsg.senderAvatar,
+            mediaUrl: newMsg.mediaUrl,
+            mediaType: newMsg.mediaType,
           },
         ];
       });
@@ -98,18 +106,39 @@ function ChatsContent() {
     };
   }, [socket, isConnected, currentMode, channelId, workspace?.id]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!messageText.trim() || !channelId || !workspace?.id) return;
+  const getMediaTypeFromMime = (mime: string = "") => {
+    if (mime.startsWith("image/")) return "image";
+    if (mime.startsWith("video/")) return "video";
+    if (mime.startsWith("audio/")) return "audio";
+    return "document";
+  };
 
-    const content = messageText.trim();
-    setMessageText("");
+  const handleSend = async (content: string, file: File | null) => {
+    if (!channelId || !workspace?.id) return;
+
+    let mediaUrl: string | null = null;
+    let mediaType: string | null = null;
+
+    if (file) {
+      try {
+        const uploadRes = await CollaborationService.uploadFile(file, channelId, null, workspace.id);
+        if (uploadRes.success && uploadRes.data) {
+          mediaUrl = uploadRes.data.fileUrl;
+          mediaType = getMediaTypeFromMime(file.type || uploadRes.data.fileType);
+        }
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error?.message || "Failed to upload file");
+        return;
+      }
+    }
 
     if (socket && isConnected) {
       socket.emit("channel:send_message", {
         channelId,
         workspaceId: workspace.id,
-        content,
+        content: content || "",
+        mediaUrl,
+        mediaType,
       });
     } else {
       const senderName = user?.profile?.displayName || user?.profile?.username || "You";
@@ -118,28 +147,45 @@ function ChatsContent() {
         {
           id: Date.now().toString(),
           sender: senderName,
-          text: content,
+          text: content || "",
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          mediaUrl,
+          mediaType,
         },
       ]);
     }
   };
 
-  const handleScheduleMessage = async (scheduledForIso: string) => {
-    if (!messageText.trim() || !channelId || !workspace?.id) {
-      toast.error("Please enter message text to schedule");
-      return false;
+  const handleScheduleMessage = async (content: string, file: File | null, scheduledForIso: string) => {
+    if (!channelId || !workspace?.id) return false;
+
+    let mediaUrl: string | null = null;
+    let mediaType: string | null = null;
+
+    if (file) {
+      try {
+        const uploadRes = await CollaborationService.uploadFile(file, channelId, null, workspace.id);
+        if (uploadRes.success && uploadRes.data) {
+          mediaUrl = uploadRes.data.fileUrl;
+          mediaType = getMediaTypeFromMime(file.type || uploadRes.data.fileType);
+        }
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error?.message || "Failed to upload file");
+        return false;
+      }
     }
+
     try {
       const res = await CollaborationService.scheduleMessage({
-        content: messageText.trim(),
+        content: content || "",
         scheduledFor: scheduledForIso,
         channelId,
         workspaceId: workspace.id,
+        mediaUrl,
+        mediaType,
       });
       if (res.success) {
         toast.success("Message scheduled successfully");
-        setMessageText("");
         return true;
       }
     } catch (err: any) {
@@ -151,7 +197,8 @@ function ChatsContent() {
   if (currentMode === "BUSINESS" && channelId) {
     return (
       <div className="flex h-full w-full overflow-hidden bg-[#F8FAFC]">
-        <div className="flex flex-1 flex-col h-full overflow-hidden">
+        <div className="flex flex-1 flex-col h-full overflow-hidden relative">
+          <HuddleOverlay />
           <ChannelHeader
           channelId={channelId}
           channelName={channelName}
@@ -192,7 +239,28 @@ function ChatsContent() {
                     <span className="text-[10px] font-semibold text-[#8F95B2]">{m.time}</span>
                   </div>
                   <div className="mt-1 rounded-xl bg-white px-3.5 py-2.5 text-sm text-[#1D2A54] border border-[#E6EAFA] shadow-2xs">
-                    {m.text}
+                    {m.mediaUrl && (
+                      <div className="mb-1.5">
+                        {m.mediaType?.startsWith("audio") || m.mediaType === "audio" ? (
+                          <VoiceMessagePlayer
+                            src={m.mediaUrl}
+                            messageId={m.id}
+                            isMe={m.sender === (user?.profile?.displayName || user?.profile?.username || "You")}
+                          />
+                        ) : m.mediaType?.startsWith("image") || m.mediaType === "image" ? (
+                          <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer">
+                            <img src={m.mediaUrl} alt="Attached Image" className="rounded-lg max-w-sm w-full object-cover max-h-[300px]" />
+                          </a>
+                        ) : m.mediaType?.startsWith("video") || m.mediaType === "video" ? (
+                          <video src={m.mediaUrl} controls className="rounded-lg max-w-sm w-full max-h-[300px]" />
+                        ) : (
+                          <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-lg text-xs transition-colors">
+                            📎 Download Attachment
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {m.text && <div className="leading-snug whitespace-pre-wrap">{m.text}</div>}
                   </div>
                 </div>
               </div>
@@ -202,34 +270,11 @@ function ChatsContent() {
         </div>
 
         {/* Slack-style Input Box */}
-        <div className="p-4 bg-white border-t border-[#E6EAFA]">
-          <form onSubmit={handleSend} className="flex items-center gap-2 rounded-2xl border border-[#E6EAFA] bg-[#F8FAFC] px-4 py-2 focus-within:border-purple-600 focus-within:ring-3 focus-within:ring-purple-600/15 transition-all">
-            <button type="button" className="text-[#8F95B2] hover:text-[#11142D] transition-colors">
-              <Paperclip className="h-4 w-4" />
-            </button>
-            <input
-              type="text"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              placeholder={`Message #${channelName}`}
-              className="flex-1 bg-transparent text-sm font-medium text-[#11142D] placeholder-[#8F95B2] outline-none py-1"
-            />
-            <button type="button" className="text-[#8F95B2] hover:text-[#11142D] transition-colors">
-              <Smile className="h-4 w-4" />
-            </button>
-            <ScheduleSendPopover
-              disabled={!messageText.trim()}
-              onSchedule={handleScheduleMessage}
-            />
-            <button
-              type="submit"
-              disabled={!messageText.trim()}
-              className="p-2 rounded-xl bg-purple-600 text-white font-bold shadow-md shadow-purple-500/20 hover:bg-purple-700 disabled:opacity-50 disabled:shadow-none transition-all cursor-pointer"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
-        </div>
+        <ChannelInput
+          channelName={channelName}
+          onSend={handleSend}
+          onSchedule={handleScheduleMessage}
+        />
       </div>
       {workspace?.id && (
         <ProductivitySidebar workspaceId={workspace.id} channelId={channelId} />
@@ -247,12 +292,23 @@ function ChatsContent() {
       <p className="mt-2 text-[15px] font-medium text-[#8F95B2] max-w-sm">
         Select a conversation from the sidebar or start a new chat to begin messaging securely.
       </p>
-      <button 
-        onClick={() => router.push("/contacts")}
-        className="mt-8 rounded-2xl bg-[#3B58F5] px-8 py-3.5 text-[15px] font-bold text-white shadow-lg shadow-[#3B58F5]/25 transition-all hover:bg-[#2C48B8] active:scale-95 cursor-pointer"
-      >
-        Start a New Conversation
-      </button>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <button 
+          onClick={() => router.push("/contacts")}
+          className="rounded-2xl bg-[#3B58F5] px-7 py-3.5 text-[15px] font-bold text-white shadow-lg shadow-[#3B58F5]/25 transition-all hover:bg-[#2C48B8] active:scale-95 cursor-pointer"
+        >
+          Start a New Conversation
+        </button>
+        <button 
+          onClick={() => setIsExploreOpen(true)}
+          className="flex items-center gap-2 rounded-2xl bg-white border border-[#E6EAFA] px-6 py-3.5 text-[15px] font-bold text-[#1D2A54] shadow-sm transition-all hover:bg-[#F8FAFC] hover:border-[#3B58F5]/40 active:scale-95 cursor-pointer"
+        >
+          <Building2 className="h-5 w-5 text-[#3B58F5]" />
+          <span>Explore Businesses</span>
+        </button>
+      </div>
+
+      <ExploreBusinessesModal isOpen={isExploreOpen} onClose={() => setIsExploreOpen(false)} />
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { chatService } from "@/services/chat.service";
 import { useContacts, type Contact } from "@/hooks/useContacts";
+import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
+import { Building2 } from "lucide-react";
 
 export default function ContactsPage() {
   const router = useRouter();
@@ -14,6 +16,7 @@ export default function ContactsPage() {
 
   // Add Contact Modal State
   const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
+  const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [newContactPhone, setNewContactPhone] = useState("");
   const [newContactName, setNewContactName] = useState("");
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -137,13 +140,23 @@ export default function ContactsPage() {
               </button>
               <h1 className="text-[20px] font-bold">Contacts</h1>
             </div>
-            <button
-              onClick={() => setIsAddContactModalOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
-              title="Add New Contact"
-            >
-              <Plus className="h-5 w-5" strokeWidth={2.5} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsExploreOpen(true)}
+                className="flex items-center gap-2 h-9 px-3.5 rounded-full bg-white/20 text-xs font-bold transition-colors hover:bg-white/30 backdrop-blur-sm shadow-sm"
+                title="Explore Verified Businesses"
+              >
+                <Building2 className="h-4 w-4" />
+                <span>Explore Businesses</span>
+              </button>
+              <button
+                onClick={() => setIsAddContactModalOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                title="Add New Contact"
+              >
+                <Plus className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+            </div>
           </div>
 
           {/* Search Bar */}
@@ -367,6 +380,7 @@ export default function ContactsPage() {
         )}
       </AnimatePresence>
 
+      <ExploreBusinessesModal isOpen={isExploreOpen} onClose={() => setIsExploreOpen(false)} />
     </div>
   );
 }

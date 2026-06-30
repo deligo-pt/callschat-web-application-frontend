@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Hash, Lock, Users, Search, Loader2 } from "lucide-react";
+import { Hash, Lock, Users, Search, Loader2, Headset } from "lucide-react";
 
 import {
   Sheet,
@@ -13,6 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ContactService } from "@/services/contact.service";
+import { MeetingService } from "@/services/meeting.service";
+import { useMeetingStore } from "@/hooks/useMeetingStore";
+import { useUser } from "@/context/UserContext";
 
 interface ChannelHeaderProps {
   channelId: string;
@@ -42,6 +45,9 @@ export function ChannelHeader({
   const [members, setMembers] = useState<RealMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
+  const { isJoining, setIsJoining, setMeeting } = useMeetingStore();
+  const { workspace } = useUser();
+
   useEffect(() => {
     if (!isMembersOpen) return;
 
@@ -63,7 +69,11 @@ export function ChannelHeader({
               avatarUrl: profile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=8B5CF6&color=fff`,
             };
           });
-          setMembers(formatted);
+          const uniqueMap = new Map<string, RealMember>();
+          formatted.forEach((item) => {
+            if (!uniqueMap.has(item.id)) uniqueMap.set(item.id, item);
+          });
+          setMembers(Array.from(uniqueMap.values()));
         }
       } catch (err) {
         console.error("Failed to fetch channel members", err);
@@ -78,6 +88,25 @@ export function ChannelHeader({
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(memberSearch.toLowerCase())
   );
+
+  // Right: Members & Actions
+  const handleStartHuddle = async () => {
+    if (!channelId || isJoining) return;
+    if (!workspace?.id) {
+      console.error("No active workspace found");
+      return;
+    }
+    
+    setIsJoining(true);
+    try {
+      const { meetingId } = await MeetingService.startHuddle(channelId, workspace.id);
+      const { token } = await MeetingService.getToken(meetingId, workspace.id);
+      setMeeting(meetingId, token, channelId);
+    } catch (err) {
+      console.error("Failed to start huddle", err);
+      setIsJoining(false);
+    }
+  };
 
   return (
     <div className="flex items-center justify-between border-b border-[#E6EAFA] bg-white px-6 py-3.5 shadow-xs shrink-0 z-20">
@@ -104,6 +133,22 @@ export function ChannelHeader({
 
       {/* Right: Members & Actions */}
       <div className="flex items-center gap-2">
+        {/* Huddle Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleStartHuddle}
+          disabled={isJoining}
+          className="h-9 gap-2 rounded-xl border-[#E6EAFA] bg-[#F8FAFC] px-3 font-semibold text-[#1D2A54] hover:bg-[#EEF2FF] hover:border-purple-200 transition-all cursor-pointer"
+        >
+          {isJoining ? (
+            <Loader2 className="h-4 w-4 text-[#8B5CF6] animate-spin" />
+          ) : (
+            <Headset className="h-4 w-4 text-[#8B5CF6]" />
+          )}
+          <span>Huddle</span>
+        </Button>
+
         <Button
           variant="outline"
           size="sm"
@@ -156,9 +201,9 @@ export function ChannelHeader({
                 No members found.
               </div>
             ) : (
-              filteredMembers.map((member) => (
+              filteredMembers.map((member, idx) => (
                 <div
-                  key={member.id}
+                  key={`${member.id}-${idx}`}
                   className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8FAFC] transition-colors"
                 >
                   <div className="flex items-center gap-3">

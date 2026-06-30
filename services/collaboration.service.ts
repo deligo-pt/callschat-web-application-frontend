@@ -57,6 +57,8 @@ export interface ScheduleMessagePayload {
   channelId?: string;
   ticketId?: string;
   workspaceId?: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
 }
 
 // ---------------------------------------------------------------------------

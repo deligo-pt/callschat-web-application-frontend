@@ -23,10 +23,9 @@ export const chatService = {
     return response.data;
   },
 
-  initiateConversation: async (targetUserId: string) => {
-    const response = await apiClient.post('/conversations/initiate', {
-      targetUserId
-    });
+  initiateConversation: async (params: string | { targetUserId?: string; groupId?: string; workspaceId?: string }) => {
+    const payload = typeof params === 'string' ? { targetUserId: params } : params;
+    const response = await apiClient.post('/conversations/initiate', payload);
     return response.data;
   },
 
@@ -69,6 +68,11 @@ export const chatService = {
 
   clearChat: async (conversationId: string) => {
     const response = await apiClient.delete(`/chats/${conversationId}/clear`);
+    return response.data;
+  },
+
+  sendMessage: async (payload: { conversationId: string; ciphertext: string; nonce: string; mediaUrl?: string | null; mediaType?: string | null; ticketId?: string }) => {
+    const response = await apiClient.post(`/conversations/${payload.conversationId}/messages`, payload);
     return response.data;
   },
 };

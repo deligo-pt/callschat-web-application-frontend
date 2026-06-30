@@ -5,9 +5,12 @@ import { Settings, ShieldCheck, Building2, Globe, MapPin, ArrowLeft } from "luci
 import { useRouter } from "next/navigation";
 import { VerificationStatus } from "@/components/business/VerificationStatus";
 import { BusinessService, BusinessProfileData } from "@/services/business.service";
+import { WorkspaceService } from "@/services/workspace.service";
+import { useUser } from "@/context/UserContext";
 
 export default function BusinessSettingsPage() {
   const router = useRouter();
+  const { workspace, updateCurrentMode } = useUser();
   const [profile, setProfile] = useState<BusinessProfileData | null>(null);
 
   useEffect(() => {
@@ -35,7 +38,7 @@ export default function BusinessSettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl">
-        {/* Left Column: Verification Status */}
+        {/* Left Column: Verification Status & Actions */}
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-3xl bg-white p-6 border border-[#E6EAFA] shadow-xs">
             <div className="flex items-center gap-2.5 mb-4 pb-4 border-b border-[#F4F6FC]">
@@ -43,6 +46,41 @@ export default function BusinessSettingsPage() {
               <h2 className="text-base font-bold text-[#1D2A54]">Identity & Compliance Verification</h2>
             </div>
             <VerificationStatus />
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 border border-red-100 shadow-xs">
+            <div className="flex items-center gap-2.5 mb-4 pb-4 border-b border-red-50">
+              <h2 className="text-base font-bold text-red-600">Danger Zone</h2>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[#1D2A54]">Leave Workspace</h3>
+                <p className="text-xs text-[#8F95B2] mt-1">
+                  Leave your current workspace. You will lose access to all channels and business data.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  if (confirm("Are you sure you want to leave this workspace?")) {
+                    try {
+                      const res = await WorkspaceService.leaveWorkspace(workspace?.id || "");
+                      if (res.success) {
+                        updateCurrentMode("PERSONAL");
+                        window.location.href = "/chats";
+                      } else {
+                        alert("Failed to leave workspace");
+                      }
+                    } catch (e: any) {
+                      console.error(e);
+                      alert(e.response?.data?.error?.message || "Failed to leave workspace");
+                    }
+                  }
+                }}
+                className="rounded-xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+              >
+                Leave Workspace
+              </button>
+            </div>
           </div>
         </div>
 

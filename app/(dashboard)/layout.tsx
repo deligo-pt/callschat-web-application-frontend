@@ -10,6 +10,7 @@ import { CallProvider } from "@/components/providers/CallProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
 import { UserProvider, useUser } from "@/context/UserContext";
 import { WorkspaceSwitcher } from "@/components/navigation/WorkspaceSwitcher";
+import { PendingInvitesModal } from "@/components/business/PendingInvitesModal";
 
 function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -187,6 +188,8 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
           </span>
         </Link>
       </nav>
+      
+      {isBusiness && <PendingInvitesModal />}
     </div>
   );
 }

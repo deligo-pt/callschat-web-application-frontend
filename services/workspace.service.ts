@@ -25,4 +25,33 @@ export const WorkspaceService = {
     const response = await apiClient.get('/business/workspaces/me');
     return response.data;
   },
+
+  inviteWorkspaceMember: async (phone: string, role: string = 'AGENT'): Promise<any> => {
+    const response = await apiClient.post('/business/workspaces/invites', { phone, role });
+    return response.data;
+  },
+
+  getMyInvites: async (): Promise<any> => {
+    const response = await apiClient.get('/business/workspaces/invites/pending');
+    return response.data;
+  },
+
+  acceptInvite: async (inviteId: string): Promise<any> => {
+    const response = await apiClient.post(`/business/workspaces/invites/${inviteId}/accept`);
+    return response.data;
+  },
+
+  rejectInvite: async (inviteId: string): Promise<any> => {
+    const response = await apiClient.post(`/business/workspaces/invites/${inviteId}/reject`);
+    return response.data;
+  },
+
+  leaveWorkspace: async (workspaceId: string): Promise<any> => {
+    const response = await apiClient.post('/business/workspaces/leave', {}, {
+      headers: {
+        'x-workspace-id': workspaceId,
+      }
+    });
+    return response.data;
+  },
 };

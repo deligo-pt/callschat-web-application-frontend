@@ -23,12 +23,13 @@ export interface TicketAgent {
 
 export interface TicketLastMessage {
   id: string;
-  conversationId: string;
+  conversationId?: string;
   senderId: string;
   ciphertext: string | null;
+  preview: string | null;
   mediaType: string | null;
-  ticketId: string | null;
   createdAt: string;
+  fromCustomer: boolean;
 }
 
 export interface TicketTag {
@@ -109,13 +110,42 @@ export const SupportService = {
   },
 
   /**
+   * Reply to a customer ticket. The message is delivered into the
+   * customer's personal chat thread via the shared Message table.
+   *
+   * Maps to: POST /api/v1/business/inbox/:ticketId/reply
+   */
+  replyToTicket: async (
+    ticketId: string,
+    content: string,
+  ): Promise<{ success: boolean; data: { id: string; senderId: string; ciphertext: string | null; createdAt: string } }> => {
+    const response = await apiClient.post(`/business/inbox/${ticketId}/reply`, { content });
+    return response.data;
+  },
+
+  /**
    * Add a private internal note to a ticket (not visible to customers).
+   *
+   * Maps to: POST /api/v1/business/inbox/:ticketId/notes
    */
   createInternalNote: async (
     ticketId: string,
     content: string
   ): Promise<{ success: boolean; data: InternalNote }> => {
     const response = await apiClient.post(`/business/inbox/${ticketId}/notes`, { content });
+    return response.data;
+  },
+
+  /**
+   * Fetch the full thread (messages + internal notes) for a support ticket.
+   * Returns a combined, chronologically-sorted array typed by { type: 'message'|'note' }.
+   *
+   * Maps to: GET /api/v1/business/inbox/:ticketId/thread
+   */
+  getTicketMessages: async (
+    ticketId: string
+  ): Promise<{ success: boolean; data: any[] }> => {
+    const response = await apiClient.get(`/business/inbox/${ticketId}/thread`);
     return response.data;
   },
 };

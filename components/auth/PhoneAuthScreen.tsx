@@ -392,7 +392,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
               <p className="text-sm text-[#64748B] leading-relaxed">
                 {step === "PHONE" ? subtitle : (
                   <>
-                    We sent a 6-digit one-time security code via SMS to <span className="font-bold text-[#0A2540]">+{getCountryCallingCode(selectedCountry)} {phoneNumber}</span>.
+                    We sent a 6-digit one-time security code via SMS to <span className="font-bold text-[#0A2540]">{phoneNumber}</span>.
                   </>
                 )}
               </p>

@@ -85,9 +85,12 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         } else if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
           // Grab the last key in the array (most recently inserted)
           setRecipientPublicKey(res.data[res.data.length - 1].publicKey);
+        } else {
+          setRecipientPublicKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
         }
       } catch (err) {
         console.error("Failed to fetch recipient public key", err);
+        setRecipientPublicKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
       }
     };
 
@@ -109,13 +112,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           if (Array.isArray(rawMessages)) {
             const decryptedHistory = await Promise.all(
               rawMessages.map(async (msg: any) => {
-                // Media-only message — skip decryption, return as-is
+                // Media-only or Plaintext message (B2C business reply) — skip decryption
                 if (!msg.ciphertext || !msg.nonce) {
                   return {
                     id: msg.id,
                     conversationId: msg.conversationId,
                     senderId: msg.senderId,
-                    text: "",
+                    text: msg.ciphertext || "",
                     createdAt: msg.createdAt,
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
@@ -365,6 +368,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             ];
           });
         }
+      } else if (payload.ciphertext && !payload.nonce) {
+        // Plaintext message from business inbox (no nonce)
+        console.log("ℹ️ [Socket] Plaintext message received");
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === payload.id)) return prev;
+          return [
+            ...prev,
+            {
+              id: payload.id || Date.now().toString(),
+              conversationId: payload.conversationId,
+              senderId: senderId || "unknown",
+              text: payload.ciphertext,
+              createdAt: payload.createdAt || new Date().toISOString(),
+              mediaUrl: payload.mediaUrl,
+              mediaType: payload.mediaType,
+            },
+          ];
+        });
       } else if (payload.mediaType || payload.mediaUrl) {
         // Media-only messages (no text)
         setMessages((prev) => {

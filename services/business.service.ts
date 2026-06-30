@@ -73,4 +73,9 @@ export const BusinessService = {
     const response = await apiClient.post('/business/verify', data);
     return response.data;
   },
+
+  getDirectory: async (): Promise<{ success: boolean; data: Array<{ workspaceId: string; name: string; isVerified: boolean; avatarUrl: string | null; description: string | null }> }> => {
+    const response = await apiClient.get('/business/directory');
+    return response.data;
+  },
 };

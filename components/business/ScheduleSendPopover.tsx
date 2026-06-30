@@ -27,7 +27,6 @@ export function ScheduleSendPopover({ disabled, onSchedule }: ScheduleSendPopove
 
   const getMinDateTime = () => {
     const now = new Date();
-    now.setMinutes(now.getMinutes() + 2); // At least 2 minutes in the future
     return now.toISOString().slice(0, 16);
   };
 
@@ -40,8 +39,8 @@ export function ScheduleSendPopover({ disabled, onSchedule }: ScheduleSendPopove
     const selectedDate = new Date(dateTime);
     const now = new Date();
 
-    if (selectedDate.getTime() <= now.getTime() + 60000) {
-      toast.error("Scheduled time must be at least 1 minute in the future");
+    if (selectedDate.getTime() <= now.getTime() + 10000) {
+      toast.error("Scheduled time must be at least 10 seconds in the future");
       return;
     }
 
