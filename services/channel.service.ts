@@ -59,4 +59,11 @@ export const ChannelService = {
     });
     return response.data;
   },
+
+  getChannelMembers: async (workspaceId: string, channelId: string): Promise<{ success: boolean; data: any[] }> => {
+    const response = await apiClient.get(`/business/channels/${channelId}/members`, {
+      params: { workspaceId },
+    });
+    return response.data;
+  },
 };

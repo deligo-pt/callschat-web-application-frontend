@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useSocket } from "@/components/providers/SocketProvider";
 import {
   CollaborationService,
   WorkspaceTask,
@@ -156,6 +157,23 @@ export function ProductivitySidebar({
     if (activeTab === "tasks") fetchTasks();
     if (activeTab === "files") fetchFiles();
   }, [activeTab, fetchTasks, fetchFiles]);
+
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket || !workspaceId) return;
+
+    const handleTaskUpdated = (data: { workspaceId: string }) => {
+      if (data.workspaceId === workspaceId) {
+        fetchTasks();
+      }
+    };
+
+    socket.on("workspace:task_updated", handleTaskUpdated);
+
+    return () => {
+      socket.off("workspace:task_updated", handleTaskUpdated);
+    };
+  }, [socket, workspaceId, fetchTasks]);
 
   // Handle Create Task
   const handleCreateTask = async () => {

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ContactService } from "@/services/contact.service";
+import { ChannelService } from "@/services/channel.service";
 import { MeetingService } from "@/services/meeting.service";
 import { useMeetingStore } from "@/hooks/useMeetingStore";
 import { useUser } from "@/context/UserContext";
@@ -52,28 +52,22 @@ export function ChannelHeader({
     if (!isMembersOpen) return;
 
     const loadMembers = async () => {
+      if (!workspace?.id) return;
       try {
         setIsLoadingMembers(true);
-        const res = await ContactService.fetchContacts();
+        const res = await ChannelService.getChannelMembers(workspace.id, channelId);
         if (res?.success) {
-          const rawList = res.data?.contacts || (Array.isArray(res.data) ? res.data : []);
+          const rawList = res.data || [];
           const formatted: RealMember[] = rawList.map((c: any) => {
-            const addressee = c.addressee || c.contact || c;
-            const profile = addressee.profile || {};
-            const name = c.customName || profile.displayName || profile.username || addressee.phone || "Member";
             return {
-              id: addressee.id || c.id || Math.random().toString(),
-              name,
+              id: c.id,
+              name: c.name,
               role: c.role || "Member",
-              isOnline: profile.isOnline || false,
-              avatarUrl: profile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=8B5CF6&color=fff`,
+              isOnline: c.isOnline || false,
+              avatarUrl: c.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=8B5CF6&color=fff`,
             };
           });
-          const uniqueMap = new Map<string, RealMember>();
-          formatted.forEach((item) => {
-            if (!uniqueMap.has(item.id)) uniqueMap.set(item.id, item);
-          });
-          setMembers(Array.from(uniqueMap.values()));
+          setMembers(formatted);
         }
       } catch (err) {
         console.error("Failed to fetch channel members", err);
