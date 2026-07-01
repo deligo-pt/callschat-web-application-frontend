@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SupportService, Ticket, TicketStatus, InternalNote } from "@/services/support.service";
 import { useUser } from "@/context/UserContext";
+import { useSocket } from "@/components/providers/SocketProvider";
 import { TicketListPane } from "@/components/business/inbox/TicketListPane";
 import { ThreadPane } from "@/components/business/inbox/ThreadPane";
 import { MetaPane } from "@/components/business/inbox/MetaPane";
@@ -19,51 +20,83 @@ export type ThreadMessage =
   | { kind: "note"; data: InternalNote }
   | { kind: "message"; data: { id: string; senderId: string; ciphertext: string | null; mediaType: string | null; createdAt: string } };
 
-async function tryDecrypt(
-  ciphertext: string | null,
-  nonce?: string | null,
+/**
+ * Resolves the display text for a ticket thread message.
+ *
+ * B2C support messages are stored as PLAINTEXT in the `ciphertext` / `content`
+ * column and are protected by TLS in transit and DB-level encryption at rest.
+ * Client-side libsodium E2EE is intentionally NOT used for ticket messages
+ * because: (a) multiple agents need to read them, and (b) the Automation Engine
+ * reads the raw text to evaluate auto-reply rules.
+ *
+ * Rule:
+ *   - If `isEncrypted === false`  → return content directly (no decryption).
+ *   - If `nonce` is null/absent   → return ciphertext directly (plaintext path).
+ *   - Otherwise                   → attempt libsodium decryption (P2P chat path,
+ *                                   should never happen for ticket messages).
+ */
+async function resolveTicketMessageText(
+  item: {
+    content?: string | null;
+    ciphertext?: string | null;
+    nonce?: string | null;
+    isEncrypted?: boolean;
+  },
   peerUserId?: string,
-  currentUserId?: string
+  currentUserId?: string,
 ): Promise<string> {
-  if (!ciphertext) return "";
-  if (!nonce || !peerUserId) return ciphertext;
-  
-  let myPriv = null;
-  if (typeof window !== "undefined") {
-    if (currentUserId) {
-      myPriv = localStorage.getItem(`privateKey_${currentUserId}`);
-    }
-    if (!myPriv) {
-      myPriv = localStorage.getItem("privateKey");
-    }
-    if (!myPriv) {
-      myPriv = localStorage.getItem("chat_private_key");
-    }
+  // Fast-path 0: legacy encrypted message (old row with real nonce, encrypted by
+  // mistake via WebSocket before the plaintext-only B2C path was enforced).
+  // The dummy key pair used then is unrecoverable on the business side.
+  // Show a human-readable placeholder rather than garbled base64.
+  if (item.isEncrypted === true) {
+    return "[Message sent before encryption bypass — not readable]";
   }
-  if (!myPriv) return ciphertext;
+
+  // Fast-path 1: backend explicitly declared this is not E2EE-encrypted.
+  if (item.isEncrypted === false) {
+    return item.content ?? item.ciphertext ?? "";
+  }
+
+  // Fast-path 2: no nonce means the ciphertext column holds plaintext.
+  if (!item.nonce) {
+    return item.ciphertext ?? item.content ?? "";
+  }
+
+  // Slow-path: this message was encrypted with libsodium (P2P chat overlap).
+  // This should not normally occur for ticket messages but is handled
+  // defensively to avoid a blank UI.
+  if (!item.ciphertext || !peerUserId) return item.ciphertext ?? "";
+
+  let myPriv: string | null = null;
+  if (typeof window !== "undefined") {
+    if (currentUserId) myPriv = localStorage.getItem(`privateKey_${currentUserId}`);
+    if (!myPriv) myPriv = localStorage.getItem("privateKey");
+    if (!myPriv) myPriv = localStorage.getItem("chat_private_key");
+  }
+  if (!myPriv) return item.ciphertext;
 
   try {
     const res = await chatService.fetchRecipientKey(peerUserId);
     let pubKeys: string[] = [];
     if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-      pubKeys = res.data.map((item: any) => item.publicKey).reverse();
+      pubKeys = res.data.map((k: any) => k.publicKey).reverse();
     } else if (res?.success && res?.data?.publicKey) {
       pubKeys = [res.data.publicKey];
     }
-
     for (const pubKey of pubKeys) {
       if (!pubKey) continue;
       try {
-        const decrypted = await decryptMessage(ciphertext, nonce, pubKey, myPriv);
+        const decrypted = await decryptMessage(item.ciphertext, item.nonce, pubKey, myPriv);
         if (decrypted) return decrypted;
       } catch {
-        // try next public key
+        // try next key
       }
     }
   } catch (e) {
-    console.warn("Decryption error in tryDecrypt:", e);
+    console.warn("[Inbox] Fallback decryption attempt failed:", e);
   }
-  return ciphertext;
+  return item.ciphertext;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +104,7 @@ async function tryDecrypt(
 // ---------------------------------------------------------------------------
 export default function InboxPage() {
   const { user, workspace } = useUser();
+  const { socket, isConnected } = useSocket();
 
   // --- Ticket List State ---
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -109,14 +143,12 @@ export default function InboxPage() {
           data = data.filter((t) => t.assignedAgentId === null && t.status !== "CLOSED");
         }
         for (const t of data) {
-          if (t.lastMessage?.ciphertext) {
-            const peerId = t.lastMessage.senderId === user?.id ? t.customerId : t.lastMessage.senderId;
-            t.lastMessage.ciphertext = await tryDecrypt(
-              t.lastMessage.ciphertext,
-              (t.lastMessage as any).nonce,
-              peerId,
-              user?.id
-            );
+          if (t.lastMessage) {
+            // B2C ticket previews are always plaintext — read content directly,
+            // never attempt libsodium decryption.
+            if (t.lastMessage.isEncrypted === false || !t.lastMessage.nonce) {
+              t.lastMessage.ciphertext = t.lastMessage.content ?? t.lastMessage.ciphertext ?? "";
+            }
           }
         }
         setTickets(data);
@@ -132,6 +164,96 @@ export default function InboxPage() {
     fetchInbox();
   }, [fetchInbox]);
 
+  // Join workspace room for socket events
+  useEffect(() => {
+    if (socket && isConnected && workspace?.id) {
+      socket.emit("business:join_workspace", { workspaceId: workspace.id });
+    }
+  }, [socket, isConnected, workspace?.id]);
+
+  // Listen for NEW_TICKET_MESSAGE
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleNewTicketMessage = async (payload: any) => {
+      // payload could be the result from contactBusiness or chat.gateway
+      const ticketId = payload.ticketId || payload.message?.ticketId;
+      const msg = payload.message;
+      if (!ticketId || !msg) return;
+
+      // B2C ticket messages are always plaintext — no libsodium decryption.
+      // Use content directly; nonce is always null for ticket messages.
+      let decryptedText = msg.content ?? msg.ciphertext ?? "";
+      if (msg.isEncrypted !== false && msg.nonce) {
+        // Defensive: if somehow a nonce crept in, try to resolve it
+        // but this should never happen for properly sent ticket messages.
+        const peerId = msg.senderId === user?.id ? payload.customerId : msg.senderId;
+        decryptedText = await resolveTicketMessageText(
+          { content: msg.content, ciphertext: msg.ciphertext, nonce: msg.nonce, isEncrypted: msg.isEncrypted },
+          peerId,
+          user?.id,
+        );
+      }
+
+      // Update thread if it's the active ticket
+      if (activeTicketId === ticketId) {
+        setThread((prev) => {
+          if (prev.some((m) => m.kind === "message" && m.data.id === msg.id)) return prev;
+          return [
+            ...prev,
+            {
+              kind: "message",
+              data: {
+                id: msg.id,
+                senderId: msg.senderId,
+                ciphertext: decryptedText,
+                mediaType: msg.mediaType || null,
+                createdAt: msg.createdAt,
+              },
+            },
+          ];
+        });
+      }
+
+      // Update the ticket list with the latest message
+      let needsRefetch = false;
+      setTickets((prev) => {
+        const ticketIdx = prev.findIndex((t) => t.id === ticketId);
+        if (ticketIdx > -1) {
+          const updated = [...prev];
+          updated[ticketIdx] = {
+            ...updated[ticketIdx],
+            lastMessage: {
+              id: msg.id,
+              senderId: msg.senderId,
+              ciphertext: msg.ciphertext ?? null,
+              preview: decryptedText?.substring(0, 80) || "",
+              mediaType: msg.mediaType || null,
+              createdAt: msg.createdAt,
+              fromCustomer: msg.senderId !== user?.id,
+            },
+          };
+          // Move to top
+          const [t] = updated.splice(ticketIdx, 1);
+          return [t, ...updated];
+        } else if (activeFilter === "all" || activeFilter === "unassigned") {
+          // If we don't have it, flag it to fetch after state update
+          needsRefetch = true;
+        }
+        return prev;
+      });
+
+      if (needsRefetch) {
+        fetchInbox();
+      }
+    };
+
+    socket.on("NEW_TICKET_MESSAGE", handleNewTicketMessage);
+    return () => {
+      socket.off("NEW_TICKET_MESSAGE", handleNewTicketMessage);
+    };
+  }, [socket, isConnected, activeTicketId, user?.id, activeFilter, fetchInbox]);
+
   // Reset thread when ticket changes
   useEffect(() => {
     if (!activeTicketId) return;
@@ -144,7 +266,10 @@ export default function InboxPage() {
     const loadThread = async () => {
       try {
         const res = await SupportService.getTicketMessages(activeTicketId);
-        if (res.success && isMounted) {
+        if (!res.success) {
+          throw new Error("Failed to fetch ticket messages");
+        }
+        if (isMounted) {
           const items: ThreadMessage[] = [];
           for (const item of res.data) {
             if (item.type === "note") {
@@ -159,13 +284,18 @@ export default function InboxPage() {
                 },
               });
             } else {
-              const ticketCustId = tickets.find((t: Ticket) => t.id === activeTicketId)?.customerId;
-              const peerId = item.senderId === user?.id ? ticketCustId : item.senderId;
-              const decryptedText = await tryDecrypt(
-                item.ciphertext,
-                item.nonce,
-                peerId,
-                user?.id
+              const decryptedText = await resolveTicketMessageText(
+                {
+                  content: item.content,
+                  ciphertext: item.ciphertext,
+                  nonce: item.nonce,
+                  // isEncrypted from backend signals this is a plaintext B2C message
+                  isEncrypted: item.isEncrypted,
+                },
+                // peerUserId / currentUserId only matter for the slow P2P path,
+                // which should never trigger for ticket messages.
+                undefined,
+                user?.id,
               );
               items.push({
                 kind: "message",
@@ -183,8 +313,14 @@ export default function InboxPage() {
         }
       } catch (err) {
         console.error("Failed to fetch ticket messages", err);
+        if (isMounted) {
+          setActiveTicketId(null);
+          toast.error("Failed to load ticket messages.");
+        }
       } finally {
-        if (isMounted) setThreadLoading(false);
+        if (isMounted) {
+          setThreadLoading(false);
+        }
       }
     };
 
@@ -214,8 +350,8 @@ export default function InboxPage() {
   // Remove from list (used when filtered view no longer matches)
   const removeTicket = useCallback((ticketId: string) => {
     setTickets((prev) => prev.filter((t) => t.id !== ticketId));
-    if (activeTicketId === ticketId) setActiveTicketId(null);
-  }, [activeTicketId]);
+    setActiveTicketId((prev) => (prev === ticketId ? null : prev));
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Handler: Assign ticket

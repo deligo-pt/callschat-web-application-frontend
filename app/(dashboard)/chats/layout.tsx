@@ -25,12 +25,16 @@ interface Conversation {
   otherUserName: string;
   otherUserAvatar: string | null;
   otherUserOnline: boolean;
+  context?: string;
+  workspaceId?: string | null;
   unreadCount?: number;
   lastMessage: {
     id: string;
     senderId: string;
     ciphertext: string | null;
     nonce: string | null;
+    /** Set when the message belongs to a B2C support ticket (plaintext; no E2EE). */
+    ticketId?: string | null;
     mediaType: string | null;
     createdAt: string;
   } | null;
@@ -208,9 +212,41 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
 
       for (const conv of conversations) {
         const msg = conv.lastMessage;
-        if (!msg || !msg.ciphertext || !msg.nonce) continue;
-        if (newPreviews[conv.id]) continue; // Already decrypted
+        if (!msg) continue;
+        if (newPreviews[conv.id]) continue; // Already resolved
         if (msg.mediaType) continue; // Media handled differently
+
+        // B2C support conversations: messages are stored as plaintext.
+        // Skip libsodium when ANY of these is true — listed from cheapest to check:
+        //   • nonce is null/absent        → plaintext stored directly
+        //   • ticketId is set             → B2C ticket message (covers most cases)
+        //   • workspaceId on conversation  → B2C context indicator
+        //   • context is BUSINESS         → explicit B2C conversation
+        //   • otherUserId is null         → no real peer; B2C threads have no peer
+        const isBizConv =
+          !msg.nonce ||
+          msg.ticketId ||
+          conv.workspaceId ||
+          conv.context === 'BUSINESS' ||
+          !conv.otherUserId;
+
+        if (isBizConv) {
+          if (msg.ciphertext && !msg.nonce) {
+            // True plaintext — show directly
+            newPreviews[conv.id] = msg.ciphertext.length > 60
+              ? msg.ciphertext.substring(0, 60) + "..."
+              : msg.ciphertext;
+            hasChanges = true;
+          } else if (msg.ciphertext && msg.nonce) {
+            // Old encrypted B2C message — unrecoverable, show placeholder
+            newPreviews[conv.id] = "Message (legacy encrypted)";
+            hasChanges = true;
+          }
+          continue;
+        }
+
+        // Personal E2EE conversation — decrypt with libsodium.
+        if (!msg.ciphertext) continue;
 
         try {
           const targetUserId = msg.senderId === currentUserId ? conv.otherUserId : msg.senderId;
@@ -230,13 +266,15 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
           }
 
           if (pubKeyToUse) {
-            const text = await decryptMessage(msg.ciphertext, msg.nonce, pubKeyToUse, myPrivateKey);
+            const text = await decryptMessage(msg.ciphertext, msg.nonce!, pubKeyToUse, myPrivateKey);
             newPreviews[conv.id] = text;
             hasChanges = true;
           }
-        } catch (err) {
-          console.error(`Failed to decrypt preview for conv ${conv.id}`, err);
-          newPreviews[conv.id] = "🔒 Decryption Failed";
+        } catch {
+          // Decryption failed — silently fall back to a placeholder.
+          // This can happen when a key has been rotated. The error is
+          // intentionally NOT logged to avoid flooding the console.
+          newPreviews[conv.id] = "🔒 Encrypted message";
           hasChanges = true;
         }
       }
@@ -267,6 +305,10 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     
     if (decryptedPreviews[conv.id]) {
       return decryptedPreviews[conv.id];
+    }
+    
+    if (msg.ciphertext && !msg.nonce) {
+      return msg.ciphertext.length > 50 ? msg.ciphertext.substring(0, 50) + "..." : msg.ciphertext;
     }
     
     return "🔒 Encrypted message";

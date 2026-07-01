@@ -25,7 +25,18 @@ export interface TicketLastMessage {
   id: string;
   conversationId?: string;
   senderId: string;
+  /** Readable text (same as content for B2C; ciphertext bytes for P2P). */
   ciphertext: string | null;
+  /** Plaintext copy — always populated for B2C ticket messages. */
+  content?: string | null;
+  /** Always null for B2C ticket messages; non-null only for P2P E2EE chats. */
+  nonce?: string | null;
+  /**
+   * `false`  → plaintext B2C message (TLS + DB protected); skip libsodium.
+   * `true`   → E2EE-encrypted personal chat message; call decryptMessage.
+   * `undefined` → legacy/unknown; fall back to nonce-presence check.
+   */
+  isEncrypted?: boolean;
   preview: string | null;
   mediaType: string | null;
   createdAt: string;
@@ -113,18 +124,26 @@ export const SupportService = {
    * Reply to a customer ticket. The message is delivered into the
    * customer's personal chat thread via the shared Message table.
    *
+   * ENCRYPTION NOTE:
+   * Agent replies are intentionally NOT encrypted with libsodium.
+   * Reasons: (a) all agents on the workspace must be able to read the thread,
+   *          (b) the Automation Engine reads raw text for auto-reply evaluation.
+   * Security: protected by TLS in transit and DB-level encryption at rest.
+   *
    * Maps to: POST /api/v1/business/inbox/:ticketId/reply
    */
   replyToTicket: async (
     ticketId: string,
-    content: string,
-  ): Promise<{ success: boolean; data: { id: string; senderId: string; ciphertext: string | null; createdAt: string } }> => {
+    content: string, // plaintext — backend stores with nonce=null (no E2EE)
+  ): Promise<{ success: boolean; data: { id: string; senderId: string; content: string | null; ciphertext: string | null; isEncrypted: boolean; createdAt: string } }> => {
     const response = await apiClient.post(`/business/inbox/${ticketId}/reply`, { content });
     return response.data;
   },
 
   /**
    * Add a private internal note to a ticket (not visible to customers).
+   * Internal notes are plain text — never encrypted, as agents need to
+   * collaborate freely on ticket resolution.
    *
    * Maps to: POST /api/v1/business/inbox/:ticketId/notes
    */

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Building2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { WorkspaceService } from "@/services/workspace.service";
 import { useUser } from "@/context/UserContext";
+import { useSocket } from "@/components/providers/SocketProvider";
 import { toast } from "sonner";
 
 interface InviteItem {
@@ -27,13 +28,27 @@ export function PendingInvitesModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
 
+  const { socket } = useSocket();
+
   useEffect(() => {
-    if (user && currentMode === "BUSINESS") {
+    if (user) {
       fetchInvites();
     } else {
       setIsOpen(false);
     }
-  }, [user, currentMode]);
+  }, [user]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleNewInvite = () => {
+      fetchInvites();
+      toast("You received a new workspace invitation!", { icon: "🏢" });
+    };
+    socket.on("workspace:invite_received", handleNewInvite);
+    return () => {
+      socket.off("workspace:invite_received", handleNewInvite);
+    };
+  }, [socket]);
 
   const fetchInvites = async () => {
     setIsLoading(true);

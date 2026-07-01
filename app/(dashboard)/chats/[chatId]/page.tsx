@@ -39,7 +39,7 @@ function parseJwt(token: string) {
         .map(function (c) {
           return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
         })
-        .join("")
+        .join(""),
     );
     return JSON.parse(jsonPayload);
   } catch (e) {
@@ -87,7 +87,9 @@ function BusinessChatHeader({
         {/* Details */}
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-[17px] font-bold text-white tracking-tight">{bizName}</h2>
+            <h2 className="text-[17px] font-bold text-white tracking-tight">
+              {bizName}
+            </h2>
             {bizVerified && (
               <span
                 title="Verified Business"
@@ -108,7 +110,9 @@ function BusinessChatHeader({
       <div className="flex items-center gap-1">
         <div className="flex items-center gap-1.5 rounded-full bg-white/10 border border-white/20 px-3 py-1.5">
           <Lock className="h-3 w-3 text-white/80" />
-          <span className="text-[11px] font-semibold text-white/80">Secure</span>
+          <span className="text-[11px] font-semibold text-white/80">
+            Secure
+          </span>
         </div>
       </div>
     </div>
@@ -136,7 +140,7 @@ export default function ChatRoomPage() {
   const bizHandle = searchParams.get("bizHandle") || "";
   const bizName = searchParams.get("bizName") || "";
   const bizVerified = searchParams.get("bizVerified") === "true";
-  const isBizChat = !!bizHandle;
+  const [isBizChat, setIsBizChat] = useState<boolean>(!!bizHandle);
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [currentUserId, setCurrentUserId] = useState<string>("");
@@ -145,10 +149,19 @@ export default function ChatRoomPage() {
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
 
-  // B2C: track whether the first real message has been sent via the support API.
-  // Once true, subsequent sends use the normal WebSocket path.
+  // B2C: track whether we know the bizHandle for this conversation
+  // (needed to route ALL subsequent messages through contactBusiness REST API).
+  const [resolvedBizHandle, setResolvedBizHandle] = useState<string>(bizHandle);
+  const bizHandleRef = useRef<string>(bizHandle);
+  const [isSendingFirstBizMessage, setIsSendingFirstBizMessage] =
+    useState(false);
+  // bizTicketCreated is kept for the welcome-banner hide logic
   const [bizTicketCreated, setBizTicketCreated] = useState(false);
-  const [isSendingFirstBizMessage, setIsSendingFirstBizMessage] = useState(false);
+  const [blockStatus, setBlockStatus] = useState<{
+    isBlocked: boolean;
+    isBlockedByMe: boolean;
+    hasBlockedMe: boolean;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -182,7 +195,29 @@ export default function ChatRoomPage() {
           try {
             const convsRes = await chatService.fetchMyConversations();
             if (convsRes?.success && Array.isArray(convsRes?.data)) {
-              const conv = convsRes.data.find((c: any) => c.id === conversationId);
+              const conv = convsRes.data.find(
+                (c: any) => c.id === conversationId,
+              );
+              if (
+                conv?.context === "BUSINESS" ||
+                conv?.workspaceId ||
+                conv?.lastMessage?.ticketId ||
+                !conv?.otherUserId
+              ) {
+                setIsBizChat(true);
+                // Restore the bizHandle so ALL subsequent messages can use contactBusiness.
+                // The handle is stored in the workspace name or derived from business data.
+                // We store whatever handle we can resolve; contactBusiness will use it.
+                const handle =
+                  conv?.businessHandle || conv?.otherUserHandle || "";
+                if (handle) {
+                  setResolvedBizHandle(handle);
+                  bizHandleRef.current = handle;
+                }
+                setBizTicketCreated(true); // thread exists, skip welcome banner
+                setIsInitializing(false);
+                return;
+              }
               if (conv?.otherUserId) {
                 finalRecipientId = conv.otherUserId;
                 setRecipientId(finalRecipientId);
@@ -221,7 +256,7 @@ export default function ChatRoomPage() {
 
           const match = usersArray.find(
             (u: any) =>
-              (u.addressee?.id || u.contact?.id || u.id) === finalRecipientId
+              (u.addressee?.id || u.contact?.id || u.id) === finalRecipientId,
           );
 
           if (match) {
@@ -252,6 +287,22 @@ export default function ChatRoomPage() {
               isOnline: false,
             });
           }
+
+          // Fetch block status
+          try {
+            const blockRes = await fetch(
+              `${baseUrl}/user/block/${finalRecipientId}/status`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              },
+            );
+            const blockData = await blockRes.json();
+            if (blockData.success) {
+              setBlockStatus(blockData.data);
+            }
+          } catch (e) {
+            console.error("Failed to fetch block status", e);
+          }
         }
       } catch (err) {
         console.error("Failed to initialize chat room", err);
@@ -263,15 +314,18 @@ export default function ChatRoomPage() {
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
 
-  const { messages, sendMessage, clearMessages, isReady, isUploading } = useChat(
-    conversationId,
-    currentUserId,
-    recipientId
-  );
+  const { messages, sendMessage, clearMessages, isReady, isUploading } =
+    useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setBizTicketCreated(true);
+    }
+  }, [messages.length]);
 
   // Mark conversation as read
   useEffect(() => {
@@ -290,34 +344,50 @@ export default function ChatRoomPage() {
 
   // ── Send Handler ──────────────────────────────────────────────────────────
   /**
-   * For B2C chats the first message goes through CustomerService.contactBusiness
-   * (which handles the Ticket lifecycle). Subsequent messages use the normal
-   * WebSocket path because the conversation already exists in the DB.
+   * For B2C chats, ALL messages go through CustomerService.contactBusiness
+   * (which correctly links ticketId, stores plaintext, and emits NEW_TICKET_MESSAGE
+   * so the business inbox receives them in real-time).
+   *
+   * The generic chat:send_message WebSocket path MUST NOT be used for B2C
+   * because it creates messages without ticketId, which are invisible to the
+   * business inbox and may inadvertently encrypt the payload.
    */
   const handleSend = async (text: string, file: File | null) => {
     if (!currentUserId) return;
 
-    if (isBizChat && !bizTicketCreated && text.trim()) {
+    const effectiveBizHandle = resolvedBizHandle || bizHandleRef.current;
+
+    if (
+      isBizChat &&
+      effectiveBizHandle &&
+      effectiveBizHandle.length >= 2 &&
+      text.trim()
+    ) {
+      // B2C path: always use the REST API, regardless of whether the ticket
+      // was already created. contactBusiness handles both new and existing tickets.
       setIsSendingFirstBizMessage(true);
       try {
-        const res = await CustomerService.contactBusiness(bizHandle, text.trim());
+        const res = await CustomerService.contactBusiness(
+          effectiveBizHandle,
+          text.trim(),
+        );
         if (res.success) {
           setBizTicketCreated(true);
-          // The conversationId in the URL is already the right one from
-          // when the modal opened, so the WebSocket room is already joined.
         } else {
           toast.error("Failed to send message to business.");
         }
       } catch (err: any) {
-        toast.error(err?.response?.data?.error?.message || "Failed to send message.");
+        toast.error(
+          err?.response?.data?.error?.message || "Failed to send message.",
+        );
       } finally {
         setIsSendingFirstBizMessage(false);
       }
       return;
     }
 
-    // Normal path (personal DM OR subsequent B2C messages)
-    sendMessage(text, currentUserId, file);
+    // Personal P2P DM path — encrypted WebSocket channel.
+    sendMessage(text, currentUserId, file, false);
   };
 
   if (!conversationId) {
@@ -351,7 +421,7 @@ export default function ChatRoomPage() {
               <div
                 className={cn(
                   "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E6EAFA]",
-                  (isUserOnline(recipientId) || recipient?.isOnline)
+                  (!blockStatus?.isBlocked && (isUserOnline(recipientId) || recipient?.isOnline))
                     ? "border-[2.5px] border-emerald-400 p-[2px]"
                     : ""
                 )}
@@ -367,7 +437,7 @@ export default function ChatRoomPage() {
                     {recipient?.name?.charAt(0) || "U"}
                   </div>
                 )}
-                {(isUserOnline(recipientId) || recipient?.isOnline) && (
+                {(!blockStatus?.isBlocked && (isUserOnline(recipientId) || recipient?.isOnline)) && (
                   <span
                     aria-hidden="true"
                     className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#254BCC] bg-emerald-400"
@@ -379,14 +449,20 @@ export default function ChatRoomPage() {
                   {recipient?.name || "Loading..."}
                 </h2>
                 {isInitializing ? (
-                  <span className="text-[12px] font-medium text-white/70">Connecting...</span>
+                  <span className="text-[12px] font-medium text-white/70">
+                    Connecting...
+                  </span>
+                ) : blockStatus?.isBlocked ? (
+                  <span className="text-[12px] font-medium text-white/50">Offline</span>
                 ) : isUserOnline(recipientId) || recipient?.isOnline ? (
                   <span className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Active now
                   </span>
                 ) : (
-                  <span className="text-[12px] font-medium text-white/50">Offline</span>
+                  <span className="text-[12px] font-medium text-white/50">
+                    Offline
+                  </span>
                 )}
               </div>
             </div>
@@ -394,15 +470,31 @@ export default function ChatRoomPage() {
 
           <div className="flex items-center gap-1">
             <button
-              onClick={() => recipientId && initiateCall(recipientId, "VIDEO", recipient?.name, recipient?.avatarUrl)}
-              disabled={!recipientId}
+              onClick={() =>
+                recipientId &&
+                initiateCall(
+                  recipientId,
+                  "VIDEO",
+                  recipient?.name,
+                  recipient?.avatarUrl,
+                )
+              }
+              disabled={!recipientId || blockStatus?.isBlocked}
               className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
             >
               <Video className="h-5 w-5" strokeWidth={2} />
             </button>
             <button
-              onClick={() => recipientId && initiateCall(recipientId, "AUDIO", recipient?.name, recipient?.avatarUrl)}
-              disabled={!recipientId}
+              onClick={() =>
+                recipientId &&
+                initiateCall(
+                  recipientId,
+                  "AUDIO",
+                  recipient?.name,
+                  recipient?.avatarUrl,
+                )
+              }
+              disabled={!recipientId || blockStatus?.isBlocked}
               className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
             >
               <Phone className="h-5 w-5" strokeWidth={2} />
@@ -413,6 +505,8 @@ export default function ChatRoomPage() {
                 peerId={recipientId}
                 onMediaInfoClick={() => setGalleryOpen(true)}
                 onClearSuccess={clearMessages}
+                blockStatus={blockStatus}
+                setBlockStatus={setBlockStatus}
               />
             )}
           </div>
@@ -431,7 +525,8 @@ export default function ChatRoomPage() {
                 You're chatting with {bizName || bizHandle}
               </p>
               <p className="text-[12px] text-[#6B7A99] mt-0.5">
-                Send your first message to open a support ticket. A team member will reply soon.
+                Send your first message to open a support ticket. A team member
+                will reply soon.
               </p>
             </div>
           </div>
@@ -465,7 +560,8 @@ export default function ChatRoomPage() {
         ) : (
           messages.map((msg, index) => {
             const isMe = msg.senderId === currentUserId;
-            const showTail = index === 0 || messages[index - 1].senderId !== msg.senderId;
+            const showTail =
+              index === 0 || messages[index - 1].senderId !== msg.senderId;
 
             return (
               <MessageBubble
@@ -484,11 +580,19 @@ export default function ChatRoomPage() {
       </div>
 
       {/* ── Input ────────────────────────────────────────────────────────── */}
-      <ChatInput
-        onSend={handleSend}
-        isReady={isBizChat ? true : isReady}
-        isUploading={isUploading || isSendingFirstBizMessage}
-      />
+      {blockStatus?.isBlocked ? (
+        <div className="shrink-0 p-4 bg-white border-t border-[#EEF2FF] text-center text-[#6B7A99] font-medium">
+          {blockStatus.isBlockedByMe
+            ? "You have blocked this contact."
+            : "You cannot reply to this conversation."}
+        </div>
+      ) : (
+        <ChatInput
+          onSend={handleSend}
+          isReady={isBizChat ? true : isReady}
+          isUploading={isUploading || isSendingFirstBizMessage}
+        />
+      )}
 
       {/* ── Media Gallery ─────────────────────────────────────────────────── */}
       {!isBizChat && (

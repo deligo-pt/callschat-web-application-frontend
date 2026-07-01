@@ -65,15 +65,24 @@ export const CustomerService = {
    * Send a message to a business by its unique handle.
    * Creates a new Ticket (or reuses an open one) and posts the message.
    *
+   * ENCRYPTION NOTE:
+   * B2C support messages are intentionally NOT encrypted with libsodium.
+   * Reasons: (a) multiple agents need to read incoming messages,
+   *          (b) the Automation Engine must read raw text to trigger auto-replies.
+   * Security: messages are protected by TLS in transit (HTTPS) and
+   * database-level encryption at rest. Client-side E2EE is inappropriate here.
+   *
    * Maps to: POST /api/v1/support/contact
    */
   contactBusiness: async (
     businessHandle: string,
     messageContent: string,
   ): Promise<{ success: boolean; data: ContactBusinessResponse }> => {
+    // Send as plain text — the backend stores it in the `ciphertext` column
+    // with `nonce = null` to signal "not E2EE-encrypted" to all consumers.
     const response = await apiClient.post('/support/contact', {
       businessHandle,
-      message: messageContent,
+      message: messageContent, // plaintext: protected by TLS + DB encryption
     });
     return response.data;
   },

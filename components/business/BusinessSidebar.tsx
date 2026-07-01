@@ -1,29 +1,26 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import {
+  Building2,
   ChevronDown,
   ChevronRight,
-  Plus,
   Hash,
   Lock,
-  MessageSquare,
-  Settings,
-  Building2,
-  Users,
-  MoreVertical,
+  Plus,
+  Settings
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
-import { cn } from "@/lib/utils";
-import { useUser } from "@/context/UserContext";
 import { usePresence } from "@/context/PresenceContext";
+import { useUser } from "@/context/UserContext";
+import { cn } from "@/lib/utils";
 import { ChannelService, type ChannelData } from "@/services/channel.service";
 import { chatService } from "@/services/chat.service";
+import { UserPlus } from "lucide-react";
 import { CreateChannelModal } from "./CreateChannelModal";
 import { InviteMemberModal } from "./InviteMemberModal";
-import { UserPlus } from "lucide-react";
 
 interface Conversation {
   id: string;

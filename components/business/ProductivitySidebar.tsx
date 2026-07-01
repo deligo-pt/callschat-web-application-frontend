@@ -116,7 +116,9 @@ export function ProductivitySidebar({
   useEffect(() => {
     if (!workspaceId) return;
     apiClient
-      .get("/business/workspaces/me")
+      .get("/business/workspaces/me", {
+        headers: { "x-workspace-id": workspaceId }
+      })
       .then((res) => {
         if (res.data?.success && Array.isArray(res.data.data?.members)) {
           setMembers(res.data.data.members);

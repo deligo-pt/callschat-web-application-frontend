@@ -15,13 +15,16 @@ import { PendingInvitesModal } from "@/components/business/PendingInvitesModal";
 function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentMode, businessProfile, workspace, isLoading } = useUser();
+  const { user, currentMode, businessProfile, workspace, isLoading } = useUser();
   const isBusiness = currentMode === "BUSINESS";
   const isOnboarding = pathname === "/business/onboarding";
 
   useEffect(() => {
     if (!isLoading && isBusiness && workspace === null && !isOnboarding) {
       router.replace("/business/onboarding");
+    }
+    if (!isLoading && isBusiness && workspace !== null && isOnboarding) {
+      router.replace("/business/dashboard");
     }
   }, [isLoading, isBusiness, workspace, isOnboarding, router]);
 
@@ -59,6 +62,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
         <main className="flex flex-1 h-full overflow-hidden relative w-full">
           {children}
         </main>
+        {user && <PendingInvitesModal />}
       </div>
     );
   }
@@ -189,7 +193,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
         </Link>
       </nav>
       
-      {isBusiness && <PendingInvitesModal />}
+      {user && <PendingInvitesModal />}
     </div>
   );
 }

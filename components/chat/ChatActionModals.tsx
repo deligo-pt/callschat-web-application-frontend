@@ -22,6 +22,7 @@ export interface ChatActionModalsProps {
   setIsBlockUserOpen: (v: boolean) => void;
   onClearSuccess?: () => void;
   onBlockSuccess?: () => void;
+  isBlockedByMe?: boolean;
 }
 
 export function ChatActionModals({
@@ -33,6 +34,7 @@ export function ChatActionModals({
   setIsBlockUserOpen,
   onClearSuccess,
   onBlockSuccess,
+  isBlockedByMe,
 }: ChatActionModalsProps) {
   const [isClearing, setIsClearing] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
@@ -57,15 +59,21 @@ export function ChatActionModals({
   const handleBlockUser = async () => {
     setIsBlocking(true);
     try {
-      // TODO: Implement actual API call when backend endpoint is ready
-      // await apiClient.post(`/users/block`, { targetUserId: peerId });
-      await new Promise((resolve) => setTimeout(resolve, 800)); // Mock network delay
-      toast.success("Contact blocked successfully.");
+      if (isBlockedByMe) {
+        await apiClient.delete(`/user/block/${peerId}`);
+        toast.success("Contact unblocked successfully.");
+      } else {
+        await apiClient.post(`/user/block/${peerId}`);
+        toast.success("Contact blocked successfully.");
+      }
       setIsBlockUserOpen(false);
       onBlockSuccess?.();
     } catch (e: any) {
       console.error(e);
-      toast.error(e.response?.data?.message || "Failed to block user.");
+      toast.error(
+        e.response?.data?.message ||
+          (isBlockedByMe ? "Failed to unblock user." : "Failed to block user."),
+      );
     } finally {
       setIsBlocking(false);
     }
@@ -78,7 +86,8 @@ export function ChatActionModals({
           <AlertDialogHeader>
             <AlertDialogTitle>Clear chat history?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to clear this chat? This action cannot be undone on your end.
+              Are you sure you want to clear this chat? This action cannot be
+              undone on your end.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -100,9 +109,13 @@ export function ChatActionModals({
       <AlertDialog open={isBlockUserOpen} onOpenChange={setIsBlockUserOpen}>
         <AlertDialogContent className="bg-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>Block this contact?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isBlockedByMe ? "Unblock this contact?" : "Block this contact?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              They will no longer be able to send you messages or call you.
+              {isBlockedByMe
+                ? "They will be able to send you messages and call you again."
+                : "They will no longer be able to send you messages or call you."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -115,7 +128,13 @@ export function ChatActionModals({
               }}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
-              {isBlocking ? "Blocking..." : "Block User"}
+              {isBlocking
+                ? isBlockedByMe
+                  ? "Unblocking..."
+                  : "Blocking..."
+                : isBlockedByMe
+                  ? "Unblock User"
+                  : "Block User"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

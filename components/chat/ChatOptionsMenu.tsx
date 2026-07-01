@@ -18,7 +18,7 @@ import {
   Star,
   Trash2,
   Ban,
-  Search
+  Search,
 } from "lucide-react";
 import { ChatActionModals } from "./ChatActionModals";
 
@@ -27,9 +27,28 @@ export interface ChatOptionsMenuProps {
   peerId: string;
   onMediaInfoClick?: () => void;
   onClearSuccess?: () => void;
+  blockStatus?: {
+    isBlocked: boolean;
+    isBlockedByMe: boolean;
+    hasBlockedMe: boolean;
+  } | null;
+  setBlockStatus?: React.Dispatch<
+    React.SetStateAction<{
+      isBlocked: boolean;
+      isBlockedByMe: boolean;
+      hasBlockedMe: boolean;
+    } | null>
+  >;
 }
 
-export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick, onClearSuccess }: ChatOptionsMenuProps) {
+export function ChatOptionsMenu({
+  conversationId,
+  peerId,
+  onMediaInfoClick,
+  onClearSuccess,
+  blockStatus,
+  setBlockStatus,
+}: ChatOptionsMenuProps) {
   const [isClearChatOpen, setIsClearChatOpen] = useState(false);
   const [isBlockUserOpen, setIsBlockUserOpen] = useState(false);
 
@@ -52,52 +71,70 @@ export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick, onCl
         >
           {/* Action Items */}
           <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
-            <User className="h-[18px] w-[18px] text-[#3B58F5]" strokeWidth={2.5} />
+            <User
+              className="h-[18px] w-[18px] text-[#3B58F5]"
+              strokeWidth={2.5}
+            />
             <span className="text-[14.5px]">View Contact</span>
           </DropdownMenuItem>
           <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
-            <Bell className="h-[18px] w-[18px] text-[#3B58F5]" strokeWidth={2.5} />
+            <Bell
+              className="h-[18px] w-[18px] text-[#3B58F5]"
+              strokeWidth={2.5}
+            />
             <span className="text-[14.5px]">Unmute Notifications</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />
 
           {/* Toggle Items */}
-          <div 
-            className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors" 
+          <div
+            className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors"
             onClick={(e) => {
               e.preventDefault();
               setAiProtection(!aiProtection);
             }}
           >
             <div className="flex items-center gap-3">
-              <Shield className="h-[18px] w-[18px] text-[#3B58F5]" strokeWidth={2.5} />
+              <Shield
+                className="h-[18px] w-[18px] text-[#3B58F5]"
+                strokeWidth={2.5}
+              />
               <span className="text-[14.5px]">AI Protection</span>
             </div>
             <Switch checked={aiProtection} onCheckedChange={setAiProtection} />
           </div>
-          <div 
-            className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors" 
+          <div
+            className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors"
             onClick={(e) => {
               e.preventDefault();
               setLiveTranslation(!liveTranslation);
             }}
           >
             <div className="flex items-center gap-3">
-              <Languages className="h-[18px] w-[18px] text-[#00A884]" strokeWidth={2.5} />
+              <Languages
+                className="h-[18px] w-[18px] text-[#00A884]"
+                strokeWidth={2.5}
+              />
               <span className="text-[14.5px]">Live Translation</span>
             </div>
-            <Switch checked={liveTranslation} onCheckedChange={setLiveTranslation} />
+            <Switch
+              checked={liveTranslation}
+              onCheckedChange={setLiveTranslation}
+            />
           </div>
-          <div 
-            className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors" 
+          <div
+            className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors"
             onClick={(e) => {
               e.preventDefault();
               setPrivacyMode(!privacyMode);
             }}
           >
             <div className="flex items-center gap-3">
-              <EyeOff className="h-[18px] w-[18px] text-[#FF7A00]" strokeWidth={2.5} />
+              <EyeOff
+                className="h-[18px] w-[18px] text-[#FF7A00]"
+                strokeWidth={2.5}
+              />
               <span className="text-[14.5px]">Privacy Mode</span>
             </div>
             <Switch checked={privacyMode} onCheckedChange={setPrivacyMode} />
@@ -105,36 +142,45 @@ export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick, onCl
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />
 
-          <DropdownMenuItem 
+          <DropdownMenuItem
             className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]"
             onClick={onMediaInfoClick}
           >
-            <ImageIcon className="h-[18px] w-[18px] text-[#3B58F5]" strokeWidth={2.5} />
+            <ImageIcon
+              className="h-[18px] w-[18px] text-[#3B58F5]"
+              strokeWidth={2.5}
+            />
             <span className="text-[14.5px]">Media Info</span>
           </DropdownMenuItem>
           <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
-            <Star className="h-[18px] w-[18px] text-[#FFB020]" strokeWidth={2.5} />
+            <Star
+              className="h-[18px] w-[18px] text-[#FFB020]"
+              strokeWidth={2.5}
+            />
             <span className="text-[14.5px]">Add to Favorites</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />
 
           {/* Destructive Items */}
-          <DropdownMenuItem 
+          <DropdownMenuItem
             className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-red-50 rounded-xl focus:bg-red-50 focus:text-red-600 text-red-500 transition-colors"
             onClick={() => setIsClearChatOpen(true)}
           >
             <Trash2 className="h-[18px] w-[18px]" strokeWidth={2.5} />
             <span className="text-[14.5px]">Clear Chat</span>
           </DropdownMenuItem>
-          <DropdownMenuItem 
-            className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-red-50 rounded-xl focus:bg-red-50 focus:text-red-600 text-red-500 transition-colors"
-            onClick={() => setIsBlockUserOpen(true)}
-          >
-            <Ban className="h-[18px] w-[18px]" strokeWidth={2.5} />
-            <span className="text-[14.5px]">Block</span>
-          </DropdownMenuItem>
-
+          {!blockStatus?.hasBlockedMe && (
+            <DropdownMenuItem
+              className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-red-50 rounded-xl focus:bg-red-50 focus:text-red-600 text-red-500 transition-colors"
+              onClick={() => setIsBlockUserOpen(true)}
+            >
+              <Ban className="h-[18px] w-[18px]" strokeWidth={2.5} />
+              <span className="text-[14.5px]">
+                {blockStatus?.isBlockedByMe ? "Unblock" : "Block"}
+              </span>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -146,6 +192,18 @@ export function ChatOptionsMenu({ conversationId, peerId, onMediaInfoClick, onCl
         isBlockUserOpen={isBlockUserOpen}
         setIsBlockUserOpen={setIsBlockUserOpen}
         onClearSuccess={onClearSuccess}
+        isBlockedByMe={blockStatus?.isBlockedByMe}
+        onBlockSuccess={() => {
+          setBlockStatus?.((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isBlockedByMe: !prev.isBlockedByMe,
+                  isBlocked: !prev.isBlockedByMe || prev.hasBlockedMe,
+                }
+              : { isBlocked: true, isBlockedByMe: true, hasBlockedMe: false },
+          );
+        }}
       />
     </>
   );

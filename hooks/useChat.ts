@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
+import { toast } from "sonner";
 
 export interface ChatMessage {
   id: string;
@@ -13,7 +14,7 @@ export interface ChatMessage {
   mediaType?: 'image' | 'video' | 'audio' | 'document' | null;
 }
 
-export const useChat = (conversationId: string, currentUserId: string, activePeerId: string) => {
+export const useChat = (conversationId: string, currentUserId: string, activePeerId: string, isBizChat: boolean = false) => {
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
@@ -26,6 +27,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const recipientPublicKeyRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
   const activePeerIdRef = useRef<string>(activePeerId);
+  const isBizChatRef = useRef<boolean>(isBizChat);
+
+  useEffect(() => {
+    isBizChatRef.current = isBizChat;
+  }, [isBizChat]);
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
@@ -75,7 +81,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
   // ── Fetch Recipient Public Key ─────────────────────────────────────────────
   useEffect(() => {
-    if (!activePeerId) return;
+    // If there is no peer (B2C thread or unresolved state) do NOT fetch a key.
+    // Fetching with an empty string returns a dummy key which causes "incorrect
+    // key pair" errors when the server echoes back the message.
+    if (!activePeerId || isBizChat) return;
 
     const fetchRecipientKey = async () => {
       try {
@@ -85,21 +94,19 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         } else if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
           // Grab the last key in the array (most recently inserted)
           setRecipientPublicKey(res.data[res.data.length - 1].publicKey);
-        } else {
-          setRecipientPublicKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
         }
+        // Do NOT set a dummy fallback key — absence of key = cannot encrypt = safe
       } catch (err) {
         console.error("Failed to fetch recipient public key", err);
-        setRecipientPublicKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
       }
     };
 
     fetchRecipientKey();
-  }, [activePeerId]);
+  }, [activePeerId, isBizChat]);
 
   // ── Load Message History ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!conversationId || !myPrivateKey || !recipientPublicKey || !currentUserId || !activePeerId) return;
+    if (!conversationId || !myPrivateKey || (!recipientPublicKey && !isBizChat) || !currentUserId || (!activePeerId && !isBizChat)) return;
 
     const loadHistory = async () => {
       try {
@@ -112,8 +119,18 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           if (Array.isArray(rawMessages)) {
             const decryptedHistory = await Promise.all(
               rawMessages.map(async (msg: any) => {
-                // Media-only or Plaintext message (B2C business reply) — skip decryption
-                if (!msg.ciphertext || !msg.nonce) {
+                // ── Plaintext bypass rules ─────────────────────────────────────
+                // A message must NOT go through libsodium decryption when ANY of:
+                //   1. msg.ticketId is set → B2C support ticket message (plaintext
+                //      stored in ciphertext column; TLS + DB encryption protect it).
+                //      This covers OLD messages saved before the plaintext-only path
+                //      was enforced (they may have a non-null nonce from the E2EE
+                //      WebSocket path — ignore it, still render as plaintext).
+                //   2. isBizChat flag → the whole conversation is a B2C thread.
+                //   3. nonce is absent → plaintext was stored directly.
+                //   4. ciphertext is absent → media-only message.
+                const isTicketMessage = !!msg.ticketId;
+                if (!msg.ciphertext || !msg.nonce || isBizChat || isTicketMessage) {
                   return {
                     id: msg.id,
                     conversationId: msg.conversationId,
@@ -129,13 +146,19 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   const targetUserId = msg.senderId === currentUserId ? activePeerId : msg.senderId;
                   
                   let pubKeyToUse = recipientPublicKey;
-                  if (targetUserId !== activePeerId) {
-                    const res = await chatService.fetchRecipientKey(targetUserId);
-                    if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                      pubKeyToUse = res.data[res.data.length - 1].publicKey;
-                    } else if (res?.success && res?.data?.publicKey) {
-                      pubKeyToUse = res.data.publicKey;
+                  if (!pubKeyToUse || (targetUserId && targetUserId !== activePeerId)) {
+                    if (targetUserId) {
+                      const res = await chatService.fetchRecipientKey(targetUserId);
+                      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+                        pubKeyToUse = res.data[res.data.length - 1].publicKey;
+                      } else if (res?.success && res?.data?.publicKey) {
+                        pubKeyToUse = res.data.publicKey;
+                      }
                     }
+                  }
+
+                  if (!pubKeyToUse || !myPrivateKey) {
+                    throw new Error("Missing keys for decryption");
                   }
 
                   let text: string;
@@ -153,6 +176,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                       let latestKey = pubKeyToUse;
                       if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
                         latestKey = res.data[res.data.length - 1].publicKey;
+                      }
+                      if (!latestKey) {
+                        throw new Error("Missing fallback key");
                       }
                       text = await decryptMessage(msg.ciphertext, msg.nonce, latestKey, myPrivateKey);
                       console.log(`[History] Successfully decrypted msg ${msg.id} with latest key!`);
@@ -241,17 +267,20 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
       const privKey = myPrivateKeyRef.current;
       const pubKey = recipientPublicKeyRef.current;
+      const isBiz = isBizChatRef.current;
+      // Treat as B2C/plaintext if: explicitly a biz chat, OR no peer resolved yet,
+      // OR nonce is absent, OR the message carries a ticketId (B2C ticket message).
+      // The ticketId check covers old DB messages that were accidentally saved with
+      // a nonce before the plaintext-only B2C path was enforced.
+      const noPeer = !activePeerIdRef.current;
+      const isTicket = !!(payload.ticketId);
 
-      if (!privKey) {
-        console.error("⚠️ [Socket] Missing myPrivateKey — cannot decrypt");
-        return;
-      }
-      if (!pubKey) {
-        console.error("⚠️ [Socket] Missing recipientPublicKey — cannot decrypt");
-        return;
-      }
+      if (!isBiz && !noPeer && !isTicket && payload.ciphertext && payload.nonce) {
+        if (!privKey) {
+          console.error("⚠️ [Socket] Missing myPrivateKey — cannot decrypt");
+          return;
+        }
 
-      if (payload.ciphertext && payload.nonce) {
         try {
           if (!senderId) {
             console.error("❌ [Socket] Malformed payload: missing senderId. Cannot determine decryption key.", payload);
@@ -263,14 +292,20 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           const targetUserId = senderId === currentUser ? peerUser : senderId;
 
           let pubKeyToUse = pubKey;
-          if (targetUserId !== peerUser) {
-            console.log(`[Socket] Target user (${targetUserId}) is not active peer (${peerUser}), fetching their key...`);
-            const res = await chatService.fetchRecipientKey(targetUserId);
-            if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-              pubKeyToUse = res.data[res.data.length - 1].publicKey;
-            } else if (res?.success && res?.data?.publicKey) {
-              pubKeyToUse = res.data.publicKey;
+          if (!pubKeyToUse || (targetUserId && targetUserId !== peerUser)) {
+            if (targetUserId) {
+              console.log(`[Socket] Target user (${targetUserId}) key needed, fetching...`);
+              const res = await chatService.fetchRecipientKey(targetUserId);
+              if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+                pubKeyToUse = res.data[res.data.length - 1].publicKey;
+              } else if (res?.success && res?.data?.publicKey) {
+                pubKeyToUse = res.data.publicKey;
+              }
             }
+          }
+
+          if (!pubKeyToUse) {
+            throw new Error("Missing public key for decryption");
           }
 
           console.log(`[Socket] Attempting decryption. Sender: ${senderId}, Decrypting with Public Key of: ${targetUserId}`);
@@ -290,7 +325,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
               latestKey = res.data[res.data.length - 1].publicKey;
             }
-            if (latestKey !== pubKeyToUse) {
+            if (latestKey && latestKey !== pubKeyToUse) {
               text = await decryptMessage(payload.ciphertext, payload.nonce, latestKey, privKey);
               console.log("✅ [Socket] Successfully decrypted with latest key!");
               // Update the ref so future messages don't fail!
@@ -368,8 +403,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             ];
           });
         }
-      } else if (payload.ciphertext && !payload.nonce) {
-        // Plaintext message from business inbox (no nonce)
+      } else if (payload.ciphertext && (!payload.nonce || isBiz || noPeer || isTicket)) {
+        // Plaintext: no nonce, B2C chat, peer not resolved, or ticket message
         console.log("ℹ️ [Socket] Plaintext message received");
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
@@ -408,22 +443,44 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
     const handleChatError = (err: any) => {
       console.error("🚨 [Socket] Chat Error:", err);
+      // Remove optimistic messages on error
+      setMessages((prev) => prev.filter((m) => !m.id.startsWith("optimistic-")));
+      
+      const errorMessage = err?.message || "Failed to send message.";
+      // Special friendly message for block
+      if (err?.code === 'SEND_FAILED' && errorMessage.toLowerCase().includes('block')) {
+        toast.error("Message not sent. You cannot reply to this conversation.");
+      } else {
+        toast.error(errorMessage);
+      }
     };
 
     socket.on("chat:receive_message", handleReceiveMessage);
+    socket.on("NEW_MESSAGE", handleReceiveMessage);
     socket.on("chat:error", handleChatError);
 
     return () => {
       socket.off("chat:receive_message", handleReceiveMessage);
+      socket.off("NEW_MESSAGE", handleReceiveMessage);
       socket.off("chat:error", handleChatError);
     };
   }, [socket, isConnected, conversationId]);
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (text: string, currentUserId: string, file: File | null = null) => {
-      if (!socket || !isConnected || !myPrivateKey || !recipientPublicKey || !conversationId) {
-        console.error("Cannot send: missing keys, socket, or conversationId");
+    async (text: string, currentUserId: string, file: File | null = null, skipEncryption: boolean = false) => {
+      if (!socket || !isConnected || !conversationId) {
+        console.error("Cannot send: missing socket or conversationId");
+        return;
+      }
+      
+      // If there is no resolved peer, this is a B2C-style plaintext send regardless
+      // of what the caller requested — never encrypt without a real peer identity.
+      const effectiveSkipEncryption = skipEncryption || !activePeerId || isBizChatRef.current;
+
+      // If we are encrypting but missing keys, abort
+      if (!effectiveSkipEncryption && (!myPrivateKey || !recipientPublicKey)) {
+        console.error("Cannot encrypt send: missing keys");
         return;
       }
 
@@ -459,21 +516,34 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
         let ciphertext, nonce;
         if (text) {
-          let pubKeyToUse = recipientPublicKey;
-          try {
-            const res = await chatService.fetchRecipientKey(activePeerId);
-            if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-              pubKeyToUse = res.data[res.data.length - 1].publicKey;
-            } else if (res?.success && res?.data?.publicKey) {
-              pubKeyToUse = res.data.publicKey;
+          if (effectiveSkipEncryption) {
+            // B2C or no-peer: send as plaintext (stored in ciphertext column, nonce stays null)
+            ciphertext = text;
+            nonce = null;
+          } else {
+            let pubKeyToUse = recipientPublicKey;
+            try {
+              const res = await chatService.fetchRecipientKey(activePeerId);
+              if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+                pubKeyToUse = res.data[res.data.length - 1].publicKey;
+              } else if (res?.success && res?.data?.publicKey) {
+                pubKeyToUse = res.data.publicKey;
+              }
+            } catch (e) {
+              console.warn("Failed to fetch latest key before sending, using cached", e);
             }
-          } catch (e) {
-            console.warn("Failed to fetch latest key before sending, using cached", e);
-          }
 
-          const encrypted = await encryptMessage(text, pubKeyToUse, myPrivateKey);
-          ciphertext = encrypted.ciphertext;
-          nonce = encrypted.nonce;
+            if (!pubKeyToUse) {
+              console.error("Cannot encrypt: no recipient public key available. Aborting send.");
+              setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+              return;
+            }
+
+            // We know myPrivateKey is non-null here because of the guard above
+            const encrypted = await encryptMessage(text, pubKeyToUse, myPrivateKey!);
+            ciphertext = encrypted.ciphertext;
+            nonce = encrypted.nonce;
+          }
         }
 
         const payload = { conversationId, ciphertext, nonce, mediaUrl, mediaType };
@@ -499,6 +569,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     clearMessages: () => setMessages([]),
     sendMessage,
     isUploading,
-    isReady: !!(myPrivateKey && recipientPublicKey && isConnected && conversationId),
+    isReady: !!(myPrivateKey && (recipientPublicKey || isBizChat) && isConnected && conversationId),
   };
 };
