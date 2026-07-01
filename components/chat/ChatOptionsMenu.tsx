@@ -20,6 +20,8 @@ import {
   Ban,
   Search,
 } from "lucide-react";
+import { toast } from "sonner";
+import { ContactService } from "@/services/contact.service";
 import { ChatActionModals } from "./ChatActionModals";
 
 export interface ChatOptionsMenuProps {
@@ -56,6 +58,22 @@ export function ChatOptionsMenu({
   const [aiProtection, setAiProtection] = useState(true);
   const [liveTranslation, setLiveTranslation] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
+
+  const [isFavouriting, setIsFavouriting] = useState(false);
+
+  const handleAddToFavourites = async () => {
+    if (isFavouriting) return;
+    setIsFavouriting(true);
+    try {
+      await ContactService.toggleFavouriteByUser(peerId, true);
+      toast.success("Added to favourites!");
+    } catch (error: any) {
+      console.error("Failed to add to favourites:", error);
+      toast.error(error?.response?.data?.message || "Failed to add to favourites");
+    } finally {
+      setIsFavouriting(false);
+    }
+  };
 
   return (
     <>
@@ -152,12 +170,16 @@ export function ChatOptionsMenu({
             />
             <span className="text-[14.5px]">Media Info</span>
           </DropdownMenuItem>
-          <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
+          <DropdownMenuItem 
+            className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]"
+            onClick={handleAddToFavourites}
+            disabled={isFavouriting}
+          >
             <Star
               className="h-[18px] w-[18px] text-[#FFB020]"
               strokeWidth={2.5}
             />
-            <span className="text-[14.5px]">Add to Favorites</span>
+            <span className="text-[14.5px]">{isFavouriting ? "Adding..." : "Add to Favorites"}</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />

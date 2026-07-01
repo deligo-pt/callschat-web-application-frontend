@@ -16,6 +16,11 @@ export const ContactService = {
     return response.data;
   },
 
+  toggleFavouriteByUser: async (targetUserId: string, isFavourite: boolean) => {
+    const response = await apiClient.patch(`/contacts/favourite-user/${targetUserId}`, { isFavourite });
+    return response.data;
+  },
+
   addMutualContact: async (targetId: string) => {
     const response = await apiClient.post(`/contacts/add-back/${targetId}`);
     return response.data;
