@@ -36,7 +36,7 @@ if (firebaseConfig.apiKey) {
       const type = payload.data?.type;
       
       const notificationTitle = payload.notification?.title || 'New Notification';
-      const notificationOptions: any = {
+      const notificationOptions = {
         body: payload.notification?.body || '',
         icon: payload.data?.senderAvatar || '/icon.png',
         data: payload.data || {}
