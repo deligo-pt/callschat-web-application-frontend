@@ -759,7 +759,7 @@ export default function GroupChatPage() {
       )}
 
       {/* Sidebar - Admin Activity */}
-      {showAdminActivity && (
+      {showAdminActivity && isAdmin && (
         <div className="w-full lg:w-[480px] h-full flex flex-col bg-[#F8FAFC] border-l border-[#EEF2FF] shadow-2xl animate-in slide-in-from-right duration-300 z-50 shrink-0">
           <div className="flex items-center gap-4 bg-[#3B58F5] px-4 py-4 shrink-0 text-white shadow-md">
             <button
@@ -799,8 +799,8 @@ export default function GroupChatPage() {
                 const mRole = member.role || "MEMBER";
                 const isAdminRole = mRole === "ADMIN" || mRole === "OWNER";
                 const mAvatar = member.profile?.avatarUrl || member.user?.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(mName)}&background=3B58F5&color=fff`;
-                const mPhone = member.profile?.phone || member.user?.phone || (member.profile?.username ? `@${member.profile.username}` : "+1 (555) xxx-xxxx");
-                const mEmail = member.profile?.email || member.user?.email || `${mName.toLowerCase().replace(/\s+/g, '.')}@email.com`;
+                const mPhone = member.profile?.phone || member.user?.phone;
+                const mEmail = member.profile?.email || member.user?.email;
                 const mJoined = member.joinedAt ? new Date(member.joinedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Jan 15, 2026";
                 const isMe = member.userId === currentUserId || member.user?.id === currentUserId;
                 const isOwner = mRole === "OWNER";
@@ -820,14 +820,18 @@ export default function GroupChatPage() {
                         </div>
 
                         <div className="flex flex-col gap-1.5 mt-2.5 text-gray-600 text-[13px] font-medium">
-                          <div className="flex items-center gap-2 text-gray-600 truncate">
-                            <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                            <span className="truncate">{mPhone}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-gray-600 truncate">
-                            <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                            <span className="truncate">{mEmail}</span>
-                          </div>
+                          {mPhone && (
+                            <div className="flex items-center gap-2 text-gray-600 truncate">
+                              <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <span className="truncate">{mPhone}</span>
+                            </div>
+                          )}
+                          {mEmail && (
+                            <div className="flex items-center gap-2 text-gray-600 truncate">
+                              <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <span className="truncate">{mEmail}</span>
+                            </div>
+                          )}
                           <span className="text-[11.5px] text-gray-400 font-normal mt-1">
                             Joined {mJoined}
                           </span>
