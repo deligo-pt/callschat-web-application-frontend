@@ -284,29 +284,20 @@ function ChatsContent() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center">
-      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-xl shadow-blue-500/5 mb-6">
-        <MessageSquare className="h-10 w-10 text-[#3B58F5]" strokeWidth={1.5} />
+    <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center bg-white">
+      <div className="mb-6 mt-10 flex justify-center w-full max-w-sm">
+        <img 
+          src="/welcome-illustration.png" 
+          alt="Welcome Illustration" 
+          className="w-full h-auto object-contain"
+        />
       </div>
-      <h2 className="text-[24px] font-bold text-[#1D2A54]">Your Messages</h2>
-      <p className="mt-2 text-[15px] font-medium text-[#8F95B2] max-w-sm">
-        Select a conversation from the sidebar or start a new chat to begin messaging securely.
+      
+      <h1 className="text-[28px] font-bold text-[#0F172A] mb-4 tracking-tight">Welcome to CallsChat.</h1>
+      <h2 className="text-[18px] font-semibold text-[#1E3A8A] mb-4">You're all set.</h2>
+      <p className="text-[14px] font-medium text-slate-600 max-w-md mx-auto leading-relaxed">
+        Start a conversation, make a call, or create a group to connect with your friends and team.
       </p>
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <button 
-          onClick={() => router.push("/contacts")}
-          className="rounded-2xl bg-[#3B58F5] px-7 py-3.5 text-[15px] font-bold text-white shadow-lg shadow-[#3B58F5]/25 transition-all hover:bg-[#2C48B8] active:scale-95 cursor-pointer"
-        >
-          Start a New Conversation
-        </button>
-        <button 
-          onClick={() => setIsExploreOpen(true)}
-          className="flex items-center gap-2 rounded-2xl bg-white border border-[#E6EAFA] px-6 py-3.5 text-[15px] font-bold text-[#1D2A54] shadow-sm transition-all hover:bg-[#F8FAFC] hover:border-[#3B58F5]/40 active:scale-95 cursor-pointer"
-        >
-          <Building2 className="h-5 w-5 text-[#3B58F5]" />
-          <span>Explore Businesses</span>
-        </button>
-      </div>
 
       <ExploreBusinessesModal isOpen={isExploreOpen} onClose={() => setIsExploreOpen(false)} />
     </div>

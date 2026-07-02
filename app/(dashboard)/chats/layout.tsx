@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare } from "lucide-react";
+import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { chatService } from "@/services/chat.service";
@@ -334,22 +334,12 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
             {/* Header Area */}
             <div className="flex flex-col px-6 pt-8 pb-4">
               <div className="flex items-center justify-between">
-                <h1 className="text-[28px] font-extrabold tracking-tight text-[#11142D]">
-                  Chats
+                <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">
+                  Groups
                 </h1>
                 <div className="flex items-center gap-2">
-                  {/* Compose / New Message Button */}
-                  <button
-                    onClick={() => setIsNewMessageOpen(true)}
-                    title="New Message"
-                    className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA] hover:border-[#3B58F5]/30"
-                  >
-                    <PenSquare className="h-[18px] w-[18px] text-[#3B58F5]" strokeWidth={2.2} />
-                  </button>
-
-                  <Link href="/chats/favorites" className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
-                    <Star className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
-                    <div className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#FFA500]" />
+                  <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
+                    <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
                   </Link>
 
                   <NotificationDropdown />
@@ -357,14 +347,14 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
               </div>
 
               {/* Search Bar */}
-              <div className="mt-6 relative">
-                <Search className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8F95B2]" />
+              <div className="mt-4 relative">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search conversations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-[48px] w-full rounded-2xl bg-[#F4F6FC] pl-11 pr-4 text-[14px] font-medium text-[#11142D] placeholder-[#8F95B2] focus:outline-none focus:ring-1 focus:ring-[#3B58F5]/50"
+                  className="h-10 w-full rounded-full bg-[#EEF2FF] pl-10 pr-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-transparent focus:border-blue-200 transition-all"
                 />
               </div>
             </div>
@@ -396,11 +386,27 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#3B58F5] border-t-transparent" />
                   </div>
                 ) : filteredConversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                    <MessageSquare className="h-10 w-10 text-[#E6EAFA] mb-3" />
-                    <p className="text-[13px] font-medium text-[#8F95B2]">
-                      No conversations yet. Tap an active contact above to start chatting securely.
+                  <div className="flex flex-col items-center justify-center py-12 px-6 text-center mt-4">
+                    <h3 className="text-[18px] font-bold text-[#0F172A] mb-2">No conversations yet</h3>
+                    <p className="text-[12px] font-medium text-slate-500 max-w-[200px] leading-relaxed mb-8">
+                      You haven't started any conversations. Message your friends or create a group to start chatting.
                     </p>
+                    <div className="flex flex-col gap-3 w-full max-w-[180px]">
+                      <button
+                        onClick={() => setIsNewMessageOpen(true)}
+                        className="flex items-center justify-center gap-2 rounded-full bg-[#2563EB] py-2.5 text-[12px] font-bold text-white transition-all hover:bg-blue-700 shadow-sm"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        New Message
+                      </button>
+                      <button
+                        onClick={() => router.push("/contacts")}
+                        className="flex items-center justify-center gap-2 rounded-full border border-blue-200 bg-white py-2.5 text-[12px] font-bold text-[#2563EB] transition-all hover:bg-blue-50"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Invite Friends
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col">

@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Inbox, Settings, CheckCircle2 } from "lucide-react";
+import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Inbox, Settings, CheckCircle2, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { CallProvider } from "@/components/providers/CallProvider";
@@ -50,10 +50,11 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     { name: "Analytics", href: "/business/analytics", icon: BarChart3 },
     { name: "Settings", href: "/business/settings", icon: Settings },
   ] : [
-    { name: "Chats", href: "/chats", icon: MessageSquare },
+    { name: "Message", href: "/chats", icon: MessageSquare },
     { name: "Calls", href: "/calls", icon: PhoneCall },
-    { name: "Groups", href: "/groups", icon: Users },
+    { name: "Group", href: "/groups", icon: Users },
     { name: "Contacts", href: "/contacts", icon: Contact },
+    { name: "Media", href: "/media", icon: Folder },
   ];
 
   if (isOnboarding) {
@@ -71,31 +72,25 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
       {/* Persistent Left Sidebar - Desktop First */}
       <nav className="hidden md:flex h-full w-[88px] flex-col items-center border-r border-[#E6EAFA] bg-white py-6 shadow-sm z-20">
-        <div className="mb-6">
-          {/* Logo */}
-          <div className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-xl shadow-lg transition-all duration-300 relative",
-            isBusiness 
-              ? "bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] shadow-purple-500/25" 
-              : "bg-gradient-to-br from-[#4A72FF] to-[#1D3BB5] shadow-[#3B58F5]/20"
-          )}>
-            {isBusiness ? (
+        {isBusiness && (
+          <div className="mb-6">
+            {/* Logo */}
+            <div className={cn(
+              "flex h-12 w-12 items-center justify-center rounded-xl shadow-lg transition-all duration-300 relative",
+              "bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] shadow-purple-500/25" 
+            )}>
               <Briefcase className="h-6 w-6 text-white" strokeWidth={2.5} />
-            ) : (
-              <MessageSquare className="h-6 w-6 text-white" strokeWidth={2.5} />
-            )}
-            {isBusiness && (
               <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[8px] font-extrabold text-purple-600 shadow-xs">
                 B
               </span>
-            )}
-            {isBusiness && businessProfile?.isVerified && (
-              <span title="Verified Business" className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-xs">
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#3B58F5] fill-[#3B58F5]" />
-              </span>
-            )}
+              {businessProfile?.isVerified && (
+                <span title="Verified Business" className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-xs">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#3B58F5] fill-[#3B58F5]" />
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="mb-4">
           <WorkspaceSwitcher compact={true} />
@@ -107,48 +102,52 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
             const Icon = item.icon;
             
             return (
-              <Link 
-                key={item.name} 
-                href={item.href}
-                className="group relative flex w-full flex-col items-center justify-center py-3"
-              >
-                {/* Active Indicator Bar */}
-                {isActive && (
-                  <div className={cn(
-                    "absolute left-0 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-r-full transition-colors",
-                    isBusiness ? "bg-[#8B5CF6]" : "bg-[#3B58F5]"
-                  )} />
-                )}
-                
-                <div 
-                  className={cn(
-                    "flex h-12 w-12 items-center justify-center rounded-[1.25rem] transition-all duration-300",
-                    isActive 
-                      ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] shadow-sm" : "bg-[#EEF2FB] text-[#3B58F5] shadow-sm")
-                      : "text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54]"
-                  )}
+                <Link 
+                  key={item.name} 
+                  href={item.href}
+                  className="group relative flex w-full flex-col items-center justify-center py-2"
                 >
-                  <Icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.5 : 2} />
-                </div>
-              </Link>
+                  <div 
+                    className={cn(
+                      "flex h-[42px] w-[42px] items-center justify-center rounded-full transition-all duration-300 shadow-sm",
+                      isActive 
+                        ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] border border-purple-100" : "bg-[#EEF2FF] text-[#2563EB] border border-[#E0E7FF]")
+                        : "bg-slate-50 border border-slate-100 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-bold mt-1.5",
+                    isActive ? (isBusiness ? "text-[#8B5CF6]" : "text-[#2563EB]") : "text-slate-400"
+                  )}>
+                    {item.name}
+                  </span>
+                </Link>
             );
           })}
         </div>
 
         {/* Profile Button at bottom */}
         <div className="mt-auto w-full mb-4">
-          <Link href="/profile" className="flex w-full items-center justify-center py-3">
+          <Link href="/profile" className="flex flex-col w-full items-center justify-center py-2">
             <div className={cn(
-              "flex h-12 w-12 items-center justify-center rounded-[1.25rem] transition-all duration-300 relative",
+              "flex h-[42px] w-[42px] items-center justify-center rounded-full transition-all duration-300 relative shadow-sm",
               pathname.startsWith("/profile")
-                ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] shadow-sm" : "bg-[#EEF2FB] text-[#3B58F5] shadow-sm")
-                : "text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54]"
+                ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] border border-purple-100" : "bg-[#EEF2FF] text-[#2563EB] border border-[#E0E7FF]")
+                : "bg-slate-50 border border-slate-100 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             )}>
-              <UserCircle2 className="h-[24px] w-[24px]" strokeWidth={pathname.startsWith("/profile") ? 2.5 : 2} />
+              <UserCircle2 className="h-5 w-5" strokeWidth={pathname.startsWith("/profile") ? 2.5 : 2} />
               {isBusiness && (
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
               )}
             </div>
+            <span className={cn(
+              "text-[10px] font-bold mt-1.5",
+              pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#2563EB]") : "text-slate-400"
+            )}>
+              Profile
+            </span>
           </Link>
         </div>
       </nav>

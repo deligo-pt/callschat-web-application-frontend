@@ -308,16 +308,25 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   return (
     <div className="flex min-h-screen w-full flex-col bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] font-sans">
       {/* Top Header Section */}
-      <div className="flex flex-col items-center justify-center pt-16 pb-10 text-white px-4">
-        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md shadow-inner">
-          <MessageCircle className="h-8 w-8 text-white stroke-[2]" />
-        </div>
+      <div className="flex flex-col items-center justify-center pt-16 pb-12 text-white px-4">
+        {step === "PHONE" && (
+          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md shadow-inner">
+            <MessageCircle className="h-8 w-8 text-white stroke-[2]" />
+          </div>
+        )}
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 text-center">
-          {step === "PHONE" ? title : "Verify Account"}
+          {step === "PHONE" ? title : "Verify Your Phone"}
         </h1>
-        <p className="text-blue-100 font-medium text-center">
-          {step === "PHONE" ? subtitle : "Enter your activation code"}
-        </p>
+        {step === "PHONE" ? (
+          <p className="text-blue-100 font-medium text-center">
+            {subtitle}
+          </p>
+        ) : (
+          <div className="text-center mt-2">
+            <p className="text-blue-100 text-sm font-medium mb-1">We've sent a code to</p>
+            <p className="text-white text-sm font-semibold tracking-wide">{phoneNumber || sentPhoneNumber || "your phone number"}</p>
+          </div>
+        )}
       </div>
 
       {/* Bottom White Section */}
@@ -337,14 +346,14 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
         <div className="w-full max-w-[400px] flex-1 flex flex-col pt-4 sm:pt-6">
           {/* Form header */}
           <div className="text-center space-y-3 mb-10">
-             <h2 className="text-2xl font-bold text-[#0F172A]">
-               {step === "PHONE" ? "Enter your phone number" : "Enter activation code"}
+             <h2 className="text-2xl font-bold text-[#1E293B]">
+               {step === "PHONE" ? "Enter your phone number" : "Enter the code below"}
              </h2>
-             <p className="text-sm text-slate-500 leading-relaxed">
-               {step === "PHONE" 
-                 ? "Make sure this number can receive SMS. You'll receive your activation code through it."
-                 : <>We sent a 6-digit one-time security code via SMS to <span className="font-bold text-[#0F172A]">{phoneNumber}</span>.</>}
-             </p>
+             {step === "PHONE" && (
+               <p className="text-sm text-slate-500 leading-relaxed">
+                 Make sure this number can receive SMS. You'll receive your activation code through it.
+               </p>
+             )}
           </div>
 
           {/* Form Body */}
@@ -451,8 +460,8 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
               </div>
             ) : (
               /* OTP Verification Step */
-              <div className="space-y-8">
-                <div className="flex justify-between gap-2 sm:gap-3 px-2">
+              <div className="space-y-6 flex flex-col items-center">
+                <div className="flex justify-center gap-2 sm:gap-3 w-full">
                   {otp.map((digit, idx) => (
                     <input
                       key={idx}
@@ -466,9 +475,25 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                       onPaste={handleOtpPaste}
-                      className="h-12 w-10 sm:h-14 sm:w-12 rounded-xl border border-indigo-100 bg-indigo-50/50 text-center text-xl font-bold text-slate-800 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200"
+                      className="h-12 w-10 sm:h-14 sm:w-12 rounded-xl border border-indigo-100 bg-[#EEF2FF] text-center text-xl font-bold text-[#1E293B] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200"
                     />
                   ))}
+                </div>
+
+                <div className="flex items-center justify-center pt-2 text-sm text-slate-500">
+                  <span>Didn't receive the code? </span>
+                  {timer > 0 ? (
+                    <span className="font-bold text-blue-600/50 ml-1 cursor-not-allowed">Resend</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRequestOTP}
+                      disabled={isPending}
+                      className="font-bold text-[#2563EB] hover:underline ml-1"
+                    >
+                      Resend
+                    </button>
+                  )}
                 </div>
 
                 <button
@@ -476,7 +501,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                   onClick={handleVerifyOTP}
                   disabled={!isOtpComplete || isPending}
                   className={cn(
-                    "w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 shadow-sm mt-4",
+                    "w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 shadow-sm mt-2",
                     isOtpComplete && !isPending
                       ? "bg-[#2563EB] text-white hover:bg-blue-700 active:scale-[0.99]"
                       : "cursor-not-allowed bg-slate-100 text-slate-400"
@@ -488,38 +513,31 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                       Verifying...
                     </span>
                   ) : (
-                    "Continue"
+                    "Verify & Continue"
                   )}
                 </button>
 
-                <div className="flex items-center justify-center pt-2 text-sm text-slate-500">
-                  {timer > 0 ? (
-                    <span>Resend code in <span className="font-medium text-slate-700">{timer}s</span></span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleRequestOTP}
-                      disabled={isPending}
-                      className="font-bold text-blue-600 hover:underline"
-                    >
-                      Resend Code
-                    </button>
-                  )}
+                <div className="w-full flex justify-center mt-4">
+                  <div className="w-full text-center bg-[#F0F9FF] border border-[#E0F2FE] text-slate-500 text-sm py-3 px-4 rounded-xl font-medium shadow-sm">
+                    This code will expire in <span className="font-bold text-[#0F172A]">{Math.floor(timer/60)}:{(timer%60).toString().padStart(2, '0')}</span>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
           {/* Bottom Link */}
-          <div className="mt-12 mb-4 text-center text-sm font-medium text-slate-500">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <Link
-              href={isLogin ? "/signup" : "/login"}
-              className="font-bold text-blue-600 hover:underline transition-colors ml-1"
-            >
-              {isLogin ? "Sign up" : "Login"}
-            </Link>
-          </div>
+          {step === "PHONE" && (
+            <div className="mt-12 mb-4 text-center text-sm font-medium text-slate-500">
+              {isLogin ? "Don't have an account? " : "Already have an account? "}
+              <Link
+                href={isLogin ? "/signup" : "/login"}
+                className="font-bold text-blue-600 hover:underline transition-colors ml-1"
+              >
+                {isLogin ? "Sign up" : "Login"}
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
