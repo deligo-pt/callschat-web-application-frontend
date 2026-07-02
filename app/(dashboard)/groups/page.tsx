@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { groupService, GroupItem } from "@/services/group.service";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
@@ -124,98 +125,71 @@ export default function GroupsPage() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col items-center bg-[#F8FAFC] overflow-y-auto">
-      {/* Container simulating the mobile view but suitable for web */}
-      <div className="w-full max-w-2xl my-8 bg-white rounded-3xl shadow-sm border border-[#E6EAFA] overflow-hidden flex flex-col min-h-[700px] relative">
+    <div className="flex h-full w-full bg-[#F8FAFC]">
+      {/* Left Panel (List) */}
+      <div className="flex h-full w-full flex-col border-r border-[#E6EAFA] bg-white md:w-[350px] shrink-0">
         
-        {/* Header Area */}
-        <div className="bg-[#3B58F5] text-white px-6 pt-6 pb-8 flex flex-col shrink-0">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <Link href="/chats" className="rounded-full p-2 hover:bg-white/10 transition-colors">
-                <ArrowLeft className="h-5 w-5" />
+        {/* Header */}
+        <div className="flex flex-col px-6 pt-8 pb-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">Groups</h1>
+            <div className="flex items-center gap-2">
+              <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
+                <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
               </Link>
-              <h1 className="text-[22px] font-bold">Groups</h1>
+              <NotificationDropdown />
             </div>
-            
-            <Link 
-              href="/groups/create" 
-              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full transition-colors font-medium text-sm border border-white/10"
-            >
-              <Plus className="h-4 w-4" />
-              Create Group
-            </Link>
           </div>
-
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/60" />
+          
+          <div className="mt-4 relative">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search groups..."
+              placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-[48px] rounded-xl border border-white/20 bg-white/10 pl-12 pr-4 text-[14px] text-white placeholder-white/60 focus:border-white/50 focus:bg-white/20 focus:outline-none transition-colors"
+              className="h-10 w-full rounded-full bg-[#EEF2FF] pl-10 pr-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-transparent focus:border-blue-200 transition-all"
             />
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 scrollbar-hide">
-          
-          {/* Privacy Notice Card */}
-          <div className="bg-[#F4F6FC] rounded-2xl p-4 mb-4 border border-[#E6EAFA] flex items-start gap-4">
-            <div className="h-10 w-10 bg-[#3B58F5] rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-              <Lock className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-[15px] font-bold text-[#1D2A54]">Privacy-First Groups</h3>
-              <p className="text-[13px] text-[#8F95B2] mt-0.5 leading-snug">
-                Only admins can see member phone numbers.
-              </p>
-            </div>
-          </div>
-
-          {/* Groups List */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide pb-4">
           {isLoading ? (
             <div className="flex w-full items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
             </div>
           ) : groups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-              <div className="h-20 w-20 bg-[#F4F6FC] rounded-full flex items-center justify-center mb-6">
-                <Users className="h-10 w-10 text-[#3B58F5]/50" />
-              </div>
-              <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">No groups yet</h2>
-              <p className="text-[14px] text-[#8F95B2] mb-8 max-w-xs">
-                You haven't joined any groups. Create one to start collaborating with your team or family securely!
+            <div className="flex flex-col items-center justify-center h-full px-8 text-center pb-20">
+              <p className="text-[12px] font-bold text-[#1E293B] mb-8 leading-relaxed max-w-[200px]">
+                Create a new group to start chatting and collaboration.
               </p>
               <Link 
                 href="/groups/create"
-                className="flex items-center gap-2 bg-[#3B58F5] hover:bg-[#2542E5] text-white px-8 py-3.5 rounded-full transition-colors font-bold text-[15px] shadow-lg shadow-blue-500/30"
+                className="flex items-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white px-8 py-2.5 rounded-full transition-colors font-bold text-[13px] shadow-sm"
               >
-                <Plus className="h-5 w-5" />
-                Create New Group
+                <Plus className="h-4 w-4" />
+                Create Group
               </Link>
             </div>
           ) : filteredGroups.length === 0 ? (
             <div className="flex w-full justify-center py-10">
-              <p className="text-[14px] text-[#8F95B2]">No groups match your search.</p>
+              <p className="text-[13px] text-slate-500 font-medium">No groups match your search.</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="flex flex-col mt-2">
               {filteredGroups.map((group, index) => {
                 const color = COLORS[index % COLORS.length];
                 
                 return (
                   <div
                     key={group.id}
-                    className="relative group"
+                    className="relative group px-2"
                     onMouseLeave={() => setMenuOpenForId(null)}
                   >
                     <Link 
                       href={`/groups/${group.id}`} 
-                      className="flex items-center gap-4 p-4 rounded-2xl hover:bg-[#F8FAFC] transition-colors cursor-pointer group/item border border-transparent hover:border-[#E6EAFA]"
+                      className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-[#F8FAFC] transition-colors cursor-pointer group/item"
                     >
                       {/* Avatar */}
                       <div className="relative shrink-0">
@@ -223,7 +197,7 @@ export default function GroupsPage() {
                           <img 
                             src={group.avatarUrl} 
                             alt={group.name} 
-                            className="h-[52px] w-[52px] rounded-full object-cover border border-[#E6EAFA]"
+                            className="h-[52px] w-[52px] rounded-full object-cover bg-slate-100"
                           />
                         ) : (
                           <div className={cn("h-[52px] w-[52px] rounded-full flex items-center justify-center text-white font-bold text-[16px] shadow-sm", color)}>
@@ -233,9 +207,9 @@ export default function GroupsPage() {
                       </div>
 
                       {/* Info */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                      <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-[16px] font-bold text-[#1D2A54] truncate pr-2">
+                          <h3 className="text-[15px] font-bold text-[#1D2A54] truncate pr-2">
                             {group.name}
                           </h3>
                           <div className="flex items-center gap-2 shrink-0">
@@ -243,21 +217,18 @@ export default function GroupsPage() {
                               {formatTime(group.createdAt)}
                             </span>
                             {hasUnreadGroup(group) && (
-                              <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3B58F5] px-1 text-[10px] font-bold text-white shadow-sm">
+                              <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#2563EB] px-1 text-[10px] font-bold text-white shadow-sm">
                                 ●
                               </div>
                             )}
                           </div>
                         </div>
                         
-                        <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center justify-between gap-4 mt-0.5">
                           <div className="flex flex-col gap-0.5 truncate min-w-0">
-                            <div className="flex items-center gap-1.5 text-[#8F95B2]">
-                              <Users className="h-3.5 w-3.5 shrink-0" />
-                              <span className="text-[12px] font-medium">{group.memberCount || 1} members</span>
-                            </div>
-                            <p className="text-[13px] text-[#8F95B2] truncate">
-                              {group.description || "No description provided"}
+                            <p className="text-[13px] font-medium text-slate-500 truncate flex items-center gap-1.5">
+                              <Users className="h-3 w-3 shrink-0" />
+                              {group.memberCount || 1} members
                             </p>
                           </div>
                         </div>
@@ -265,7 +236,7 @@ export default function GroupsPage() {
                     </Link>
 
                     {/* Context Menu Button */}
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                       <button 
                         onClick={(e) => {
                           e.preventDefault();
@@ -316,6 +287,22 @@ export default function GroupsPage() {
             </div>
           )}
         </div>
+      </div>
+      
+      {/* Right Content Area (Empty State) */}
+      <div className="hidden flex-1 flex-col items-center justify-center bg-white md:flex w-full">
+         <div className="flex flex-col items-center text-center max-w-sm">
+            <div className="relative mb-8">
+              <div className="h-[120px] w-[120px] rounded-full bg-[#EEF2FF] flex items-center justify-center border border-[#E0E7FF] shadow-2xl shadow-blue-500/10">
+                <Users className="h-16 w-16 text-[#2563EB]" strokeWidth={1.5} />
+              </div>
+            </div>
+            
+            <h2 className="text-[22px] font-bold text-[#0F172A] mb-3">No Groups Yet</h2>
+            <p className="text-[13px] font-semibold text-[#1E293B] leading-relaxed max-w-[240px]">
+              You haven't joined or created any<br />groups yet.
+            </p>
+         </div>
       </div>
 
       {/* Delete Confirmation Modal */}

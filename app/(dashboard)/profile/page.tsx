@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut, Briefcase, User, RefreshCw, X, Building2, Globe, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut, Briefcase, User, RefreshCw, X, Building2, Globe, MapPin, Sparkles, Search, Star, ChevronRight, Send, Bell, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { BusinessService } from "@/services/business.service";
 import SetupBusinessModal from "@/components/business/SetupBusinessModal";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
 // Define the shape of the user profile from the API
 interface UserProfileData {
@@ -219,286 +220,232 @@ export default function ProfilePage() {
 
   return (
     <div className="flex h-full w-full bg-[#F8FAFC]">
-      
-      {/* Left Panel - Profile View */}
-      <div className="flex h-full w-full flex-col border-r border-[#E6EAFA] bg-white md:w-[400px] shrink-0">
-        
-        {/* Header */}
-        <div className={cn(
-          "flex items-center gap-4 px-6 py-5 text-white shadow-md z-10 transition-all duration-300",
-          activeMode === "BUSINESS" ? "bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9]" : "bg-[#3B58F5]"
-        )}>
-          <button 
-            onClick={() => router.push("/chats")}
-            className="rounded-full p-1.5 transition-colors hover:bg-white/20"
-          >
-            <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-[18px] font-bold">Profile</h1>
-            <span className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-sm transition-all duration-300",
-              activeMode === "BUSINESS" 
-                ? "bg-purple-500/30 text-purple-100 border border-purple-400/30" 
-                : "bg-white/20 text-blue-100 border border-white/20"
-            )}>
-              {activeMode === "BUSINESS" ? <Briefcase className="h-3 w-3 animate-pulse" /> : <User className="h-3 w-3 animate-pulse" />}
-              {activeMode === "BUSINESS" ? "Business Mode" : "Personal Mode"}
-            </span>
-          </div>
-          
-          <button 
-             onClick={handleLogout}
-             className="ml-auto rounded-full p-1.5 transition-colors hover:bg-red-500/80 text-red-100 hover:text-white flex items-center justify-center bg-red-500/20"
-             title="Logout"
-          >
-             <LogOut className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-        </div>
-
-        {isLoading ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto scrollbar-hide">
-            <div className="flex flex-col items-center px-6 py-8">
-              
-              {/* Avatar Section */}
-              <div className="flex flex-col items-center">
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-full border-4 border-[#EEF2FB] bg-[#F4F6FC] transition-transform hover:scale-105 shadow-sm"
-                >
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Profile" className="h-full w-full object-cover" />
-                  ) : (
-                    <UserCircle2 className="h-14 w-14 text-[#A0A6C0]" strokeWidth={1.5} />
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity hover:opacity-100">
-                    <Camera className="h-8 w-8 text-white" />
-                  </div>
-                </div>
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mt-3 flex items-center gap-1.5 text-[13px] font-bold text-[#3B58F5] hover:underline"
-                >
-                  <Camera className="h-4 w-4" />
-                  Picture
-                </button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  onChange={handleImageSelect}
-                  accept="image/jpeg,image/png,image/webp" 
-                  className="hidden" 
-                />
-              </div>
-
-              {/* Account Interface Mode Segmented Card */}
-              <div className="mt-6 w-full rounded-3xl border border-[#E6EAFA] bg-[#F4F6FC] p-4 shadow-sm transition-all duration-300">
-                <div className="flex items-center justify-between px-1 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-extrabold text-[#1D2A54]">Active Interface Mode</span>
-                    <span className={cn("flex h-2 w-2 rounded-full animate-pulse", activeMode === "BUSINESS" ? "bg-purple-500" : "bg-emerald-500")} title="Active" />
-                  </div>
-                  <span className="text-[11px] font-semibold text-[#8F95B2]">
-                    Status: <strong className={cn("uppercase font-extrabold transition-colors", activeMode === "BUSINESS" ? "text-[#8B5CF6]" : "text-[#3B58F5]")}>{activeMode === "BUSINESS" ? "Business Active" : "Personal Active"}</strong>
-                  </span>
-                </div>
-
-                {/* Segmented Control */}
-                <div className="relative flex w-full rounded-2xl bg-[#E6EAFA]/70 p-1.5 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeMode !== "PERSONAL") {
-                         handleSwitchMode("PERSONAL");
-                      }
-                    }}
-                    disabled={isSwitchingMode}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-bold transition-all duration-200 cursor-pointer select-none",
-                      activeMode === "PERSONAL"
-                        ? "bg-white text-[#3B58F5] shadow-md shadow-[#3B58F5]/10 scale-[1.01]"
-                        : "text-[#64748B] hover:text-[#1E293B] hover:bg-white/40"
-                    )}
-                  >
-                    {isSwitchingMode && activeMode !== "PERSONAL" ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-[#3B58F5]" />
-                    ) : (
-                      <User className="h-4 w-4" strokeWidth={2.5} />
-                    )}
-                    Personal Mode
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeMode !== "BUSINESS") {
-                         handleSwitchMode("BUSINESS");
-                     }
-                    }}
-                    disabled={isSwitchingMode}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-bold transition-all duration-200 cursor-pointer select-none",
-                      activeMode === "BUSINESS"
-                        ? "bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white shadow-md shadow-purple-500/25 scale-[1.01]"
-                        : "text-[#64748B] hover:text-[#1E293B] hover:bg-white/40"
-                    )}
-                  >
-                    {isSwitchingMode && activeMode === "BUSINESS" ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-white" />
-                    ) : (
-                      <Briefcase className="h-4 w-4" strokeWidth={2.5} />
-                    )}
-                    Business Mode
-                  </button>
-                </div>
-              </div>
-
-              {/* Form Fields */}
-              <div className="mt-8 flex w-full flex-col gap-5">
-                
-                {/* Name */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-bold text-[#1D2A54]">Name</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.displayName}
-                      onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                      className="h-[48px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#3B58F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B58F5]/50 transition-colors"
-                      placeholder="Your display name"
-                    />
-                    <Edit2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#3B58F5]" />
-                  </div>
-                </div>
-
-                {/* Username */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-bold text-[#1D2A54]">Username</label>
-                  <input
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="h-[48px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#3B58F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B58F5]/50 transition-colors"
-                    placeholder="@username"
-                  />
-                </div>
-
-                {/* Bio */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-bold text-[#1D2A54]">Bio</label>
-                  <textarea
-                    value={formData.bio}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    rows={3}
-                    className="w-full resize-none rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] p-4 text-[14px] font-semibold text-[#11142D] focus:border-[#3B58F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B58F5]/50 transition-colors"
-                    placeholder="Tell us about yourself..."
-                  />
-                </div>
-
-                {/* Phone (Read Only) */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-bold text-[#1D2A54]">Phone</label>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    readOnly
-                    className="h-[48px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#8F95B2] cursor-not-allowed"
-                  />
-                </div>
-
-                {/* Email (Read Only - placeholder) */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-bold text-[#1D2A54]">Email</label>
-                  <input
-                    type="email"
-                    value={formData.email || ""}
-                    readOnly
-                    placeholder="Not set"
-                    className="h-[48px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#8F95B2] cursor-not-allowed"
-                  />
-                </div>
-
-                {/* Additional Settings Group */}
-                <div className="mt-2 flex gap-4">
-                  <div className="flex flex-1 flex-col gap-1.5">
-                    <label className="text-[13px] font-bold text-[#1D2A54]">Country</label>
-                    <input
-                      type="text"
-                      value={formData.country}
-                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                      className="h-[48px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#3B58F5] focus:bg-white focus:outline-none"
-                      placeholder="e.g. US"
-                    />
-                  </div>
-                  <div className="flex flex-1 flex-col gap-1.5">
-                    <label className="text-[13px] font-bold text-[#1D2A54]">Language</label>
-                    <input
-                      type="text"
-                      value={formData.language}
-                      onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                      className="h-[48px] w-full rounded-2xl border border-[#E6EAFA] bg-[#F4F6FC] px-4 text-[14px] font-semibold text-[#11142D] focus:border-[#3B58F5] focus:bg-white focus:outline-none"
-                      placeholder="e.g. en"
-                    />
-                  </div>
-                </div>
-
-              </div>
-              
-              {/* Spacer for bottom padding */}
-              <div className="h-8" />
+      {/* Middle Column (Settings Menu) */}
+      <div className="flex h-full w-full flex-col border-r border-[#E6EAFA] bg-white md:w-[350px] shrink-0 overflow-y-auto scrollbar-hide">
+        {/* Header (Matching Image precisely) */}
+        <div className="flex flex-col px-6 pt-8 pb-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">Groups</h1>
+            <div className="flex items-center gap-2">
+              <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
+                <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
+              </Link>
+              <NotificationDropdown />
             </div>
           </div>
-        )}
+          <div className="mt-4 relative">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              className="h-10 w-full rounded-full bg-[#EEF2FF] pl-10 pr-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-transparent focus:border-blue-200 transition-all"
+            />
+          </div>
+        </div>
 
-        {/* Fixed Save Button Area */}
-        <div className="border-t border-[#E6EAFA] bg-white p-6 pb-28 md:pb-6 z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-          <button
-            onClick={handleSaveProfile}
-            disabled={isPending || isLoading}
-            className={cn(
-              "flex h-[52px] w-full items-center justify-center rounded-2xl text-[15px] font-bold text-white transition-all",
-              isPending || isLoading 
-                ? "bg-[#B5C7FE] cursor-not-allowed" 
-                : "bg-[#3B58F5] hover:bg-[#2C48B8] shadow-lg shadow-[#3B58F5]/25 active:scale-[0.98]"
+        {/* User Summary */}
+        <div className="flex flex-col items-center px-6 pt-4 pb-6">
+          <div className="h-20 w-20 rounded-full bg-[#EEF2FF] flex items-center justify-center border border-[#E0E7FF] mb-3 overflow-hidden">
+            {avatarPreview ? (
+              <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+            ) : (
+              <UserCircle2 className="h-12 w-12 text-slate-400" strokeWidth={1.5} />
             )}
-          >
-            {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save Change"}
-          </button>
+          </div>
+          <h2 className="text-[16px] font-bold text-[#0F172A]">{formData.displayName || "User"}</h2>
+          <p className="text-[12px] font-medium text-slate-500 mt-1">{formData.phone || "+111 xxx 2345"}</p>
+          <div className="mt-2 rounded-full bg-[#EEF2FF] px-3 py-1 text-[10px] font-bold text-[#2563EB]">
+            {activeMode === "BUSINESS" ? "Business" : "Personal"}
+          </div>
+        </div>
+
+        {/* Menu Items */}
+        <div className="px-6 pb-8 flex flex-col gap-6">
+          {/* ACCOUNT */}
+          <div className="flex flex-col">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Account</span>
+            <div className="flex flex-col gap-1">
+              <button className="flex items-center justify-between rounded-xl border border-blue-100 bg-white p-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB]">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Profile</span>
+                    <span className="text-[11px] font-medium text-slate-500">Edit your information</span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* PREFERENCES */}
+          <div className="flex flex-col">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Preferences</span>
+            <div className="flex flex-col gap-1">
+              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-500">
+                    <Globe className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Language</span>
+                    <span className="text-[11px] font-medium text-slate-500">English (US)</span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+
+              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-400">
+                    <Send className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Invite</span>
+                    <span className="text-[11px] font-medium text-slate-500">Invite a friend</span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+              
+              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-50 text-orange-400">
+                    <Bell className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Notifications</span>
+                    <span className="text-[11px] font-medium text-slate-500">Manage alerts</span>
+                  </div>
+                </div>
+                {/* Toggle switch */}
+                <div className="h-5 w-9 rounded-full bg-[#2563EB] relative cursor-pointer">
+                  <div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-white shadow-sm" />
+                </div>
+              </button>
+
+              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-400">
+                    <Briefcase className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Business Dashboard</span>
+                    <span className="text-[11px] font-medium text-slate-500">Analytical & insight</span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* SECURITY */}
+          <div className="flex flex-col">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Security</span>
+            <div className="flex flex-col gap-1">
+              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-50 text-pink-400">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Disappearing Messages</span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Right Panel - Empty State (Desktop Only) */}
-      <div className="hidden flex-1 flex-col items-center justify-center bg-[#F8FAFC] md:flex relative overflow-hidden">
-        {/* Background abstract shapes */}
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 h-96 w-96 rounded-full bg-gradient-to-br from-[#4A72FF]/5 to-[#1D3BB5]/5 blur-3xl" />
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-80 w-80 rounded-full bg-gradient-to-tr from-[#3B58F5]/5 to-transparent blur-2xl" />
-        
-        <div className="flex flex-col items-center text-center p-8 z-10">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-xl shadow-blue-500/5 mb-6">
-            <MessageSquare className="h-10 w-10 text-[#3B58F5]" strokeWidth={1.5} />
+      {/* Right Column (Edit Form) */}
+      <div className="flex-1 flex flex-col items-center bg-white overflow-y-auto scrollbar-hide py-16">
+        <div className="w-full max-w-[440px] flex flex-col px-6">
+          {/* Avatar Edit */}
+          <div className="flex flex-col items-center mb-10">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="relative flex h-[100px] w-[100px] cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#EEF2FF] border border-[#E0E7FF] transition-transform hover:scale-105"
+            >
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                <UserCircle2 className="h-12 w-12 text-slate-400" strokeWidth={1.5} />
+              )}
+            </div>
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-3 flex items-center gap-1.5 text-[12px] font-bold text-[#2563EB] hover:underline"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              Picture
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              onChange={handleImageSelect}
+              accept="image/jpeg,image/png,image/webp" 
+              className="hidden" 
+            />
           </div>
-          <h2 className="text-[24px] font-bold text-[#1D2A54]">CallsChat for Web</h2>
-          <p className="mt-3 text-[15px] font-medium text-[#8F95B2] max-w-md leading-relaxed">
-            Update your profile details on the left. Changes will instantly sync across all your devices using our real-time database.
-          </p>
-          
-          <div className="mt-10 flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-[13px] font-bold text-green-600">
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            End-to-End Encrypted
+
+          {/* Form Fields */}
+          <div className="flex flex-col gap-5 w-full">
+            <div className="flex flex-col gap-2">
+              <label className="text-[13px] font-bold text-[#0F172A]">Name</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.displayName}
+                  onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                  className="h-[46px] w-full rounded-xl border border-transparent bg-[#F8FAFC] px-4 text-[13px] font-medium text-slate-800 focus:border-blue-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  placeholder="User"
+                />
+                <Edit2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2563EB]" />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[13px] font-bold text-[#0F172A]">Phone</label>
+              <input
+                type="text"
+                value={formData.phone}
+                readOnly
+                className="h-[46px] w-full rounded-xl border border-transparent bg-[#F8FAFC] px-4 text-[13px] font-medium text-slate-500 cursor-not-allowed"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[13px] font-bold text-[#0F172A]">Email</label>
+              <input
+                type="email"
+                value={formData.email || ""}
+                readOnly
+                placeholder="Not set"
+                className="h-[46px] w-full rounded-xl border border-transparent bg-[#F8FAFC] px-4 text-[13px] font-medium text-slate-500 cursor-not-allowed"
+              />
+            </div>
+
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={handleSaveProfile}
+                disabled={isPending || isLoading}
+                className="flex h-10 w-36 items-center justify-center rounded-full bg-[#2563EB] text-[13px] font-bold text-white shadow-sm hover:bg-blue-700 transition-all"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Change"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Setup Business Profile Modal */}
       <SetupBusinessModal
         isOpen={isSetupModalOpen}
         onClose={() => setIsSetupModalOpen(false)}
       />
-
     </div>
   );
 }
