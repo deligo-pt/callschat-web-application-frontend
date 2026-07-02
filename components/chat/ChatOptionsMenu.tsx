@@ -19,10 +19,12 @@ import {
   Trash2,
   Ban,
   Search,
+  Timer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ContactService } from "@/services/contact.service";
 import { ChatActionModals } from "./ChatActionModals";
+import { DisappearingMessagesModal } from "./DisappearingMessagesModal";
 
 export interface ChatOptionsMenuProps {
   conversationId: string;
@@ -41,6 +43,10 @@ export interface ChatOptionsMenuProps {
       hasBlockedMe: boolean;
     } | null>
   >;
+  /** Current disappear setting fetched from the server (null = off). */
+  disappearAfterSeconds?: number | null;
+  /** Called after successful update so the parent can re-sync state. */
+  onDisappearUpdated?: (newValue: number | null) => void;
 }
 
 export function ChatOptionsMenu({
@@ -50,9 +56,18 @@ export function ChatOptionsMenu({
   onClearSuccess,
   blockStatus,
   setBlockStatus,
+  disappearAfterSeconds: initialDisappear = null,
+  onDisappearUpdated,
 }: ChatOptionsMenuProps) {
   const [isClearChatOpen, setIsClearChatOpen] = useState(false);
   const [isBlockUserOpen, setIsBlockUserOpen] = useState(false);
+  const [isDisappearOpen, setIsDisappearOpen] = useState(false);
+  const [disappearValue, setDisappearValue] = useState<number | null>(initialDisappear);
+
+  // Sync when parent prop changes (e.g. after a socket update)
+  React.useEffect(() => {
+    setDisappearValue(initialDisappear);
+  }, [initialDisappear]);
 
   // Mock states for toggle items
   const [aiProtection, setAiProtection] = useState(true);
@@ -170,6 +185,33 @@ export function ChatOptionsMenu({
             />
             <span className="text-[14.5px]">Media Info</span>
           </DropdownMenuItem>
+
+          {/* ── Disappearing Messages ─────────────────────────────────────── */}
+          <DropdownMenuItem
+            className="flex items-center justify-between gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]"
+            onClick={(e) => {
+              e.preventDefault();
+              setIsDisappearOpen(true);
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <Timer
+                className="h-[18px] w-[18px] text-[#7C3AED]"
+                strokeWidth={2.5}
+              />
+              <span className="text-[14.5px]">Disappearing Messages</span>
+            </div>
+            {disappearValue !== null && (
+              <span className="text-[11px] font-bold text-[#7C3AED] bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                {disappearValue === 30 ? "30s"
+                  : disappearValue === 300 ? "5m"
+                  : disappearValue === 3600 ? "1h"
+                  : disappearValue === 86400 ? "24h"
+                  : disappearValue === 604800 ? "7d"
+                  : "90d"}
+              </span>
+            )}
+          </DropdownMenuItem>
           <DropdownMenuItem 
             className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]"
             onClick={handleAddToFavourites}
@@ -225,6 +267,17 @@ export function ChatOptionsMenu({
                 }
               : { isBlocked: true, isBlockedByMe: true, hasBlockedMe: false },
           );
+        }}
+      />
+
+      <DisappearingMessagesModal
+        open={isDisappearOpen}
+        onClose={() => setIsDisappearOpen(false)}
+        conversationId={conversationId}
+        currentValue={disappearValue}
+        onUpdated={(v) => {
+          setDisappearValue(v);
+          onDisappearUpdated?.(v);
         }}
       />
     </>

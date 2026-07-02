@@ -246,7 +246,8 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
           isOnline: profile.isOnline || false,
         };
       });
-      setContacts(parsed);
+      const uniqueContacts = Array.from(new Map(parsed.map((c) => [c.id, c])).values());
+      setContacts(uniqueContacts);
     } catch {
       // Non-fatal
     } finally {

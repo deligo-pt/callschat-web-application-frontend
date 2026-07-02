@@ -17,7 +17,7 @@ export interface CallContextType {
   outgoingGroupCall: OutgoingGroupCall | null;
   activeGroupCalls: string[];
   initiateCall: (receiverId: string, callType: 'AUDIO' | 'VIDEO', receiverName?: string, receiverAvatar?: string) => void;
-  acceptCall: (callId: string, roomName: string) => void;
+  acceptCall: (callId: string, roomName: string, peerName?: string, peerAvatar?: string) => void;
   /** Phase 4: Accept an escalated (mid-call) invitation — fetches token via REST, bypasses DB. */
   acceptEscalatedCall: (roomName: string, callType: 'AUDIO' | 'VIDEO') => Promise<void>;
   rejectCall: (callId: string, roomName: string, isGroup?: boolean, isEscalated?: boolean) => void;

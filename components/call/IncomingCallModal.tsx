@@ -41,9 +41,10 @@ export const IncomingCallModal = () => {
         if (data.success && Array.isArray(data.data)) {
           const caller = data.data.find((u: any) => u.id === incomingCall.callerId);
           if (caller) {
+            const fullName = `${caller.profile?.firstName || ""} ${caller.profile?.lastName || ""}`.trim();
             const displayName =
+              fullName ||
               caller.profile?.displayName ||
-              `${caller.profile?.firstName || ""} ${caller.profile?.lastName || ""}`.trim() ||
               caller.username ||
               "Anonymous";
             setCallerName(displayName);
@@ -81,7 +82,7 @@ export const IncomingCallModal = () => {
         joinGroupCall(incomingCall.groupId);
         rejectCall(incomingCall.callId, incomingCall.roomName, true);
       } else {
-        acceptCall(incomingCall.callId, incomingCall.roomName);
+        acceptCall(incomingCall.callId, incomingCall.roomName, callerName || undefined, callerAvatar || undefined);
       }
     } finally {
       // If we are still mounted (e.g. token fetch failed), reset the spinner

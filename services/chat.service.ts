@@ -75,4 +75,20 @@ export const chatService = {
     const response = await apiClient.post(`/conversations/${payload.conversationId}/messages`, payload);
     return response.data;
   },
+
+  /**
+   * Sets or clears the disappearing-messages timer for a 1v1 conversation.
+   * Both participants share the same setting since it is stored on the
+   * Conversation row and broadcast via socket.
+   *
+   * @param conversationId - The conversation to update.
+   * @param disappearAfterSeconds - Timer in seconds, or null to turn off.
+   */
+  setDisappearSettings: async (conversationId: string, disappearAfterSeconds: number | null) => {
+    const response = await apiClient.patch(`/conversations/${conversationId}/disappear`, {
+      disappearAfterSeconds,
+    });
+    return response.data;
+  },
 };
+

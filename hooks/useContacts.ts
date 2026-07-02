@@ -30,12 +30,20 @@ export function useContacts() {
         contactsArray = data.data.contacts;
       }
 
+      const getFullName = (profile: any) => {
+        if (!profile) return "";
+        if (profile.firstName || profile.lastName) {
+          return `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
+        }
+        return profile.displayName || profile.username || "";
+      };
+
       const mappedContacts = contactsArray.map((u: any) => ({
         id: u.id,
         userId: u.addressee?.id || u.userId || u.id,
-        name: u.customName || u.addressee?.profile?.displayName || u.profile?.displayName || u.profile?.username || "Unknown",
+        name: u.customName || getFullName(u.addressee?.profile) || getFullName(u.contact?.profile) || getFullName(u.profile) || "Unknown",
         phone: u.contact?.phone || u.phoneNumber || u.phone || "No phone number",
-        avatarUrl: u.addressee?.profile?.avatarUrl || u.profile?.avatarUrl || null,
+        avatarUrl: u.addressee?.profile?.avatarUrl || u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || null,
         isFavourite: u.isFavourite || false,
         isOnline: u.addressee?.profile?.isOnline || u.contact?.profile?.isOnline || u.profile?.isOnline || false
       }));

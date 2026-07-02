@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
 import {
@@ -27,6 +27,8 @@ import { MediaGallery } from "@/components/chat/MediaGallery";
 import { Images } from "lucide-react";
 import { usePresence } from "@/context/PresenceContext";
 import { toast } from "sonner";
+import { useSocket } from "@/components/providers/SocketProvider";
+import { isMessageExpired } from "@/components/chat/DisappearingMessagesModal";
 
 function parseJwt(token: string) {
   try {
@@ -163,6 +165,13 @@ export default function ChatRoomPage() {
     hasBlockedMe: boolean;
   } | null>(null);
 
+  // ── Disappearing Messages ──────────────────────────────────────────────────
+  // Stored as seconds (null = off). Loaded from the conversation metadata and
+  // kept in sync with the other participant via socket events.
+  const [disappearAfterSeconds, setDisappearAfterSeconds] = useState<number | null>(null);
+  // Ticker: forces a re-render every second so expired messages vanish in real-time.
+  const [, setTick] = useState(0);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -229,6 +238,10 @@ export default function ChatRoomPage() {
                     `https://ui-avatars.com/api/?name=U&background=F4F6FC&color=3B58F5`,
                   isOnline: conv.otherUserOnline || false,
                 });
+                // Load the disappear setting from the conversation metadata
+                if (conv.disappearAfterSeconds != null) {
+                  setDisappearAfterSeconds(conv.disappearAfterSeconds);
+                }
                 setIsInitializing(false);
                 return;
               }
@@ -316,6 +329,27 @@ export default function ChatRoomPage() {
 
   const { messages, sendMessage, clearMessages, isReady, isUploading } =
     useChat(conversationId, currentUserId, recipientId, isBizChat);
+
+  // ── Disappear ticker ─────────────────────────────────────────────────────
+  // Re-render every second so messages disappear exactly when they expire.
+  useEffect(() => {
+    if (!disappearAfterSeconds) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [disappearAfterSeconds]);
+
+  // ── Socket: listen for real-time disappear setting changes ───────────────
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (payload: { conversationId: string; disappearAfterSeconds: number | null }) => {
+      if (payload.conversationId === conversationId) {
+        setDisappearAfterSeconds(payload.disappearAfterSeconds);
+      }
+    };
+    socket.on("chat:disappear_updated", handler);
+    return () => { socket.off("chat:disappear_updated", handler); };
+  }, [socket, conversationId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -507,6 +541,8 @@ export default function ChatRoomPage() {
                 onClearSuccess={clearMessages}
                 blockStatus={blockStatus}
                 setBlockStatus={setBlockStatus}
+                disappearAfterSeconds={disappearAfterSeconds}
+                onDisappearUpdated={setDisappearAfterSeconds}
               />
             )}
           </div>
@@ -558,23 +594,25 @@ export default function ChatRoomPage() {
             )}
           </div>
         ) : (
-          messages.map((msg, index) => {
-            const isMe = msg.senderId === currentUserId;
-            const showTail =
-              index === 0 || messages[index - 1].senderId !== msg.senderId;
+          messages
+            .filter((msg) => !isMessageExpired(msg.createdAt, disappearAfterSeconds))
+            .map((msg, index, visibleMsgs) => {
+              const isMe = msg.senderId === currentUserId;
+              const showTail =
+                index === 0 || visibleMsgs[index - 1].senderId !== msg.senderId;
 
-            return (
-              <MessageBubble
-                key={msg.id}
-                msg={msg}
-                isMe={isMe}
-                showTail={showTail}
-                peerId={recipientId}
-                peerName={isBizChat ? bizName : recipient?.name}
-                peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
-              />
-            );
-          })
+              return (
+                <MessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  isMe={isMe}
+                  showTail={showTail}
+                  peerId={recipientId}
+                  peerName={isBizChat ? bizName : recipient?.name}
+                  peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
+                />
+              );
+            })
         )}
         <div ref={messagesEndRef} />
       </div>

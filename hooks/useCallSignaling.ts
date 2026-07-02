@@ -26,6 +26,8 @@ export interface ActiveCall {
   roomName: string;
   callType: 'AUDIO' | 'VIDEO';
   isGroup?: boolean;
+  peerName?: string;
+  peerAvatar?: string;
 }
 
 export interface OutgoingCall {
@@ -64,6 +66,8 @@ export const useCallSignaling = () => {
   const [incomingGroupCall, setIncomingGroupCall] = useState<IncomingGroupCall | null>(null);
   const [outgoingGroupCall, setOutgoingGroupCall] = useState<OutgoingGroupCall | null>(null);
   const [activeGroupCalls, setActiveGroupCalls] = useState<string[]>([]);
+  
+  const pendingPeerRef = useRef<{ name?: string; avatar?: string }>({});
   const pendingCancelRef = useRef<boolean>(false);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   /**
@@ -110,6 +114,7 @@ export const useCallSignaling = () => {
     const handleIncomingCall = (payload: IncomingCall) => {
       console.log('[Call] Incoming call received:', payload);
       playRingtone();
+      pendingPeerRef.current = { name: payload.callerName };
       setIncomingCall(payload);
     };
 
@@ -124,7 +129,10 @@ export const useCallSignaling = () => {
         serverUrl: payload.livekitUrl,
         roomName: payload.roomName,
         callType: payload.callType,
+        peerName: pendingPeerRef.current.name,
+        peerAvatar: pendingPeerRef.current.avatar,
       });
+      pendingPeerRef.current = {};
     };
 
     const handleCallEnded = (payload?: unknown) => {
@@ -299,6 +307,9 @@ export const useCallSignaling = () => {
       if (!socket) return;
       console.log('[Call] Initiating call to', receiverId, callType);
       pendingCancelRef.current = false;
+      playRingtone();
+      pendingPeerRef.current = { name: receiverName, avatar: receiverAvatar };
+      // Set tentative outgoing state; callId will be populated when socket responds
       setOutgoingCall({ receiverId, callType, receiverName, receiverAvatar });
 
       socket.emit('call:initiate', { receiverId, callType }, (response: any) => {
@@ -324,9 +335,11 @@ export const useCallSignaling = () => {
   // acceptCall – standard 1v1 accept; emits call:accept to the server
   // -------------------------------------------------------------------------
   const acceptCall = useCallback(
-    (callId: string, roomName: string) => {
+    (callId: string, roomName: string, peerName?: string, peerAvatar?: string) => {
       if (!socket) return;
       console.log('[Call] Accepting call', callId);
+      // Store peer info so call:connected handler can inject it into activeCall
+      pendingPeerRef.current = { name: peerName, avatar: peerAvatar };
       socket.emit('call:accept', { callId, roomName });
     },
     [socket],

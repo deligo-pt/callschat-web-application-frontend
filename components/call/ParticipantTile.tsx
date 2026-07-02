@@ -5,6 +5,7 @@ import { TrackReferenceOrPlaceholder, VideoTrack, useIsSpeaking } from "@livekit
 import { Track } from "livekit-client";
 import { Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useContacts } from "@/hooks/useContacts";
 
 interface ParticipantTileProps {
   trackRef: TrackReferenceOrPlaceholder;
@@ -13,13 +14,46 @@ interface ParticipantTileProps {
 export function ParticipantTile({ trackRef }: ParticipantTileProps) {
   const { participant } = trackRef;
   const isSpeaking = useIsSpeaking(participant);
+  const { contacts } = useContacts();
 
   const isVideoOn = participant.isCameraEnabled && trackRef.source === Track.Source.Camera;
   const isMicrophoneEnabled = participant.isMicrophoneEnabled;
-  const name = participant.name || participant.identity || "Unknown";
+  let name = participant.name || participant.identity || "Unknown";
+  let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B58F5&color=fff&size=256`;
   
-  // Avatar fallback logic
-  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B58F5&color=fff&size=256`;
+  if (!participant.isLocal) {
+    try {
+      const meta = JSON.parse(participant.metadata || "{}");
+      if (meta.firstName || meta.lastName) {
+        name = `${meta.firstName || ""} ${meta.lastName || ""}`.trim();
+      } else if (meta.displayName) {
+        name = meta.displayName;
+      }
+      if (meta.avatarUrl) {
+        avatarUrl = meta.avatarUrl;
+      }
+    } catch(e) {}
+    
+    // Fallback to contacts lookup
+    if (name === participant.identity || name === "Unknown" || name === participant.name || !avatarUrl.includes("ui-avatars.com") === false) {
+      const contact = contacts.find(c => c.userId === participant.identity);
+      if (contact) {
+        if (!name || name === participant.identity || name === "Unknown" || name === participant.name) {
+          name = contact.name;
+        }
+        // Update avatar fallback string
+        if (contact.avatarUrl && avatarUrl.includes("ui-avatars.com")) {
+          avatarUrl = contact.avatarUrl;
+        } else if (!avatarUrl.includes("ui-avatars.com")) {
+           // keep current avatar
+        } else {
+          avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B58F5&color=fff&size=256`;
+        }
+      } else {
+         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B58F5&color=fff&size=256`;
+      }
+    }
+  }
 
   return (
     <div

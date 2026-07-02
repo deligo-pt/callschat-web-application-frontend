@@ -36,6 +36,7 @@ interface Conversation {
     /** Set when the message belongs to a B2C support ticket (plaintext; no E2EE). */
     ticketId?: string | null;
     mediaType: string | null;
+    mediaUrl?: string | null;
     createdAt: string;
   } | null;
 }
@@ -302,6 +303,18 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     if (msg.mediaType === "video") return "🎥 Video";
     if (msg.mediaType === "audio") return "🎤 Voice message";
     if (msg.mediaType === "document") return "📄 Document";
+    
+    if (msg.mediaType === "call") {
+      if (msg.mediaUrl) {
+        try {
+          const payload = JSON.parse(msg.mediaUrl);
+          return payload.type === "VIDEO" ? "📹 Video call" : "📞 Audio call";
+        } catch (e) {
+          // Fallback if parsing fails
+        }
+      }
+      return "📞 Call";
+    }
     
     if (decryptedPreviews[conv.id]) {
       return decryptedPreviews[conv.id];
