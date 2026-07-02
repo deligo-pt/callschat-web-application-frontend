@@ -200,55 +200,53 @@ export default function ChatRoomPage() {
 
         let finalRecipientId = recipientIdFromQuery;
 
-        if (!finalRecipientId) {
-          try {
-            const convsRes = await chatService.fetchMyConversations();
-            if (convsRes?.success && Array.isArray(convsRes?.data)) {
-              const conv = convsRes.data.find(
-                (c: any) => c.id === conversationId,
-              );
-              if (
-                conv?.context === "BUSINESS" ||
-                conv?.workspaceId ||
-                conv?.lastMessage?.ticketId ||
-                !conv?.otherUserId
-              ) {
-                setIsBizChat(true);
-                // Restore the bizHandle so ALL subsequent messages can use contactBusiness.
-                // The handle is stored in the workspace name or derived from business data.
-                // We store whatever handle we can resolve; contactBusiness will use it.
-                const handle =
-                  conv?.businessHandle || conv?.otherUserHandle || "";
-                if (handle) {
-                  setResolvedBizHandle(handle);
-                  bizHandleRef.current = handle;
-                }
-                setBizTicketCreated(true); // thread exists, skip welcome banner
-                setIsInitializing(false);
-                return;
-              }
-              if (conv?.otherUserId) {
-                finalRecipientId = conv.otherUserId;
-                setRecipientId(finalRecipientId);
-                setRecipient({
-                  id: conv.otherUserId,
-                  name: conv.otherUserName || "Unknown",
-                  avatarUrl:
-                    conv.otherUserAvatar ||
-                    `https://ui-avatars.com/api/?name=U&background=F4F6FC&color=3B58F5`,
-                  isOnline: conv.otherUserOnline || false,
-                });
-                // Load the disappear setting from the conversation metadata
-                if (conv.disappearAfterSeconds != null) {
-                  setDisappearAfterSeconds(conv.disappearAfterSeconds);
-                }
-                setIsInitializing(false);
-                return;
-              }
+        try {
+          const convsRes = await chatService.fetchMyConversations();
+          if (convsRes?.success && Array.isArray(convsRes?.data)) {
+            const conv = convsRes.data.find(
+              (c: any) => c.id === conversationId,
+            );
+            
+            // Load the disappear setting unconditionally if the conversation is found
+            if (conv && conv.disappearAfterSeconds !== undefined) {
+              setDisappearAfterSeconds(conv.disappearAfterSeconds);
             }
-          } catch {
-            // fall through
+
+            if (
+              conv?.context === "BUSINESS" ||
+              conv?.workspaceId ||
+              conv?.lastMessage?.ticketId ||
+              (conv && !conv.otherUserId) // B2C where I am the business
+            ) {
+              setIsBizChat(true);
+              const handle =
+                conv?.businessHandle || conv?.otherUserHandle || "";
+              if (handle) {
+                setResolvedBizHandle(handle);
+                bizHandleRef.current = handle;
+              }
+              setBizTicketCreated(true);
+              setIsInitializing(false);
+              return;
+            }
+            
+            if (conv?.otherUserId) {
+              finalRecipientId = conv.otherUserId;
+              setRecipientId(finalRecipientId);
+              setRecipient({
+                id: conv.otherUserId,
+                name: conv.otherUserName || "Unknown",
+                avatarUrl:
+                  conv.otherUserAvatar ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName || "U")}&background=F4F6FC&color=3B58F5`,
+                isOnline: conv.otherUserOnline || false,
+              });
+              setIsInitializing(false);
+              return;
+            }
           }
+        } catch {
+          // fall through to fallback contact lookup if fetchMyConversations fails
         }
 
         if (finalRecipientId) {
