@@ -100,6 +100,16 @@ export const groupService = {
     }
   },
 
+  async rekeyGroup(groupId: string, keys: Array<{ userId: string; encryptedGroupKey: string; keyNonce: string }>): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await apiClient.post(`/groups/${groupId}/rekey`, { keys });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to re-key group ${groupId}`, error);
+      return { success: false, error: error.response?.data?.message || 'Failed to re-key group' };
+    }
+  },
+
   async fetchGroupMessages(groupId: string): Promise<{ success: boolean; data?: any[] }> {
     try {
       const response = await apiClient.get(`/groups/${groupId}/messages`);

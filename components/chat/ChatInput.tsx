@@ -3,6 +3,9 @@ import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, S
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
 import { useQuickReply, QuickReplyDropdown } from "@/components/business/QuickReplyMenu";
+import dynamic from "next/dynamic";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 interface ChatInputProps {
   onSend: (text: string, file: File | null) => void;
@@ -13,8 +16,24 @@ interface ChatInputProps {
 export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      // Don't close if clicking the emoji toggle button itself
+      const target = event.target as Element;
+      if (target.closest('.emoji-toggle-btn')) return;
+      
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(target)) {
+        setShowEmojiPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const {
     isRecording,
@@ -92,6 +111,17 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
 
   return (
     <div className="bg-white px-4 py-3 shrink-0 relative border-t border-gray-100">
+      {/* Emoji Picker Modal */}
+      {showEmojiPicker && (
+        <div ref={emojiPickerRef} className="absolute bottom-full left-4 mb-2 z-50 shadow-2xl rounded-xl">
+          <EmojiPicker
+            onEmojiClick={(emojiData) => {
+              setInputText((prev) => prev + emojiData.emoji);
+            }}
+          />
+        </div>
+      )}
+
       {/* Camera Modal */}
       {isCameraOpen && (
         <div className="absolute bottom-full left-4 mb-2 bg-black rounded-xl overflow-hidden shadow-xl z-50 border border-gray-800">
@@ -160,7 +190,8 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
             <button
               type="button"
               disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-[#6B7280] hover:text-[#254BCC] transition-colors disabled:opacity-50"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              className="emoji-toggle-btn flex items-center justify-center text-[#6B7280] hover:text-[#254BCC] transition-colors disabled:opacity-50"
             >
               <Smile className="h-[22px] w-[22px]" strokeWidth={1.5} />
             </button>

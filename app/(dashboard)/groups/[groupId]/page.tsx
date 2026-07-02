@@ -88,6 +88,63 @@ export default function GroupChatPage() {
 
   const { messages, sendMessage, isReady, error, getGroupKey, isUploading } = useGroupChat(groupId, currentUserId);
 
+  // ── Re-sync Group Keys ─────────────────────────────────────────────────────
+  // When decryption fails (usually after a keypair regeneration), admins can
+  // re-encrypt the group key for all current members using their current keypair.
+  const [isResyncingKeys, setIsResyncingKeys] = useState(false);
+
+  const handleResyncGroupKeys = async () => {
+    setIsResyncingKeys(true);
+    try {
+      const myPrivKey = localStorage.getItem(`privateKey_${currentUserId}`);
+      const myPubKey = localStorage.getItem(`publicKey_${currentUserId}`);
+      if (!myPrivKey || !myPubKey) throw new Error("Local keypair missing. Please log out and back in.");
+
+      // 1. Generate a fresh group key
+      const { generateGroupKey } = await import("@/utils/crypto");
+      const newGroupKey = await generateGroupKey();
+
+      // 2. Fetch all current members
+      const membersRes = await groupService.fetchGroupMembers(groupId);
+      if (!membersRes.success || !membersRes.data?.members) throw new Error("Could not load group members");
+      const members = membersRes.data.members;
+
+      // 3. Encrypt the new group key for each member using their latest public key
+      const keys: Array<{ userId: string; encryptedGroupKey: string; keyNonce: string }> = [];
+      for (const member of members) {
+        const memberId = member.userId || member.user?.id;
+        if (!memberId) continue;
+        const res = await chatService.fetchRecipientKey(memberId);
+        let pubKey = "";
+        if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+          pubKey = res.data[res.data.length - 1].publicKey;
+        } else if (res?.success && res?.data?.publicKey) {
+          pubKey = res.data.publicKey;
+        }
+        if (!pubKey) {
+          console.warn(`[ResyncKeys] No public key for member ${memberId}, skipping`);
+          continue;
+        }
+        const { ciphertext, nonce } = await encryptMessage(newGroupKey, pubKey, myPrivKey);
+        keys.push({ userId: memberId, encryptedGroupKey: ciphertext, keyNonce: nonce });
+      }
+
+      if (keys.length === 0) throw new Error("Could not encrypt key for any member");
+
+      // 4. Send re-encrypted keys via service
+      const result = await groupService.rekeyGroup(groupId, keys);
+      if (!result.success) throw new Error(result.error || "Re-keying failed on server");
+
+      toast.success("Group keys re-synced! Reloading...");
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err: any) {
+      console.error("[ResyncKeys] Failed:", err);
+      toast.error(err.message || "Failed to re-sync group keys");
+    } finally {
+      setIsResyncingKeys(false);
+    }
+  };
+
   const isCallActive = activeGroupCalls.includes(groupId);
 
   // Socket Synchronization for Phase 4
@@ -300,7 +357,7 @@ export default function GroupChatPage() {
   const isAdmin = myRole === "ADMIN" || myRole === "OWNER";
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-[#EEF2FF]">
+    <>
       
       {/* Main Chat Area */}
       <div className={cn("flex flex-col h-full transition-all duration-300", (showGroupInfo || showAdminActivity) ? "w-0 lg:flex-1 hidden lg:flex" : "flex-1")}>
@@ -333,7 +390,7 @@ export default function GroupChatPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             {isCallActive ? (
               <button
                 onClick={() => joinGroupCall(groupId)}
@@ -345,26 +402,26 @@ export default function GroupChatPage() {
             ) : (
               <>
                 <button 
-                  onClick={() => startGroupCall(groupId, 'VIDEO')}
-                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                  onClick={() => startGroupCall(groupId, 'AUDIO')}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#2563EB] hover:bg-white/90 transition-colors shadow-sm"
                 >
-                  <Video className="h-5 w-5" strokeWidth={2} />
+                  <Phone className="h-[16px] w-[16px]" strokeWidth={2.5} />
                 </button>
                 <button 
-                  onClick={() => startGroupCall(groupId, 'AUDIO')}
-                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                  onClick={() => startGroupCall(groupId, 'VIDEO')}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#2563EB] hover:bg-white/90 transition-colors shadow-sm"
                 >
-                  <Phone className="h-5 w-5" strokeWidth={2} />
+                  <Video className="h-[16px] w-[16px]" strokeWidth={2.5} />
                 </button>
               </>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button 
-                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors focus:outline-none"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#2563EB] hover:bg-white/90 transition-colors shadow-sm"
                   title="Group Options"
                 >
-                  <MoreVertical className="h-5 w-5" strokeWidth={2} />
+                  <MoreVertical className="h-[16px] w-[16px]" strokeWidth={2.5} />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[280px] rounded-2xl p-2 bg-white shadow-xl border border-gray-100 text-[#1E293B] z-50">
@@ -451,8 +508,44 @@ export default function GroupChatPage() {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 relative">
-          {!isReady && messages.length === 0 ? (
+        <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 relative bg-white">
+          {error ? (
+            // ── Error State: Decryption Failed ────────────────────────────────
+            <div className="flex flex-col items-center justify-center h-full gap-5 px-6 text-center">
+              <div className="h-16 w-16 rounded-full bg-red-50 flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-[16px] font-bold text-[#1E293B] mb-1">Could Not Unlock Chat</h3>
+                <p className="text-[13px] font-medium text-slate-500 max-w-[280px] leading-relaxed">
+                  {error.includes("out of sync") || error.includes("incorrect key")
+                    ? "The encryption keys are out of sync, likely because your keys were regenerated after this group was created."
+                    : error
+                  }
+                </p>
+              </div>
+              {isAdmin && (
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    onClick={handleResyncGroupKeys}
+                    disabled={isResyncingKeys}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-[#2563EB] text-white rounded-full text-[13px] font-bold hover:bg-blue-700 transition-colors disabled:opacity-60"
+                  >
+                    {isResyncingKeys ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                    {isResyncingKeys ? "Re-syncing..." : "Re-sync Group Keys"}
+                  </button>
+                  <p className="text-[11px] text-slate-400 max-w-[240px]">
+                    As an admin, you can generate and distribute new keys to all members.
+                  </p>
+                </div>
+              )}
+              {!isAdmin && (
+                <p className="text-[12px] text-slate-400 max-w-[240px]">
+                  Please ask a group admin to re-sync the group keys.
+                </p>
+              )}
+            </div>
+          ) : !isReady && messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2] gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
               <p className="text-sm font-medium">Unlocking Group Keys...</p>
@@ -905,6 +998,6 @@ export default function GroupChatPage() {
         onOpenChange={setGalleryOpen} 
         isGroup={true}
       />
-    </div>
+    </>
   );
 }

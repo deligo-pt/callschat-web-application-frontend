@@ -58,14 +58,29 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
         const { encryptedGroupKey, keyNonce } = keyRes.data;
 
-        // 3. Fetch creator's public key
+        // 3. Fetch creator's ALL public keys (key history) — newest last
         const creatorKeyRes = await chatService.fetchRecipientKey(creatorId);
-        let creatorPubKey: string;
+        let creatorPubKeys: string[] = [];
+
         if (creatorKeyRes?.data && Array.isArray(creatorKeyRes.data) && creatorKeyRes.data.length > 0) {
-          creatorPubKey = creatorKeyRes.data[creatorKeyRes.data.length - 1].publicKey;
+          // Collect all known public keys; try newest first (most likely match)
+          creatorPubKeys = [...creatorKeyRes.data]
+            .reverse()
+            .map((k: any) => k.publicKey)
+            .filter(Boolean);
         } else if (creatorKeyRes?.success && creatorKeyRes?.data?.publicKey) {
-          creatorPubKey = creatorKeyRes.data.publicKey;
-        } else {
+          creatorPubKeys = [creatorKeyRes.data.publicKey];
+        }
+
+        // Also include the current user's own public key as a fallback
+        // (in case the current user IS the creator and the key is self-encrypted
+        // with an older keypair stored locally)
+        const myPubKeyLocal = localStorage.getItem(`publicKey_${currentUserId}`) || localStorage.getItem("publicKey");
+        if (myPubKeyLocal && !creatorPubKeys.includes(myPubKeyLocal)) {
+          creatorPubKeys.push(myPubKeyLocal);
+        }
+
+        if (creatorPubKeys.length === 0) {
           throw new Error("Could not find creator's public key to decrypt group key");
         }
 
@@ -76,13 +91,36 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           throw new Error("Missing local private key");
         }
 
-        // 5. Decrypt the group key
-        const plaintextGroupKey = await decryptMessage(
-          encryptedGroupKey,
-          keyNonce,
-          creatorPubKey,
-          myPrivKey
-        );
+        // 5. Try decrypting with each creator public key (newest → oldest)
+        //    This handles the case where the creator regenerated their keypair
+        //    after the group was created (key rotation).
+        let plaintextGroupKey: string | null = null;
+        let lastDecryptError: any = null;
+
+        for (const pubKey of creatorPubKeys) {
+          try {
+            plaintextGroupKey = await decryptMessage(
+              encryptedGroupKey,
+              keyNonce,
+              pubKey,
+              myPrivKey
+            );
+            // If we reach here, decryption succeeded
+            console.log("[useGroupChat] Group key decrypted successfully.");
+            break;
+          } catch (err) {
+            lastDecryptError = err;
+            console.warn("[useGroupChat] Decryption attempt failed with a public key, trying next...");
+          }
+        }
+
+        if (!plaintextGroupKey) {
+          console.error("[useGroupChat] All public key attempts exhausted.", lastDecryptError);
+          throw new Error(
+            "Failed to decrypt group key. The encryption keys may be out of sync. " +
+            "Try re-logging in to regenerate your keypair."
+          );
+        }
 
         groupKeyRef.current = plaintextGroupKey;
 

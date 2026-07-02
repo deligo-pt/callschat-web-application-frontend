@@ -59,44 +59,25 @@ export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, is
       : (dur > 0 ? formatDur(dur) : "Call ended");
 
     return (
-      <div className={cn("flex w-full mb-1", isMe ? "justify-end" : "justify-start")}>
-        {!isMe && (
-          <div className="w-8 shrink-0 mr-3 flex items-end pb-2">
-            {showAvatar && (
-              <div className="h-8 w-8 rounded-full flex items-center justify-center bg-[#3B58F5] text-white text-xs font-bold shadow-sm overflow-hidden">
-                {msg.sender?.profile?.avatarUrl ? (
-                  <img src={msg.sender.profile.avatarUrl} className="h-full w-full object-cover" alt={senderName} />
-                ) : senderInitials}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
-          {!isMe && isFirstFromSender && (
-            <span className="text-[12px] font-semibold text-[#3B58F5] ml-1 mb-1">{senderName}</span>
-          )}
-
+      <div className={cn("flex w-full mb-2", isMe ? "justify-end" : "justify-start")}>
+        <div className={cn("flex flex-col w-full max-w-[280px]", isMe ? "items-end" : "items-start")}>
           <div
             onClick={() => groupId && startGroupCall(groupId, isVideo ? 'VIDEO' : 'AUDIO')}
             className={cn(
-              "flex items-center gap-3.5 px-4 py-3 rounded-2xl border shadow-sm max-w-[280px] w-full transition-colors cursor-pointer",
-              isMe ? "bg-[#EEF2FF] border-[#D8E2FF] hover:bg-[#E0E9FF]" : "bg-white border-gray-200 hover:bg-gray-50"
+              "flex items-center gap-3 px-4 py-3 rounded-xl border shadow-sm w-full transition-colors cursor-pointer",
+              isMe ? "bg-[#EEF2FF] border-[#E0E7FF] hover:bg-[#E0E7FF]" : "bg-[#EEF2FF] border-[#E0E7FF] hover:bg-[#E0E7FF]"
             )}
           >
-            <div className={cn(
-              "w-10 h-10 rounded-full shrink-0 flex items-center justify-center shadow-sm",
-              isMissed ? "bg-red-50 text-red-500" : "bg-[#E0E9FF] text-[#254BCC]"
-            )}>
-              {isVideo ? <Video className="w-5 h-5" /> : isMissed ? <PhoneMissed className="w-5 h-5" /> : isMe ? <PhoneOutgoing className="w-5 h-5" /> : <PhoneIncoming className="w-5 h-5" />}
+            <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[#2563EB]">
+              {isVideo ? <Video className="w-4 h-4" /> : isMissed ? <PhoneMissed className="w-4 h-4 text-red-500" /> : <Phone className="w-4 h-4" strokeWidth={2.5} />}
             </div>
             <div className="flex flex-col min-w-0 flex-1">
-              <span className={cn("font-bold text-[14px] truncate", isMissed ? "text-red-500" : "text-[#254BCC]")}>
-                {isVideo ? "Group Video call" : "Group Audio call"}
+              <span className={cn("font-bold text-[13px] truncate", isMissed ? "text-red-500" : "text-[#2563EB]")}>
+                {isVideo ? "Video call" : "Audio call"}
               </span>
-              <span className="text-xs text-gray-500 font-medium">{subtitle}</span>
+              <span className="text-[11px] text-slate-500 font-medium">{subtitle}</span>
             </div>
-            <span className="text-[10px] text-gray-400 font-medium self-end ml-1">{formatTime(msg.createdAt)}</span>
+            <span className="text-[10px] text-slate-400 font-medium self-end mb-0.5">{formatTime(msg.createdAt).toLowerCase()}</span>
           </div>
         </div>
       </div>
@@ -148,45 +129,21 @@ export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, is
   };
 
   return (
-    <div className={cn("flex w-full mb-1", isMe ? "justify-end" : "justify-start")}>
-      {!isMe && (
-        <div className="w-8 shrink-0 mr-3 flex items-end pb-5">
-          {showAvatar && (
-            <div className="h-8 w-8 rounded-full flex items-center justify-center bg-[#3B58F5] text-white text-xs font-bold shadow-sm overflow-hidden">
-              {msg.sender?.profile?.avatarUrl ? (
-                <img
-                  src={msg.sender.profile.avatarUrl}
-                  className="h-full w-full object-cover"
-                  alt={senderName}
-                />
-              ) : (
-                senderInitials
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
-        {!isMe && isFirstFromSender && (
-          <span className="text-[12px] font-semibold text-[#3B58F5] ml-1 mb-1">
-            {senderName}
-          </span>
-        )}
-
+    <div className={cn("flex w-full mb-4", isMe ? "justify-end" : "justify-start")}>
+      <div className={cn("flex flex-col max-w-[65%]", isMe ? "items-end" : "items-start")}>
         <div
           className={cn(
-            "px-4 py-3 text-[14.5px] shadow-sm leading-relaxed flex flex-col group",
+            "px-4 py-2.5 text-[14px] shadow-sm leading-relaxed flex flex-col group",
             isMe
-              ? "bg-[#3B58F5] text-white rounded-[20px] rounded-br-sm"
-              : "bg-white text-[#11142D] rounded-[20px] rounded-bl-sm"
+              ? "bg-[#2563EB] text-white rounded-[20px] rounded-tr-sm"
+              : "bg-white text-[#1E293B] rounded-[20px] rounded-tl-sm"
           )}
         >
           {renderMedia()}
 
           {msg.text && (
             <span
-              className="whitespace-pre-wrap"
+              className="whitespace-pre-wrap font-medium"
               style={{ wordBreak: "break-word" }}
             >
               {msg.text}
@@ -195,9 +152,9 @@ export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, is
         </div>
 
         {(!isNextSameSender || isMe) && (
-          <div className={cn("flex flex-col mt-1", isMe ? "items-end mr-1" : "ml-1")}>
-            <span className="text-[11px] font-medium text-[#8F95B2]">
-              {formatTime(msg.createdAt)}
+          <div className={cn("flex flex-col mt-1.5", isMe ? "items-end mr-1" : "ml-1")}>
+            <span className="text-[11px] font-semibold text-slate-400">
+              {isMe ? "Sent" : formatTime(msg.createdAt).toUpperCase()}
             </span>
           </div>
         )}

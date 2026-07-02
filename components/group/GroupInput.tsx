@@ -2,6 +2,9 @@ import React, { useRef, useState, useEffect } from "react";
 import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, Smile } from "lucide-react";
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 interface GroupInputProps {
   onSend: (text: string, file: File | null) => void;
@@ -12,8 +15,24 @@ interface GroupInputProps {
 export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      // Don't close if clicking the emoji toggle button itself
+      const target = event.target as Element;
+      if (target.closest('.emoji-toggle-btn')) return;
+      
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(target)) {
+        setShowEmojiPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const {
     isRecording,
@@ -83,6 +102,17 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
 
   return (
     <div className="bg-white px-4 py-3 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)] relative z-20">
+      {/* Emoji Picker Modal */}
+      {showEmojiPicker && (
+        <div ref={emojiPickerRef} className="absolute bottom-full left-4 mb-2 z-50 shadow-2xl rounded-xl">
+          <EmojiPicker
+            onEmojiClick={(emojiData) => {
+              setInputText((prev) => prev + emojiData.emoji);
+            }}
+          />
+        </div>
+      )}
+
       {/* Camera Modal */}
       {isCameraOpen && (
         <div className="absolute bottom-full left-4 mb-2 bg-black rounded-xl overflow-hidden shadow-xl z-50 border border-gray-800">
@@ -148,34 +178,35 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
 
         {/* Attachment & Camera Buttons (hidden when recording) */}
         {!isRecording && (
-          <div className="flex gap-2 items-center mb-2">
+          <div className="flex gap-3 items-center mb-2.5 shrink-0 pr-1">
             <button
               type="button"
               disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-[#8F95B2] hover:text-[#3B58F5] transition-colors disabled:opacity-50 hidden sm:block"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              className="emoji-toggle-btn flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50 hidden sm:block"
             >
-              <Smile className="h-[22px] w-[22px]" strokeWidth={1.5} />
+              <Smile className="h-5 w-5" strokeWidth={2} />
             </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-[#8F95B2] hover:text-[#3B58F5] transition-colors disabled:opacity-50"
+              className="flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
             >
-              <Paperclip className="h-[22px] w-[22px]" strokeWidth={1.5} />
+              <Paperclip className="h-5 w-5" strokeWidth={2} />
             </button>
             <button
               type="button"
               onClick={() => (isCameraOpen ? stopCamera() : startCamera())}
               disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-[#8F95B2] hover:text-[#3B58F5] transition-colors disabled:opacity-50 pr-1 hidden sm:block"
+              className="flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50 hidden sm:block"
             >
-              <ImageIcon className="h-[22px] w-[22px]" strokeWidth={1.5} />
+              <ImageIcon className="h-5 w-5" strokeWidth={2} />
             </button>
           </div>
         )}
 
-        <div className="flex-1 bg-[#F4F6FC] rounded-[24px] flex items-center px-5 py-2 shadow-sm min-h-[44px]">
+        <div className="flex-1 bg-[#F8FAFC] border border-[#E6EAFA] rounded-full flex items-center px-4 py-1.5 shadow-sm min-h-[44px]">
           {isRecording ? (
             <div className="flex-1 flex items-center gap-3 h-6">
               <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
@@ -211,13 +242,13 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
             disabled={!isReady}
             className={cn(
               "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-md mb-0.5",
-              isRecording ? "bg-red-500 text-white" : "bg-[#3B58F5] text-white"
+              isRecording ? "bg-red-500 text-white" : "bg-[#2563EB] text-white"
             )}
           >
             {isRecording ? (
               <Square className="h-5 w-5 fill-current" strokeWidth={2} />
             ) : (
-              <Mic className="h-[20px] w-[20px]" strokeWidth={2.5} />
+              <Mic className="h-5 w-5" strokeWidth={2} />
             )}
           </button>
         ) : (
@@ -225,12 +256,12 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
           <button
             type="submit"
             disabled={!isReady || isUploading || (!inputText.trim() && !selectedFile)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3B58F5] text-white transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-md mb-0.5"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-white transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-md mb-0.5"
           >
             {isUploading ? (
               <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.5} />
             ) : (
-              <Send className="h-5 w-5 ml-0.5" strokeWidth={2.5} />
+              <Send className="h-4 w-4 ml-0.5" strokeWidth={2.5} />
             )}
           </button>
         )}
