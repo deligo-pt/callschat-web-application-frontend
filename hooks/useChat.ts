@@ -11,7 +11,7 @@ export interface ChatMessage {
   text: string;
   createdAt: string;
   mediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'audio' | 'document' | null;
+  mediaType?: 'image' | 'video' | 'audio' | 'document' | 'link' | string | null;
 }
 
 export const useChat = (conversationId: string, currentUserId: string, activePeerId: string, isBizChat: boolean = false) => {
@@ -355,7 +355,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
           console.log(`[Socket] Attempting decryption. Sender: ${senderId}, Decrypting with Public Key of: ${targetUserId}`);
 
-          let text: string;
+          let text = "";
           try {
             text = await decryptMessage(
               payload.ciphertext,
@@ -546,15 +546,33 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
       // Optimistic local update with a temporary ID
       const optimisticId = `optimistic-${Date.now()}`;
+      
+      let optimisticMediaType: string | undefined = undefined;
+      let optimisticMediaUrl: string | undefined = undefined;
+      if (file) {
+        optimisticMediaUrl = URL.createObjectURL(file);
+        if (file.type.startsWith("image")) optimisticMediaType = "image";
+        else if (file.type.startsWith("video")) optimisticMediaType = "video";
+        else if (file.type.startsWith("audio")) optimisticMediaType = "audio";
+        else optimisticMediaType = "document";
+      } else if (text) {
+        const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
+        if (urlMatch && urlMatch[0]) {
+          optimisticMediaUrl = urlMatch[0];
+          optimisticMediaType = "link";
+        }
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           id: optimisticId,
           conversationId,
           senderId: currentUserId,
-          text: file ? "Uploading media..." : text,
+          text: text,
           createdAt: new Date().toISOString(),
-          // We don't have the mediaUrl yet for optimistic update
+          mediaUrl: optimisticMediaUrl,
+          mediaType: optimisticMediaType,
         },
       ]);
 
@@ -572,6 +590,12 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             // Update the optimistic message to show the media preview (if it's local URL we could use ObjectURL, but we just wait for real msg)
           }
           setIsUploading(false);
+        } else if (text) {
+          const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
+          if (urlMatch && urlMatch[0]) {
+            mediaUrl = urlMatch[0];
+            mediaType = 'link';
+          }
         }
 
         let ciphertext, nonce;

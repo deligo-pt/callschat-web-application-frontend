@@ -1,7 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing } from "lucide-react";
+import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
 
 interface MessageBubbleProps {
@@ -117,39 +117,88 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
     if (!msg.mediaUrl) return null;
 
     const mediaKey = `media-${msg.id}-${msg.mediaUrl}`;
+    const isOptimistic = msg.id.startsWith("optimistic-");
+
+    if (msg.mediaType === 'link') {
+      return null;
+    }
 
     if (msg.mediaType?.startsWith("image")) {
       return (
-        <img
-          key={mediaKey}
-          src={msg.mediaUrl}
-          alt="Attached Image"
-          className="rounded-lg max-w-sm w-full cursor-pointer object-cover mb-1"
-        />
+        <div className="relative mb-1">
+          <img
+            key={mediaKey}
+            src={msg.mediaUrl}
+            alt="Attached Image"
+            className={cn("rounded-lg max-w-sm w-full cursor-pointer object-cover", isOptimistic && "opacity-70 blur-[2px]")}
+          />
+          {isOptimistic && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/50 p-3 rounded-full text-white shadow-lg backdrop-blur-sm">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            </div>
+          )}
+        </div>
       );
     }
 
     if (msg.mediaType?.startsWith("video")) {
       return (
-        <video
-          key={mediaKey}
-          src={msg.mediaUrl}
-          controls
-          className="rounded-lg max-w-sm w-full max-h-[300px] mb-1"
-        />
+        <div className="relative mb-1">
+          <video
+            key={mediaKey}
+            src={msg.mediaUrl}
+            controls={!isOptimistic}
+            className={cn("rounded-lg max-w-sm w-full max-h-[300px]", isOptimistic && "opacity-70 blur-[2px]")}
+          />
+          {isOptimistic && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/50 p-3 rounded-full text-white shadow-lg backdrop-blur-sm">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            </div>
+          )}
+        </div>
       );
     }
 
-    // Fallback: downloadable link
+    // Document Card
     return (
       <a
         key={mediaKey}
-        href={msg.mediaUrl}
-        target="_blank"
+        href={isOptimistic ? undefined : msg.mediaUrl}
+        target={isOptimistic ? undefined : "_blank"}
         rel="noopener noreferrer"
-        className="block text-blue-500 underline mb-1"
+        className={cn(
+          "flex items-center gap-3 p-3 rounded-xl mb-1 min-w-[200px] border shadow-sm transition-colors",
+          isMe 
+            ? "bg-white/10 border-white/20 hover:bg-white/20 text-white" 
+            : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-800",
+          isOptimistic && "pointer-events-none opacity-80"
+        )}
       >
-        📎 Download Attachment
+        <div className={cn(
+          "flex items-center justify-center w-10 h-10 rounded-lg shrink-0",
+          isMe ? "bg-white/20" : "bg-blue-100 text-blue-600"
+        )}>
+          {isOptimistic ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <FileText className="w-5 h-5" />
+          )}
+        </div>
+        <div className="flex flex-col flex-1 truncate">
+          <span className="text-sm font-semibold truncate leading-tight">Document</span>
+          <span className={cn("text-xs font-medium", isMe ? "text-blue-100" : "text-slate-500")}>
+            {isOptimistic ? "Uploading..." : "Click to view"}
+          </span>
+        </div>
+        {!isOptimistic && (
+          <div className={cn("w-8 h-8 rounded-full flex items-center justify-center transition-colors", isMe ? "hover:bg-white/20" : "hover:bg-slate-200")}>
+            <Download className="w-4 h-4" />
+          </div>
+        )}
       </a>
     );
   };

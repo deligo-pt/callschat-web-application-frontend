@@ -16,7 +16,8 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
@@ -71,9 +72,9 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
     if (file) {
       setSelectedFile(file);
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    // Reset both inputs so the same file can be selected again if needed
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+    if (docInputRef.current) docInputRef.current.value = "";
   };
 
   const handleToggleRecording = async () => {
@@ -167,16 +168,23 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
       )}
 
       <form onSubmit={handleSend} className="flex items-end gap-3 w-full max-w-4xl mx-auto">
-        {/* Hidden File Input */}
+        {/* Hidden File Inputs */}
         <input
           type="file"
-          ref={fileInputRef}
+          ref={galleryInputRef}
           className="hidden"
           onChange={handleFileChange}
-          accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+          accept="image/*,video/*"
+        />
+        <input
+          type="file"
+          ref={docInputRef}
+          className="hidden"
+          onChange={handleFileChange}
+          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx"
         />
 
-        {/* Attachment & Camera Buttons (hidden when recording) */}
+        {/* Attachment Buttons (hidden when recording) */}
         {!isRecording && (
           <div className="flex gap-3 items-center mb-2.5 shrink-0 pr-1">
             <button
@@ -189,19 +197,19 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
             </button>
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!isReady || isUploading}
-              className="flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
-            >
-              <Paperclip className="h-5 w-5" strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              onClick={() => (isCameraOpen ? stopCamera() : startCamera())}
+              onClick={() => galleryInputRef.current?.click()}
               disabled={!isReady || isUploading}
               className="flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50 hidden sm:block"
             >
               <ImageIcon className="h-5 w-5" strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              onClick={() => docInputRef.current?.click()}
+              disabled={!isReady || isUploading}
+              className="flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+            >
+              <Paperclip className="h-5 w-5" strokeWidth={2} />
             </button>
           </div>
         )}

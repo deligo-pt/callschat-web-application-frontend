@@ -4,7 +4,7 @@ import { groupService } from "@/services/group.service";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, FileIcon, ImageIcon, Music, Play, ExternalLink } from "lucide-react";
+import { Loader2, FileIcon, ImageIcon, Music, Play, ExternalLink, Link as LinkIcon } from "lucide-react";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
 
 interface MediaItem {
@@ -64,8 +64,10 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
   );
   
   const filesAndVoice = items.filter(
-    m => m.mediaType.startsWith("audio/") || m.mediaType === "audio" || (!m.mediaType.startsWith("image/") && !m.mediaType.startsWith("video/") && m.mediaType !== "image" && m.mediaType !== "video" && m.mediaType !== "emoji")
+    m => (m.mediaType.startsWith("audio/") || m.mediaType === "audio" || (!m.mediaType.startsWith("image/") && !m.mediaType.startsWith("video/") && m.mediaType !== "image" && m.mediaType !== "video" && m.mediaType !== "emoji")) && m.mediaType !== "link"
   );
+  
+  const links = items.filter(m => m.mediaType === "link");
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -76,12 +78,15 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
         
         <Tabs defaultValue="media" className="flex-1 flex flex-col h-full overflow-hidden">
           <div className="px-6 pt-4 pb-2 border-b">
-            <TabsList className="w-full grid grid-cols-2 bg-[#F3F4F6] p-1 rounded-xl">
+            <TabsList className="w-full grid grid-cols-3 bg-[#F3F4F6] p-1 rounded-xl">
               <TabsTrigger value="media" className="rounded-lg font-medium text-[14px] data-[state=active]:bg-white data-[state=active]:text-[#3B58F5] data-[state=active]:shadow-sm transition-all">
                 Media
               </TabsTrigger>
               <TabsTrigger value="files" className="rounded-lg font-medium text-[14px] data-[state=active]:bg-white data-[state=active]:text-[#3B58F5] data-[state=active]:shadow-sm transition-all">
-                Files & Voice
+                Files
+              </TabsTrigger>
+              <TabsTrigger value="links" className="rounded-lg font-medium text-[14px] data-[state=active]:bg-white data-[state=active]:text-[#3B58F5] data-[state=active]:shadow-sm transition-all">
+                Links
               </TabsTrigger>
             </TabsList>
           </div>
@@ -196,6 +201,56 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                         </a>
                       )}
                     </div>
+                  ))}
+                  {hasMore && !loading && (
+                    <button 
+                      onClick={() => setPage(p => p + 1)}
+                      className="w-full py-3 rounded-xl bg-[#F3F4F6] hover:bg-[#E5E7EB] text-[#3B58F5] font-medium transition-colors mt-2"
+                    >
+                      Load more
+                    </button>
+                  )}
+                  {loading && page > 1 && (
+                    <div className="flex justify-center p-4">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="links" className="p-6 m-0 border-none outline-none">
+              {loading && page === 1 ? (
+                <div className="flex justify-center p-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                </div>
+              ) : links.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center p-12 text-[#6B7280]">
+                  <LinkIcon className="w-12 h-12 mb-4 opacity-20" />
+                  <p>No links shared yet</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {links.map((item) => (
+                    <a 
+                      key={item.id}
+                      href={item.mediaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-[#E5E7EB]/50 transition-all hover:shadow-md hover:border-[#3B58F5]/30 group"
+                    >
+                      <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-50 group-hover:bg-[#3B58F5] flex items-center justify-center transition-colors">
+                        <LinkIcon className="w-5 h-5 text-[#3B58F5] group-hover:text-white transition-colors" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold text-[#111928] truncate group-hover:text-[#3B58F5] transition-colors">
+                          {item.mediaUrl}
+                        </p>
+                        <p className="text-[12px] text-[#6B7280]">
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </a>
                   ))}
                   {hasMore && !loading && (
                     <button 

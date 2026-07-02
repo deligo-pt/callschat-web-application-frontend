@@ -17,7 +17,8 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
@@ -80,9 +81,9 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
     if (file) {
       setSelectedFile(file);
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    // Reset both inputs so the same file can be selected again if needed
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+    if (docInputRef.current) docInputRef.current.value = "";
   };
 
   const handleToggleRecording = async () => {
@@ -175,16 +176,23 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
       )}
 
       <form onSubmit={handleSend} className="flex items-end gap-2">
-        {/* Hidden File Input */}
+        {/* Hidden File Inputs */}
         <input
           type="file"
-          ref={fileInputRef}
+          ref={galleryInputRef}
           className="hidden"
           onChange={handleFileChange}
-          accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+          accept="image/*,video/*"
+        />
+        <input
+          type="file"
+          ref={docInputRef}
+          className="hidden"
+          onChange={handleFileChange}
+          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx"
         />
 
-        {/* Attachment & Camera Buttons (hidden when recording) */}
+        {/* Attachment Buttons (hidden when recording) */}
         {!isRecording && (
           <div className="flex gap-2 items-center mb-2">
             <button
@@ -197,19 +205,19 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
             </button>
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => galleryInputRef.current?.click()}
               disabled={!isReady || isUploading}
               className="flex items-center justify-center text-[#6B7280] hover:text-[#254BCC] transition-colors disabled:opacity-50"
             >
-              <Paperclip className="h-[22px] w-[22px]" strokeWidth={1.5} />
+              <ImageIcon className="h-[22px] w-[22px]" strokeWidth={1.5} />
             </button>
             <button
               type="button"
-              onClick={() => (isCameraOpen ? stopCamera() : startCamera())}
+              onClick={() => docInputRef.current?.click()}
               disabled={!isReady || isUploading}
               className="flex items-center justify-center text-[#6B7280] hover:text-[#254BCC] transition-colors disabled:opacity-50 pr-1"
             >
-              <ImageIcon className="h-[22px] w-[22px]" strokeWidth={1.5} />
+              <Paperclip className="h-[22px] w-[22px]" strokeWidth={1.5} />
             </button>
           </div>
         )}
