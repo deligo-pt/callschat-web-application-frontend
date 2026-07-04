@@ -93,6 +93,11 @@ export const useCallSignaling = () => {
     }
   }, [stopRingtone]);
 
+  // Safety net: always stop ringtone when the hook unmounts (e.g. user navigates away)
+  useEffect(() => {
+    return () => { stopRingtone(); };
+  }, [stopRingtone]);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -426,6 +431,9 @@ export const useCallSignaling = () => {
     if (!socket || !outgoingCall) return;
     console.log('[Call] Canceling outgoing call');
 
+    // ✅ Always stop ringtone immediately when the caller cancels
+    stopRingtone();
+
     if (outgoingCall.callId) {
       socket.emit('call:hangup', { callId: outgoingCall.callId });
     } else {
@@ -434,7 +442,7 @@ export const useCallSignaling = () => {
     }
 
     setOutgoingCall(null);
-  }, [socket, outgoingCall]);
+  }, [socket, outgoingCall, stopRingtone]);
 
   // -------------------------------------------------------------------------
   // Group call actions
@@ -467,10 +475,12 @@ export const useCallSignaling = () => {
     (groupId: string) => {
       if (!socket) return;
       console.log('[Call] Canceling group call for', groupId);
+      // ✅ Stop ringtone immediately when the caller cancels a group call
+      stopRingtone();
       socket.emit('group:call_cancel', { groupId });
       setOutgoingGroupCall(null);
     },
-    [socket],
+    [socket, stopRingtone],
   );
 
   const acceptGroupCall = useCallback(

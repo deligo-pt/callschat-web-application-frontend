@@ -154,6 +154,7 @@ export default function ProfilePage() {
         const submitData = new FormData();
         if (formData.displayName) submitData.append("displayName", formData.displayName);
         if (formData.username) submitData.append("username", formData.username);
+        if (formData.email !== undefined) submitData.append("email", formData.email);
         if (formData.bio) submitData.append("bio", formData.bio);
         if (formData.country) submitData.append("country", formData.country);
         if (formData.timezone) submitData.append("timezone", formData.timezone);
@@ -358,6 +359,23 @@ export default function ProfilePage() {
               </button>
             </div>
           </div>
+
+          {/* LOGOUT */}
+          <div className="flex flex-col mt-2">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50 p-3 hover:bg-red-100 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-500">
+                  <LogOut className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-[13px] font-bold text-red-600">Logout</span>
+                </div>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -420,13 +438,16 @@ export default function ProfilePage() {
 
             <div className="flex flex-col gap-2">
               <label className="text-[13px] font-bold text-[#0F172A]">Email</label>
-              <input
-                type="email"
-                value={formData.email || ""}
-                readOnly
-                placeholder="Not set"
-                className="h-[46px] w-full rounded-xl border border-transparent bg-[#F8FAFC] px-4 text-[13px] font-medium text-slate-500 cursor-not-allowed"
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  value={formData.email || ""}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Not set"
+                  className="h-[46px] w-full rounded-xl border border-transparent bg-[#F8FAFC] px-4 text-[13px] font-medium text-slate-800 focus:border-blue-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                />
+                <Edit2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2563EB]" />
+              </div>
             </div>
 
             <div className="mt-8 flex justify-center">

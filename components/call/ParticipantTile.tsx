@@ -9,9 +9,12 @@ import { useContacts } from "@/hooks/useContacts";
 
 interface ParticipantTileProps {
   trackRef: TrackReferenceOrPlaceholder;
+  disableOverlay?: boolean;
+  hideName?: boolean;
+  className?: string;
 }
 
-export function ParticipantTile({ trackRef }: ParticipantTileProps) {
+export function ParticipantTile({ trackRef, disableOverlay, hideName, className }: ParticipantTileProps) {
   const { participant } = trackRef;
   const isSpeaking = useIsSpeaking(participant);
   const { contacts } = useContacts();
@@ -59,7 +62,8 @@ export function ParticipantTile({ trackRef }: ParticipantTileProps) {
     <div
       className={cn(
         "relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-[#0F172A] shadow-lg transition-all duration-300",
-        isSpeaking ? "ring-4 ring-[#3B58F5] shadow-[0_0_20px_rgba(59,88,245,0.5)]" : "ring-1 ring-white/10"
+        isSpeaking ? "ring-4 ring-[#3B58F5] shadow-[0_0_20px_rgba(59,88,245,0.5)]" : "ring-1 ring-white/10",
+        className
       )}
     >
       {/* Video or Fallback Avatar */}
@@ -87,22 +91,28 @@ export function ParticipantTile({ trackRef }: ParticipantTileProps) {
       )}
 
       {/* Status Overlays */}
-      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-        {/* Name Tag */}
-        <div className="flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-md">
-          <span className="text-sm font-medium text-white shadow-sm drop-shadow-md truncate max-w-[120px] md:max-w-[200px]">
-            {name} {participant.isLocal && "(You)"}
-          </span>
-        </div>
+      {!disableOverlay && (
+        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+          {/* Name Tag */}
+          {!hideName ? (
+            <div className="flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-md">
+              <span className="text-sm font-medium text-white shadow-sm drop-shadow-md truncate max-w-[120px] md:max-w-[200px]">
+                {name} {participant.isLocal && "(You)"}
+              </span>
+            </div>
+          ) : (
+            <div />
+          )}
 
-        {/* Mic Indicator */}
-        <div className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md",
-          isMicrophoneEnabled ? "bg-black/50 text-white" : "bg-red-500/80 text-white"
-        )}>
-          {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          {/* Mic Indicator */}
+          <div className={cn(
+            "flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md",
+            isMicrophoneEnabled ? "bg-black/50 text-white" : "bg-red-500/80 text-white"
+          )}>
+            {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -21,6 +21,8 @@ import {
   ArrowLeft,
   UserPlus,
   MoreVertical,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
@@ -36,11 +38,11 @@ interface CustomCallLayoutProps {
   onOpenInvite: () => void;
   onCloseInvite: () => void;
 }
-
 const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCallLayoutProps) => {
   const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected } = useCallContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const { contacts } = useContacts();
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
 
   // -------------------------------------------------------------------------
   // Phase 5: Dynamic Grid Engine
@@ -110,16 +112,16 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
   // ─────────────────────────────────────────────────────────────────────────
   const ControlDock = ({ compact = false }: { compact?: boolean }) => (
     <div className={cn(
-      "flex items-center justify-center gap-5",
+      "flex items-center justify-center gap-6",
       compact
-        ? "absolute bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-[2rem] bg-[#111936]/80 px-8 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl border border-white/5"
-        : "absolute bottom-10 left-1/2 z-50 flex -translate-x-1/2 rounded-[2rem] bg-[#223263]/90 px-8 py-5 shadow-2xl backdrop-blur-xl border border-white/10",
+        ? "absolute -bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-[2rem] bg-[#223263]/90 px-10 py-5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl border border-white/5"
+        : "absolute bottom-10 left-1/2 z-50 flex -translate-x-1/2 rounded-[2rem] bg-[#223263]/90 px-10 py-5 shadow-2xl backdrop-blur-xl border border-white/10",
     )}>
-      <div className="flex flex-col items-center gap-1.5">
+      <div className="flex flex-col items-center gap-2">
         <button
           onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
           className={cn(
-            "flex h-[60px] w-[60px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-[56px] w-[56px] items-center justify-center rounded-full transition-all duration-300",
             isCameraEnabled
               ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30"
               : "bg-white/10 text-white/80 hover:bg-white/20",
@@ -128,34 +130,50 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
         >
           {isCameraEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
         </button>
-        <span className="text-[12px] font-medium text-white/50">Video</span>
+        <span className="text-[13px] font-medium text-white/50">Video</span>
       </div>
 
-      <div className="flex flex-col items-center gap-1.5">
+      <div className="flex flex-col items-center gap-2">
         <button
           onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
           className={cn(
-            "flex h-[60px] w-[60px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-[56px] w-[56px] items-center justify-center rounded-full transition-all duration-300",
             isMicrophoneEnabled
               ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30"
               : "bg-white/10 text-white/80 hover:bg-white/20",
           )}
-          aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
+          aria-label={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
         >
           {isMicrophoneEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
         </button>
-        <span className="text-[12px] font-medium text-white/50">Mic</span>
+        <span className="text-[13px] font-medium text-white/50">Mic</span>
       </div>
 
-      <div className="flex flex-col items-center gap-1.5 ml-2">
+      <div className="flex flex-col items-center gap-2">
+        <button
+          onClick={() => setIsSpeakerMuted(!isSpeakerMuted)}
+          className={cn(
+            "flex h-[56px] w-[56px] items-center justify-center rounded-full transition-all duration-300",
+            !isSpeakerMuted
+              ? "bg-white/10 text-white hover:bg-white/20"
+              : "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30"
+          )}
+          aria-label={!isSpeakerMuted ? "Mute Speaker" : "Unmute Speaker"}
+        >
+          {!isSpeakerMuted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+        </button>
+        <span className="text-[13px] font-medium text-white/50">Mute</span>
+      </div>
+
+      <div className="flex flex-col items-center gap-2 ml-2">
         <button
           onClick={handleEndCall}
-          className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[#EF4444] text-white transition-all duration-300 hover:scale-105 hover:bg-red-600 active:scale-95 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
+          className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-[#EF4444] text-white transition-all duration-300 hover:scale-105 hover:bg-red-600 active:scale-95 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
           aria-label="End call"
         >
           <PhoneOff className="h-6 w-6" fill="currentColor" />
         </button>
-        <span className="text-[12px] font-medium text-[#EF4444]">End</span>
+        <span className="text-[13px] font-medium text-[#EF4444]">End</span>
       </div>
     </div>
   );
@@ -396,60 +414,89 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
     );
   }
 
-  return (
-    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0A0F24]">
+  const isOneOnOne = !activeCall?.isGroup && tracks.length === 2;
+  const localTrack = tracks.find(t => t.participant.isLocal);
+  const remoteTrack = tracks.find(t => !t.participant.isLocal);
 
+  return (
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#1D2A54]">
+      
       {/* ─── Top Header ─── */}
-      <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/60 to-transparent">
+      <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-6">
         <button
           onClick={handleEndCall}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[#3B58F5] transition-all hover:bg-white/20 backdrop-blur-md"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#1D2A54] transition-all hover:bg-white/90 shadow-md"
           aria-label="Back / End call"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
 
         <div className="flex flex-col items-center">
-          <h2 className="text-sm font-bold tracking-wide text-[#3B58F5]">
+          <h2 className="text-[20px] font-bold tracking-wide text-white">
             {activeCall?.isGroup ? "Group Call" : "Call"}
           </h2>
-          <p className="text-xs font-semibold text-[#3B58F5]">
+          <p className="text-[13px] font-medium text-white/70">
             {formatDuration(duration)}
           </p>
         </div>
 
-        <div className="flex gap-2 md:gap-4">
-          {/* Phase 3: Add Participant button — hidden for group calls (already multi-party) */}
+        <div className="flex gap-4">
           {!activeCall?.isGroup && (
             <button
               onClick={onOpenInvite}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[#3B58F5] transition-all hover:bg-[#3B58F5]/30 hover:text-white backdrop-blur-md"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
               title="Add participant"
               aria-label="Invite someone to this call"
             >
-              <UserPlus className="h-4 w-4" />
+              <UserPlus className="h-5 w-5" />
             </button>
           )}
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[#3B58F5] transition-all hover:bg-white/20 backdrop-blur-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
             aria-label="More options"
           >
-            <MoreVertical className="h-4 w-4" />
+            <MoreVertical className="h-5 w-5" />
           </button>
         </div>
       </div>
 
-      {/* ─── Dynamic Participant Grid ─── */}
-      <div className={cn("absolute inset-0 z-0", gridClass)}>
-        {tracks.map((trackRef, idx) => (
-          <ParticipantTile
-            key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
-            trackRef={trackRef}
-          />
-        ))}
+      {/* ─── Main Video Area ─── */}
+      <div className="flex-1 flex flex-col pt-24 pb-32 px-6">
+        {isOneOnOne && localTrack && remoteTrack ? (
+          // 1-on-1 Picture-in-Picture Layout
+          <div className="relative w-full h-full max-w-5xl mx-auto rounded-[32px] overflow-visible shadow-2xl bg-[#0F172A]">
+             <div className="absolute inset-0 rounded-[32px] overflow-hidden bg-black">
+                <ParticipantTile key={`${remoteTrack.participant.identity}-remote`} trackRef={remoteTrack} disableOverlay className="rounded-none ring-0 shadow-none border-0" />
+             </div>
+             
+             {/* PiP Local Video */}
+             <div className="absolute bottom-6 right-6 w-32 h-44 md:w-48 md:h-64 z-10">
+                <ParticipantTile key={`${localTrack.participant.identity}-local`} trackRef={localTrack} disableOverlay hideName className="shadow-2xl ring-2 ring-white/20" />
+             </div>
+
+             {/* Dock overlaying the bottom edge */}
+             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
+               <ControlDock compact />
+             </div>
+          </div>
+        ) : (
+          // Group Call or other layout
+          <div className="relative w-full h-full">
+            <div className={cn("absolute inset-0 z-0", gridClass)}>
+              {tracks.map((trackRef, idx) => (
+                <ParticipantTile
+                  key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
+                  trackRef={trackRef}
+                />
+              ))}
+            </div>
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
+              <ControlDock compact />
+            </div>
+          </div>
+        )}
       </div>
 
-      <ControlDock compact />
     </div>
   );
 };

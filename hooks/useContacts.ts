@@ -28,6 +28,8 @@ export function useContacts() {
         contactsArray = data;
       } else if (data.data && Array.isArray(data.data.contacts)) {
         contactsArray = data.data.contacts;
+      } else if (Array.isArray(data.contacts)) {
+        contactsArray = data.contacts;
       }
 
       const getFullName = (profile: any) => {
