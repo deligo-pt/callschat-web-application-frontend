@@ -170,7 +170,7 @@ export default function ChatRoomPage() {
   // kept in sync with the other participant via socket events.
   const [disappearAfterSeconds, setDisappearAfterSeconds] = useState<number | null>(null);
   // Ticker: forces a re-render every second so expired messages vanish in real-time.
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -336,6 +336,37 @@ export default function ChatRoomPage() {
     return () => clearInterval(id);
   }, [disappearAfterSeconds]);
 
+  // ── Ephemeral auto-delete ─────────────────────────────────────────────────
+  // When disappearAfterSeconds is set and ALL visible messages have expired
+  // (or the message list is empty), fire the cleanup endpoint. The server
+  // re-validates and broadcasts chat:conversation_auto_deleted if confirmed.
+  const cleanupFiredRef = useRef(false);
+  const handleEphemeralCleanup = useCallback(async () => {
+    if (!disappearAfterSeconds || cleanupFiredRef.current) return;
+    if (messages.length === 0) return; // Do not auto-delete brand new empty conversations
+
+    const allExpired = messages.every((msg) => isMessageExpired(msg.createdAt, disappearAfterSeconds));
+    if (!allExpired) return;
+
+    cleanupFiredRef.current = true;
+    try {
+      await chatService.triggerEphemeralCleanup(conversationId);
+    } catch {
+      cleanupFiredRef.current = false; // allow retry
+    }
+  }, [conversationId, disappearAfterSeconds, messages]);
+
+  useEffect(() => {
+    if (!disappearAfterSeconds) return;
+    // Check every second (piggyback on tick) whether all messages are gone
+    void handleEphemeralCleanup();
+  }, [handleEphemeralCleanup, disappearAfterSeconds, tick]);
+
+  // Reset the cleanup guard when timer is turned off or conversation changes
+  useEffect(() => {
+    cleanupFiredRef.current = false;
+  }, [conversationId, disappearAfterSeconds]);
+
   // ── Socket: listen for real-time disappear setting changes ───────────────
   const { socket } = useSocket();
   useEffect(() => {
@@ -348,6 +379,21 @@ export default function ChatRoomPage() {
     socket.on("chat:disappear_updated", handler);
     return () => { socket.off("chat:disappear_updated", handler); };
   }, [socket, conversationId]);
+
+  // ── Socket: listen for auto-deletion broadcast ───────────────────────────
+  // When the server confirms the ephemeral conversation was deleted, redirect
+  // the user back to the conversations list.
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (payload: { conversationId: string }) => {
+      if (payload.conversationId === conversationId) {
+        toast.info("🔥 Ephemeral conversation ended — all messages have disappeared.");
+        router.push("/chats");
+      }
+    };
+    socket.on("chat:conversation_auto_deleted", handler);
+    return () => { socket.off("chat:conversation_auto_deleted", handler); };
+  }, [socket, conversationId, router]);
 
   useEffect(() => {
     scrollToBottom();
@@ -567,6 +613,40 @@ export default function ChatRoomPage() {
         </div>
       )}
 
+      {/* ── Ephemeral Banner ──────────────────────────────────────────────── */}
+      {!isBizChat && disappearAfterSeconds && (
+        <div className="shrink-0 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-violet-50 px-5 py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {/* Animated flame icon */}
+            <span className="relative flex h-5 w-5 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-300 opacity-40" />
+              <span className="text-[15px]">🔥</span>
+            </span>
+            <span className="text-[12px] font-bold text-[#6D28D9]">
+              Ephemeral Chat
+            </span>
+            <span className="text-[11px] font-medium text-purple-400">·</span>
+            <span className="text-[11px] font-medium text-[#7C3AED]">
+              Messages disappear after{" "}
+              {disappearAfterSeconds === 30
+                ? "30 seconds"
+                : disappearAfterSeconds === 300
+                  ? "5 minutes"
+                  : disappearAfterSeconds === 3600
+                    ? "1 hour"
+                    : disappearAfterSeconds === 86400
+                      ? "24 hours"
+                      : disappearAfterSeconds === 604800
+                        ? "7 days"
+                        : "90 days"}
+            </span>
+          </div>
+          <span className="text-[10px] font-bold text-purple-300 uppercase tracking-widest">
+            Secret
+          </span>
+        </div>
+      )}
+
       {/* ── Messages ─────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-[#F0F2F5] relative">
         {/* Chat Background Pattern */}
@@ -581,12 +661,26 @@ export default function ChatRoomPage() {
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2]">
             {isReady || isBizChat ? (
-              <div className="bg-[#FFF8C6] text-[#665D1E] text-xs px-4 py-2 rounded-lg text-center shadow-sm max-w-sm">
-                <Lock className="inline-block h-3 w-3 mr-1 mb-0.5" />
-                {isBizChat
-                  ? "Your messages to this business are private and secure."
-                  : "Messages are end-to-end encrypted. No one outside of this chat, not even CallsChat, can read or listen to them."}
-              </div>
+              disappearAfterSeconds ? (
+                <div className="flex flex-col items-center gap-3 text-center max-w-[280px]">
+                  <div className="text-4xl animate-bounce">🔥</div>
+                  <div className="bg-purple-50 border border-purple-100 rounded-2xl px-5 py-4 text-center shadow-sm">
+                    <p className="text-[13px] font-bold text-[#6D28D9] mb-1">
+                      Ephemeral Chat Active
+                    </p>
+                    <p className="text-[11px] font-medium text-purple-400 leading-relaxed">
+                      Messages in this conversation disappear automatically. Send your first secret message.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-[#FFF8C6] text-[#665D1E] text-xs px-4 py-2 rounded-lg text-center shadow-sm max-w-sm">
+                  <Lock className="inline-block h-3 w-3 mr-1 mb-0.5" />
+                  {isBizChat
+                    ? "Your messages to this business are private and secure."
+                    : "Messages are end-to-end encrypted. No one outside of this chat, not even CallsChat, can read or listen to them."}
+                </div>
+              )
             ) : (
               <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
             )}

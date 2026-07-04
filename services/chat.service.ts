@@ -23,7 +23,15 @@ export const chatService = {
     return response.data;
   },
 
-  initiateConversation: async (params: string | { targetUserId?: string; groupId?: string; workspaceId?: string }) => {
+  initiateConversation: async (
+    params: string | {
+      targetUserId?: string;
+      groupId?: string;
+      workspaceId?: string;
+      /** When provided, creates a brand-new ephemeral conversation with this timer. */
+      disappearAfterSeconds?: number | null;
+    },
+  ) => {
     const payload = typeof params === 'string' ? { targetUserId: params } : params;
     const response = await apiClient.post('/conversations/initiate', payload);
     return response.data;
@@ -77,7 +85,7 @@ export const chatService = {
   },
 
   /**
-   * Sets or clears the disappearing-messages timer for a 1v1 conversation.
+   * Sets or clears the disappearing-messages timer for an EXISTING conversation.
    * Both participants share the same setting since it is stored on the
    * Conversation row and broadcast via socket.
    *
@@ -88,6 +96,17 @@ export const chatService = {
     const response = await apiClient.patch(`/conversations/${conversationId}/disappear`, {
       disappearAfterSeconds,
     });
+    return response.data;
+  },
+
+  /**
+   * Triggers server-side auto-deletion of an ephemeral conversation once all
+   * messages have expired. The server independently re-validates before deleting.
+   *
+   * @param conversationId - The ephemeral conversation to clean up.
+   */
+  triggerEphemeralCleanup: async (conversationId: string) => {
+    const response = await apiClient.post(`/conversations/${conversationId}/ephemeral-cleanup`);
     return response.data;
   },
 };

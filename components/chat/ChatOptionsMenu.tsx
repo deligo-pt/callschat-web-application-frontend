@@ -274,6 +274,7 @@ export function ChatOptionsMenu({
         open={isDisappearOpen}
         onClose={() => setIsDisappearOpen(false)}
         conversationId={conversationId}
+        peerId={peerId}
         currentValue={disappearValue}
         onUpdated={(v) => {
           setDisappearValue(v);

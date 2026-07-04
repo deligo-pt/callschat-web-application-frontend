@@ -152,6 +152,23 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
     };
   }, [socket, fetchData]);
 
+  // Listen for ephemeral conversation auto-deletion so the sidebar removes
+  // the dead conversation without requiring a page refresh.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleAutoDeleted = (payload: { conversationId: string }) => {
+      setConversations((prev) => prev.filter((c) => c.id !== payload.conversationId));
+      // If the user is currently in this conversation, the child page will
+      // redirect them — no action needed here.
+    };
+
+    socket.on("chat:conversation_auto_deleted", handleAutoDeleted);
+    return () => {
+      socket.off("chat:conversation_auto_deleted", handleAutoDeleted);
+    };
+  }, [socket]);
+
   /**
    * Returns true when the conversation has an unread last message.
    * A message is considered unread when:

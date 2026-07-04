@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Timer, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Timer, CheckCircle2, Loader2, Flame, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 // ---------------------------------------------------------------------------
 // Timer option type
@@ -24,13 +25,13 @@ interface TimerOption {
 }
 
 const TIMER_OPTIONS: TimerOption[] = [
-  { label: "Off",      sublabel: "Messages stay forever",  value: null   },
-  { label: "30s",      sublabel: "30 seconds (testing)",   value: 30     },
-  { label: "5 min",    sublabel: "5 minutes",              value: 300    },
-  { label: "1 hour",   sublabel: "60 minutes",             value: 3600   },
-  { label: "24 hours", sublabel: "Disappear after a day",  value: 86400  },
-  { label: "7 days",   sublabel: "Disappear after a week", value: 604800 },
-  { label: "90 days",  sublabel: "Disappear after 90 days",value: 2592000},
+  { label: "Off",      sublabel: "Messages stay forever",   value: null    },
+  { label: "30s",      sublabel: "30 seconds (testing)",    value: 30      },
+  { label: "5 min",    sublabel: "5 minutes",               value: 300     },
+  { label: "1 hour",   sublabel: "60 minutes",              value: 3600    },
+  { label: "24 hours", sublabel: "Disappear after a day",   value: 86400   },
+  { label: "7 days",   sublabel: "Disappear after a week",  value: 604800  },
+  { label: "90 days",  sublabel: "Disappear after 90 days", value: 2592000 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,8 @@ export interface DisappearingMessagesModalProps {
   open: boolean;
   onClose: () => void;
   conversationId: string;
+  /** The peer user ID — needed to start a new ephemeral conversation. */
+  peerId: string;
   /** Current setting fetched from the server (null = off). */
   currentValue: number | null;
   /** Called after a successful save so the parent can update its local state. */
@@ -55,9 +58,11 @@ export function DisappearingMessagesModal({
   open,
   onClose,
   conversationId,
+  peerId,
   currentValue,
   onUpdated,
 }: DisappearingMessagesModalProps) {
+  const router = useRouter();
   const [selected, setSelected] = useState<number | null>(currentValue);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -74,45 +79,84 @@ export function DisappearingMessagesModal({
 
     setIsSaving(true);
     try {
-      await chatService.setDisappearSettings(conversationId, selected);
+      if (selected === null) {
+        // ── Turning OFF disappearing messages ──────────────────────────────
+        // Just patch the existing conversation timer to null.
+        await chatService.setDisappearSettings(conversationId, null);
+        onUpdated(null);
+        toast.success("Disappearing messages turned off.");
+        onClose();
+      } else {
+        // ── Turning ON or changing the timer ──────────────────────────────
+        // Start a brand-new ephemeral conversation with the peer so that
+        // the current conversation is preserved and the ephemeral session
+        // is an isolated, self-destructing thread.
+        const res = await chatService.initiateConversation({
+          targetUserId:         peerId,
+          disappearAfterSeconds: selected,
+        });
 
-      onUpdated(selected);
+        if (!res?.success || !res?.data?.conversationId) {
+          throw new Error("Failed to create ephemeral conversation.");
+        }
 
-      const label = TIMER_OPTIONS.find((o) => o.value === selected)?.label ?? "Off";
-      toast.success(
-        selected === null
-          ? "Disappearing messages turned off."
-          : `Messages will disappear after ${label}.`,
-      );
-      onClose();
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message || "Failed to update disappearing messages.",
-      );
+        const newConvId = res.data.conversationId as string;
+        const label     = TIMER_OPTIONS.find((o) => o.value === selected)?.label ?? "";
+
+        onUpdated(selected);
+        toast.success(
+          `🔥 Ephemeral chat started — messages disappear after ${label}.`,
+        );
+        onClose();
+
+        // Navigate into the new ephemeral conversation
+        router.push(`/chats/${newConvId}?recipientId=${peerId}`);
+      }
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Failed to update disappearing messages.";
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Are we currently inside an ephemeral conversation?
+  const isCurrentlyEphemeral = currentValue !== null;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-white sm:max-w-[400px] rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
+      <DialogContent className="bg-white sm:max-w-[420px] rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-[#EEF2FF] bg-gradient-to-br from-[#F0F4FF] to-white">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-[#EEF2FF] bg-gradient-to-br from-[#F5F0FF] to-white">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3B58F5]/10">
-              <Timer className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7C3AED]/10">
+              <Flame className="h-5 w-5 text-[#7C3AED]" strokeWidth={2.5} />
             </div>
             <div>
               <DialogTitle className="text-[16px] font-bold text-[#11142D]">
                 Disappearing Messages
               </DialogTitle>
               <DialogDescription className="text-[12px] text-[#8F95B2] mt-0.5">
-                Messages auto-delete after the chosen time.
+                {isCurrentlyEphemeral
+                  ? "This is an ephemeral chat. Choose a new timer or turn off."
+                  : "Start a new secret chat — messages vanish automatically."}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
+
+        {/* ── Info Banner (non-ephemeral) ──────────────────────────────────── */}
+        {!isCurrentlyEphemeral && (
+          <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-purple-50 border border-purple-100 px-4 py-3">
+            <Lock className="h-4 w-4 text-[#7C3AED] mt-0.5 shrink-0" strokeWidth={2.5} />
+            <p className="text-[12px] font-medium text-[#6B3FC0] leading-relaxed">
+              Selecting a timer will open a <strong>new ephemeral conversation</strong> with this
+              contact. Your current chat remains intact.
+            </p>
+          </div>
+        )}
 
         {/* ── Options ────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-1 px-4 py-4">
@@ -125,7 +169,7 @@ export function DisappearingMessagesModal({
                 className={cn(
                   "flex items-center justify-between w-full rounded-xl px-4 py-3.5 text-left transition-all",
                   isActive
-                    ? "bg-[#EEF2FF] border border-[#C7D2FF]"
+                    ? "bg-[#F0E9FF] border border-[#C9B3FF]"
                     : "hover:bg-[#F8FAFC] border border-transparent",
                 )}
               >
@@ -133,7 +177,7 @@ export function DisappearingMessagesModal({
                   <span
                     className={cn(
                       "text-[14px] font-bold",
-                      isActive ? "text-[#3B58F5]" : "text-[#1D2A54]",
+                      isActive ? "text-[#7C3AED]" : "text-[#1D2A54]",
                     )}
                   >
                     {opt.label}
@@ -144,7 +188,7 @@ export function DisappearingMessagesModal({
                 </div>
                 {isActive && (
                   <CheckCircle2
-                    className="h-5 w-5 text-[#3B58F5] shrink-0"
+                    className="h-5 w-5 text-[#7C3AED] shrink-0"
                     strokeWidth={2.5}
                   />
                 )}
@@ -165,15 +209,17 @@ export function DisappearingMessagesModal({
           <button
             onClick={handleSave}
             disabled={isSaving || selected === currentValue}
-            className="flex-1 h-11 rounded-xl bg-[#3B58F5] text-[14px] font-bold text-white transition-colors hover:bg-[#2C48CC] disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 h-11 rounded-xl bg-[#7C3AED] text-[14px] font-bold text-white transition-colors hover:bg-[#6D28CC] disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Saving…
+                {selected === null ? "Turning off…" : "Starting…"}
               </>
+            ) : selected === null ? (
+              "Turn Off"
             ) : (
-              "Save"
+              "Start Ephemeral Chat"
             )}
           </button>
         </div>
