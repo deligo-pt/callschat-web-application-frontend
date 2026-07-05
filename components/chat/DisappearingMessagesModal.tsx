@@ -27,6 +27,7 @@ interface TimerOption {
 const TIMER_OPTIONS: TimerOption[] = [
   { label: "Off",      sublabel: "Messages stay forever",   value: null    },
   { label: "30s",      sublabel: "30 seconds (testing)",    value: 30      },
+  { label: "1 min",    sublabel: "60 seconds",              value: 60      },
   { label: "5 min",    sublabel: "5 minutes",               value: 300     },
   { label: "1 hour",   sublabel: "60 minutes",              value: 3600    },
   { label: "24 hours", sublabel: "Disappear after a day",   value: 86400   },
@@ -79,39 +80,15 @@ export function DisappearingMessagesModal({
 
     setIsSaving(true);
     try {
+      await chatService.setDisappearSettings(conversationId, selected);
+      const label = TIMER_OPTIONS.find((o) => o.value === selected)?.label ?? "";
+      onUpdated(selected);
       if (selected === null) {
-        // ── Turning OFF disappearing messages ──────────────────────────────
-        // Just patch the existing conversation timer to null.
-        await chatService.setDisappearSettings(conversationId, null);
-        onUpdated(null);
         toast.success("Disappearing messages turned off.");
-        onClose();
       } else {
-        // ── Turning ON or changing the timer ──────────────────────────────
-        // Start a brand-new ephemeral conversation with the peer so that
-        // the current conversation is preserved and the ephemeral session
-        // is an isolated, self-destructing thread.
-        const res = await chatService.initiateConversation({
-          targetUserId:         peerId,
-          disappearAfterSeconds: selected,
-        });
-
-        if (!res?.success || !res?.data?.conversationId) {
-          throw new Error("Failed to create ephemeral conversation.");
-        }
-
-        const newConvId = res.data.conversationId as string;
-        const label     = TIMER_OPTIONS.find((o) => o.value === selected)?.label ?? "";
-
-        onUpdated(selected);
-        toast.success(
-          `🔥 Ephemeral chat started — messages disappear after ${label}.`,
-        );
-        onClose();
-
-        // Navigate into the new ephemeral conversation
-        router.push(`/chats/${newConvId}?recipientId=${peerId}`);
+        toast.success(`Disappearing messages set to ${label}.`);
       }
+      onClose();
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -140,23 +117,20 @@ export function DisappearingMessagesModal({
               </DialogTitle>
               <DialogDescription className="text-[12px] text-[#8F95B2] mt-0.5">
                 {isCurrentlyEphemeral
-                  ? "This is an ephemeral chat. Choose a new timer or turn off."
-                  : "Start a new secret chat — messages vanish automatically."}
+                  ? "Choose a new timer or turn off disappearing messages."
+                  : "When turned on, messages sent in this chat will vanish automatically."}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        {/* ── Info Banner (non-ephemeral) ──────────────────────────────────── */}
-        {!isCurrentlyEphemeral && (
-          <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-purple-50 border border-purple-100 px-4 py-3">
-            <Lock className="h-4 w-4 text-[#7C3AED] mt-0.5 shrink-0" strokeWidth={2.5} />
-            <p className="text-[12px] font-medium text-[#6B3FC0] leading-relaxed">
-              Selecting a timer will open a <strong>new ephemeral conversation</strong> with this
-              contact. Your current chat remains intact.
-            </p>
-          </div>
-        )}
+        {/* ── Info Banner ──────────────────────────────────────────────────── */}
+        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-purple-50 border border-purple-100 px-4 py-3">
+          <Lock className="h-4 w-4 text-[#7C3AED] mt-0.5 shrink-0" strokeWidth={2.5} />
+          <p className="text-[12px] font-medium text-[#6B3FC0] leading-relaxed">
+            When turned on, new messages sent in this chat will disappear after the selected duration.
+          </p>
+        </div>
 
         {/* ── Options ────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-1 px-4 py-4">

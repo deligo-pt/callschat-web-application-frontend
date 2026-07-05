@@ -632,15 +632,17 @@ export default function ChatRoomPage() {
               Messages disappear after{" "}
               {disappearAfterSeconds === 30
                 ? "30 seconds"
-                : disappearAfterSeconds === 300
-                  ? "5 minutes"
-                  : disappearAfterSeconds === 3600
-                    ? "1 hour"
-                    : disappearAfterSeconds === 86400
-                      ? "24 hours"
-                      : disappearAfterSeconds === 604800
-                        ? "7 days"
-                        : "90 days"}
+                : disappearAfterSeconds === 60
+                  ? "1 minute"
+                  : disappearAfterSeconds === 300
+                    ? "5 minutes"
+                    : disappearAfterSeconds === 3600
+                      ? "1 hour"
+                      : disappearAfterSeconds === 86400
+                        ? "24 hours"
+                        : disappearAfterSeconds === 604800
+                          ? "7 days"
+                          : "90 days"}
             </span>
           </div>
           <span className="text-[10px] font-bold text-purple-300 uppercase tracking-widest">

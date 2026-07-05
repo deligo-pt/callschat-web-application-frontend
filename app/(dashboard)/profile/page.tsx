@@ -12,6 +12,8 @@ import SetupBusinessModal from "@/components/business/SetupBusinessModal";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useTranslations, useLocale } from "next-intl";
 import { LanguageSelector } from "@/components/i18n/LanguageSelector";
+import { InviteFriends } from "@/components/profile/InviteFriends";
+import { DisappearingMessages } from "@/components/profile/DisappearingMessages";
 import { Locale } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<Locale, string> = {
@@ -49,7 +51,7 @@ export default function ProfilePage() {
   const tCommon = useTranslations("common");
 
   // Controls which panel is rendered in the right column
-  type ActivePanel = "edit" | "language";
+  type ActivePanel = "edit" | "language" | "invite" | "disappearing";
   const [activePanel, setActivePanel] = useState<ActivePanel>("edit");
   
   // State for form fields
@@ -333,17 +335,34 @@ export default function ProfilePage() {
                 )} />
               </button>
 
-              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
+              <button
+                onClick={() => setActivePanel("invite")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-3 transition-colors mt-2",
+                  activePanel === "invite"
+                    ? "border-blue-200 bg-[#EEF2FF]"
+                    : "border-slate-100 bg-white hover:bg-slate-50"
+                )}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-400">
+                  <div className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full",
+                    activePanel === "invite" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-blue-50 text-blue-400"
+                  )}>
                     <Send className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("invite")}</span>
+                    <span className={cn(
+                      "text-[13px] font-bold",
+                      activePanel === "invite" ? "text-[#2563EB]" : "text-[#0F172A]"
+                    )}>{tCommon("invite")}</span>
                     <span className="text-[11px] font-medium text-slate-500">{t("invite_friend")}</span>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className={cn(
+                  "h-4 w-4 transition-colors",
+                  activePanel === "invite" ? "text-[#2563EB]" : "text-slate-400"
+                )} />
               </button>
               
               <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
@@ -381,16 +400,33 @@ export default function ProfilePage() {
           <div className="flex flex-col">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("security")}</span>
             <div className="flex flex-col gap-1">
-              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors">
+              <button
+                onClick={() => setActivePanel("disappearing")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-3 transition-colors",
+                  activePanel === "disappearing"
+                    ? "border-blue-200 bg-[#EEF2FF]"
+                    : "border-slate-100 bg-white hover:bg-slate-50"
+                )}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-50 text-pink-400">
+                  <div className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full",
+                    activePanel === "disappearing" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-pink-50 text-pink-400"
+                  )}>
                     <Clock className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("disappearing_messages")}</span>
+                    <span className={cn(
+                      "text-[13px] font-bold",
+                      activePanel === "disappearing" ? "text-[#2563EB]" : "text-[#0F172A]"
+                    )}>{tCommon("disappearing_messages")}</span>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className={cn(
+                  "h-4 w-4 transition-colors",
+                  activePanel === "disappearing" ? "text-[#2563EB]" : "text-slate-400"
+                )} />
               </button>
             </div>
           </div>
@@ -419,6 +455,14 @@ export default function ProfilePage() {
         {activePanel === "language" ? (
           <LanguageSelector
             currentLocale={currentLocale}
+            onBack={() => setActivePanel("edit")}
+          />
+        ) : activePanel === "invite" ? (
+          <InviteFriends
+            onBack={() => setActivePanel("edit")}
+          />
+        ) : activePanel === "disappearing" ? (
+          <DisappearingMessages
             onBack={() => setActivePanel("edit")}
           />
         ) : (

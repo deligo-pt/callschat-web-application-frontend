@@ -19,7 +19,7 @@ export default function MediaPage() {
     try {
       const res = await chatService.initiateConversation(targetUserId);
       if (res.success && res.data?.conversationId) {
-        router.push(`/chats/${res.data.conversationId}`);
+        router.push(`/chats/${res.data.conversationId}?recipientId=${targetUserId}`);
       }
     } catch (error) {
       console.error("Failed to start conversation:", error);

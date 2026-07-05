@@ -204,6 +204,7 @@ export function ChatOptionsMenu({
             {disappearValue !== null && (
               <span className="text-[11px] font-bold text-[#7C3AED] bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
                 {disappearValue === 30 ? "30s"
+                  : disappearValue === 60 ? "1m"
                   : disappearValue === 300 ? "5m"
                   : disappearValue === 3600 ? "1h"
                   : disappearValue === 86400 ? "24h"

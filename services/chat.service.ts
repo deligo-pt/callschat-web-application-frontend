@@ -32,7 +32,21 @@ export const chatService = {
       disappearAfterSeconds?: number | null;
     },
   ) => {
-    const payload = typeof params === 'string' ? { targetUserId: params } : params;
+    const payload = typeof params === 'string' ? { targetUserId: params } : { ...params };
+    
+    // Automatically apply default disappearing messages setting for new 1v1 conversations
+    if (payload.targetUserId && !payload.groupId && !payload.workspaceId && payload.disappearAfterSeconds === undefined) {
+      if (typeof window !== 'undefined') {
+        const defaultTimer = localStorage.getItem('callschat_default_disappear_seconds');
+        if (defaultTimer && defaultTimer !== 'null' && defaultTimer !== '0') {
+          const seconds = parseInt(defaultTimer, 10);
+          if (!isNaN(seconds) && seconds > 0) {
+            payload.disappearAfterSeconds = seconds;
+          }
+        }
+      }
+    }
+
     const response = await apiClient.post('/conversations/initiate', payload);
     return response.data;
   },
