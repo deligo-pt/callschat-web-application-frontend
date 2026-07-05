@@ -14,6 +14,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { LanguageSelector } from "@/components/i18n/LanguageSelector";
 import { InviteFriends } from "@/components/profile/InviteFriends";
 import { DisappearingMessages } from "@/components/profile/DisappearingMessages";
+import { BusinessDashboard } from "@/components/profile/BusinessDashboard";
 import { Locale } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<Locale, string> = {
@@ -51,7 +52,7 @@ export default function ProfilePage() {
   const tCommon = useTranslations("common");
 
   // Controls which panel is rendered in the right column
-  type ActivePanel = "edit" | "language" | "invite" | "disappearing";
+  type ActivePanel = "edit" | "language" | "invite" | "disappearing" | "dashboard";
   const [activePanel, setActivePanel] = useState<ActivePanel>("edit");
   
   // State for form fields
@@ -381,17 +382,34 @@ export default function ProfilePage() {
                 </div>
               </button>
 
-              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
+              <button
+                onClick={() => setActivePanel("dashboard")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-3 transition-colors mt-2",
+                  activePanel === "dashboard"
+                    ? "border-blue-200 bg-[#EEF2FF]"
+                    : "border-slate-100 bg-white hover:bg-slate-50"
+                )}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-400">
+                  <div className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full",
+                    activePanel === "dashboard" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-purple-50 text-purple-400"
+                  )}>
                     <Briefcase className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("business_dashboard")}</span>
+                    <span className={cn(
+                      "text-[13px] font-bold",
+                      activePanel === "dashboard" ? "text-[#2563EB]" : "text-[#0F172A]"
+                    )}>{tCommon("business_dashboard")}</span>
                     <span className="text-[11px] font-medium text-slate-500">{t("analytical_insight")}</span>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className={cn(
+                  "h-4 w-4 transition-colors",
+                  activePanel === "dashboard" ? "text-[#2563EB]" : "text-slate-400"
+                )} />
               </button>
             </div>
           </div>
@@ -463,6 +481,10 @@ export default function ProfilePage() {
           />
         ) : activePanel === "disappearing" ? (
           <DisappearingMessages
+            onBack={() => setActivePanel("edit")}
+          />
+        ) : activePanel === "dashboard" ? (
+          <BusinessDashboard
             onBack={() => setActivePanel("edit")}
           />
         ) : (

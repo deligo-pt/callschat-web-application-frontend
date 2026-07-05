@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Shield, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { chatService } from "@/services/chat.service";
 
 interface TimerOption {
   label: string;
@@ -43,7 +44,7 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
     }
   }, []);
 
-  const handleSelect = (value: number | null) => {
+  const handleSelect = async (value: number | null) => {
     setSelectedTimer(value);
     if (typeof window !== "undefined") {
       if (value === null) {
@@ -53,6 +54,20 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
       }
     }
     toast.success("Default disappearing messages timer updated");
+
+    // Proactively sync this global setting to all existing 1v1 conversations
+    try {
+      const convsRes = await chatService.fetchMyConversations();
+      if (convsRes?.success && Array.isArray(convsRes.data)) {
+        for (const conv of convsRes.data) {
+          if (!conv.workspaceId && conv.context !== "BUSINESS" && !conv.groupId) {
+            void chatService.setDisappearSettings(conv.id, value).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to sync global disappearing timer to existing chats:", e);
+    }
   };
 
   return (

@@ -210,8 +210,19 @@ export default function ChatRoomPage() {
             );
             
             // Load the disappear setting unconditionally if the conversation is found
-            if (conv && conv.disappearAfterSeconds !== undefined) {
-              setDisappearAfterSeconds(conv.disappearAfterSeconds);
+            if (conv) {
+              let timer = conv.disappearAfterSeconds !== undefined ? conv.disappearAfterSeconds : null;
+              if (!conv.workspaceId && conv.context !== "BUSINESS" && !conv.groupId && typeof window !== "undefined") {
+                const stored = localStorage.getItem("callschat_default_disappear_seconds");
+                if (stored && stored !== "null" && stored !== "0") {
+                  const parsed = parseInt(stored, 10);
+                  if (!isNaN(parsed) && parsed > 0 && timer !== parsed) {
+                    timer = parsed;
+                    void chatService.setDisappearSettings(conv.id, parsed).catch(() => {});
+                  }
+                }
+              }
+              setDisappearAfterSeconds(timer);
             }
 
             if (
@@ -338,37 +349,6 @@ export default function ChatRoomPage() {
     return () => clearInterval(id);
   }, [disappearAfterSeconds]);
 
-  // ── Ephemeral auto-delete ─────────────────────────────────────────────────
-  // When disappearAfterSeconds is set and ALL visible messages have expired
-  // (or the message list is empty), fire the cleanup endpoint. The server
-  // re-validates and broadcasts chat:conversation_auto_deleted if confirmed.
-  const cleanupFiredRef = useRef(false);
-  const handleEphemeralCleanup = useCallback(async () => {
-    if (!disappearAfterSeconds || cleanupFiredRef.current) return;
-    if (messages.length === 0) return; // Do not auto-delete brand new empty conversations
-
-    const allExpired = messages.every((msg) => isMessageExpired(msg.createdAt, disappearAfterSeconds));
-    if (!allExpired) return;
-
-    cleanupFiredRef.current = true;
-    try {
-      await chatService.triggerEphemeralCleanup(conversationId);
-    } catch {
-      cleanupFiredRef.current = false; // allow retry
-    }
-  }, [conversationId, disappearAfterSeconds, messages]);
-
-  useEffect(() => {
-    if (!disappearAfterSeconds) return;
-    // Check every second (piggyback on tick) whether all messages are gone
-    void handleEphemeralCleanup();
-  }, [handleEphemeralCleanup, disappearAfterSeconds, tick]);
-
-  // Reset the cleanup guard when timer is turned off or conversation changes
-  useEffect(() => {
-    cleanupFiredRef.current = false;
-  }, [conversationId, disappearAfterSeconds]);
-
   // ── Socket: listen for real-time disappear setting changes ───────────────
   const { socket } = useSocket();
   useEffect(() => {
@@ -381,21 +361,6 @@ export default function ChatRoomPage() {
     socket.on("chat:disappear_updated", handler);
     return () => { socket.off("chat:disappear_updated", handler); };
   }, [socket, conversationId]);
-
-  // ── Socket: listen for auto-deletion broadcast ───────────────────────────
-  // When the server confirms the ephemeral conversation was deleted, redirect
-  // the user back to the conversations list.
-  useEffect(() => {
-    if (!socket) return;
-    const handler = (payload: { conversationId: string }) => {
-      if (payload.conversationId === conversationId) {
-        toast.info("🔥 Ephemeral conversation ended — all messages have disappeared.");
-        router.push("/chats");
-      }
-    };
-    socket.on("chat:conversation_auto_deleted", handler);
-    return () => { socket.off("chat:conversation_auto_deleted", handler); };
-  }, [socket, conversationId, router]);
 
   useEffect(() => {
     scrollToBottom();
