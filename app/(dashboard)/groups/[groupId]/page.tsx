@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallContext } from "@/components/providers/CallContext";
-import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight, UserPlus, X, Info, Bell, ShieldCheck, Languages, EyeOff, UserCog, Star, Folder, Users, Mail } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight, UserPlus, X, Info, Bell, ShieldCheck, Languages, EyeOff, UserCog, Star, Folder, Users, Mail, Pin, PinOff } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import apiClient from "@/services/api.client";
 import { useGroupChat } from "@/hooks/useGroupChat";
+import { useContacts, Contact } from "@/hooks/useContacts";
 import { encryptMessage } from "@/utils/crypto";
 import { chatService } from "@/services/chat.service";
 import { groupService } from "@/services/group.service";
@@ -62,7 +63,7 @@ export default function GroupChatPage() {
 
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
-  const [contacts, setContacts] = useState<any[]>([]);
+  const { contacts, fetchContacts: fetchContactsList, isLoading: isContactsLoading } = useContacts();
   const [isAddingMember, setIsAddingMember] = useState(false);
 
   const [isLeaveGroupDialogOpen, setIsLeaveGroupDialogOpen] = useState(false);
@@ -86,7 +87,7 @@ export default function GroupChatPage() {
     }
   }, []);
 
-  const { messages, sendMessage, isReady, error, getGroupKey, isUploading } = useGroupChat(groupId, currentUserId);
+  const { messages, sendMessage, isReady, error, getGroupKey, isUploading, pinnedMessages, pinMessage } = useGroupChat(groupId, currentUserId);
 
   // ── Re-sync Group Keys ─────────────────────────────────────────────────────
   // When decryption fails (usually after a keypair regeneration), admins can
@@ -202,25 +203,8 @@ export default function GroupChatPage() {
     }
   }, [groupId]);
 
-  const fetchContacts = async () => {
-    try {
-      const res = await apiClient.get('/contacts');
-      if (res.data?.success) {
-        let contactsArray = [];
-        if (Array.isArray(res.data.data)) {
-          contactsArray = res.data.data;
-        } else if (res.data.data?.contacts) {
-          contactsArray = res.data.data.contacts;
-        }
-        setContacts(contactsArray);
-      }
-    } catch (e) {
-      console.error("Failed to fetch contacts", e);
-    }
-  };
-
   const handleOpenAddMember = () => {
-    fetchContacts();
+    fetchContactsList();
     setIsAddMemberModalOpen(true);
   };
 
@@ -507,6 +491,60 @@ export default function GroupChatPage() {
           </div>
         </div>
 
+        {/* Pinned Messages Banner */}
+        {pinnedMessages && pinnedMessages.length > 0 && (
+          <div className="bg-[#EFF6FF] border-b border-[#DBEAFE] px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xs transition-all duration-200 z-10">
+            <div 
+              className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group/pin"
+              onClick={() => {
+                const targetId = pinnedMessages[0]?.messageId;
+                if (targetId) {
+                  const el = document.getElementById(`msg-${targetId}`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    el.classList.add("bg-yellow-100/60", "transition-colors", "duration-500");
+                    setTimeout(() => el.classList.remove("bg-yellow-100/60"), 2000);
+                  } else {
+                    toast.info("Pinned message is further up in chat history");
+                  }
+                }
+              }}
+            >
+              <div className="w-8 h-8 rounded-full bg-[#3B58F5]/10 flex items-center justify-center shrink-0 text-[#3B58F5] group-hover/pin:bg-[#3B58F5]/20 transition-colors">
+                <Pin className="w-4 h-4 rotate-45" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-[#3B58F5] tracking-wide uppercase">
+                    Pinned Message {pinnedMessages.length > 1 ? `(1 of ${pinnedMessages.length})` : ""}
+                  </span>
+                  {pinnedMessages[0]?.pinnedUntil && (
+                    <span className="text-[10px] font-medium text-slate-400">
+                      · Expires {new Date(pinnedMessages[0].pinnedUntil).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[13px] font-medium text-[#1E293B] truncate">
+                  {pinnedMessages[0]?.previewText || pinnedMessages[0]?.originalMessage?.text || (
+                    pinnedMessages[0]?.previewMedia ? `📷 ${pinnedMessages[0].previewMedia}` : "Pinned attachment"
+                  )}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1 shrink-0 ml-2">
+              <button
+                type="button"
+                onClick={() => pinMessage(pinnedMessages[0].messageId, "unpin", undefined, undefined, undefined, myMemberInfo?.user?.profile?.displayName || "A member")}
+                className="p-1.5 rounded-full hover:bg-red-100/80 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                title="Unpin message"
+              >
+                <PinOff className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 relative bg-white">
           {error ? (
@@ -563,6 +601,7 @@ export default function GroupChatPage() {
               const showAvatar = !isMe && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
               const isNextSameSender = index < messages.length - 1 && messages[index + 1]?.senderId === msg.senderId;
               const isFirstFromSender = index === 0 || messages[index - 1]?.senderId !== msg.senderId;
+              const isPinned = pinnedMessages?.some((p) => p.messageId === msg.id);
               
               return (
                 <GroupMessageBubble
@@ -573,6 +612,27 @@ export default function GroupChatPage() {
                   isNextSameSender={isNextSameSender}
                   isFirstFromSender={isFirstFromSender}
                   groupId={groupId}
+                  isPinned={isPinned}
+                  onPin={(dur, previewText, previewMedia) =>
+                    pinMessage(
+                      msg.id,
+                      "pin",
+                      dur,
+                      previewText || msg.text,
+                      previewMedia || msg.mediaType || undefined,
+                      myMemberInfo?.user?.profile?.displayName || "A member"
+                    )
+                  }
+                  onUnpin={() =>
+                    pinMessage(
+                      msg.id,
+                      "unpin",
+                      undefined,
+                      undefined,
+                      undefined,
+                      myMemberInfo?.user?.profile?.displayName || "A member"
+                    )
+                  }
                 />
               );
             })
@@ -778,7 +838,7 @@ export default function GroupChatPage() {
                 <span>{groupMembers.length} Members</span>
               </div>
               <button
-                onClick={() => setIsAddMemberModalOpen(true)}
+                onClick={handleOpenAddMember}
                 className="bg-white hover:bg-blue-50/50 rounded-2xl p-3.5 border border-gray-100 shadow-sm flex items-center justify-center gap-2.5 text-[#3B58F5] font-bold text-sm transition-colors cursor-pointer"
               >
                 <UserPlus className="w-4 h-4 text-[#3B58F5]" />
@@ -905,20 +965,25 @@ export default function GroupChatPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto min-h-[200px]">
-                {contacts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-[#8F95B2] text-sm">
+                {isContactsLoading ? (
+                  <div className="flex flex-col items-center justify-center h-full text-[#8F95B2] text-sm gap-2 py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-[#3B58F5]" />
+                    <span>Loading contacts...</span>
+                  </div>
+                ) : contacts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-[#8F95B2] text-sm py-8">
                     No contacts found.
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {contacts.map((contact) => {
-                      const cName = contact.customName || contact.addressee?.profile?.displayName || contact.profile?.displayName || "Unknown";
-                      const cId = contact.addressee?.id || contact.userId || contact.id;
-                      const cAvatar = contact.addressee?.profile?.avatarUrl || contact.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(cName)}&background=random`;
+                    {contacts.map((contact: any) => {
+                      const cName = contact.name || contact.customName || contact.addressee?.profile?.displayName || contact.profile?.displayName || "Unknown";
+                      const cId = contact.userId || contact.addressee?.id || contact.id;
+                      const cAvatar = contact.avatarUrl || contact.addressee?.profile?.avatarUrl || contact.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(cName)}&background=3B58F5&color=fff`;
                       const isAlreadyMember = groupMembers.some(m => m.userId === cId || m.user?.id === cId);
 
                       return (
-                        <div key={contact.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F8FAFC] transition-colors">
+                        <div key={contact.id || cId} className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F8FAFC] transition-colors">
                           <div className="flex items-center gap-3">
                             <img src={cAvatar} alt={cName} className="w-10 h-10 rounded-full object-cover" />
                             <span className="text-[14px] font-bold text-[#11142D]">{cName}</span>

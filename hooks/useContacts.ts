@@ -22,14 +22,26 @@ export function useContacts() {
     try {
       const data = await ContactService.fetchContacts();
       let contactsArray = [];
-      if (data.success && Array.isArray(data.data)) {
-        contactsArray = data.data;
-      } else if (Array.isArray(data)) {
+      if (Array.isArray(data)) {
         contactsArray = data;
-      } else if (data.data && Array.isArray(data.data.contacts)) {
+      } else if (data && Array.isArray(data.data)) {
+        contactsArray = data.data;
+      } else if (data && data.data && Array.isArray(data.data.contacts)) {
         contactsArray = data.data.contacts;
-      } else if (Array.isArray(data.contacts)) {
+      } else if (data && data.data && Array.isArray(data.data.items)) {
+        contactsArray = data.data.items;
+      } else if (data && data.data && Array.isArray(data.data.list)) {
+        contactsArray = data.data.list;
+      } else if (data && data.data && Array.isArray(data.data.users)) {
+        contactsArray = data.data.users;
+      } else if (data && Array.isArray(data.contacts)) {
         contactsArray = data.contacts;
+      } else if (data && Array.isArray(data.items)) {
+        contactsArray = data.items;
+      } else if (data && Array.isArray(data.list)) {
+        contactsArray = data.list;
+      } else if (data && Array.isArray(data.users)) {
+        contactsArray = data.users;
       }
 
       const getFullName = (profile: any) => {
@@ -40,20 +52,34 @@ export function useContacts() {
         return profile.displayName || profile.username || "";
       };
 
-      const mappedContacts = contactsArray.map((u: any) => ({
-        id: u.id,
-        userId: u.addressee?.id || u.userId || u.id,
-        name: u.customName || getFullName(u.addressee?.profile) || getFullName(u.contact?.profile) || getFullName(u.profile) || "Unknown",
-        phone: u.contact?.phone || u.phoneNumber || u.phone || "No phone number",
-        avatarUrl: u.addressee?.profile?.avatarUrl || u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || null,
-        isFavourite: u.isFavourite || false,
-        isOnline: u.addressee?.profile?.isOnline || u.contact?.profile?.isOnline || u.profile?.isOnline || false
-      }));
+      const mappedContacts = contactsArray.map((u: any, idx: number) => {
+        const id = u.id || u._id || u.addressee?.id || u.contact?.id || `contact-${idx}`;
+        const userId = u.addressee?.id || u.addresseeId || u.userId || u.user?.id || u.contact?.userId || u.contact?.id || u.contactId || u.id || id;
+        const name = u.customName || u.name || getFullName(u.addressee?.profile) || getFullName(u.contact?.profile) || getFullName(u.profile) || getFullName(u.user?.profile) || "Unknown";
+        const phone = u.contact?.phone || u.phoneNumber || u.phone || u.user?.phone || u.addressee?.phone || "No phone number";
+        const avatarUrl = u.avatarUrl || u.addressee?.profile?.avatarUrl || u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || u.user?.profile?.avatarUrl || null;
+        const isFavourite = u.isFavourite || false;
+        const isOnline = u.addressee?.profile?.isOnline || u.contact?.profile?.isOnline || u.profile?.isOnline || u.user?.profile?.isOnline || false;
+
+        return {
+          id,
+          userId,
+          name,
+          phone,
+          avatarUrl,
+          isFavourite,
+          isOnline
+        };
+      });
       
-      // Deduplicate by userId to prevent rendering the same person twice for mutual contacts
-      const uniqueContacts = Array.from(new Map<string, Contact>(mappedContacts.map((c: Contact) => [c.userId, c])).values());
-      
-      // Sort alphabetically
+      const uniqueMap = new Map<string, Contact>();
+      for (const c of mappedContacts) {
+        const key = c.userId || c.id || Math.random().toString();
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, c);
+        }
+      }
+      const uniqueContacts = Array.from(uniqueMap.values());
       uniqueContacts.sort((a, b) => a.name.localeCompare(b.name));
       setContacts(uniqueContacts);
     } catch (error) {

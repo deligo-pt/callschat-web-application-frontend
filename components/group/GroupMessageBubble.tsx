@@ -1,7 +1,28 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download } from "lucide-react";
+import {
+  Phone,
+  Video,
+  PhoneMissed,
+  PhoneIncoming,
+  PhoneOutgoing,
+  Loader2,
+  FileText,
+  Download,
+  Pin,
+  PinOff,
+  MoreHorizontal,
+  Clock,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { useCallContext } from "@/components/providers/CallContext";
 
 interface GroupMessageBubbleProps {
@@ -24,9 +45,129 @@ interface GroupMessageBubbleProps {
   isNextSameSender: boolean;
   isFirstFromSender: boolean;
   groupId?: string;
+  isPinned?: boolean;
+  onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
+  onUnpin?: () => void;
 }
 
-export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, isFirstFromSender, groupId }: GroupMessageBubbleProps) {
+export function GroupMessageBubble({
+  msg,
+  isMe,
+  showAvatar,
+  isNextSameSender,
+  isFirstFromSender,
+  groupId,
+  isPinned,
+  onPin,
+  onUnpin,
+}: GroupMessageBubbleProps) {
+  if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
+    try {
+      const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
+      if (payload && payload.action) {
+        const isPin = payload.action === "pin";
+        return (
+          <div className="flex justify-center my-3 w-full">
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-1.5 rounded-full text-[12px] font-medium text-[#64748B] flex items-center gap-1.5 shadow-xs">
+              <Pin className="w-3.5 h-3.5 text-[#3B58F5] shrink-0" />
+              <span>
+                <strong className="font-semibold text-[#334155]">{payload.pinnerName || "A member"}</strong>{" "}
+                {isPin ? "pinned" : "unpinned"} a message
+              </span>
+            </div>
+          </div>
+        );
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  const renderOptionsMenu = () => (
+    <div
+      className={cn(
+        "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1.5 shrink-0 z-20",
+        isMe ? "order-first" : "order-last"
+      )}
+    >
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+            title="Message options"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={isMe ? "end" : "start"}
+          className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
+        >
+          {!isPinned ? (
+            <>
+              <DropdownMenuLabel className="text-[11px] font-semibold text-slate-400 px-2 py-1">
+                Pin Message
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => onPin?.(86400, msg.text, msg.mediaType || undefined)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
+                <span>For 24 hours</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
+                <span>For 7 days</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onPin?.(2592000, msg.text, msg.mediaType || undefined)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
+                <span>For 30 days</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 bg-slate-100" />
+              <DropdownMenuItem
+                onClick={() => onPin?.(undefined, msg.text, msg.mediaType || undefined)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                <Pin className="w-3.5 h-3.5 text-[#3B58F5]" />
+                <span>Until unpinned</span>
+              </DropdownMenuItem>
+            </>
+          ) : (
+            <DropdownMenuItem
+              onClick={() => onUnpin?.()}
+              className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
+            >
+              <PinOff className="w-3.5 h-3.5 text-red-500" />
+              <span>Unpin message</span>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+
+  const renderPinnedBadge = () => {
+    if (!isPinned) return null;
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-1 text-[10px] font-bold mb-1.5 px-2 py-0.5 rounded-full w-fit shadow-2xs",
+          isMe
+            ? "bg-white/20 text-white self-end"
+            : "bg-[#3B58F5]/10 text-[#3B58F5] self-start"
+        )}
+      >
+        <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
+        <span>Pinned</span>
+      </div>
+    );
+  };
   const { startGroupCall } = useCallContext();
   const senderName = msg.sender?.profile?.displayName || "Unknown";
   const senderInitials = senderName.charAt(0).toUpperCase();
@@ -59,25 +200,29 @@ export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, is
       : (dur > 0 ? formatDur(dur) : "Call ended");
 
     return (
-      <div className={cn("flex w-full mb-2", isMe ? "justify-end" : "justify-start")}>
+      <div id={`msg-${msg.id}`} className={cn("flex w-full mb-2 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+        {renderOptionsMenu()}
         <div className={cn("flex flex-col w-full max-w-[280px]", isMe ? "items-end" : "items-start")}>
           <div
             onClick={() => groupId && startGroupCall(groupId, isVideo ? 'VIDEO' : 'AUDIO')}
             className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-xl border shadow-sm w-full transition-colors cursor-pointer",
+              "flex flex-col px-4 py-3 rounded-xl border shadow-sm w-full transition-colors cursor-pointer",
               isMe ? "bg-[#EEF2FF] border-[#E0E7FF] hover:bg-[#E0E7FF]" : "bg-[#EEF2FF] border-[#E0E7FF] hover:bg-[#E0E7FF]"
             )}
           >
-            <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[#2563EB]">
-              {isVideo ? <Video className="w-4 h-4" /> : isMissed ? <PhoneMissed className="w-4 h-4 text-red-500" /> : <Phone className="w-4 h-4" strokeWidth={2.5} />}
+            {renderPinnedBadge()}
+            <div className="flex items-center gap-3 w-full">
+              <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[#2563EB]">
+                {isVideo ? <Video className="w-4 h-4" /> : isMissed ? <PhoneMissed className="w-4 h-4 text-red-500" /> : <Phone className="w-4 h-4" strokeWidth={2.5} />}
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className={cn("font-bold text-[13px] truncate", isMissed ? "text-red-500" : "text-[#2563EB]")}>
+                  {isVideo ? "Video call" : "Audio call"}
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium">{subtitle}</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium self-end mb-0.5">{formatTime(msg.createdAt).toLowerCase()}</span>
             </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className={cn("font-bold text-[13px] truncate", isMissed ? "text-red-500" : "text-[#2563EB]")}>
-                {isVideo ? "Video call" : "Audio call"}
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">{subtitle}</span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium self-end mb-0.5">{formatTime(msg.createdAt).toLowerCase()}</span>
           </div>
         </div>
       </div>
@@ -179,7 +324,8 @@ export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, is
   };
 
   return (
-    <div className={cn("flex w-full mb-4", isMe ? "justify-end" : "justify-start")}>
+    <div id={`msg-${msg.id}`} className={cn("flex w-full mb-4 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+      {renderOptionsMenu()}
       <div className={cn("flex flex-col max-w-[65%]", isMe ? "items-end" : "items-start")}>
         <div
           className={cn(
@@ -189,6 +335,7 @@ export function GroupMessageBubble({ msg, isMe, showAvatar, isNextSameSender, is
               : "bg-white text-[#1E293B] rounded-[20px] rounded-tl-sm"
           )}
         >
+          {renderPinnedBadge()}
           {renderMedia()}
 
           {msg.text && (

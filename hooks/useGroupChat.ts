@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { groupService } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
@@ -18,6 +18,16 @@ export interface GroupMessage {
       avatarUrl: string | null;
     } | null;
   };
+}
+
+export interface PinnedMessage {
+  messageId: string;
+  pinnedAt: number;
+  pinnedUntil: number | null;
+  pinnerName: string;
+  previewText?: string;
+  previewMedia?: string;
+  originalMessage?: GroupMessage;
 }
 
 export const useGroupChat = (groupId: string, currentUserId: string) => {
@@ -351,12 +361,84 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     [socket, isConnected, groupId]
   );
 
+  const pinnedMessages = useMemo(() => {
+    const map = new Map<string, PinnedMessage>();
+    const now = Date.now();
+
+    for (const msg of messages) {
+      if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
+        try {
+          const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
+          if (payload && payload.messageId && payload.action) {
+            if (payload.action === "pin") {
+              const timestamp = payload.timestamp || new Date(msg.createdAt).getTime();
+              const pinnedUntil = payload.durationSeconds ? timestamp + payload.durationSeconds * 1000 : null;
+              
+              if (!pinnedUntil || pinnedUntil > now) {
+                map.set(payload.messageId, {
+                  messageId: payload.messageId,
+                  pinnedAt: timestamp,
+                  pinnedUntil,
+                  pinnerName: payload.pinnerName || "A member",
+                  previewText: payload.previewText,
+                  previewMedia: payload.previewMedia,
+                });
+              } else {
+                map.delete(payload.messageId);
+              }
+            } else if (payload.action === "unpin") {
+              map.delete(payload.messageId);
+            }
+          }
+        } catch (e) {
+          // Ignore malformed pin events
+        }
+      }
+    }
+
+    const result: PinnedMessage[] = [];
+    for (const pin of map.values()) {
+      const orig = messages.find((m) => m.id === pin.messageId);
+      result.push({
+        ...pin,
+        originalMessage: orig,
+      });
+    }
+
+    return result.sort((a, b) => b.pinnedAt - a.pinnedAt);
+  }, [messages]);
+
+  const pinMessage = useCallback(
+    (
+      messageId: string,
+      action: "pin" | "unpin",
+      durationSeconds?: number,
+      previewText?: string,
+      previewMedia?: string,
+      pinnerName: string = "A member"
+    ) => {
+      const payload = {
+        messageId,
+        action,
+        durationSeconds: durationSeconds || null,
+        timestamp: Date.now(),
+        pinnerName,
+        previewText: previewText || "",
+        previewMedia: previewMedia || "",
+      };
+      sendMessage(`__PIN_EVENT__:${JSON.stringify(payload)}`);
+    },
+    [sendMessage]
+  );
+
   return {
     messages,
     sendMessage,
     isReady,
     error,
     isUploading,
+    pinnedMessages,
+    pinMessage,
     getGroupKey: () => groupKeyRef.current,
   };
 };

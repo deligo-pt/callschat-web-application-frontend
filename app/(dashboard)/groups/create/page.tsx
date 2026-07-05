@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { groupService } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
+import { useContacts } from "@/hooks/useContacts";
 import { generateGroupKey, encryptMessage } from "@/utils/crypto";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
@@ -49,60 +50,16 @@ export default function CreateGroupPage() {
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
 
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+  const { contacts: rawContacts, isLoading: isLoadingContacts } = useContacts();
 
-  useEffect(() => {
-    const fetchContacts = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-        const res = await fetch(`${baseUrl}/contacts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        const data = await res.json();
-        
-        let usersArray: any[] = [];
-        if (data.success && Array.isArray(data.data)) {
-          usersArray = data.data;
-        } else if (Array.isArray(data)) {
-          usersArray = data;
-        } else if (data.data && Array.isArray(data.data.contacts)) {
-          usersArray = data.data.contacts;
-        }
-
-        const mappedContacts = usersArray.map((u: any, index: number) => {
-          const userProfile = u.addressee?.profile || u.contact?.profile || u.profile || {};
-          const userId = u.addressee?.id || u.contact?.id || u.id;
-          const displayName = u.customName || userProfile.displayName || userProfile.username || "Unknown";
-          const phone = u.addressee?.phone || u.contact?.phone || userProfile.phone || "";
-          
-          return {
-            id: userId,
-            name: displayName,
-            phone: phone,
-            initials: displayName.slice(0, 2).toUpperCase(),
-            color: COLORS[index % COLORS.length],
-            avatarUrl: userProfile.avatarUrl,
-          };
-        });
-
-        // Remove duplicates just in case
-        const uniqueContacts = Array.from(new Map(mappedContacts.map(item => [item.id, item])).values());
-        
-        setContacts(uniqueContacts);
-      } catch (error) {
-        console.error("Failed to fetch contacts", error);
-      } finally {
-        setIsLoadingContacts(false);
-      }
-    };
-
-    fetchContacts();
-  }, []);
+  const contacts: Contact[] = rawContacts.map((c, index) => ({
+    id: c.userId,
+    name: c.name,
+    phone: c.phone,
+    initials: c.name.slice(0, 2).toUpperCase(),
+    color: COLORS[index % COLORS.length],
+    avatarUrl: c.avatarUrl || undefined,
+  }));
 
   // Step 2 State
   const [searchQuery, setSearchQuery] = useState("");
