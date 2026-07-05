@@ -18,7 +18,15 @@ export interface GroupMessage {
       avatarUrl: string | null;
     } | null;
   };
+  isEdited?: boolean;
 }
+
+const parseEditedText = (rawText: string) => {
+  if (rawText && rawText.startsWith("__EDITED__:")) {
+    return { text: rawText.substring("__EDITED__:".length), isEdited: true };
+  }
+  return { text: rawText, isEdited: false };
+};
 
 export interface PinnedMessage {
   messageId: string;
@@ -147,16 +155,18 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                     groupId: msg.groupId || msg.conversationId,
                   };
                 }
-                const text = await decryptGroupMessage(
+                const decrypted = await decryptGroupMessage(
                   msg.ciphertext,
                   msg.nonce,
                   plaintextGroupKey
                 );
+                const parsed = parseEditedText(decrypted);
                 return {
                   id: msg.id,
                   groupId: msg.groupId || msg.conversationId,
                   senderId: msg.senderId,
-                  text,
+                  text: parsed.text,
+                  isEdited: parsed.isEdited,
                   createdAt: msg.createdAt,
                   mediaUrl: msg.mediaUrl,
                   mediaType: msg.mediaType,
@@ -168,6 +178,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                   groupId: msg.groupId || msg.conversationId,
                   senderId: msg.senderId,
                   text: "🔒 Encrypted Message (Decryption Failed)",
+                  isEdited: false,
                   createdAt: msg.createdAt,
                   mediaUrl: msg.mediaUrl,
                   mediaType: msg.mediaType,
@@ -274,17 +285,19 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
 
       try {
-        const text = await decryptGroupMessage(
+        const decrypted = await decryptGroupMessage(
           payload.ciphertext,
           payload.nonce,
           gKey
         );
-        appendMessage({ ...baseMsg, text });
+        const parsed = parseEditedText(decrypted);
+        appendMessage({ ...baseMsg, text: parsed.text, isEdited: parsed.isEdited });
       } catch (err) {
         console.error("❌ [Socket] Failed to decrypt group message:", err);
         appendMessage({
           ...baseMsg,
           text: payload.mediaUrl ? "" : "🔒 Encrypted group message (Decryption Failed)",
+          isEdited: false,
         });
       }
     };
@@ -293,11 +306,28 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       console.error("🚨 [Socket] Group Chat Error:", err);
     };
 
+    const handleMessageEdited = async (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      const gKey = groupKeyRef.current;
+      let text = payload.ciphertext || "";
+      if (payload.ciphertext && payload.nonce && gKey) {
+        try {
+          text = await decryptGroupMessage(payload.ciphertext, payload.nonce, gKey);
+        } catch {}
+      }
+      const parsed = parseEditedText(text);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === payload.id ? { ...m, text: parsed.text, isEdited: parsed.isEdited } : m))
+      );
+    };
+
     socket.on("group:receive_message", handleReceiveMessage);
+    socket.on("group:message_edited", handleMessageEdited);
     socket.on("group:error", handleGroupError);
 
     return () => {
       socket.off("group:receive_message", handleReceiveMessage);
+      socket.off("group:message_edited", handleMessageEdited);
       socket.off("group:error", handleGroupError);
     };
   }, [socket, isConnected, groupId]);
@@ -431,9 +461,30 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     [sendMessage]
   );
 
+  const editMessage = useCallback(
+    async (messageId: string, newText: string) => {
+      if (!socket || !isConnected || !groupId) return;
+      const formattedText = `__EDITED__:${newText}`;
+      const groupKey = groupKeyRef.current;
+      if (!groupKey) return;
+      const encrypted = await encryptGroupMessage(formattedText, groupKey);
+      socket.emit("group:edit_message", {
+        messageId,
+        groupId,
+        ciphertext: encrypted.ciphertext,
+        nonce: encrypted.nonce,
+      });
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, text: newText, isEdited: true } : m))
+      );
+    },
+    [socket, isConnected, groupId]
+  );
+
   return {
     messages,
     sendMessage,
+    editMessage,
     isReady,
     error,
     isUploading,

@@ -1,7 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download } from "lucide-react";
+import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { useCallContext } from "@/components/providers/CallContext";
 
 interface MessageBubbleProps {
@@ -12,16 +18,58 @@ interface MessageBubbleProps {
     createdAt: string;
     mediaUrl?: string;
     mediaType?: string | null;
+    isEdited?: boolean;
   };
   isMe: boolean;
   showTail: boolean;
   peerId?: string;
   peerName?: string;
   peerAvatar?: string;
+  onEdit?: (messageId: string, newText: string) => void;
 }
 
-export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar }: MessageBubbleProps) {
+export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit }: MessageBubbleProps) {
   const { initiateCall } = useCallContext();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(msg.text);
+
+  const renderOptionsMenu = () => {
+    if (!isMe || msg.id.startsWith("optimistic-") || !msg.text) return null;
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1.5 shrink-0 z-20 order-first"
+        )}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+              title="Message options"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
+          >
+            <DropdownMenuItem
+              onClick={() => {
+                setEditText(msg.text);
+                setIsEditing(true);
+              }}
+              className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
+              <span>Edit message</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  };
 
   const formatTime = (dateString: string) => {
     const d = new Date(dateString);
@@ -204,31 +252,83 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
   };
 
   return (
-    <div className={cn("flex w-full z-10 flex-col mb-1", isMe ? "items-end" : "items-start")}>
-      <div
-        className={cn(
-          "relative max-w-[75%] px-5 py-3 text-[15px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex flex-col group",
-          isMe ? "bg-[#254BCC] text-white rounded-[24px] rounded-br-[6px]" : "bg-white text-[#11142D] rounded-[24px] rounded-bl-[6px]"
-        )}
-      >
+    <div className={cn("flex w-full z-10 my-1 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+      {renderOptionsMenu()}
+      <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
+        <div
+          className={cn(
+            "relative px-5 py-3 text-[15px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex flex-col group",
+            isMe ? "bg-[#254BCC] text-white rounded-[24px] rounded-br-[6px]" : "bg-white text-[#11142D] rounded-[24px] rounded-bl-[6px]"
+          )}
+        >
 
-        {renderMedia()}
+          {renderMedia()}
 
-        {msg.text && (
-          <span
-            className="leading-snug whitespace-pre-wrap"
-            style={{ wordBreak: "break-word" }}
-          >
-            {msg.text}
+          {msg.text && (
+            isEditing ? (
+              <div className="flex flex-col gap-2 w-full min-w-[200px] mt-1">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (editText.trim() && editText.trim() !== msg.text) {
+                        onEdit?.(msg.id, editText.trim());
+                      }
+                      setIsEditing(false);
+                    } else if (e.key === "Escape") {
+                      setIsEditing(false);
+                      setEditText(msg.text);
+                    }
+                  }}
+                  className="w-full text-sm bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
+                  rows={2}
+                  autoFocus
+                />
+                <div className="flex justify-end gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditText(msg.text);
+                    }}
+                    className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editText.trim() && editText.trim() !== msg.text) {
+                        onEdit?.(msg.id, editText.trim());
+                      }
+                      setIsEditing(false);
+                    }}
+                    className="px-2.5 py-1 rounded bg-white font-medium text-[#254BCC] hover:bg-blue-50 transition-colors cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <span
+                className="leading-snug whitespace-pre-wrap"
+                style={{ wordBreak: "break-word" }}
+              >
+                {msg.text}
+              </span>
+            )
+          )}
+        </div>
+        
+        {/* Timestamp outside the bubble */}
+        <div className={cn("flex items-center gap-1 mt-1 px-1", isMe ? "justify-end text-gray-500" : "justify-start text-gray-500")}>
+          <span className="text-[11px] font-medium flex items-center gap-1">
+            {msg.isEdited && <span className="italic font-normal">(edited)</span>}
+            {isMe ? "Sent" : formatTime(msg.createdAt)}
           </span>
-        )}
-      </div>
-      
-      {/* Timestamp outside the bubble */}
-      <div className={cn("flex items-center gap-1 mt-1 px-1", isMe ? "justify-end text-gray-500" : "justify-start text-gray-500")}>
-        <span className="text-[11px] font-medium">
-          {isMe ? "Sent" : formatTime(msg.createdAt)}
-        </span>
+        </div>
       </div>
     </div>
   );

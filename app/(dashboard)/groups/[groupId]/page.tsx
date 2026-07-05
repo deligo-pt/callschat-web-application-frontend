@@ -87,7 +87,7 @@ export default function GroupChatPage() {
     }
   }, []);
 
-  const { messages, sendMessage, isReady, error, getGroupKey, isUploading, pinnedMessages, pinMessage } = useGroupChat(groupId, currentUserId);
+  const { messages, sendMessage, editMessage, isReady, error, getGroupKey, isUploading, pinnedMessages, pinMessage } = useGroupChat(groupId, currentUserId);
 
   // ── Re-sync Group Keys ─────────────────────────────────────────────────────
   // When decryption fails (usually after a keypair regeneration), admins can
@@ -633,6 +633,7 @@ export default function GroupChatPage() {
                       myMemberInfo?.user?.profile?.displayName || "A member"
                     )
                   }
+                  onEdit={(msgId, newText) => editMessage(msgId, newText)}
                 />
               );
             })

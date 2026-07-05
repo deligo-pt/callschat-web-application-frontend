@@ -325,7 +325,7 @@ export default function ChatRoomPage() {
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
 
-  const { messages, sendMessage, clearMessages, isReady, isUploading } =
+  const { messages, sendMessage, editMessage, clearMessages, isReady, isUploading } =
     useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -702,6 +702,7 @@ export default function ChatRoomPage() {
                   peerId={recipientId}
                   peerName={isBizChat ? bizName : recipient?.name}
                   peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
+                  onEdit={(msgId, newText) => editMessage(msgId, newText)}
                 />
               );
             })

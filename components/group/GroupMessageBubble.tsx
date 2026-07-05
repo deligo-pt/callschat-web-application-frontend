@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
 import {
@@ -14,6 +14,7 @@ import {
   PinOff,
   MoreHorizontal,
   Clock,
+  Edit2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ interface GroupMessageBubbleProps {
         avatarUrl: string | null;
       } | null;
     };
+    isEdited?: boolean;
   };
   isMe: boolean;
   showAvatar: boolean;
@@ -48,6 +50,7 @@ interface GroupMessageBubbleProps {
   isPinned?: boolean;
   onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
   onUnpin?: () => void;
+  onEdit?: (messageId: string, newText: string) => void;
 }
 
 export function GroupMessageBubble({
@@ -60,7 +63,11 @@ export function GroupMessageBubble({
   isPinned,
   onPin,
   onUnpin,
+  onEdit,
 }: GroupMessageBubbleProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(msg.text);
+
   if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
     try {
       const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
@@ -103,6 +110,21 @@ export function GroupMessageBubble({
           align={isMe ? "end" : "start"}
           className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
         >
+          {isMe && !msg.id.startsWith("optimistic-") && msg.text && !msg.text.startsWith("__PIN_EVENT__:") && (
+            <>
+              <DropdownMenuItem
+                onClick={() => {
+                  setEditText(msg.text);
+                  setIsEditing(true);
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
+                <span>Edit message</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 bg-slate-100" />
+            </>
+          )}
           {!isPinned ? (
             <>
               <DropdownMenuLabel className="text-[11px] font-semibold text-slate-400 px-2 py-1">
@@ -339,18 +361,67 @@ export function GroupMessageBubble({
           {renderMedia()}
 
           {msg.text && (
-            <span
-              className="whitespace-pre-wrap font-medium"
-              style={{ wordBreak: "break-word" }}
-            >
-              {msg.text}
-            </span>
+            isEditing ? (
+              <div className="flex flex-col gap-2 w-full min-w-[200px] mt-1">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (editText.trim() && editText.trim() !== msg.text) {
+                        onEdit?.(msg.id, editText.trim());
+                      }
+                      setIsEditing(false);
+                    } else if (e.key === "Escape") {
+                      setIsEditing(false);
+                      setEditText(msg.text);
+                    }
+                  }}
+                  className="w-full text-sm bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
+                  rows={2}
+                  autoFocus
+                />
+                <div className="flex justify-end gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditText(msg.text);
+                    }}
+                    className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editText.trim() && editText.trim() !== msg.text) {
+                        onEdit?.(msg.id, editText.trim());
+                      }
+                      setIsEditing(false);
+                    }}
+                    className="px-2.5 py-1 rounded bg-white font-medium text-[#2563EB] hover:bg-blue-50 transition-colors cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <span
+                className="whitespace-pre-wrap font-medium"
+                style={{ wordBreak: "break-word" }}
+              >
+                {msg.text}
+              </span>
+            )
           )}
         </div>
 
         {(!isNextSameSender || isMe) && (
           <div className={cn("flex flex-col mt-1.5", isMe ? "items-end mr-1" : "ml-1")}>
-            <span className="text-[11px] font-semibold text-slate-400">
+            <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+              {msg.isEdited && <span className="italic font-normal">(edited)</span>}
               {isMe ? "Sent" : formatTime(msg.createdAt).toUpperCase()}
             </span>
           </div>

@@ -12,7 +12,15 @@ export interface ChatMessage {
   createdAt: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video' | 'audio' | 'document' | 'link' | string | null;
+  isEdited?: boolean;
 }
+
+const parseEditedText = (rawText: string) => {
+  if (rawText && rawText.startsWith("__EDITED__:")) {
+    return { text: rawText.substring("__EDITED__:".length), isEdited: true };
+  }
+  return { text: rawText, isEdited: false };
+};
 
 export const useChat = (conversationId: string, currentUserId: string, activePeerId: string, isBizChat: boolean = false) => {
   const { socket, isConnected } = useSocket();
@@ -138,11 +146,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 //   4. ciphertext is absent → media-only message.
                 const isTicketMessage = !!msg.ticketId;
                 if (!msg.ciphertext || !msg.nonce || isBizChat || isTicketMessage) {
+                  const parsed = parseEditedText(msg.ciphertext || "");
                   return {
                     id: msg.id,
                     conversationId: msg.conversationId,
                     senderId: msg.senderId,
-                    text: msg.ciphertext || "",
+                    text: parsed.text,
+                    isEdited: parsed.isEdited,
                     createdAt: msg.createdAt,
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
@@ -231,11 +241,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     }
                   }
 
+                  const parsed = parseEditedText(text!);
                   return {
                     id: msg.id,
                     conversationId: msg.conversationId,
                     senderId: msg.senderId,
-                    text: text!,
+                    text: parsed.text,
+                    isEdited: parsed.isEdited,
                     createdAt: msg.createdAt,
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
@@ -246,6 +258,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     conversationId: msg.conversationId,
                     senderId: msg.senderId,
                     text: "🔒 Encrypted Message",
+                    isEdited: false,
                     createdAt: msg.createdAt,
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
@@ -416,11 +429,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             );
             if (optimisticIdx !== -1) {
               const updated = [...prev];
+              const parsed = parseEditedText(text);
               updated[optimisticIdx] = {
                 id: payload.id,
                 conversationId: payload.conversationId,
                 senderId: payload.senderId,
-                text,
+                text: parsed.text,
+                isEdited: parsed.isEdited,
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
@@ -428,13 +443,15 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               return updated;
             }
 
+            const parsed = parseEditedText(text);
             return [
               ...prev,
               {
                 id: payload.id || Date.now().toString(),
                 conversationId: payload.conversationId,
                 senderId: senderId,
-                text,
+                text: parsed.text,
+                isEdited: parsed.isEdited,
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
@@ -456,6 +473,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 conversationId: payload.conversationId,
                 senderId: fallbackSenderId,
                 text: "🔒 Encrypted message (Decryption Failed)",
+                isEdited: false,
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
@@ -466,6 +484,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       } else if (payload.ciphertext && (!payload.nonce || isBiz || noPeer || isTicket)) {
         // Plaintext: no nonce, B2C chat, peer not resolved, or ticket message
         console.log("ℹ️ [Socket] Plaintext message received");
+        const parsed = parseEditedText(payload.ciphertext || "");
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
           return [
@@ -474,7 +493,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               id: payload.id || Date.now().toString(),
               conversationId: payload.conversationId,
               senderId: senderId || "unknown",
-              text: payload.ciphertext,
+              text: parsed.text,
+              isEdited: parsed.isEdited,
               createdAt: payload.createdAt || new Date().toISOString(),
               mediaUrl: payload.mediaUrl,
               mediaType: payload.mediaType,
@@ -515,13 +535,39 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
     };
 
+    const handleMessageEdited = async (payload: any) => {
+      if (payload.conversationId !== conversationId) return;
+      const privKey = myPrivateKeyRef.current;
+      const pubKey = recipientPublicKeyRef.current;
+      const isBiz = isBizChatRef.current;
+      const noPeer = !activePeerIdRef.current;
+      let text = payload.ciphertext || "";
+      if (!isBiz && !noPeer && payload.ciphertext && payload.nonce && privKey && pubKey) {
+        try {
+          text = await decryptMessage(payload.ciphertext, payload.nonce, pubKey, privKey);
+        } catch {
+          try {
+            if (myPublicKeyRef.current) {
+              text = await decryptMessage(payload.ciphertext, payload.nonce, myPublicKeyRef.current, privKey);
+            }
+          } catch {}
+        }
+      }
+      const parsed = parseEditedText(text);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === payload.id ? { ...m, text: parsed.text, isEdited: parsed.isEdited } : m))
+      );
+    };
+
     socket.on("chat:receive_message", handleReceiveMessage);
     socket.on("NEW_MESSAGE", handleReceiveMessage);
+    socket.on("chat:message_edited", handleMessageEdited);
     socket.on("chat:error", handleChatError);
 
     return () => {
       socket.off("chat:receive_message", handleReceiveMessage);
       socket.off("NEW_MESSAGE", handleReceiveMessage);
+      socket.off("chat:message_edited", handleMessageEdited);
       socket.off("chat:error", handleChatError);
     };
   }, [socket, isConnected, conversationId]);
@@ -647,11 +693,35 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [socket, isConnected, conversationId, myPrivateKey, recipientPublicKey, activePeerId]
   );
 
+  const editMessage = useCallback(
+    async (messageId: string, newText: string) => {
+      if (!socket || !isConnected || !conversationId) return;
+      const formattedText = `__EDITED__:${newText}`;
+      const effectiveSkipEncryption = !activePeerId || isBizChatRef.current;
+      let ciphertext, nonce;
+      if (effectiveSkipEncryption) {
+        ciphertext = formattedText;
+        nonce = null;
+      } else {
+        if (!myPrivateKey || !recipientPublicKey) return;
+        const encrypted = await encryptMessage(formattedText, recipientPublicKey, myPrivateKey);
+        ciphertext = encrypted.ciphertext;
+        nonce = encrypted.nonce;
+      }
+      socket.emit("chat:edit_message", { messageId, conversationId, ciphertext, nonce });
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, text: newText, isEdited: true } : m))
+      );
+    },
+    [socket, isConnected, conversationId, myPrivateKey, recipientPublicKey, activePeerId]
+  );
+
   return {
     messages,
     setMessages,
     clearMessages: () => setMessages([]),
     sendMessage,
+    editMessage,
     isUploading,
     isReady: !!(myPrivateKey && (recipientPublicKey || isBizChat) && isConnected && conversationId),
   };
