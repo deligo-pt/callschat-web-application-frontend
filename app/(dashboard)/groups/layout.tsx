@@ -9,10 +9,15 @@ import { groupService, GroupItem } from "@/services/group.service";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { useTranslations } from "next-intl";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
 export default function GroupsLayout({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("options");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
+  const tNotif = useTranslations("notifications");
   const pathname = usePathname();
   const { currentMode } = useUser();
   
@@ -134,7 +139,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
         {/* Header */}
         <div className="flex flex-col px-6 pt-8 pb-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">Groups</h1>
+            <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">{tNav("group")}</h1>
             <div className="flex items-center gap-2">
               <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
                 <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
@@ -147,7 +152,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder={tCommon("search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-10 w-full rounded-full bg-[#EEF2FF] pl-10 pr-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 border border-transparent transition-all"
@@ -155,7 +160,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="flex items-center gap-2 mt-4">
-            <button className="px-5 py-1.5 bg-[#2563EB] text-white rounded-full text-[12px] font-bold shadow-sm">All</button>
+            <button className="px-5 py-1.5 bg-[#2563EB] text-white rounded-full text-[12px] font-bold shadow-sm">{tNotif("all")}</button>
           </div>
         </div>
 
@@ -168,12 +173,12 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
           ) : groups.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full px-8 text-center pb-20">
               <p className="text-[12px] font-bold text-[#1E293B] mb-8 leading-relaxed max-w-[200px]">
-                Create a new group to start chatting and collaboration.
+                {t("create_group_prompt")}
               </p>
             </div>
           ) : filteredGroups.length === 0 ? (
             <div className="flex w-full justify-center py-10">
-              <p className="text-[13px] text-slate-500 font-medium">No groups match your search.</p>
+              <p className="text-[13px] text-slate-500 font-medium">{t("no_groups_match")}</p>
             </div>
           ) : (
             <div className="flex flex-col mt-2">
@@ -267,7 +272,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
                             className="w-full px-4 py-2 text-left text-[13px] font-semibold text-[#1D2A54] hover:bg-[#F4F6FC] flex items-center gap-2"
                           >
                             <Star className={cn("h-4 w-4", group.isFavourite ? "fill-[#FFA500] text-[#FFA500]" : "text-[#8F95B2]")} />
-                            {group.isFavourite ? "Remove from Favorites" : "Add to Favorites"}
+                            {group.isFavourite ? t("remove_from_favorites") : t("add_to_favorites")}
                           </button>
 
                           {group.myRole === 'ADMIN' && (
@@ -281,7 +286,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
                               className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2 border-t border-[#F4F6FC]"
                             >
                               <Trash2 className="h-4 w-4" />
-                              Delete Group
+                              {t("delete_group")}
                             </button>
                           )}
                         </div>
@@ -307,16 +312,16 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
       {groupToDelete && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#1D2A54]/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">Delete Group</h2>
+            <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">{t("delete_group")}</h2>
             <p className="text-[14px] font-medium text-[#8F95B2] mb-6">
-              Are you sure you want to delete this group? This action cannot be undone and will permanently remove all messages and members.
+              {t("delete_conversation_desc")}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setGroupToDelete(null)}
                 className="flex-1 rounded-xl bg-[#F8FAFC] py-3 text-[14px] font-bold text-[#1D2A54] transition-colors hover:bg-[#E6EAFA]"
               >
-                Cancel
+                {tCommon("cancel")}
               </button>
               <button
                 disabled={isDeleting}
@@ -326,7 +331,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
                 {isDeleting ? (
                   <Loader2 className="h-4 w-4 animate-spin text-white" />
                 ) : (
-                  "Delete Group"
+                  t("delete_group")
                 )}
               </button>
             </div>

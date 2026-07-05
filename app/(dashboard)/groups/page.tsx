@@ -7,7 +7,10 @@ import { cn } from "@/lib/utils";
 import { groupService, GroupItem } from "@/services/group.service";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
+import { useTranslations } from "next-intl";
+
 export default function GroupsPage() {
+  const t = useTranslations("options");
   return (
     <div className="hidden flex-1 flex-col items-center justify-center bg-white md:flex w-full">
       <div className="flex flex-col items-center text-center max-w-sm">
@@ -17,9 +20,9 @@ export default function GroupsPage() {
           </div>
         </div>
         
-        <h2 className="text-[22px] font-bold text-[#0F172A] mb-3">No Groups Yet</h2>
+        <h2 className="text-[22px] font-bold text-[#0F172A] mb-3">{t("no_groups_yet")}</h2>
         <p className="text-[13px] font-semibold text-[#1E293B] leading-relaxed max-w-[240px]">
-          You haven't joined or created any<br />groups yet.
+          {t("no_groups_desc")}
         </p>
       </div>
     </div>

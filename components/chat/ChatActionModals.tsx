@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import apiClient from "@/services/api.client";
 import { chatService } from "@/services/chat.service";
+import { useTranslations } from "next-intl";
 
 export interface ChatActionModalsProps {
   conversationId: string;
@@ -36,6 +37,8 @@ export function ChatActionModals({
   onBlockSuccess,
   isBlockedByMe,
 }: ChatActionModalsProps) {
+  const t = useTranslations("options");
+  const tCommon = useTranslations("common");
   const [isClearing, setIsClearing] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
 
@@ -84,14 +87,13 @@ export function ChatActionModals({
       <AlertDialog open={isClearChatOpen} onOpenChange={setIsClearChatOpen}>
         <AlertDialogContent className="bg-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear chat history?</AlertDialogTitle>
+            <AlertDialogTitle>{t("clear_chat_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to clear this chat? This action cannot be
-              undone on your end.
+              {t("clear_chat_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isClearing}>{tCommon("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={isClearing}
               onClick={(e) => {
@@ -100,7 +102,7 @@ export function ChatActionModals({
               }}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
-              {isClearing ? "Clearing..." : "Clear Chat"}
+              {isClearing ? t("clearing") : t("clear_chat")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -110,16 +112,16 @@ export function ChatActionModals({
         <AlertDialogContent className="bg-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {isBlockedByMe ? "Unblock this contact?" : "Block this contact?"}
+              {isBlockedByMe ? t("unblock_title") : t("block_title")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {isBlockedByMe
-                ? "They will be able to send you messages and call you again."
-                : "They will no longer be able to send you messages or call you."}
+                ? t("unblock_desc")
+                : t("block_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isBlocking}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isBlocking}>{tCommon("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={isBlocking}
               onClick={(e) => {
@@ -130,11 +132,11 @@ export function ChatActionModals({
             >
               {isBlocking
                 ? isBlockedByMe
-                  ? "Unblocking..."
-                  : "Blocking..."
+                  ? t("unblocking")
+                  : t("blocking")
                 : isBlockedByMe
-                  ? "Unblock User"
-                  : "Block User"}
+                  ? t("unblock_user")
+                  : t("block_user")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -22,6 +22,7 @@ const LOCALE_LABELS: Record<Locale, string> = {
   bn: "বাংলা",
   pt: "Português",
   hi: "हिन्दी",
+  de: "Deutsch",
 };
 
 // Define the shape of the user profile from the API

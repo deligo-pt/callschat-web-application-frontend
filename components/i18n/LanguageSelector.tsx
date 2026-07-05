@@ -18,6 +18,7 @@ const LANGUAGES: LanguageOption[] = [
   { code: "bn", nativeName: "বাংলা", regionLabel: "Bengali" },
   { code: "hi", nativeName: "हिन्दी", regionLabel: "Hindi" },
   { code: "pt", nativeName: "Português", regionLabel: "Portuguese" },
+  { code: "de", nativeName: "Deutsch", regionLabel: "German (DE)" },
 ];
 
 interface LanguageSelectorProps {

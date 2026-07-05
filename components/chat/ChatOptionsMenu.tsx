@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { ContactService } from "@/services/contact.service";
 import { ChatActionModals } from "./ChatActionModals";
 import { DisappearingMessagesModal } from "./DisappearingMessagesModal";
+import { useTranslations } from "next-intl";
 
 export interface ChatOptionsMenuProps {
   conversationId: string;
@@ -59,6 +60,8 @@ export function ChatOptionsMenu({
   disappearAfterSeconds: initialDisappear = null,
   onDisappearUpdated,
 }: ChatOptionsMenuProps) {
+  const t = useTranslations("options");
+  const tNotif = useTranslations("notifications");
   const [isClearChatOpen, setIsClearChatOpen] = useState(false);
   const [isBlockUserOpen, setIsBlockUserOpen] = useState(false);
   const [isDisappearOpen, setIsDisappearOpen] = useState(false);
@@ -81,7 +84,7 @@ export function ChatOptionsMenu({
     setIsFavouriting(true);
     try {
       await ContactService.toggleFavouriteByUser(peerId, true);
-      toast.success("Added to favourites!");
+      toast.success(t("add_to_favorites"));
     } catch (error: any) {
       console.error("Failed to add to favourites:", error);
       toast.error(error?.response?.data?.message || "Failed to add to favourites");
@@ -108,14 +111,14 @@ export function ChatOptionsMenu({
               className="h-[18px] w-[18px] text-[#3B58F5]"
               strokeWidth={2.5}
             />
-            <span className="text-[14.5px]">View Contact</span>
+            <span className="text-[14.5px]">{t("view_contact")}</span>
           </DropdownMenuItem>
           <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
             <Bell
               className="h-[18px] w-[18px] text-[#3B58F5]"
               strokeWidth={2.5}
             />
-            <span className="text-[14.5px]">Unmute Notifications</span>
+            <span className="text-[14.5px]">{t("unmute_notifications")}</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />
@@ -133,7 +136,7 @@ export function ChatOptionsMenu({
                 className="h-[18px] w-[18px] text-[#3B58F5]"
                 strokeWidth={2.5}
               />
-              <span className="text-[14.5px]">AI Protection</span>
+              <span className="text-[14.5px]">{t("ai_protection")}</span>
             </div>
             <Switch checked={aiProtection} onCheckedChange={setAiProtection} />
           </div>
@@ -149,7 +152,7 @@ export function ChatOptionsMenu({
                 className="h-[18px] w-[18px] text-[#00A884]"
                 strokeWidth={2.5}
               />
-              <span className="text-[14.5px]">Live Translation</span>
+              <span className="text-[14.5px]">{t("live_translation")}</span>
             </div>
             <Switch
               checked={liveTranslation}
@@ -168,7 +171,7 @@ export function ChatOptionsMenu({
                 className="h-[18px] w-[18px] text-[#FF7A00]"
                 strokeWidth={2.5}
               />
-              <span className="text-[14.5px]">Privacy Mode</span>
+              <span className="text-[14.5px]">{t("privacy_mode")}</span>
             </div>
             <Switch checked={privacyMode} onCheckedChange={setPrivacyMode} />
           </div>
@@ -183,7 +186,7 @@ export function ChatOptionsMenu({
               className="h-[18px] w-[18px] text-[#3B58F5]"
               strokeWidth={2.5}
             />
-            <span className="text-[14.5px]">Media Info</span>
+            <span className="text-[14.5px]">{t("media_info")}</span>
           </DropdownMenuItem>
 
           {/* ── Disappearing Messages ─────────────────────────────────────── */}
@@ -199,7 +202,7 @@ export function ChatOptionsMenu({
                 className="h-[18px] w-[18px] text-[#7C3AED]"
                 strokeWidth={2.5}
               />
-              <span className="text-[14.5px]">Disappearing Messages</span>
+              <span className="text-[14.5px]">{t("disappearing_messages")}</span>
             </div>
             {disappearValue !== null && (
               <span className="text-[11px] font-bold text-[#7C3AED] bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
@@ -222,7 +225,7 @@ export function ChatOptionsMenu({
               className="h-[18px] w-[18px] text-[#FFB020]"
               strokeWidth={2.5}
             />
-            <span className="text-[14.5px]">{isFavouriting ? "Adding..." : "Add to Favorites"}</span>
+            <span className="text-[14.5px]">{isFavouriting ? tNotif("adding") : t("add_to_favorites")}</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />
@@ -233,7 +236,7 @@ export function ChatOptionsMenu({
             onClick={() => setIsClearChatOpen(true)}
           >
             <Trash2 className="h-[18px] w-[18px]" strokeWidth={2.5} />
-            <span className="text-[14.5px]">Clear Chat</span>
+            <span className="text-[14.5px]">{t("clear_chat")}</span>
           </DropdownMenuItem>
           {!blockStatus?.hasBlockedMe && (
             <DropdownMenuItem
@@ -242,7 +245,7 @@ export function ChatOptionsMenu({
             >
               <Ban className="h-[18px] w-[18px]" strokeWidth={2.5} />
               <span className="text-[14.5px]">
-                {blockStatus?.isBlockedByMe ? "Unblock" : "Block"}
+                {blockStatus?.isBlockedByMe ? t("unblock") : t("block")}
               </span>
             </DropdownMenuItem>
           )}

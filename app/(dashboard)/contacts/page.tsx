@@ -11,8 +11,12 @@ import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesM
 import { Building2 } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { useTranslations } from "next-intl";
 
 export default function ContactsPage() {
+  const t = useTranslations("contacts");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const router = useRouter();
   const { contacts, isLoading, searchQuery, setSearchQuery, fetchContacts, handleToggleFavourite } = useContacts();
 
@@ -42,7 +46,7 @@ export default function ContactsPage() {
     setAddContactError("");
     
     if (!newContactPhone) {
-      setAddContactError("Please enter a valid phone number.");
+      setAddContactError(t("err_valid_phone"));
       return;
     }
 
@@ -77,16 +81,16 @@ export default function ContactsPage() {
       } else {
         let errorMessage = data.message || "Failed to add contact";
         if (errorMessage.includes("body/phoneNumber") || res.status === 400) {
-          errorMessage = "Please enter a valid international phone number.";
+          errorMessage = t("err_valid_phone");
         } else if (res.status === 409) {
-          errorMessage = "This contact already exists or you are trying to add yourself.";
+          errorMessage = t("err_exists");
         } else if (res.status === 404) {
-          errorMessage = "No registered user found with this phone number.";
+          errorMessage = t("err_no_user");
         }
         setAddContactError(errorMessage);
       }
     } catch (error) {
-      setAddContactError("Network error. Please try again.");
+      setAddContactError(t("err_network"));
     } finally {
       setIsAddingContact(false);
     }
@@ -133,7 +137,7 @@ export default function ContactsPage() {
         {/* Header Area */}
         <div className="flex flex-col bg-white px-6 pt-8 pb-4 shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-[28px] font-bold text-[#3B58F5]">Groups</h1>
+            <h1 className="text-[28px] font-bold text-[#3B58F5]">{tNav("contacts")}</h1>
             <div className="flex items-center gap-3">
               <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
               <Bell className="h-6 w-6 text-[#3B58F5]" />
@@ -145,7 +149,7 @@ export default function ContactsPage() {
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder={tCommon("search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-[42px] w-full rounded-xl bg-[#F0F2F5] pl-11 pr-4 text-[14px] font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3B58F5] transition-colors"
@@ -162,7 +166,7 @@ export default function ContactsPage() {
           ) : Object.keys(groupedContacts).length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center h-full">
               <Users className="h-12 w-12 text-slate-300 mb-4 opacity-50" />
-              <p className="text-[15px] font-medium text-slate-400">No contacts found</p>
+              <p className="text-[15px] font-medium text-slate-400">{t("no_contacts")}</p>
             </div>
           ) : (
             <div className="flex flex-col">
@@ -243,16 +247,16 @@ export default function ContactsPage() {
         <div className="flex flex-col items-center text-center p-8 max-w-sm">
           <div className="mb-6 flex flex-col items-center justify-center h-32 w-32 rounded-xl bg-[#3B58F5] text-white shadow-lg shadow-blue-500/20">
             <UserPlus className="h-10 w-10 mb-2" strokeWidth={2} />
-            <span className="text-[13px] font-semibold">Add contact</span>
+            <span className="text-[13px] font-semibold">{t("add_contact")}</span>
           </div>
           <p className="text-[15px] font-medium text-slate-500 leading-relaxed mb-8">
-            Add contacts and start chatting or calling them instantly.
+            {t("add_contact_desc")}
           </p>
           <button 
             onClick={() => setIsAddContactPanelOpen(true)}
             className="rounded-full bg-[#1D2A54] px-6 py-2.5 text-[14px] font-bold text-white transition-colors hover:bg-[#2A3F7A]"
           >
-            + Add number
+            {t("add_number")}
           </button>
         </div>
       </div>
@@ -267,7 +271,7 @@ export default function ContactsPage() {
             >
               <X className="h-5 w-5" />
             </button>
-            <h2 className="text-[16px] font-bold text-slate-800">New contact</h2>
+            <h2 className="text-[16px] font-bold text-slate-800">{t("new_contact")}</h2>
           </div>
 
           <div className="p-6">
@@ -278,7 +282,7 @@ export default function ContactsPage() {
                 <div className="flex-1 border-b border-slate-300 pb-2">
                   <input
                     type="text"
-                    placeholder="First name"
+                    placeholder={t("first_name")}
                     value={newContactFirstName}
                     onChange={(e) => setNewContactFirstName(e.target.value)}
                     className="w-full text-[14px] font-medium text-slate-900 placeholder-slate-400 focus:outline-none bg-transparent"
@@ -291,7 +295,7 @@ export default function ContactsPage() {
                 <div className="flex-1 border-b border-slate-300 pb-2">
                   <input
                     type="text"
-                    placeholder="Last name"
+                    placeholder={t("last_name")}
                     value={newContactLastName}
                     onChange={(e) => setNewContactLastName(e.target.value)}
                     className="w-full text-[14px] font-medium text-slate-900 placeholder-slate-400 focus:outline-none bg-transparent"
@@ -301,7 +305,7 @@ export default function ContactsPage() {
 
               <div className="mt-4">
                 <label className="block text-[13px] font-bold text-slate-500 mb-3 ml-8">
-                  Phone number
+                  {t("phone_number")}
                 </label>
                 <div className="ml-8">
                   <PhoneInput
@@ -330,7 +334,7 @@ export default function ContactsPage() {
                   className="rounded-full bg-[#3B58F5] px-10 py-2.5 text-[14px] font-bold text-white transition-colors hover:bg-[#2A41C7] disabled:opacity-70 flex items-center gap-2"
                 >
                   {isAddingContact && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-                  Save
+                  {isAddingContact ? tCommon("saving") : t("save")}
                 </button>
               </div>
             </form>

@@ -9,6 +9,7 @@ import enMessages from "@/messages/en.json";
 import bnMessages from "@/messages/bn.json";
 import ptMessages from "@/messages/pt.json";
 import hiMessages from "@/messages/hi.json";
+import deMessages from "@/messages/de.json";
 
 type Messages = typeof enMessages;
 
@@ -17,6 +18,7 @@ const MESSAGE_MAP: Record<Locale, Messages> = {
   bn: bnMessages,
   pt: ptMessages,
   hi: hiMessages,
+  de: deMessages,
 };
 
 interface ClientIntlProviderProps {

@@ -3,6 +3,7 @@ import { AppNotification } from "@/services/notification.service";
 import { MessageCircle, PhoneMissed, UserPlus, Users, UserMinus, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface NotificationItemProps {
   notification: AppNotification;
@@ -13,12 +14,12 @@ interface NotificationItemProps {
   isResolved: boolean;
 }
 
-function getRelativeTimeShort(dateString: string) {
+function getRelativeTimeShort(dateString: string, t: any) {
   const date = new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return "Just now";
+  if (diffInSeconds < 60) return t("just_now");
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   if (diffInMinutes < 60) return `${diffInMinutes}m`;
   const diffInHours = Math.floor(diffInMinutes / 60);
@@ -29,6 +30,7 @@ function getRelativeTimeShort(dateString: string) {
 }
 
 export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, onAcceptContact, isProcessing, isResolved }: NotificationItemProps) {
+  const t = useTranslations("notifications");
   const router = useRouter();
 
   const handleClick = () => {
@@ -71,7 +73,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       iconClass = "text-blue-500";
       textContent = (
         <>
-          <span className="font-semibold text-foreground">{issuerName}</span> sent you a message.
+          <span className="font-semibold text-foreground">{issuerName}</span> {t("msg_sent")}
         </>
       );
       break;
@@ -80,7 +82,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       iconClass = "text-red-500";
       textContent = (
         <>
-          You missed a call from <span className="font-semibold text-foreground">{issuerName}</span>.
+          {t("msg_missed_call")} <span className="font-semibold text-foreground">{issuerName}</span>.
         </>
       );
       break;
@@ -89,7 +91,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       iconClass = "text-blue-500";
       textContent = (
         <>
-          <span className="font-semibold text-foreground">{issuerName}</span> added you to their contacts.
+          <span className="font-semibold text-foreground">{issuerName}</span> {t("msg_contact_added")}
         </>
       );
       break;
@@ -98,7 +100,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       iconClass = "text-green-500";
       textContent = (
         <>
-          <span className="font-semibold text-foreground">{issuerName}</span> added you to a group.
+          <span className="font-semibold text-foreground">{issuerName}</span> {t("msg_group_added")}
         </>
       );
       break;
@@ -107,14 +109,14 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       iconClass = "text-gray-500";
       textContent = (
         <>
-          <span className="font-semibold text-foreground">{issuerName}</span> removed you from a group.
+          <span className="font-semibold text-foreground">{issuerName}</span> {t("msg_group_removed")}
         </>
       );
       break;
     default:
       textContent = (
         <>
-          <span className="font-semibold text-foreground">{issuerName}</span> triggered an event.
+          <span className="font-semibold text-foreground">{issuerName}</span> {t("msg_event")}
         </>
       );
       break;
@@ -166,7 +168,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
                 }
               }}
             >
-              {isProcessing ? "Adding..." : "Add Back"}
+              {isProcessing ? t("adding") : t("add_back")}
             </Button>
             <Button 
               variant="secondary" 
@@ -177,13 +179,13 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
                 onMarkAsRead(notification.id);
               }}
             >
-              Dismiss
+              {t("dismiss")}
             </Button>
           </div>
         )}
 
         <span className="text-xs font-medium text-muted-foreground mt-1">
-          {getRelativeTimeShort(notification.createdAt)}
+          {getRelativeTimeShort(notification.createdAt, t)}
         </span>
       </div>
 

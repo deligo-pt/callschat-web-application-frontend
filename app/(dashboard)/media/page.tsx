@@ -7,8 +7,12 @@ import { useState } from "react";
 import { chatService } from "@/services/chat.service";
 import { useContacts, type Contact } from "@/hooks/useContacts";
 import { useAllMedia, type MediaItem } from "@/hooks/useAllMedia";
+import { useTranslations } from "next-intl";
 
 export default function MediaPage() {
+  const t = useTranslations("media");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const router = useRouter();
   const { contacts, isLoading: contactsLoading, searchQuery, setSearchQuery } = useContacts();
   const { media, isLoading: mediaLoading, loadMore, hasMore } = useAllMedia();
@@ -74,11 +78,11 @@ export default function MediaPage() {
 
       if (date.toDateString() === today.toDateString()) {
         groupKey = 'today';
-        label = 'Today';
+        label = t('today');
         dateLabel = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).toLowerCase();
       } else if (date.toDateString() === yesterday.toDateString()) {
         groupKey = 'yesterday';
-        label = 'Yesterday';
+        label = t('yesterday');
         dateLabel = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).toLowerCase();
       } else {
         groupKey = date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -106,7 +110,7 @@ export default function MediaPage() {
       <div className="hidden h-full w-full flex-col border-r border-[#E6EAFA] bg-white md:flex md:w-[380px] shrink-0">
         <div className="flex flex-col bg-white px-6 pt-8 pb-4 shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-[28px] font-bold text-[#3B58F5]">Groups</h1>
+            <h1 className="text-[28px] font-bold text-[#3B58F5]">{tNav("media")}</h1>
             <div className="flex items-center gap-3">
               <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
               <Bell className="h-6 w-6 text-[#3B58F5]" />
@@ -116,7 +120,7 @@ export default function MediaPage() {
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder={tCommon("search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-[42px] w-full rounded-xl bg-[#F0F2F5] pl-11 pr-4 text-[14px] font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3B58F5] transition-colors"
@@ -188,23 +192,27 @@ export default function MediaPage() {
             <button className="text-slate-400 hover:text-slate-600 transition-colors">
               <X className="h-5 w-5" />
             </button>
-            <h2 className="text-[16px] font-bold text-slate-700">Media from all chats</h2>
+            <h2 className="text-[16px] font-bold text-slate-700">{t("title")}</h2>
           </div>
           
           {/* Tabs */}
           <div className="flex px-6 items-center w-full">
-            {['Media', 'Docs', 'Links'].map(tab => (
+            {[
+              { id: 'Media', label: t('tab_media') },
+              { id: 'Docs', label: t('tab_docs') },
+              { id: 'Links', label: t('tab_links') }
+            ].map(tab => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
                 className={cn(
                   "flex-1 py-3 text-[14px] font-medium text-center transition-colors border-b-2",
-                  activeTab === tab 
+                  activeTab === tab.id 
                     ? "text-[#3B58F5] border-[#3B58F5]" 
                     : "text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300"
                 )}
               >
-                {tab}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -218,7 +226,7 @@ export default function MediaPage() {
             </div>
           ) : mediaGroups.length === 0 ? (
             <div className="flex h-full items-center justify-center text-slate-500 text-[15px] font-medium">
-              No media found
+              {t("no_media")}
             </div>
           ) : (
             <div className="flex flex-col gap-8 pb-10">
@@ -266,7 +274,7 @@ export default function MediaPage() {
               {activeTab === 'Docs' && docsGroups.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-40 text-slate-500 text-[15px] font-medium">
                   <FileText className="w-10 h-10 mb-3 opacity-20" />
-                  No documents found
+                  {t("no_docs")}
                 </div>
               )}
               
@@ -308,7 +316,7 @@ export default function MediaPage() {
               {activeTab === 'Links' && linksGroups.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-40 text-slate-500 text-[15px] font-medium">
                   <LinkIcon className="w-10 h-10 mb-3 opacity-20" />
-                  No links found
+                  {t("no_links")}
                 </div>
               )}
 
@@ -351,7 +359,7 @@ export default function MediaPage() {
                     disabled={mediaLoading}
                     className="rounded-full bg-slate-100 px-6 py-2 text-[14px] font-semibold text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
                   >
-                    {mediaLoading ? 'Loading...' : 'Load more'}
+                    {mediaLoading ? tCommon('loading') : t('load_more')}
                   </button>
                 </div>
               )}

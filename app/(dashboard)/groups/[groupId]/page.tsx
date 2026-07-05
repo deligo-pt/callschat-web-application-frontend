@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { GroupInput } from "@/components/group/GroupInput";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
 import { MediaGallery } from "@/components/chat/MediaGallery";
+import { useTranslations } from "next-intl";
 
 function parseJwt(token: string) {
   try {
@@ -42,6 +43,7 @@ function parseJwt(token: string) {
 }
 
 export default function GroupChatPage() {
+  const t = useTranslations("options");
   const params = useParams();
   const router = useRouter();
   const groupId = params.groupId as string;
@@ -411,7 +413,7 @@ export default function GroupChatPage() {
               <DropdownMenuContent align="end" className="w-[280px] rounded-2xl p-2 bg-white shadow-xl border border-gray-100 text-[#1E293B] z-50">
                 <DropdownMenuItem onClick={() => setShowGroupInfo(true)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
                   <Info className="w-4 h-4 text-[#3B58F5]" />
-                  <span>Group Info</span>
+                  <span>{t("group_info")}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem onClick={() => {
@@ -420,7 +422,7 @@ export default function GroupChatPage() {
                 }} className="flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
                   <div className="flex items-center gap-3">
                     <Bell className="w-4 h-4 text-[#3B58F5]" />
-                    <span>{isNotificationsMuted ? "Unmute Notifications" : "Mute Notifications"}</span>
+                    <span>{isNotificationsMuted ? t("unmute_notifications") : t("mute_notifications")}</span>
                   </div>
                 </DropdownMenuItem>
 
@@ -429,7 +431,7 @@ export default function GroupChatPage() {
                 <div className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 text-sm font-semibold cursor-pointer text-[#1E293B]" onClick={(e) => { e.preventDefault(); setIsAiProtectionEnabled(!isAiProtectionEnabled); toast.success(!isAiProtectionEnabled ? "AI Protection enabled" : "AI Protection disabled"); }}>
                   <div className="flex items-center gap-3">
                     <ShieldCheck className="w-4 h-4 text-[#3B58F5]" />
-                    <span>AI Protection</span>
+                    <span>{t("ai_protection")}</span>
                   </div>
                   <Switch checked={isAiProtectionEnabled} onCheckedChange={setIsAiProtectionEnabled} className="data-[state=checked]:bg-[#3B58F5]" />
                 </div>
@@ -437,7 +439,7 @@ export default function GroupChatPage() {
                 <div className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 text-sm font-semibold cursor-pointer text-[#1E293B]" onClick={(e) => { e.preventDefault(); setIsLiveTranslationEnabled(!isLiveTranslationEnabled); toast.success(!isLiveTranslationEnabled ? "Live Translation enabled" : "Live Translation disabled"); }}>
                   <div className="flex items-center gap-3">
                     <Languages className="w-4 h-4 text-[#22C55E]" />
-                    <span>Live Translation</span>
+                    <span>{t("live_translation")}</span>
                   </div>
                   <Switch checked={isLiveTranslationEnabled} onCheckedChange={setIsLiveTranslationEnabled} className="data-[state=checked]:bg-[#3B58F5]" />
                 </div>
@@ -445,7 +447,7 @@ export default function GroupChatPage() {
                 <div className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 text-sm font-semibold cursor-pointer text-[#1E293B]" onClick={(e) => { e.preventDefault(); setIsPrivacyModeEnabled(!isPrivacyModeEnabled); toast.success(!isPrivacyModeEnabled ? "Privacy Mode enabled" : "Privacy Mode disabled"); }}>
                   <div className="flex items-center gap-3">
                     <EyeOff className="w-4 h-4 text-[#F59E0B]" />
-                    <span>Privacy Mode</span>
+                    <span>{t("privacy_mode")}</span>
                   </div>
                   <Switch checked={isPrivacyModeEnabled} onCheckedChange={setIsPrivacyModeEnabled} className="data-[state=checked]:bg-[#3B58F5]" />
                 </div>
@@ -454,7 +456,7 @@ export default function GroupChatPage() {
                   <DropdownMenuItem onClick={() => { setShowGroupInfo(false); setShowAdminActivity(true); }} className="flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
                     <div className="flex items-center gap-3">
                       <UserCog className="w-4 h-4 text-[#3B58F5]" />
-                      <span>Admin Activity</span>
+                      <span>{t("admin_activity")}</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
                   </DropdownMenuItem>
@@ -464,7 +466,7 @@ export default function GroupChatPage() {
 
                 <DropdownMenuItem onClick={() => { setShowGroupInfo(true); setGalleryOpen(true); }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
                   <Folder className="w-4 h-4 text-[#3B58F5]" />
-                  <span>Media Info</span>
+                  <span>{t("media_info")}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem onClick={async () => {
@@ -474,17 +476,17 @@ export default function GroupChatPage() {
                   toast.success(newFav ? "Added to Favorites" : "Removed from Favorites");
                 }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
                   <Star className={cn("w-4 h-4", isFavourite ? "text-[#F59E0B] fill-[#F59E0B]" : "text-[#F59E0B]")} />
-                  <span>{isFavourite ? "Remove from Favorites" : "Add to Favorites"}</span>
+                  <span>{isFavourite ? t("remove_from_favorites") : t("add_to_favorites")}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem onClick={() => { toast.success("Chat history cleared"); window.location.reload(); }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-red-50 focus:bg-red-50 text-sm font-semibold text-red-500">
                   <Trash2 className="w-4 h-4 text-red-500" />
-                  <span>Clear Chat</span>
+                  <span>{t("clear_chat")}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem onClick={() => setIsLeaveGroupDialogOpen(true)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-red-50 focus:bg-red-50 text-sm font-semibold text-red-500">
                   <LogOut className="w-4 h-4 text-red-500" />
-                  <span>Leave Group</span>
+                  <span>{t("leave_group")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

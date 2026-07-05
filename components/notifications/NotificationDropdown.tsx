@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { AppNotification } from "@/services/notification.service";
 import { NotificationItem } from "./NotificationItem";
+import { useTranslations } from "next-intl";
 
 
 
 export function NotificationDropdown() {
+  const t = useTranslations("notifications");
   const {
     notifications,
     unreadCount,
@@ -58,13 +60,13 @@ export function NotificationDropdown() {
         {/* Header */}
         <div className="flex flex-col gap-4 p-4 border-b border-border">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">Notifications</h2>
+            <h2 className="text-xl font-bold text-foreground">{t("title")}</h2>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
                 className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
               >
-                Mark all as read
+                {t("mark_all_read")}
               </button>
             )}
           </div>
@@ -80,7 +82,7 @@ export function NotificationDropdown() {
                   : "bg-muted text-foreground hover:bg-muted/80"
               )}
             >
-              All
+              {t("all")}
             </button>
             <button
               onClick={() => setFilter("unread")}
@@ -91,7 +93,7 @@ export function NotificationDropdown() {
                   : "bg-muted text-foreground hover:bg-muted/80"
               )}
             >
-              Unread
+              {t("unread")}
             </button>
           </div>
         </div>
@@ -104,7 +106,7 @@ export function NotificationDropdown() {
           {notifications.length === 0 && !isLoading ? (
             <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center">
               <Bell className="h-10 w-10 text-muted-foreground/30 mb-3" />
-              <p className="font-medium text-sm">No notifications found.</p>
+              <p className="font-medium text-sm">{t("no_notifications")}</p>
             </div>
           ) : (
             notifications.map((notification) => (
