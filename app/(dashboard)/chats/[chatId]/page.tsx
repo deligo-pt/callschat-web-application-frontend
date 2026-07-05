@@ -14,6 +14,8 @@ import {
   Building2,
   CheckCircle2,
   ShieldCheck,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -325,7 +327,7 @@ export default function ChatRoomPage() {
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
 
-  const { messages, sendMessage, editMessage, clearMessages, isReady, isUploading } =
+  const { messages, sendMessage, editMessage, pinnedMessages, pinMessage, clearMessages, isReady, isUploading } =
     useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -647,6 +649,60 @@ export default function ChatRoomPage() {
         </div>
       )}
 
+      {/* Pinned Messages Banner */}
+      {pinnedMessages && pinnedMessages.length > 0 && (
+        <div className="bg-[#EFF6FF] border-b border-[#DBEAFE] px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xs transition-all duration-200 z-10">
+          <div 
+            className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group/pin"
+            onClick={() => {
+              const targetId = pinnedMessages[0]?.messageId;
+              if (targetId) {
+                const el = document.getElementById(`msg-${targetId}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  el.classList.add("bg-yellow-100/60", "transition-colors", "duration-500");
+                  setTimeout(() => el.classList.remove("bg-yellow-100/60"), 2000);
+                } else {
+                  toast.info("Pinned message is further up in chat history");
+                }
+              }
+            }}
+          >
+            <div className="w-8 h-8 rounded-full bg-[#3B58F5]/10 flex items-center justify-center shrink-0 text-[#3B58F5] group-hover/pin:bg-[#3B58F5]/20 transition-colors">
+              <Pin className="w-4 h-4 rotate-45" />
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-[#3B58F5] tracking-wide uppercase">
+                  Pinned Message {pinnedMessages.length > 1 ? `(1 of ${pinnedMessages.length})` : ""}
+                </span>
+                {pinnedMessages[0]?.pinnedUntil && (
+                  <span className="text-[10px] font-medium text-slate-400">
+                    · Expires {new Date(pinnedMessages[0].pinnedUntil).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+              <p className="text-[13px] font-medium text-[#1E293B] truncate">
+                {pinnedMessages[0]?.previewText || pinnedMessages[0]?.originalMessage?.text || (
+                  pinnedMessages[0]?.previewMedia ? `📷 ${pinnedMessages[0].previewMedia}` : "Pinned attachment"
+                )}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1 shrink-0 ml-2">
+            <button
+              type="button"
+              onClick={() => pinMessage(pinnedMessages[0].messageId, "unpin", undefined, undefined, undefined, "You")}
+              className="p-1.5 rounded-full hover:bg-red-100/80 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+              title="Unpin message"
+            >
+              <PinOff className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Messages ─────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-[#F0F2F5] relative">
         {/* Chat Background Pattern */}
@@ -692,6 +748,7 @@ export default function ChatRoomPage() {
               const isMe = msg.senderId === currentUserId;
               const showTail =
                 index === 0 || visibleMsgs[index - 1].senderId !== msg.senderId;
+              const isPinned = pinnedMessages?.some((p: any) => p.messageId === msg.id);
 
               return (
                 <MessageBubble
@@ -703,6 +760,27 @@ export default function ChatRoomPage() {
                   peerName={isBizChat ? bizName : recipient?.name}
                   peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
                   onEdit={(msgId, newText) => editMessage(msgId, newText)}
+                  isPinned={isPinned}
+                  onPin={(dur, previewText, previewMedia) =>
+                    pinMessage(
+                      msg.id,
+                      "pin",
+                      dur,
+                      previewText || msg.text,
+                      previewMedia || msg.mediaType || undefined,
+                      "You"
+                    )
+                  }
+                  onUnpin={() =>
+                    pinMessage(
+                      msg.id,
+                      "unpin",
+                      undefined,
+                      undefined,
+                      undefined,
+                      "You"
+                    )
+                  }
                 />
               );
             })

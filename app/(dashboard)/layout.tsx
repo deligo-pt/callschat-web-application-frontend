@@ -11,6 +11,7 @@ import { PresenceProvider } from "@/context/PresenceContext";
 import { UserProvider, useUser } from "@/context/UserContext";
 import { WorkspaceSwitcher } from "@/components/navigation/WorkspaceSwitcher";
 import { PendingInvitesModal } from "@/components/business/PendingInvitesModal";
+import { useTranslations } from "next-intl";
 
 function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +19,8 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const { user, currentMode, businessProfile, workspace, isLoading } = useUser();
   const isBusiness = currentMode === "BUSINESS";
   const isOnboarding = pathname === "/business/onboarding";
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
 
   useEffect(() => {
     if (!isLoading && isBusiness && workspace === null && !isOnboarding) {
@@ -45,16 +48,16 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const navItems = isBusiness ? [
     { name: "Dashboard", href: "/business/dashboard", icon: LayoutDashboard },
     { name: "Inbox", href: "/business/inbox", icon: Inbox },
-    { name: "Chats", href: "/chats", icon: MessageSquare },
+    { name: tNav("message"), href: "/chats", icon: MessageSquare },
     { name: "Teams", href: "/groups", icon: Users },
     { name: "Analytics", href: "/business/analytics", icon: BarChart3 },
     { name: "Settings", href: "/business/settings", icon: Settings },
   ] : [
-    { name: "Message", href: "/chats", icon: MessageSquare },
-    { name: "Calls", href: "/calls", icon: PhoneCall },
-    { name: "Group", href: "/groups", icon: Users },
-    { name: "Contacts", href: "/contacts", icon: Contact },
-    { name: "Media", href: "/media", icon: Folder },
+    { name: tNav("message"), href: "/chats", icon: MessageSquare },
+    { name: tNav("calls"), href: "/calls", icon: PhoneCall },
+    { name: tNav("group"), href: "/groups", icon: Users },
+    { name: tNav("contacts"), href: "/contacts", icon: Contact },
+    { name: tNav("media"), href: "/media", icon: Folder },
   ];
 
   if (isOnboarding) {
@@ -146,7 +149,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
               "text-[10px] font-bold mt-1.5",
               pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#2563EB]") : "text-slate-400"
             )}>
-              Profile
+              {tNav("profile")}
             </span>
           </Link>
         </div>
@@ -187,7 +190,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
             strokeWidth={pathname.startsWith("/profile") ? 2.5 : 2} 
           />
           <span className={cn("text-[10px] font-bold", pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0]")}>
-            Profile
+            {tNav("profile")}
           </span>
         </Link>
       </nav>

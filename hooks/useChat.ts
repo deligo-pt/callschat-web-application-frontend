@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
@@ -13,6 +13,16 @@ export interface ChatMessage {
   mediaUrl?: string;
   mediaType?: 'image' | 'video' | 'audio' | 'document' | 'link' | string | null;
   isEdited?: boolean;
+}
+
+export interface PinnedMessage {
+  messageId: string;
+  pinnedAt: number;
+  pinnedUntil: number | null;
+  pinnerName: string;
+  previewText?: string;
+  previewMedia?: string;
+  originalMessage?: ChatMessage;
 }
 
 const parseEditedText = (rawText: string) => {
@@ -716,12 +726,84 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [socket, isConnected, conversationId, myPrivateKey, recipientPublicKey, activePeerId]
   );
 
+  const pinnedMessages = useMemo(() => {
+    const map = new Map<string, PinnedMessage>();
+    const now = Date.now();
+
+    for (const msg of messages) {
+      if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
+        try {
+          const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
+          if (payload && payload.messageId && payload.action) {
+            if (payload.action === "pin") {
+              const timestamp = payload.timestamp || new Date(msg.createdAt).getTime();
+              const pinnedUntil = payload.durationSeconds ? timestamp + payload.durationSeconds * 1000 : null;
+              
+              if (!pinnedUntil || pinnedUntil > now) {
+                map.set(payload.messageId, {
+                  messageId: payload.messageId,
+                  pinnedAt: timestamp,
+                  pinnedUntil,
+                  pinnerName: payload.pinnerName || "You",
+                  previewText: payload.previewText,
+                  previewMedia: payload.previewMedia,
+                });
+              } else {
+                map.delete(payload.messageId);
+              }
+            } else if (payload.action === "unpin") {
+              map.delete(payload.messageId);
+            }
+          }
+        } catch (e) {
+          // Ignore malformed pin events
+        }
+      }
+    }
+
+    const result: PinnedMessage[] = [];
+    for (const pin of map.values()) {
+      const orig = messages.find((m) => m.id === pin.messageId);
+      result.push({
+        ...pin,
+        originalMessage: orig,
+      });
+    }
+
+    return result.sort((a, b) => b.pinnedAt - a.pinnedAt);
+  }, [messages]);
+
+  const pinMessage = useCallback(
+    (
+      messageId: string,
+      action: "pin" | "unpin",
+      durationSeconds?: number,
+      previewText?: string,
+      previewMedia?: string,
+      pinnerName: string = "You"
+    ) => {
+      const payload = {
+        messageId,
+        action,
+        durationSeconds: durationSeconds || null,
+        timestamp: Date.now(),
+        pinnerName,
+        previewText: previewText || "",
+        previewMedia: previewMedia || "",
+      };
+      sendMessage(`__PIN_EVENT__:${JSON.stringify(payload)}`, currentUserIdRef.current);
+    },
+    [sendMessage]
+  );
+
   return {
     messages,
     setMessages,
     clearMessages: () => setMessages([]),
     sendMessage,
     editMessage,
+    pinnedMessages,
+    pinMessage,
     isUploading,
     isReady: !!(myPrivateKey && (recipientPublicKey || isBizChat) && isConnected && conversationId),
   };

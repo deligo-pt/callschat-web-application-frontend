@@ -1,0 +1,58 @@
+{
+  "common": {
+    "search": "Pesquisar conversas...",
+    "save": "Salvar Alteração",
+    "saving": "Salvando...",
+    "cancel": "Cancelar",
+    "loading": "Carregando...",
+    "logout": "Sair",
+    "profile": "Perfil",
+    "language": "Idioma",
+    "notifications": "Notificações",
+    "invite": "Convidar",
+    "business_dashboard": "Painel de Negócios",
+    "disappearing_messages": "Mensagens Temporárias",
+    "search_language": "Pesquisar idioma..."
+  },
+  "nav": {
+    "message": "Mensagem",
+    "calls": "Chamadas",
+    "group": "Grupo",
+    "contacts": "Contatos",
+    "media": "Mídia",
+    "profile": "Perfil"
+  },
+  "profile": {
+    "title": "Perfil",
+    "account": "Conta",
+    "preferences": "Preferências",
+    "security": "Segurança",
+    "edit_information": "Editar suas informações",
+    "invite_friend": "Convidar um amigo",
+    "manage_alerts": "Gerenciar alertas",
+    "analytical_insight": "Análise & Insights",
+    "name": "Nome",
+    "phone": "Telefone",
+    "email": "E-mail",
+    "bio": "Bio",
+    "country": "País",
+    "timezone": "Fuso horário",
+    "language": "Idioma",
+    "picture": "Foto",
+    "save_change": "Salvar Alteração",
+    "personal": "Pessoal",
+    "business": "Empresarial"
+  },
+  "language": {
+    "title": "Idioma",
+    "search_placeholder": "Pesquisar idioma...",
+    "en": "English",
+    "en_region": "English (US)",
+    "bn": "বাংলা",
+    "bn_region": "Bengali",
+    "pt": "Português",
+    "pt_region": "Português",
+    "hi": "हिन्दी",
+    "hi_region": "Hindi"
+  }
+}

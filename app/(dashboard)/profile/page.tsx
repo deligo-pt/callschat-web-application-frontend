@@ -10,6 +10,16 @@ import { useUser } from "@/context/UserContext";
 import { BusinessService } from "@/services/business.service";
 import SetupBusinessModal from "@/components/business/SetupBusinessModal";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { useTranslations, useLocale } from "next-intl";
+import { LanguageSelector } from "@/components/i18n/LanguageSelector";
+import { Locale } from "@/i18n/routing";
+
+const LOCALE_LABELS: Record<Locale, string> = {
+  en: "English (US)",
+  bn: "বাংলা",
+  pt: "Português",
+  hi: "हिन्दी",
+};
 
 // Define the shape of the user profile from the API
 interface UserProfileData {
@@ -34,6 +44,13 @@ export default function ProfilePage() {
   const { updateCurrentMode, currentMode } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const currentLocale = useLocale() as Locale;
+  const t = useTranslations("profile");
+  const tCommon = useTranslations("common");
+
+  // Controls which panel is rendered in the right column
+  type ActivePanel = "edit" | "language";
+  const [activePanel, setActivePanel] = useState<ActivePanel>("edit");
   
   // State for form fields
   const [userData, setUserData] = useState<UserProfileData | null>(null);
@@ -264,7 +281,7 @@ export default function ProfilePage() {
         <div className="px-6 pb-8 flex flex-col gap-6">
           {/* ACCOUNT */}
           <div className="flex flex-col">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Account</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("account")}</span>
             <div className="flex flex-col gap-1">
               <button className="flex items-center justify-between rounded-xl border border-blue-100 bg-white p-3 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -272,8 +289,8 @@ export default function ProfilePage() {
                     <User className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">Profile</span>
-                    <span className="text-[11px] font-medium text-slate-500">Edit your information</span>
+                    <span className="text-[13px] font-bold text-[#0F172A]">{t("title")}</span>
+                    <span className="text-[11px] font-medium text-slate-500">{t("edit_information")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -283,19 +300,37 @@ export default function ProfilePage() {
 
           {/* PREFERENCES */}
           <div className="flex flex-col">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Preferences</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("preferences")}</span>
             <div className="flex flex-col gap-1">
-              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors">
+              <button
+                id="open-language-selector"
+                onClick={() => setActivePanel("language")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-3 transition-colors",
+                  activePanel === "language"
+                    ? "border-blue-200 bg-[#EEF2FF]"
+                    : "border-slate-100 bg-white hover:bg-slate-50"
+                )}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-500">
+                  <div className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full",
+                    activePanel === "language" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-slate-50 text-slate-500"
+                  )}>
                     <Globe className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">Language</span>
-                    <span className="text-[11px] font-medium text-slate-500">English (US)</span>
+                    <span className={cn(
+                      "text-[13px] font-bold",
+                      activePanel === "language" ? "text-[#2563EB]" : "text-[#0F172A]"
+                    )}>{tCommon("language")}</span>
+                    <span className="text-[11px] font-medium text-slate-500">{LOCALE_LABELS[currentLocale]}</span>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className={cn(
+                  "h-4 w-4 transition-colors",
+                  activePanel === "language" ? "text-[#2563EB]" : "text-slate-400"
+                )} />
               </button>
 
               <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
@@ -304,8 +339,8 @@ export default function ProfilePage() {
                     <Send className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">Invite</span>
-                    <span className="text-[11px] font-medium text-slate-500">Invite a friend</span>
+                    <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("invite")}</span>
+                    <span className="text-[11px] font-medium text-slate-500">{t("invite_friend")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -317,8 +352,8 @@ export default function ProfilePage() {
                     <Bell className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">Notifications</span>
-                    <span className="text-[11px] font-medium text-slate-500">Manage alerts</span>
+                    <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("notifications")}</span>
+                    <span className="text-[11px] font-medium text-slate-500">{t("manage_alerts")}</span>
                   </div>
                 </div>
                 {/* Toggle switch */}
@@ -333,8 +368,8 @@ export default function ProfilePage() {
                     <Briefcase className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">Business Dashboard</span>
-                    <span className="text-[11px] font-medium text-slate-500">Analytical & insight</span>
+                    <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("business_dashboard")}</span>
+                    <span className="text-[11px] font-medium text-slate-500">{t("analytical_insight")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -344,7 +379,7 @@ export default function ProfilePage() {
 
           {/* SECURITY */}
           <div className="flex flex-col">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Security</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("security")}</span>
             <div className="flex flex-col gap-1">
               <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
@@ -352,7 +387,7 @@ export default function ProfilePage() {
                     <Clock className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">Disappearing Messages</span>
+                    <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("disappearing_messages")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -362,7 +397,7 @@ export default function ProfilePage() {
 
           {/* LOGOUT */}
           <div className="flex flex-col mt-2">
-            <button 
+            <button
               onClick={handleLogout}
               className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50 p-3 hover:bg-red-100 transition-colors"
             >
@@ -371,7 +406,7 @@ export default function ProfilePage() {
                   <LogOut className="h-4 w-4" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="text-[13px] font-bold text-red-600">Logout</span>
+                  <span className="text-[13px] font-bold text-red-600">{tCommon("logout")}</span>
                 </div>
               </div>
             </button>
@@ -379,9 +414,16 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Right Column (Edit Form) */}
-      <div className="flex-1 flex flex-col items-center bg-white overflow-y-auto scrollbar-hide py-16">
-        <div className="w-full max-w-[440px] flex flex-col px-6">
+      {/* Right Column – switches between Edit Form and Language Selector */}
+      <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
+        {activePanel === "language" ? (
+          <LanguageSelector
+            currentLocale={currentLocale}
+            onBack={() => setActivePanel("edit")}
+          />
+        ) : (
+          <div className="flex-1 flex flex-col items-center overflow-y-auto scrollbar-hide py-16">
+          <div className="w-full max-w-[440px] flex flex-col px-6">
           {/* Avatar Edit */}
           <div className="flex flex-col items-center mb-10">
             <div 
@@ -460,7 +502,9 @@ export default function ProfilePage() {
               </button>
             </div>
           </div>
-        </div>
+          </div>
+          </div>
+        )}
       </div>
 
       <SetupBusinessModal

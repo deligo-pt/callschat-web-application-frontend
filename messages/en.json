@@ -1,0 +1,58 @@
+{
+  "common": {
+    "search": "Search conversations...",
+    "save": "Save Change",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "logout": "Logout",
+    "profile": "Profile",
+    "language": "Language",
+    "notifications": "Notifications",
+    "invite": "Invite",
+    "business_dashboard": "Business Dashboard",
+    "disappearing_messages": "Disappearing Messages",
+    "search_language": "Search language..."
+  },
+  "nav": {
+    "message": "Message",
+    "calls": "Calls",
+    "group": "Group",
+    "contacts": "Contacts",
+    "media": "Media",
+    "profile": "Profile"
+  },
+  "profile": {
+    "title": "Profile",
+    "account": "Account",
+    "preferences": "Preferences",
+    "security": "Security",
+    "edit_information": "Edit your information",
+    "invite_friend": "Invite a friend",
+    "manage_alerts": "Manage alerts",
+    "analytical_insight": "Analytical & insight",
+    "name": "Name",
+    "phone": "Phone",
+    "email": "Email",
+    "bio": "Bio",
+    "country": "Country",
+    "timezone": "Timezone",
+    "language": "Language",
+    "picture": "Picture",
+    "save_change": "Save Change",
+    "personal": "Personal",
+    "business": "Business"
+  },
+  "language": {
+    "title": "Language",
+    "search_placeholder": "Search language...",
+    "en": "English",
+    "en_region": "English (US)",
+    "bn": "বাংলা",
+    "bn_region": "Bengali",
+    "pt": "Português",
+    "pt_region": "Portuguese",
+    "hi": "हिन्दी",
+    "hi_region": "Hindi"
+  }
+}

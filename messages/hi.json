@@ -1,0 +1,58 @@
+{
+  "common": {
+    "search": "बातचीत खोजें...",
+    "save": "बदलाव सहेजें",
+    "saving": "सहेजा जा रहा है...",
+    "cancel": "रद्द करें",
+    "loading": "लोड हो रहा है...",
+    "logout": "लॉग आउट",
+    "profile": "प्रोफ़ाइल",
+    "language": "भाषा",
+    "notifications": "सूचनाएं",
+    "invite": "आमंत्रित करें",
+    "business_dashboard": "व्यवसाय डैशबोर्ड",
+    "disappearing_messages": "गायब होने वाले संदेश",
+    "search_language": "भाषा खोजें..."
+  },
+  "nav": {
+    "message": "संदेश",
+    "calls": "कॉल",
+    "group": "समूह",
+    "contacts": "संपर्क",
+    "media": "मीडिया",
+    "profile": "प्रोफ़ाइल"
+  },
+  "profile": {
+    "title": "प्रोफ़ाइल",
+    "account": "खाता",
+    "preferences": "प्राथमिकताएं",
+    "security": "सुरक्षा",
+    "edit_information": "अपनी जानकारी संपादित करें",
+    "invite_friend": "किसी मित्र को आमंत्रित करें",
+    "manage_alerts": "अलर्ट प्रबंधित करें",
+    "analytical_insight": "विश्लेषण & अंतर्दृष्टि",
+    "name": "नाम",
+    "phone": "फ़ोन",
+    "email": "ईमेल",
+    "bio": "बायो",
+    "country": "देश",
+    "timezone": "टाइमज़ोन",
+    "language": "भाषा",
+    "picture": "तस्वीर",
+    "save_change": "बदलाव सहेजें",
+    "personal": "व्यक्तिगत",
+    "business": "व्यवसाय"
+  },
+  "language": {
+    "title": "भाषा",
+    "search_placeholder": "भाषा खोजें...",
+    "en": "English",
+    "en_region": "English (US)",
+    "bn": "বাংলা",
+    "bn_region": "बंगाली",
+    "pt": "Português",
+    "pt_region": "पुर्तगाली",
+    "hi": "हिन्दी",
+    "hi_region": "हिंदी"
+  }
+}

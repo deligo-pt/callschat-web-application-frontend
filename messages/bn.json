@@ -1,0 +1,58 @@
+{
+  "common": {
+    "search": "কথোপকথন খুঁজুন...",
+    "save": "পরিবর্তন সংরক্ষণ করুন",
+    "saving": "সংরক্ষণ হচ্ছে...",
+    "cancel": "বাতিল",
+    "loading": "লোড হচ্ছে...",
+    "logout": "লগ আউট",
+    "profile": "প্রোফাইল",
+    "language": "ভাষা",
+    "notifications": "বিজ্ঞপ্তি",
+    "invite": "আমন্ত্রণ",
+    "business_dashboard": "ব্যবসায়িক ড্যাশবোর্ড",
+    "disappearing_messages": "অদৃশ্য বার্তা",
+    "search_language": "ভাষা খুঁজুন..."
+  },
+  "nav": {
+    "message": "বার্তা",
+    "calls": "কল",
+    "group": "গ্রুপ",
+    "contacts": "পরিচিতি",
+    "media": "মিডিয়া",
+    "profile": "প্রোফাইল"
+  },
+  "profile": {
+    "title": "প্রোফাইল",
+    "account": "অ্যাকাউন্ট",
+    "preferences": "পছন্দ",
+    "security": "নিরাপত্তা",
+    "edit_information": "আপনার তথ্য সম্পাদনা করুন",
+    "invite_friend": "একজন বন্ধুকে আমন্ত্রণ জানান",
+    "manage_alerts": "সতর্কতা পরিচালনা করুন",
+    "analytical_insight": "বিশ্লেষণাত্মক & অন্তর্দৃষ্টি",
+    "name": "নাম",
+    "phone": "ফোন",
+    "email": "ইমেইল",
+    "bio": "বায়ো",
+    "country": "দেশ",
+    "timezone": "টাইমজোন",
+    "language": "ভাষা",
+    "picture": "ছবি",
+    "save_change": "পরিবর্তন সংরক্ষণ করুন",
+    "personal": "ব্যক্তিগত",
+    "business": "ব্যবসায়িক"
+  },
+  "language": {
+    "title": "ভাষা",
+    "search_placeholder": "ভাষা খুঁজুন...",
+    "en": "English",
+    "en_region": "English (US)",
+    "bn": "বাংলা",
+    "bn_region": "বাংলা",
+    "pt": "Português",
+    "pt_region": "পর্তুগিজ",
+    "hi": "हिन्दी",
+    "hi_region": "হিন্দি"
+  }
+}

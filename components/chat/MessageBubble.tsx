@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2 } from "lucide-react";
+import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2, Pin, PinOff, Clock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useCallContext } from "@/components/providers/CallContext";
 
@@ -26,19 +28,44 @@ interface MessageBubbleProps {
   peerName?: string;
   peerAvatar?: string;
   onEdit?: (messageId: string, newText: string) => void;
+  isPinned?: boolean;
+  onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
+  onUnpin?: () => void;
 }
 
-export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit }: MessageBubbleProps) {
+export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit, isPinned, onPin, onUnpin }: MessageBubbleProps) {
   const { initiateCall } = useCallContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
 
+  if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
+    try {
+      const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
+      if (payload && payload.action) {
+        const isPin = payload.action === "pin";
+        return (
+          <div className="flex justify-center my-3 w-full">
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-1.5 rounded-full text-[12px] font-medium text-[#64748B] flex items-center gap-1.5 shadow-xs">
+              <Pin className="w-3.5 h-3.5 text-[#3B58F5] shrink-0" />
+              <span>
+                <strong className="font-semibold text-[#334155]">{payload.pinnerName || "You"}</strong>{" "}
+                {isPin ? "pinned" : "unpinned"} a message
+              </span>
+            </div>
+          </div>
+        );
+      }
+    } catch (e) {}
+    return null;
+  }
+
   const renderOptionsMenu = () => {
-    if (!isMe || msg.id.startsWith("optimistic-") || !msg.text) return null;
+    if (msg.id.startsWith("optimistic-") || !msg.text || msg.text.startsWith("__PIN_EVENT__:")) return null;
     return (
       <div
         className={cn(
-          "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1.5 shrink-0 z-20 order-first"
+          "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1.5 shrink-0 z-20",
+          isMe ? "order-first" : "order-last"
         )}
       >
         <DropdownMenu>
@@ -52,19 +79,68 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            align="end"
+            align={isMe ? "end" : "start"}
             className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
           >
-            <DropdownMenuItem
-              onClick={() => {
-                setEditText(msg.text);
-                setIsEditing(true);
-              }}
-              className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
-              <span>Edit message</span>
-            </DropdownMenuItem>
+            {isMe && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditText(msg.text);
+                    setIsEditing(true);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
+                  <span>Edit message</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1 bg-slate-100" />
+              </>
+            )}
+            {!isPinned ? (
+              <>
+                <DropdownMenuLabel className="text-[11px] font-semibold text-slate-400 px-2 py-1">
+                  Pin Message
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => onPin?.(86400, msg.text, msg.mediaType || undefined)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
+                  <span>For 24 hours</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
+                  <span>For 7 days</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onPin?.(2592000, msg.text, msg.mediaType || undefined)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
+                  <span>For 30 days</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1 bg-slate-100" />
+                <DropdownMenuItem
+                  onClick={() => onPin?.(undefined, msg.text, msg.mediaType || undefined)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  <Pin className="w-3.5 h-3.5 text-[#3B58F5]" />
+                  <span>Until unpinned</span>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuItem
+                onClick={() => onUnpin?.()}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
+              >
+                <PinOff className="w-3.5 h-3.5 text-red-500" />
+                <span>Unpin message</span>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -251,10 +327,26 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
     );
   };
 
+  const renderPinnedBadge = () => {
+    if (!isPinned) return null;
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-1 text-[11px] font-medium text-[#3B58F5] mb-1 px-1",
+          isMe ? "justify-end" : "justify-start"
+        )}
+      >
+        <Pin className="w-3 h-3 fill-[#3B58F5] rotate-45" />
+        <span>Pinned</span>
+      </div>
+    );
+  };
+
   return (
-    <div className={cn("flex w-full z-10 my-1 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+    <div id={`msg-${msg.id}`} className={cn("flex w-full z-10 my-1 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
       {renderOptionsMenu()}
       <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
+        {renderPinnedBadge()}
         <div
           className={cn(
             "relative px-5 py-3 text-[15px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex flex-col group",

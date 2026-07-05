@@ -250,10 +250,8 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
 
         if (isBizConv) {
           if (msg.ciphertext && !msg.nonce) {
-            // True plaintext — show directly
-            newPreviews[conv.id] = msg.ciphertext.length > 60
-              ? msg.ciphertext.substring(0, 60) + "..."
-              : msg.ciphertext;
+            // True plaintext — store full string in newPreviews, let getLastMessagePreview handle formatting & truncation
+            newPreviews[conv.id] = msg.ciphertext;
             hasChanges = true;
           } else if (msg.ciphertext && msg.nonce) {
             // Old encrypted B2C message — unrecoverable, show placeholder
@@ -333,15 +331,32 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
       return "📞 Call";
     }
     
+    let textToPreview = "";
     if (decryptedPreviews[conv.id]) {
-      return decryptedPreviews[conv.id];
+      textToPreview = decryptedPreviews[conv.id];
+    } else if (msg.ciphertext && !msg.nonce) {
+      textToPreview = msg.ciphertext;
+    } else {
+      return "🔒 Encrypted message";
     }
-    
-    if (msg.ciphertext && !msg.nonce) {
-      return msg.ciphertext.length > 50 ? msg.ciphertext.substring(0, 50) + "..." : msg.ciphertext;
+
+    if (textToPreview.startsWith("__PIN_EVENT__:")) {
+      try {
+        const payload = JSON.parse(textToPreview.substring("__PIN_EVENT__:".length));
+        const isMe = msg.senderId === currentUserId;
+        const name = isMe ? "You" : (conv.otherUserName || payload.pinnerName || "Someone");
+        const action = payload.action === "pin" ? "pinned" : "unpinned";
+        return `📌 ${name} ${action} a message`;
+      } catch (e) {
+        return "📌 Pinned a message";
+      }
     }
-    
-    return "🔒 Encrypted message";
+
+    if (textToPreview.startsWith("__EDITED__:")) {
+      textToPreview = textToPreview.substring("__EDITED__:".length);
+    }
+
+    return textToPreview.length > 50 ? textToPreview.substring(0, 50) + "..." : textToPreview;
   };
 
   const filteredConversations = conversations.filter((c) =>
@@ -486,8 +501,15 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                                 {conv.otherUserName}
                               </h3>
                               <p className="mt-0.5 w-full truncate text-left text-[13px] font-medium text-[#8F95B2] flex items-center gap-1">
-                                <Lock className="h-3 w-3 shrink-0 text-[#8F95B2]" />
-                                {getLastMessagePreview(conv)}
+                                {(() => {
+                                  const preview = getLastMessagePreview(conv);
+                                  return (
+                                    <>
+                                      {!preview.startsWith("📌") && <Lock className="h-3 w-3 shrink-0 text-[#8F95B2]" />}
+                                      <span>{preview}</span>
+                                    </>
+                                  );
+                                })()}
                               </p>
                             </div>
 
