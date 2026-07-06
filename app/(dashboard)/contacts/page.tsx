@@ -12,6 +12,8 @@ import { Building2 } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { useTranslations } from "next-intl";
+import { ContactService } from "@/services/contact.service";
+import { toast } from "sonner";
 
 export default function ContactsPage() {
   const t = useTranslations("contacts");
@@ -78,14 +80,28 @@ export default function ContactsPage() {
         setNewContactFirstName("");
         setNewContactLastName("");
         fetchContacts();
+        toast.success("Contact added successfully!");
+      } else if (res.status === 404 || (data.message && data.message.toLowerCase().includes("no registered user"))) {
+        try {
+          await ContactService.syncContacts({
+            contacts: [{ name: customName || newContactPhone, phoneNumber: newContactPhone }]
+          });
+          setIsAddContactPanelOpen(false);
+          setNewContactPhone("");
+          setNewContactFirstName("");
+          setNewContactLastName("");
+          fetchContacts();
+          toast.success("Contact saved! (Unregistered on CallsChat)");
+        } catch (syncErr) {
+          console.error("Failed to save unregistered contact:", syncErr);
+          setAddContactError("Failed to save contact. Please check phone number format.");
+        }
       } else {
         let errorMessage = data.message || "Failed to add contact";
         if (errorMessage.includes("body/phoneNumber") || res.status === 400) {
           errorMessage = t("err_valid_phone");
         } else if (res.status === 409) {
           errorMessage = t("err_exists");
-        } else if (res.status === 404) {
-          errorMessage = t("err_no_user");
         }
         setAddContactError(errorMessage);
       }
@@ -216,21 +232,40 @@ export default function ContactsPage() {
 
                         {/* Action Buttons */}
                         <div className="flex items-center gap-2 shrink-0">
-                          <button 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleStartChat(contact.userId);
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#3B58F5] transition-colors hover:bg-blue-100"
-                          >
-                            <MessageSquare className="h-4 w-4" strokeWidth={2.5} />
-                          </button>
-                          <button className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100">
-                            <Phone className="h-4 w-4" strokeWidth={2.5} />
-                          </button>
-                          <button className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100">
-                            <Video className="h-4 w-4" strokeWidth={2.5} />
-                          </button>
+                          {!contact.isUnregistered ? (
+                            <>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleStartChat(contact.userId);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#3B58F5] transition-colors hover:bg-blue-100"
+                              >
+                                <MessageSquare className="h-4 w-4" strokeWidth={2.5} />
+                              </button>
+                              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100">
+                                <Phone className="h-4 w-4" strokeWidth={2.5} />
+                              </button>
+                              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100">
+                                <Video className="h-4 w-4" strokeWidth={2.5} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                try {
+                                  await ContactService.inviteContact({ phoneNumber: contact.phone });
+                                  toast.success(`Invitation SMS sent to ${contact.name}!`);
+                                } catch (err) {
+                                  toast.error("Failed to send invitation SMS");
+                                }
+                              }}
+                              className="px-3.5 py-1.5 rounded-full bg-[#EEF2FF] hover:bg-[#3B58F5] text-[#3B58F5] hover:text-white text-[12px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1"
+                            >
+                              <span>Invite</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

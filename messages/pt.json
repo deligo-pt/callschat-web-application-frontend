@@ -144,5 +144,32 @@
     "unblocking": "Desbloqueando...",
     "block_user": "Bloquear usuário",
     "unblock_user": "Desbloquear usuário"
+  },
+  "invite_friends": {
+    "title": "Convidar amigos",
+    "subtitle": "Convide seus contatos para chamadas de áudio e vídeo seguras no CallsChat.",
+    "sync_contacts": "Sincronizar Contatos",
+    "sync_device": "Sincronizar do Dispositivo",
+    "sync_manual": "Adicionar Contatos",
+    "syncing": "Sincronizando...",
+    "no_contacts": "Nenhum contato para convidar",
+    "no_contacts_desc": "Sincronize sua agenda para encontrar amigos que ainda não estão no CallsChat.",
+    "invite": "Convidar",
+    "inviting": "Enviando...",
+    "invited": "Convidado",
+    "custom_message": "Mensagem Personalizada",
+    "send_sms": "Enviar SMS",
+    "modal_title": "Sincronizar Agenda",
+    "modal_desc": "Envie contatos para encontrar contas registradas e amigos para convidar.",
+    "name_placeholder": "Nome (ex: Wade Warren)",
+    "phone_placeholder": "Telefone (ex: +15551234567)",
+    "add_row": "+ Adicionar Outro",
+    "load_sample": "Carregar Contatos de Exemplo",
+    "sync_now": "Sincronizar Agora",
+    "page_info": "Página {current} de {total}",
+    "prev": "Anterior",
+    "next": "Próxima",
+    "default_invite_msg": "Hey! I'm using CallsChat for secure audio/video calls. Join me: https://callschat.com/download",
+    "search_placeholder": "Pesquisar por nome ou telefone..."
   }
 }

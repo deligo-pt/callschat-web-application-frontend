@@ -144,5 +144,32 @@
     "unblocking": "अनब्लॉक किया जा रहा है...",
     "block_user": "ब्लॉक करें",
     "unblock_user": "अनब्लॉक करें"
+  },
+  "invite_friends": {
+    "title": "दोस्तों को आमंत्रित करें",
+    "subtitle": "CallsChat पर सुरक्षित ऑडियो और वीडियो कॉल में शामिल होने के लिए अपने संपर्कों को आमंत्रित करें।",
+    "sync_contacts": "संपर्क सिंक करें",
+    "sync_device": "डिवाइस संपर्क सिंक करें",
+    "sync_manual": "सिंक करने के लिए संपर्क जोड़ें",
+    "syncing": "सिंक हो रहा है...",
+    "no_contacts": "कोई आमंत्रित करने योग्य संपर्क नहीं मिला",
+    "no_contacts_desc": "जो लोग अभी तक CallsChat पर नहीं हैं, उन्हें खोजने के लिए अपनी फ़ोनबुक सिंक करें।",
+    "invite": "आमंत्रित करें",
+    "inviting": "भेजा जा रहा है...",
+    "invited": "आमंत्रित",
+    "custom_message": "कस्टम संदेश",
+    "send_sms": "एसएमएस भेजें",
+    "modal_title": "फ़ोनबुक संपर्क सिंक करें",
+    "modal_desc": "पंजीकृत खातों से मिलान करने और आमंत्रित करने के लिए संपर्कों को अपलोड करें।",
+    "name_placeholder": "नाम (जैसे Wade Warren)",
+    "phone_placeholder": "फ़ोन (जैसे +15551234567)",
+    "add_row": "+ एक और जोड़ें",
+    "load_sample": "नमूना संपर्क लोड करें",
+    "sync_now": "अभी सिंक करें",
+    "page_info": "पृष्ठ {current} का {total}",
+    "prev": "पिछला",
+    "next": "अगला",
+    "default_invite_msg": "Hey! I'm using CallsChat for secure audio/video calls. Join me: https://callschat.com/download",
+    "search_placeholder": "नाम या फ़ोन से खोजें..."
   }
 }

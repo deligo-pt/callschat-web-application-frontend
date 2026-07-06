@@ -10,6 +10,7 @@ export interface Contact {
   avatarUrl: string | null;
   isFavourite: boolean;
   isOnline: boolean;
+  isUnregistered?: boolean;
 }
 
 export function useContacts() {
@@ -20,7 +21,11 @@ export function useContacts() {
   const fetchContacts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await ContactService.fetchContacts();
+      const [data, unregResponse] = await Promise.all([
+        ContactService.fetchContacts(),
+        ContactService.listUnregisteredContacts({ limit: 100 }).catch(() => ({ success: false, data: { contacts: [] } }))
+      ]);
+
       let contactsArray = [];
       if (Array.isArray(data)) {
         contactsArray = data;
@@ -71,14 +76,41 @@ export function useContacts() {
           isOnline
         };
       });
-      
+
+      const unregArray = unregResponse?.data?.contacts || (unregResponse as any)?.contacts || [];
+      const mappedUnreg = unregArray.map((u: any, idx: number) => ({
+        id: u.id || `unreg-${idx}`,
+        userId: "",
+        name: u.name || "Unknown",
+        phone: u.phoneNumber || u.phone || "No phone number",
+        avatarUrl: null,
+        isFavourite: false,
+        isOnline: false,
+        isUnregistered: true,
+      }));
+
       const uniqueMap = new Map<string, Contact>();
+      const seenPhones = new Set<string>();
+
       for (const c of mappedContacts) {
         const key = c.userId || c.id || Math.random().toString();
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, c);
+          if (c.phone) seenPhones.add(c.phone.replace(/\D/g, ""));
         }
       }
+
+      for (const c of mappedUnreg) {
+        const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
+        if (!cleanPhone || !seenPhones.has(cleanPhone)) {
+          const key = c.id || Math.random().toString();
+          if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, c);
+            if (cleanPhone) seenPhones.add(cleanPhone);
+          }
+        }
+      }
+
       const uniqueContacts = Array.from(uniqueMap.values());
       uniqueContacts.sort((a, b) => a.name.localeCompare(b.name));
       setContacts(uniqueContacts);
