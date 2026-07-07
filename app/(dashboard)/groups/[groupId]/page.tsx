@@ -22,6 +22,7 @@ import { GroupInput } from "@/components/group/GroupInput";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
 import { MediaGallery } from "@/components/chat/MediaGallery";
 import { useTranslations } from "next-intl";
+import { useGroupStore } from "@/hooks/useGroupStore";
 
 function parseJwt(token: string) {
   try {
@@ -102,6 +103,7 @@ export default function GroupChatPage() {
       if (updateRes.success) {
         toast.success("Group photo updated successfully!");
         setGroupDetails((prev: any) => prev ? { ...prev, avatarUrl: uploadRes.data?.mediaUrl } : prev);
+        useGroupStore.getState().updateGroupInStore(groupId, { avatarUrl: uploadRes.data.mediaUrl });
       } else {
         toast.error(updateRes.error || "Failed to update group photo");
       }
@@ -327,6 +329,7 @@ export default function GroupChatPage() {
       const res = await groupService.removeMember(groupId, currentUserId);
       if (res.success || res.data) {
         toast.success("You have left the group");
+        useGroupStore.getState().removeGroupFromStore(groupId);
         router.push("/chats");
       } else {
         toast.error(res.error || "Failed to leave group");
@@ -512,6 +515,7 @@ export default function GroupChatPage() {
                 <DropdownMenuItem onClick={async () => {
                   const newFav = !isFavourite;
                   setIsFavourite(newFav);
+                  useGroupStore.getState().toggleFavouriteInStore(groupId, newFav);
                   await groupService.toggleFavourite(groupId, newFav);
                   toast.success(newFav ? "Added to Favorites" : "Removed from Favorites");
                 }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">

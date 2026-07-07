@@ -7,8 +7,6 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
-import { BusinessService } from "@/services/business.service";
-import SetupBusinessModal from "@/components/business/SetupBusinessModal";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useTranslations, useLocale } from "next-intl";
 import { LanguageSelector } from "@/components/i18n/LanguageSelector";
@@ -45,7 +43,7 @@ interface UserProfileData {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { updateCurrentMode, currentMode } = useUser();
+  const { currentMode, updateCurrentMode } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const currentLocale = useLocale() as Locale;
@@ -74,32 +72,7 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Business Mode & Switching State
-  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
-  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
-
   const activeMode = currentMode || userData?.currentMode || (userData?.accountType === "BUSINESS" ? "BUSINESS" : "PERSONAL");
-
-  const handleSwitchMode = async (targetMode: "PERSONAL" | "BUSINESS") => {
-    setIsSwitchingMode(true);
-    try {
-      await BusinessService.switchMode(targetMode);
-      updateCurrentMode(targetMode);
-      setUserData((prev) => prev ? { ...prev, currentMode: targetMode } : null);
-      toast.success(`Switched to ${targetMode === "BUSINESS" ? "Business" : "Personal"} Mode!`);
-    } catch (err: any) {
-      const status = err.response?.status;
-      const errorMsg = err.response?.data?.message || err.response?.data?.error?.message || err.message || "";
-      if (status === 403 || errorMsg.toLowerCase().includes("set up a business profile") || errorMsg.toLowerCase().includes("setup") || errorMsg.toLowerCase().includes("business profile")) {
-        toast.info("Please set up your Business Profile first to switch to Business Mode.");
-        setIsSetupModalOpen(true);
-      } else {
-        toast.error(errorMsg || "Failed to switch mode");
-      }
-    } finally {
-      setIsSwitchingMode(false);
-    }
-  };
 
   // Fetch initial profile data
   useEffect(() => {
@@ -383,35 +356,37 @@ export default function ProfilePage() {
                 </div>
               </button>
 
-              <button
-                onClick={() => setActivePanel("dashboard")}
-                className={cn(
-                  "flex items-center justify-between rounded-xl border p-3 transition-colors mt-2",
-                  activePanel === "dashboard"
-                    ? "border-blue-200 bg-[#EEF2FF]"
-                    : "border-slate-100 bg-white hover:bg-slate-50"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full",
-                    activePanel === "dashboard" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-purple-50 text-purple-400"
-                  )}>
-                    <Briefcase className="h-4 w-4" />
+              {activeMode === "BUSINESS" && (
+                <button
+                  onClick={() => setActivePanel("dashboard")}
+                  className={cn(
+                    "flex items-center justify-between rounded-xl border p-3 transition-colors mt-2",
+                    activePanel === "dashboard"
+                      ? "border-blue-200 bg-[#EEF2FF]"
+                      : "border-slate-100 bg-white hover:bg-slate-50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-full",
+                      activePanel === "dashboard" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-purple-50 text-purple-400"
+                    )}>
+                      <Briefcase className="h-4 w-4" />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className={cn(
+                        "text-[13px] font-bold",
+                        activePanel === "dashboard" ? "text-[#2563EB]" : "text-[#0F172A]"
+                      )}>{tCommon("business_dashboard")}</span>
+                      <span className="text-[11px] font-medium text-slate-500">{t("analytical_insight")}</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-start">
-                    <span className={cn(
-                      "text-[13px] font-bold",
-                      activePanel === "dashboard" ? "text-[#2563EB]" : "text-[#0F172A]"
-                    )}>{tCommon("business_dashboard")}</span>
-                    <span className="text-[11px] font-medium text-slate-500">{t("analytical_insight")}</span>
-                  </div>
-                </div>
-                <ChevronRight className={cn(
-                  "h-4 w-4 transition-colors",
-                  activePanel === "dashboard" ? "text-[#2563EB]" : "text-slate-400"
-                )} />
-              </button>
+                  <ChevronRight className={cn(
+                    "h-4 w-4 transition-colors",
+                    activePanel === "dashboard" ? "text-[#2563EB]" : "text-slate-400"
+                  )} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -484,7 +459,7 @@ export default function ProfilePage() {
           <DisappearingMessages
             onBack={() => setActivePanel("edit")}
           />
-        ) : activePanel === "dashboard" ? (
+        ) : activePanel === "dashboard" && activeMode === "BUSINESS" ? (
           <BusinessDashboard
             onBack={() => setActivePanel("edit")}
           />
@@ -573,11 +548,6 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
-
-      <SetupBusinessModal
-        isOpen={isSetupModalOpen}
-        onClose={() => setIsSetupModalOpen(false)}
-      />
     </div>
   );
 }

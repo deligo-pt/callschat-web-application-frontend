@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useTranslations } from "next-intl";
+import { useGroupStore } from "@/hooks/useGroupStore";
+import { useSocket } from "@/components/providers/SocketProvider";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
@@ -20,10 +22,10 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
   const tNotif = useTranslations("notifications");
   const pathname = usePathname();
   const { currentMode } = useUser();
+  const { socket } = useSocket();
   
-  const [groups, setGroups] = useState<GroupItem[]>([]);
+  const { groups, isLoading, fetchGroups, removeGroupFromStore, toggleFavouriteInStore, updateGroupMessageTimestamp } = useGroupStore();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -31,30 +33,40 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
 
   // Fetch groups logic
   useEffect(() => {
-    const fetchGroups = async () => {
-      try {
-        const res = await groupService.fetchMyGroups();
-        if (res.success && Array.isArray(res.data)) {
-          setGroups(res.data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch groups", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchGroups();
 
     const handleWorkspaceChange = () => {
-      setIsLoading(true);
-      fetchGroups();
+      fetchGroups(true);
     };
     if (typeof window !== "undefined") {
       window.addEventListener("workspaceModeChanged", handleWorkspaceChange);
       return () => window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
     }
-  }, [currentMode]);
+  }, [currentMode, fetchGroups]);
+
+  // Subscribe socket to group rooms
+  useEffect(() => {
+    if (!socket || groups.length === 0) return;
+    groups.forEach((g) => {
+      socket.emit("group:join_room", { groupId: g.id });
+    });
+  }, [socket, groups]);
+
+  // Real-time group updates
+  useEffect(() => {
+    if (!socket) return;
+    const handleGroupMessage = (data: any) => {
+      if (data && data.groupId) {
+        updateGroupMessageTimestamp(data.groupId, data.content || data.message || "New message");
+      } else {
+        fetchGroups(true);
+      }
+    };
+    socket.on("group:receive_message", handleGroupMessage);
+    return () => {
+      socket.off("group:receive_message", handleGroupMessage);
+    };
+  }, [socket, updateGroupMessageTimestamp, fetchGroups]);
 
   useEffect(() => {
     try {
@@ -83,7 +95,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
       });
       const data = await res.json();
       if (data.success) {
-        setGroups(prev => prev.filter(g => g.id !== groupId));
+        removeGroupFromStore(groupId);
         if (pathname === `/groups/${groupId}`) {
           window.location.href = '/groups';
         }
@@ -99,11 +111,11 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
   };
 
   const handleToggleFavourite = async (groupId: string, currentStatus: boolean) => {
-    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, isFavourite: !currentStatus } : g));
+    toggleFavouriteInStore(groupId, !currentStatus);
     const res = await groupService.toggleFavourite(groupId, !currentStatus);
     if (!res.success) {
       toast.error(`Failed to ${!currentStatus ? 'add to' : 'remove from'} favorites`);
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, isFavourite: currentStatus } : g));
+      toggleFavouriteInStore(groupId, currentStatus);
     } else {
       toast.success(`Group ${!currentStatus ? 'added to' : 'removed from'} favorites`);
     }

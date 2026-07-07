@@ -46,7 +46,9 @@ export default function ChooseModeScreen() {
   const handleContinue = () => {
     if (!selectedMode) return;
     sessionStorage.setItem("auth_account_mode", selectedMode);
-    router.push("/login");
+    localStorage.setItem("auth_account_mode", selectedMode);
+    localStorage.setItem("currentMode", selectedMode);
+    router.push("/signup");
   };
 
   return (

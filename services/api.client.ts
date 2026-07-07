@@ -32,6 +32,9 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('currentMode');
+        sessionStorage.removeItem('auth_account_mode');
         window.location.href = '/login';
       }
     }

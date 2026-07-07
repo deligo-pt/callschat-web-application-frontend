@@ -136,11 +136,18 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
         const isExistingUser = responseData.data?.isExistingUser !== undefined 
           ? responseData.data.isExistingUser 
           : responseData.isExistingUser;
+        const existingAccountType = responseData.data?.existingAccountType || responseData.existingAccountType;
 
         if (responseData.success && token) {
           if (type === "login") {
-            if (isExistingUser) {
-              toast.success("Verification successful!");
+            if (isExistingUser || existingAccountType) {
+              const sessionMode = sessionStorage.getItem("auth_account_mode");
+              if (sessionMode && existingAccountType && sessionMode !== existingAccountType) {
+                const existingLabel = existingAccountType === "PERSONAL" ? "Personal" : "Business";
+                toast.info(`Note: This number is registered as a ${existingLabel} account. Logging you in...`);
+              } else {
+                toast.success("Verification successful!");
+              }
               try {
                 const loginRes = await fetch(`${baseUrl}/auth/login`, {
                   method: "POST",
@@ -165,6 +172,12 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                   }
                   
                   const accountType = loginData.data?.user?.accountType ?? "PERSONAL";
+                  localStorage.setItem("currentMode", accountType);
+                  localStorage.setItem("auth_account_mode", accountType);
+                  sessionStorage.setItem("auth_account_mode", accountType);
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: accountType } }));
+                  }
                   await new Promise(resolve => setTimeout(resolve, 50));
                   router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
                 } else {
@@ -180,7 +193,14 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
             }
           } else {
             // type === "signup"
-            if (isExistingUser) {
+            if (isExistingUser || existingAccountType) {
+              const sessionMode = sessionStorage.getItem("auth_account_mode") || "PERSONAL";
+              if (existingAccountType && existingAccountType !== sessionMode) {
+                const existingLabel = existingAccountType === "PERSONAL" ? "Personal" : "Business";
+                const attemptedLabel = sessionMode === "PERSONAL" ? "Personal" : "Business";
+                toast.error(`This phone number is already registered as a ${existingLabel} account. You cannot create a ${attemptedLabel} account with the same number.`);
+                return;
+              }
               toast.info("You already have an account! Logging you in...");
               try {
                 const loginRes = await fetch(`${baseUrl}/auth/login`, {

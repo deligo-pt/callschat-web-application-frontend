@@ -46,8 +46,8 @@ export default function Features() {
             iconBgColor: "#7C3AED",
         },
         {
-            title: "Business Mode",
-            description: "Switch to professional profile with analytics and team management.",
+            title: "Business Account",
+            description: "Create a dedicated professional account with analytics and team management.",
             icon: Briefcase,
             iconBgColor: "#64748B",
         },

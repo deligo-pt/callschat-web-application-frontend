@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { groupService, GroupItem } from "@/services/group.service";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
+import { useGroupStore } from "@/hooks/useGroupStore";
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -49,6 +50,7 @@ export default function FavoritesPage() {
   const handleToggleFavouriteGroup = async (group: GroupItem) => {
     // Optimistic UI update
     setFavoriteGroups(prev => prev.filter(g => g.id !== group.id));
+    useGroupStore.getState().toggleFavouriteInStore(group.id, false);
     
     // API Call
     const res = await groupService.toggleFavourite(group.id, false);
@@ -56,6 +58,7 @@ export default function FavoritesPage() {
       toast.error("Failed to remove group from favorites");
       // Rollback
       setFavoriteGroups(prev => [...prev, group]);
+      useGroupStore.getState().toggleFavouriteInStore(group.id, true);
     }
   };
 

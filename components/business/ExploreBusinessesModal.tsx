@@ -222,7 +222,7 @@ export function ExploreBusinessesModal({ isOpen, onClose }: ExploreBusinessesMod
                 }}
                 className="font-bold text-[#3B58F5] hover:underline"
               >
-                Switch to Business Mode →
+                Register a Business Account →
               </button>
             </div>
           </motion.div>

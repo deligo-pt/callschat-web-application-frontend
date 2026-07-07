@@ -55,7 +55,7 @@ export default function RegisterScreen() {
           sessionStorage.removeItem("registrationToken");
           
           // Route to the optional profile setup (Step 4)
-          router.push("/profile/setup");
+          router.push("/setup-profile");
         } else {
           toast.error(data.message || data.data?.message || "Failed to create account.");
         }

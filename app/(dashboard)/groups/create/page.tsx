@@ -10,6 +10,7 @@ import { chatService } from "@/services/chat.service";
 import { useContacts } from "@/hooks/useContacts";
 import { generateGroupKey, encryptMessage } from "@/utils/crypto";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { useGroupStore } from "@/hooks/useGroupStore";
 
 function parseJwt(token: string) {
   try {
@@ -162,17 +163,27 @@ export default function CreateGroupPage() {
         return;
       }
 
+      let finalAvatarUrl = groupRes.data.avatarUrl || null;
       // If an avatar file was selected, upload and update the group!
       if (avatarFile && groupRes.data.id) {
         try {
           const uploadRes = await groupService.uploadGroupMedia(groupRes.data.id, avatarFile);
           if (uploadRes.success && uploadRes.data?.mediaUrl) {
-            await groupService.updateGroup(groupRes.data.id, { avatarUrl: uploadRes.data.mediaUrl });
+            finalAvatarUrl = uploadRes.data.mediaUrl;
+            await groupService.updateGroup(groupRes.data.id, { avatarUrl: finalAvatarUrl });
           }
         } catch (uploadErr) {
           console.error("Failed to upload group avatar during creation:", uploadErr);
         }
       }
+
+      // Add to store instantly & trigger background sync
+      useGroupStore.getState().addGroup({
+        ...groupRes.data,
+        avatarUrl: finalAvatarUrl,
+        memberCount: selectedMembers.length + 1,
+      });
+      useGroupStore.getState().fetchGroups(true);
 
       // Redirect to groups list
       router.push(`/groups`);

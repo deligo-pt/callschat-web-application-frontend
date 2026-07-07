@@ -112,8 +112,15 @@ export default function BusinessSignUpScreen() {
         const data = await res.json();
         const token = data.data?.registrationToken ?? data.registrationToken;
         const isExisting = data.data?.isExistingUser ?? data.isExistingUser;
+        const existingAccountType = data.data?.existingAccountType ?? data.existingAccountType;
         if (data.success && token) {
-          if (isExisting) {
+          if (isExisting || existingAccountType) {
+            if (existingAccountType === "PERSONAL") {
+              toast.error(
+                "This phone number is already registered as a Personal account. You cannot create a Business account with the same phone number."
+              );
+              return;
+            }
             toast.info("Account found! Logging you in…");
             await autoLogin(token);
           } else {
@@ -148,6 +155,12 @@ export default function BusinessSignUpScreen() {
         const refreshToken = data.data?.tokens?.refreshToken ?? data.data?.refreshToken;
         if ((data.success || res.ok) && accessToken) {
           storeTokens(accessToken, refreshToken);
+          localStorage.setItem("currentMode", "BUSINESS");
+          localStorage.setItem("auth_account_mode", "BUSINESS");
+          sessionStorage.setItem("auth_account_mode", "BUSINESS");
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: 'BUSINESS' } }));
+          }
           toast.success("Business account created! Welcome.");
           await new Promise((r) => setTimeout(r, 50));
           router.push("/business/dashboard");
@@ -173,6 +186,12 @@ export default function BusinessSignUpScreen() {
       const accountType = data.data?.user?.accountType ?? "PERSONAL";
       if ((data.success || res.ok) && accessToken) {
         storeTokens(accessToken, refreshToken);
+        localStorage.setItem("currentMode", accountType);
+        localStorage.setItem("auth_account_mode", accountType);
+        sessionStorage.setItem("auth_account_mode", accountType);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: accountType } }));
+        }
         await new Promise((r) => setTimeout(r, 50));
         router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
       } else {

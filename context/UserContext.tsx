@@ -141,16 +141,26 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const profileData = res.data.data as UserProfileData;
         setUser(profileData);
         
-        const mode = (profileData.currentMode as 'PERSONAL' | 'BUSINESS') || 
-                     (localStorage.getItem("currentMode") as 'PERSONAL' | 'BUSINESS') || 
-                     (profileData.accountType === 'BUSINESS' ? 'BUSINESS' : 'PERSONAL');
+        const mode = (profileData.accountType === 'BUSINESS' ? 'BUSINESS' : 'PERSONAL') || 
+                     (profileData.currentMode as 'PERSONAL' | 'BUSINESS') || 
+                     (localStorage.getItem("currentMode") as 'PERSONAL' | 'BUSINESS') || 'PERSONAL';
         setCurrentModeState(mode);
         if (typeof window !== "undefined") {
           localStorage.setItem("currentMode", mode);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching user profile:", error);
+      if (error?.response?.status === 401 || error?.response?.status === 404) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("currentMode");
+          sessionStorage.removeItem("auth_account_mode");
+          setUser(null);
+          window.location.href = "/login";
+        }
+      }
     } finally {
       setIsLoading(false);
     }
