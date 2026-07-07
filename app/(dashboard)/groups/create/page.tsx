@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2, Loader2, Star } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2, Loader2, Star, Camera } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,9 @@ export default function CreateGroupPage() {
   // Step 1 State
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { contacts: rawContacts, isLoading: isLoadingContacts } = useContacts();
 
@@ -75,6 +78,18 @@ export default function CreateGroupPage() {
     setSelectedMembers((prev) =>
       prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
     );
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image size should be less than 5MB");
+        return;
+      }
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
+    }
   };
 
   const filteredContacts = contacts.filter((c) =>
@@ -147,6 +162,18 @@ export default function CreateGroupPage() {
         return;
       }
 
+      // If an avatar file was selected, upload and update the group!
+      if (avatarFile && groupRes.data.id) {
+        try {
+          const uploadRes = await groupService.uploadGroupMedia(groupRes.data.id, avatarFile);
+          if (uploadRes.success && uploadRes.data?.mediaUrl) {
+            await groupService.updateGroup(groupRes.data.id, { avatarUrl: uploadRes.data.mediaUrl });
+          }
+        } catch (uploadErr) {
+          console.error("Failed to upload group avatar during creation:", uploadErr);
+        }
+      }
+
       // Redirect to groups list
       router.push(`/groups`);
     } catch (err) {
@@ -194,11 +221,38 @@ export default function CreateGroupPage() {
         <div className="flex-1 overflow-y-auto px-6 py-2 flex flex-col scrollbar-hide">
           {step === 1 && (
             <div className="flex flex-col items-center w-full animate-in fade-in duration-300">
-              <div className="h-[72px] w-[72px] bg-[#3B58F5] rounded-full flex items-center justify-center text-white mb-4 shadow-xl shadow-blue-500/20">
-                <Users className="h-8 w-8" />
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="relative h-20 w-20 rounded-full cursor-pointer group flex items-center justify-center mb-2 shadow-lg shadow-blue-500/10 overflow-hidden bg-[#EEF2FF] border-2 border-dashed border-[#CBD5E1] hover:border-[#3B58F5] transition-all"
+                title="Click to upload group photo"
+              >
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Group Preview" className="h-full w-full object-cover" />
+                ) : (
+                  <Users className="h-8 w-8 text-[#3B58F5]" />
+                )}
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold">
+                  <Camera className="h-4 w-4 mb-0.5" />
+                  Upload
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-[12px] font-bold text-[#2563EB] hover:underline mb-4"
+              >
+                {avatarPreview ? "Change Photo" : "Add Group Photo"}
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageSelect}
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+              />
+
               <h2 className="text-[18px] font-bold text-[#0F172A] mb-1">Group Details</h2>
-              <p className="text-[12px] font-medium text-slate-500 mb-8">Give your group a name and description</p>
+              <p className="text-[12px] font-medium text-slate-500 mb-6">Give your group a name and description</p>
 
               <div className="w-full space-y-4">
                 <div className="flex flex-col gap-1.5">

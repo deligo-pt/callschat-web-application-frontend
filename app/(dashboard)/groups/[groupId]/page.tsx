@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallContext } from "@/components/providers/CallContext";
-import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight, UserPlus, X, Info, Bell, ShieldCheck, Languages, EyeOff, UserCog, Star, Folder, Users, Mail, Pin, PinOff } from "lucide-react";
+import { ArrowLeft, Phone, Video, Send, Loader2, MoreVertical, Smile, Paperclip, Image as ImageIcon, Mic, MessageSquare, Search, Trash2, LogOut, AlertCircle, ChevronRight, UserPlus, X, Info, Bell, ShieldCheck, Languages, EyeOff, UserCog, Star, Folder, Users, Mail, Pin, PinOff, Camera } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -78,6 +78,41 @@ export default function GroupChatPage() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [recentMedia, setRecentMedia] = useState<any[]>([]);
   const [totalMedia, setTotalMedia] = useState<number>(0);
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const groupAvatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGroupAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const uploadRes = await groupService.uploadGroupMedia(groupId, file);
+      if (!uploadRes.success || !uploadRes.data?.mediaUrl) {
+        toast.error(uploadRes.error || "Failed to upload image");
+        return;
+      }
+
+      const updateRes = await groupService.updateGroup(groupId, { avatarUrl: uploadRes.data.mediaUrl });
+      if (updateRes.success) {
+        toast.success("Group photo updated successfully!");
+        setGroupDetails((prev: any) => prev ? { ...prev, avatarUrl: uploadRes.data?.mediaUrl } : prev);
+      } else {
+        toast.error(updateRes.error || "Failed to update group photo");
+      }
+    } catch (err) {
+      console.error("Error updating group photo:", err);
+      toast.error("Error updating group photo");
+    } finally {
+      setIsUploadingAvatar(false);
+      if (e.target) e.target.value = "";
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -416,6 +451,11 @@ export default function GroupChatPage() {
                   <span>{t("group_info")}</span>
                 </DropdownMenuItem>
 
+                <DropdownMenuItem onClick={() => { setShowGroupInfo(true); setTimeout(() => groupAvatarInputRef.current?.click(), 100); }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 focus:bg-gray-50 text-sm font-semibold text-[#1E293B]">
+                  <Camera className="w-4 h-4 text-[#3B58F5]" />
+                  <span>Change Group Photo</span>
+                </DropdownMenuItem>
+
                 <DropdownMenuItem onClick={() => {
                   setIsNotificationsMuted(!isNotificationsMuted);
                   toast.success(isNotificationsMuted ? "Notifications unmuted" : "Notifications muted");
@@ -666,10 +706,33 @@ export default function GroupChatPage() {
           <div className="flex-1 overflow-y-auto">
             {/* Avatar & Name Section */}
             <div className="flex flex-col items-center pt-8 pb-6 bg-white">
-              <img
-                src={avatarImage}
-                alt={groupName}
-                className="w-32 h-32 rounded-full object-cover border border-[#EEF2FF] shadow-sm mb-4"
+              <div 
+                onClick={() => !isUploadingAvatar && groupAvatarInputRef.current?.click()}
+                className="relative w-32 h-32 rounded-full cursor-pointer group flex items-center justify-center mb-4 shadow-md border border-[#EEF2FF] overflow-hidden bg-[#EEF2FF] hover:border-[#3B58F5] transition-all"
+                title="Click to change group photo"
+              >
+                <img
+                  src={avatarImage}
+                  alt={groupName}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold">
+                  {isUploadingAvatar ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="h-6 w-6 mb-1" />
+                      Change Photo
+                    </>
+                  )}
+                </div>
+              </div>
+              <input
+                type="file"
+                ref={groupAvatarInputRef}
+                onChange={handleGroupAvatarChange}
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
               />
               <h2 className="text-[24px] font-bold text-[#11142D]">{groupName}</h2>
               <p className="text-[13px] font-medium text-[#8F95B2] mt-1">

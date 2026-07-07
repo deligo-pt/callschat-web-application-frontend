@@ -164,8 +164,9 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                     document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
                   }
                   
+                  const accountType = loginData.data?.user?.accountType ?? "PERSONAL";
                   await new Promise(resolve => setTimeout(resolve, 50));
-                  router.push("/chats");
+                  router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
                 } else {
                   toast.error(loginData.message || loginData.data?.message || "Failed to finalize login.");
                 }
@@ -174,7 +175,8 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
               }
             } else {
               toast.info("No account found. Let's get you signed up!");
-              router.push("/signup");
+              const sessionMode = sessionStorage.getItem("auth_account_mode") || "PERSONAL";
+              router.push(sessionMode === "BUSINESS" ? "/auth/business/signup" : "/auth/personal/signup");
             }
           } else {
             // type === "signup"
@@ -202,8 +204,9 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                     document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000`;
                   }
                   
+                  const accountType = loginData.data?.user?.accountType ?? "PERSONAL";
                   await new Promise(resolve => setTimeout(resolve, 50));
-                  router.push("/chats");
+                  router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
                 } else {
                   toast.error(`Login failed: ${loginData.message || JSON.stringify(loginData)}`);
                 }
@@ -530,12 +533,20 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
           {step === "PHONE" && (
             <div className="mt-12 mb-4 text-center text-sm font-medium text-slate-500">
               {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <Link
-                href={isLogin ? "/signup" : "/login"}
-                className="font-bold text-blue-600 hover:underline transition-colors ml-1"
+              <button
+                type="button"
+                onClick={() => {
+                  if (isLogin) {
+                    const sessionMode = sessionStorage.getItem("auth_account_mode") || "PERSONAL";
+                    router.push(sessionMode === "BUSINESS" ? "/auth/business/signup" : "/auth/personal/signup");
+                  } else {
+                    router.push("/login");
+                  }
+                }}
+                className="font-bold text-blue-600 hover:underline transition-colors ml-1 cursor-pointer"
               >
                 {isLogin ? "Sign up" : "Login"}
-              </Link>
+              </button>
             </div>
           )}
         </div>

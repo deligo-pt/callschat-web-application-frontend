@@ -48,6 +48,22 @@ export const groupService = {
     }
   },
 
+  async updateGroup(
+    groupId: string,
+    data: { name?: string; description?: string | null; avatarUrl?: string | null; isPublic?: boolean }
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const response = await apiClient.patch(`/groups/${groupId}`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to update group ${groupId}`, error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to update group details',
+      };
+    }
+  },
+
   async fetchGroupMembers(groupId: string): Promise<{ success: boolean; data?: { members: any[]; total: number; requesterRole: string } }> {
     try {
       const response = await apiClient.get(`/groups/${groupId}/members`);
