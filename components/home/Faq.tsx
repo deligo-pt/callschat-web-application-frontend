@@ -154,7 +154,7 @@ export default function Faq() {
     return (
         <section
             id="faq"
-            className="w-full bg-[#F8FAFF] px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16"
+            className="w-full bg-[#F8FAFF] px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden"
         >
             <div className="container mx-auto max-w-3xl">
                 {/* Section header */}

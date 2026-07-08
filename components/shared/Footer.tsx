@@ -18,7 +18,7 @@ export default function Footer() {
     };
 
     return (
-        <footer className="w-full bg-white pt-16 pb-8 border-t border-gray-100">
+        <footer className="w-full bg-white pt-16 pb-8 border-t border-gray-100 overflow-hidden">
             <div className="container mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8">
 
                 {/* Upper Two-Column Matrix: Branding (left) + Newsletter & Social (right) */}
@@ -39,11 +39,11 @@ export default function Footer() {
                         </p>
 
                         {/* App Badges — open the "Coming Soon" download modal, same as the navbar */}
-                        <div className="mt-8 flex flex-wrap gap-4">
+                        <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-4 w-full sm:w-auto">
                             {/* App Store */}
                             <button
                                 onClick={openModal}
-                                className="flex items-center gap-2.5 rounded-xl border border-[#1A62E8] bg-transparent px-5 py-2.5 text-left text-gray-800 transition-colors duration-200 hover:bg-blue-50 focus:outline-none"
+                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl border border-[#1A62E8] bg-transparent px-5 py-2.5 text-left text-gray-800 transition-colors duration-200 hover:bg-blue-50 focus:outline-none w-full sm:w-auto"
                             >
                                 {/* Outlined Apple Logo Icon */}
                                 <svg fill="#2563EB" width="24px" height="24px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -58,7 +58,7 @@ export default function Footer() {
                             {/* Google Play */}
                             <button
                                 onClick={openModal}
-                                className="flex items-center gap-2.5 rounded-xl bg-[#1A62E8] px-5 py-2.5 text-left text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 focus:outline-none"
+                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl bg-[#1A62E8] px-5 py-2.5 text-left text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 focus:outline-none w-full sm:w-auto"
                             >
                                 <Play className="h-4 w-4 shrink-0 fill-white text-white" />
                                 <div className="flex flex-col leading-none">
@@ -78,7 +78,7 @@ export default function Footer() {
                                 Get the latest updates, features, and news delivered to your inbox.
                             </p>
 
-                            <form onSubmit={handleSubscribe} className="mt-7 flex items-center gap-3 max-w-md mx-auto">
+                            <form onSubmit={handleSubscribe} className="mt-7 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-md mx-auto w-full">
                                 <div className="relative flex-1 flex items-center rounded-full bg-white/20 border border-white/30 px-4 py-2.5 focus-within:border-white/60 transition-colors">
                                     <Mail className="h-4 w-4 text-white/90 shrink-0" />
                                     <input
@@ -90,7 +90,7 @@ export default function Footer() {
                                 </div>
                                 <button
                                     type="submit"
-                                    className="shrink-0 rounded-full bg-white px-6 py-2.5 text-sm font-bold text-[#1A62E8] shadow-sm transition-transform duration-200 hover:bg-gray-50 active:scale-[0.98]"
+                                    className="w-full sm:w-auto shrink-0 rounded-full bg-white px-6 py-3 sm:py-2.5 text-sm font-bold text-[#1A62E8] shadow-sm transition-transform duration-200 hover:bg-gray-50 active:scale-[0.98]"
                                 >
                                     Subscribe
                                 </button>
@@ -136,9 +136,9 @@ export default function Footer() {
                 </div>
 
                 {/* Global Structural Copyright Bar Asset Line */}
-                <div className="pt-6 border-t border-[#1A62E8]/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-medium text-[#0A2540]">
+                <div className="pt-6 border-t border-[#1A62E8]/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-medium text-[#0A2540] text-center sm:text-left">
                     <span>© 2026 CallsChat. All rights reserved.</span>
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-center">
                         <Link href="/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
                         <Link href="/terms-of-service" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
                         <Link href="/cookie-policy" className="hover:text-blue-600 transition-colors">Cookie Policy</Link>

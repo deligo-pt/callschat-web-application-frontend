@@ -41,7 +41,7 @@ const SLIDES: SlideData[] = [
     description: "Manage both business and personal communication seamlessly in one powerful platform.",
     icon: Briefcase,
     gradientClass: "from-[#C436D6] to-[#4F4CE7] shadow-[#C436D6]/30",
-    buttonText: "Get Started",
+    buttonText: "Next",
   }
 ];
 

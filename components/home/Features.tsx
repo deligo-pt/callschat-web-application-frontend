@@ -77,7 +77,7 @@ export default function Features() {
     };
 
     return (
-        <section id="features" className="w-full bg-background px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16">
+        <section id="features" className="w-full bg-background px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
             <div className="container mx-auto max-w-6xl">
 
                 {/* Section Header */}

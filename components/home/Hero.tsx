@@ -51,7 +51,7 @@ export default function Hero({ onDownloadClick }: HeroProps) {
     }, [prefersReducedMotion]);
 
     return (
-        <section className="w-full bg-white px-4 py-8 sm:px-6 lg:px-8">
+        <section className="w-full bg-white px-4 py-8 sm:px-6 lg:px-8 overflow-hidden">
             <div className="container mx-auto max-w-7xl">
 
                 {/* Rounded Hero Showcase Card — always visible (no fade) so the
