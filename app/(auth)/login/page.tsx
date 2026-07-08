@@ -1,9 +1,5 @@
-import PhoneAuthScreen from "@/components/auth/PhoneAuthScreen";
+import ChooseModeScreen from "@/components/auth/ChooseModeScreen";
 
 export default function LoginPage() {
-  return (
-    <div>
-      <PhoneAuthScreen type="login" />
-    </div>
-  );
+  return <ChooseModeScreen authType="login" />;
 }

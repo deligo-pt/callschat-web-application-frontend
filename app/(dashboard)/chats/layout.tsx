@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chatService } from "@/services/chat.service";
 import { motion } from "framer-motion";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
@@ -16,6 +16,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
 import { NewMessageModal } from "@/components/chat/NewMessageModal";
+import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
 import { Building2 } from "lucide-react";
 
 interface Conversation {
@@ -56,6 +57,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
   const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Real-time presence — comes from the global PresenceProvider.
   const { isUserOnline } = usePresence();
@@ -372,15 +374,15 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
           !isRootChatsPage && "hidden md:flex"
         )}
       >
-        {currentMode === "BUSINESS" ? (
+        {currentMode === "BUSINESS" && searchParams.get("view") === "channels" ? (
           <BusinessSidebar />
         ) : (
           <>
             {/* Header Area */}
             <div className="flex flex-col px-6 pt-8 pb-4">
               <div className="flex items-center justify-between">
-                <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">
-                  Groups
+                <h1 className="text-[26px] font-bold tracking-tight text-[#3B58F5]">
+                  CallsChat
                 </h1>
                 <div className="flex items-center gap-2">
                   <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
@@ -388,6 +390,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                   </Link>
 
                   <NotificationDropdown />
+                  <BusinessFeaturesMenu />
                 </div>
               </div>
 

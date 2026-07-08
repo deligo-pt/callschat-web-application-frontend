@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronLeft, User, Shield, Camera, Info, X, Image as ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronLeft, User, Shield } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Country } from "react-phone-number-input";
@@ -10,11 +10,7 @@ import Input from "react-phone-number-input/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
 
-// ---------------------------------------------------------------------------
-// Helper: national flag emoji from country code
-// ---------------------------------------------------------------------------
 const getFlagEmoji = (cc: string) => {
   const codePoints = cc
     .toUpperCase()
@@ -26,12 +22,9 @@ const getFlagEmoji = (cc: string) => {
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:8000/api/v1";
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-export default function PersonalSignUpScreen() {
+export default function PersonalLoginScreen() {
   const router = useRouter();
-  const [step, setStep] = React.useState<"PHONE" | "OTP" | "PROFILE">("PHONE");
+  const [step, setStep] = React.useState<"PHONE" | "OTP">("PHONE");
   const [isPending, startTransition] = React.useTransition();
 
   // Phone step
@@ -45,39 +38,7 @@ export default function PersonalSignUpScreen() {
   const [otp, setOtp] = React.useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = React.useState(60);
   const [sentPhone, setSentPhone] = React.useState("");
-  const [registrationToken, setRegistrationToken] = React.useState("");
 
-  // Profile step
-  const [firstName, setFirstName] = React.useState("");
-  const [lastName, setLastName] = React.useState("");
-  const [isPhotoPickerOpen, setIsPhotoPickerOpen] = React.useState(false);
-  const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setPhotoPreview(url);
-      setIsPhotoPickerOpen(false);
-    }
-  };
-
-  const handleCameraClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.setAttribute("capture", "environment");
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleGalleryClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.removeAttribute("capture");
-      fileInputRef.current.click();
-    }
-  };
-
-  // ── Regions / country data ──────────────────────────────────────────────
   const countries = getCountries();
   const regionNames = React.useMemo(
     () => new Intl.DisplayNames(["en"], { type: "region" }),
@@ -100,7 +61,6 @@ export default function PersonalSignUpScreen() {
     });
   }, [countries, searchQuery, regionNames]);
 
-  // ── Click-outside dropdown close ──────────────────────────────────────
   React.useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -115,7 +75,6 @@ export default function PersonalSignUpScreen() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── OTP countdown ─────────────────────────────────────────────────────
   React.useEffect(() => {
     if (step !== "OTP") return;
     const interval = setInterval(() => {
@@ -129,8 +88,6 @@ export default function PersonalSignUpScreen() {
     }, 1000);
     return () => clearInterval(interval);
   }, [step]);
-
-  // ── Handlers ─────────────────────────────────────────────────────────
 
   const handleRequestOTP = () => {
     const phone = phoneNumber?.replace(/\s+/g, "").trim();
@@ -183,95 +140,20 @@ export default function PersonalSignUpScreen() {
           if (isExistingUser || existingAccountType) {
             if (existingAccountType === "BUSINESS") {
               toast.error(
-                "This phone number is already registered as a Business account. You cannot create a Personal account with the same phone number."
+                "This phone number is registered as a Business account. Please login in Business Mode."
               );
               return;
             }
-            // Existing user (PERSONAL) → auto-login
-            toast.info("Welcome back! Logging you in…");
+            toast.success("Verification successful! Logging you in…");
             await autoLogin(token);
           } else {
-            setRegistrationToken(token);
-            setStep("PROFILE");
-            toast.success("Phone verified!");
+            toast.info("No account found. Let's get you signed up!");
+            sessionStorage.setItem("auth_account_mode", "PERSONAL");
+            router.push("/auth/personal/signup");
           }
         } else {
           toast.error(
             data.error?.message ?? data.message ?? "Verification failed."
-          );
-        }
-      } catch {
-        toast.error("Network error. Please try again.");
-      }
-    });
-  };
-
-  const handleRegisterAndSetup = (isSkip = false) => {
-    if (!registrationToken) return;
-    if (!isSkip && (!firstName.trim() || !lastName.trim())) {
-      toast.error("Please enter both First Name and Last Name");
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const fullName = isSkip
-          ? (firstName.trim() ? `${firstName.trim()} ${lastName.trim()}`.trim() : "User")
-          : `${firstName.trim()} ${lastName.trim()}`;
-
-        const res = await fetch(`${BASE_URL}/auth/register`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${registrationToken}`,
-          },
-          body: JSON.stringify({ name: fullName, accountType: "PERSONAL" }),
-        });
-        const data = await res.json();
-        const accessToken =
-          data.data?.tokens?.accessToken ?? data.data?.accessToken;
-        const refreshToken =
-          data.data?.tokens?.refreshToken ?? data.data?.refreshToken;
-
-        if ((data.success || res.ok) && accessToken) {
-          storeTokens(accessToken, refreshToken);
-          localStorage.setItem("currentMode", "PERSONAL");
-          localStorage.setItem("auth_account_mode", "PERSONAL");
-          sessionStorage.setItem("auth_account_mode", "PERSONAL");
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: 'PERSONAL' } }));
-          }
-
-          if (!isSkip && (fileInputRef.current?.files?.[0] || firstName || lastName)) {
-            try {
-              const formData = new FormData();
-              formData.append("firstName", firstName.trim() || "User");
-              formData.append("lastName", lastName.trim() || "");
-              if (fileInputRef.current?.files?.[0]) {
-                formData.append("profileImage", fileInputRef.current.files[0]);
-              }
-              const setupRes = await fetch(`${BASE_URL}/user/profile/setup`, {
-                method: "PATCH",
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                },
-                body: formData,
-              });
-              await setupRes.json();
-            } catch (err) {
-              console.error("Profile setup patch error:", err);
-            }
-          }
-
-          toast.success("Account created! Welcome to CallsChat.");
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("storage"));
-          }
-          await new Promise((r) => setTimeout(r, 50));
-          router.push("/chats");
-        } else {
-          toast.error(
-            data.error?.message ?? data.message ?? "Registration failed."
           );
         }
       } catch {
@@ -303,7 +185,11 @@ export default function PersonalSignUpScreen() {
         localStorage.setItem("auth_account_mode", accountType);
         sessionStorage.setItem("auth_account_mode", accountType);
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: accountType } }));
+          window.dispatchEvent(
+            new CustomEvent("workspaceModeChanged", {
+              detail: { mode: accountType },
+            })
+          );
         }
         await new Promise((r) => setTimeout(r, 50));
         router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
@@ -326,7 +212,6 @@ export default function PersonalSignUpScreen() {
     }
   }
 
-  // ── OTP input helpers ─────────────────────────────────────────────────
   const handleOtpChange = (idx: number, val: string) => {
     if (!/^\d*$/.test(val)) return;
     if (val.length > 1) val = val.slice(-1);
@@ -334,7 +219,7 @@ export default function PersonalSignUpScreen() {
     next[idx] = val;
     setOtp(next);
     if (val && idx < 5)
-      document.getElementById(`p-otp-${idx + 1}`)?.focus();
+      document.getElementById(`pl-otp-${idx + 1}`)?.focus();
   };
 
   const handleOtpKeyDown = (
@@ -342,7 +227,7 @@ export default function PersonalSignUpScreen() {
     e: React.KeyboardEvent<HTMLInputElement>
   ) => {
     if (e.key === "Backspace" && !otp[idx] && idx > 0)
-      document.getElementById(`p-otp-${idx - 1}`)?.focus();
+      document.getElementById(`pl-otp-${idx - 1}`)?.focus();
   };
 
   const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -355,210 +240,14 @@ export default function PersonalSignUpScreen() {
     const next = [...otp];
     for (let i = 0; i < pasted.length; i++) next[i] = pasted[i]!;
     setOtp(next);
-    document.getElementById(`p-otp-${Math.min(pasted.length, 5)}`)?.focus();
+    document.getElementById(`pl-otp-${Math.min(pasted.length, 5)}`)?.focus();
   };
 
-  const isOtpComplete =
-    otp.every((d) => d.length === 1) && !!sentPhone;
-
-  // ── Render ────────────────────────────────────────────────────────────
-  if (step === "PROFILE") {
-    return (
-      <div className="flex min-h-screen w-full flex-col bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] font-sans">
-        {/* Hidden File Input */}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          accept="image/*" 
-          onChange={handlePhotoUpload} 
-          className="hidden" 
-        />
-
-        {/* Top Header Section */}
-        <div className="flex flex-col items-center justify-center pt-16 pb-12 text-white px-4">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 text-center">
-            Set up your profile
-          </h1>
-          <p className="text-blue-100 font-medium text-center">
-            Let others know who you are
-          </p>
-        </div>
-
-        {/* Bottom White Section */}
-        <div className="flex-1 rounded-t-[2.5rem] sm:rounded-t-[3.5rem] bg-white px-6 py-10 sm:px-12 flex flex-col items-center shadow-2xl relative">
-          <div className="w-full max-w-[400px] flex-1 flex flex-col pt-4 sm:pt-6">
-
-            {/* Avatar Section */}
-            <div className="flex justify-center mb-10">
-              <div className="relative group">
-                <button 
-                  type="button"
-                  onClick={() => setIsPhotoPickerOpen(true)}
-                  className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-[6px] border-[#EEF2FF] bg-[#E2E8F0] transition-all hover:border-blue-100 shadow-sm"
-                >
-                  {photoPreview ? (
-                    <img src={photoPreview} alt="Profile preview" className="h-full w-full object-cover" />
-                  ) : (
-                    <User className="h-16 w-16 text-slate-500" strokeWidth={1.5} />
-                  )}
-                </button>
-                
-                <button 
-                  type="button"
-                  onClick={() => setIsPhotoPickerOpen(true)}
-                  className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-[#2563EB] shadow-md text-white transition-transform hover:scale-110 active:scale-95"
-                >
-                  <Camera className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Form Fields */}
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 pl-1">
-                  First Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your first name"
-                  value={firstName}
-                  disabled={isPending}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="flex h-12 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 pl-1">
-                  Last Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your last name"
-                  value={lastName}
-                  disabled={isPending}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="flex h-12 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
-                />
-              </div>
-            </div>
-
-            {/* Info Box */}
-            <div className="mt-8 flex items-start gap-3 rounded-xl border border-blue-50 bg-[#EEF2FF] p-4">
-              <Info className="h-4 w-4 text-[#2563EB] shrink-0 mt-0.5" />
-              <p className="text-xs font-medium leading-relaxed text-[#2563EB]">
-                Your name will be visible to your contacts. You can change it anytime in settings.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="mt-auto space-y-4 pt-12 pb-6">
-              <button
-                type="button"
-                onClick={() => handleRegisterAndSetup(false)}
-                disabled={!firstName || !lastName || isPending}
-                className={cn(
-                  "w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 shadow-sm",
-                  firstName && lastName && !isPending
-                    ? "bg-[#2563EB] text-white hover:bg-blue-700 active:scale-[0.99]"
-                    : "cursor-not-allowed bg-slate-100 text-slate-400"
-                )}
-              >
-                {isPending ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Saving...
-                  </span>
-                ) : (
-                  "Continue"
-                )}
-              </button>
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => handleRegisterAndSetup(true)}
-                  disabled={isPending}
-                  className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  Skip for now
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* Photo Picker Modal / Dialog */}
-        <AnimatePresence>
-          {isPhotoPickerOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsPhotoPickerOpen(false)}
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              />
-
-              {/* Modal Dialog */}
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-100"
-              >
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-                  <h3 className="text-lg font-bold text-slate-800">Select Profile Picture</h3>
-                  <button 
-                    onClick={() => setIsPhotoPickerOpen(false)}
-                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <button 
-                    onClick={handleCameraClick}
-                    className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-500/40 hover:bg-blue-50/50"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-[#2563EB]">
-                      <Camera className="h-5 w-5" />
-                    </div>
-                    <div className="text-left">
-                      <span className="block font-bold text-sm text-slate-800">Take Photo</span>
-                      <span className="block text-xs text-slate-500">Use device camera</span>
-                    </div>
-                  </button>
-                  
-                  <button 
-                    onClick={handleGalleryClick}
-                    className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-500/40 hover:bg-blue-50/50"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600">
-                      <ImageIcon className="h-5 w-5" />
-                    </div>
-                    <div className="text-left">
-                      <span className="block font-bold text-sm text-slate-800">Choose from File / Gallery</span>
-                      <span className="block text-xs text-slate-500">Upload existing image</span>
-                    </div>
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  }
+  const isOtpComplete = otp.every((d) => d.length === 1) && !!sentPhone;
 
   return (
     <div className="flex min-h-screen w-full bg-[#F8FAFC] font-sans">
       <div className="flex w-full min-h-screen">
-
         {/* Left brand column */}
         <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between bg-gradient-to-br from-[#0A2540] via-[#102A63] to-[#1A62E8] p-12 text-white relative overflow-hidden">
           <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
@@ -580,16 +269,16 @@ export default function PersonalSignUpScreen() {
 
           <div className="my-auto max-w-lg relative z-10 space-y-8 py-12">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold backdrop-blur-md border border-white/15 text-[#1AC1F2]">
-              <User className="h-3.5 w-3.5" /> Personal Account
+              <User className="h-3.5 w-3.5" /> Personal Login
             </div>
             <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight">
-              Secure private <br />
+              Welcome back to <br />
               <span className="bg-gradient-to-r from-blue-300 via-[#1AC1F2] to-indigo-200 bg-clip-text text-transparent">
-                communication.
+                your private chats.
               </span>
             </h1>
             <p className="text-base text-blue-100/90 leading-relaxed">
-              Chat securely with friends and family using end-to-end encryption. Your messages stay between you.
+              Sign in securely to access your encrypted conversations, calls, and shared media across all your devices.
             </p>
             <div className="grid grid-cols-1 gap-3">
               {[
@@ -617,15 +306,9 @@ export default function PersonalSignUpScreen() {
 
         {/* Right form column */}
         <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-12 lg:w-7/12 xl:w-1/2 lg:px-20 xl:px-28 bg-white relative">
-
-          {/* Top bar */}
           <div className="absolute top-6 left-6 sm:left-12 flex items-center justify-between w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)]">
             <button
-              onClick={() =>
-                step === "OTP"
-                  ? setStep("PHONE")
-                  : router.back()
-              }
+              onClick={() => (step === "OTP" ? setStep("PHONE") : router.back())}
               className="flex items-center gap-2 text-sm font-semibold text-[#102A63] hover:text-primary transition-colors"
             >
               <ChevronLeft className="h-4 w-4" /> Back
@@ -644,32 +327,28 @@ export default function PersonalSignUpScreen() {
           </div>
 
           <div className="mx-auto w-full max-w-md space-y-8 my-auto pt-8">
-
-            {/* Step indicator */}
             <div className="flex items-center gap-2">
-              {["PHONE", "OTP", "PROFILE"].map((s, i) => (
-                <React.Fragment key={s}>
-                  <div
-                    className={cn(
-                      "h-1.5 flex-1 rounded-full transition-all duration-300",
-                      ["PHONE", "OTP", "PROFILE"].indexOf(step) >= i
-                        ? "bg-primary"
-                        : "bg-slate-200"
-                    )}
-                  />
-                </React.Fragment>
+              {["PHONE", "OTP"].map((s, i) => (
+                <div
+                  key={s}
+                  className={cn(
+                    "h-1.5 flex-1 rounded-full transition-all duration-300",
+                    ["PHONE", "OTP"].indexOf(step) >= i
+                      ? "bg-primary"
+                      : "bg-slate-200"
+                  )}
+                />
               ))}
             </div>
 
-            {/* ── STEP: PHONE ─────────────────────────────────────────── */}
             {step === "PHONE" && (
               <div className="space-y-6">
                 <div className="space-y-1">
                   <h2 className="text-2xl font-extrabold text-[#0A2540]">
-                    Create Personal Account
+                    Login to Personal Account
                   </h2>
                   <p className="text-sm text-slate-500">
-                    Enter your phone number to get started
+                    Enter your registered phone number to sign in
                   </p>
                 </div>
 
@@ -678,7 +357,6 @@ export default function PersonalSignUpScreen() {
                     Phone number
                   </label>
                   <div className="flex items-center gap-3">
-                    {/* Country selector */}
                     <div className="relative" ref={dropdownRef}>
                       <button
                         type="button"
@@ -782,18 +460,17 @@ export default function PersonalSignUpScreen() {
                 </button>
 
                 <p className="text-center text-sm text-slate-500">
-                  Already have an account?{" "}
+                  Don&apos;t have a Personal account?{" "}
                   <Link
-                    href="/auth/personal/login"
+                    href="/auth/personal/signup"
                     className="font-bold text-blue-600 hover:underline"
                   >
-                    Log in
+                    Sign up
                   </Link>
                 </p>
               </div>
             )}
 
-            {/* ── STEP: OTP ───────────────────────────────────────────── */}
             {step === "OTP" && (
               <div className="space-y-6">
                 <div className="space-y-1">
@@ -801,7 +478,7 @@ export default function PersonalSignUpScreen() {
                     Verify Your Phone
                   </h2>
                   <p className="text-sm text-slate-500">
-                    We sent a 6-digit code to{" "}
+                    Enter the verification code sent to{" "}
                     <span className="font-bold text-slate-700">{sentPhone}</span>
                   </p>
                 </div>
@@ -810,7 +487,7 @@ export default function PersonalSignUpScreen() {
                   {otp.map((digit, idx) => (
                     <input
                       key={idx}
-                      id={`p-otp-${idx}`}
+                      id={`pl-otp-${idx}`}
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -820,7 +497,7 @@ export default function PersonalSignUpScreen() {
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                       onPaste={handleOtpPaste}
-                      className="h-12 w-10 sm:h-14 sm:w-12 rounded-xl border border-indigo-100 bg-[#EEF2FF] text-center text-xl font-bold text-[#1E293B] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="h-12 w-10 sm:h-14 sm:w-12 rounded-xl border border-indigo-100 bg-indigo-50/50 text-center text-xl font-bold text-[#1E293B] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   ))}
                 </div>
@@ -829,7 +506,8 @@ export default function PersonalSignUpScreen() {
                   Didn&apos;t receive the code?{" "}
                   {timer > 0 ? (
                     <span className="font-bold text-blue-400 cursor-not-allowed">
-                      Resend ({Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, "0")})
+                      Resend ({Math.floor(timer / 60)}:
+                      {(timer % 60).toString().padStart(2, "0")})
                     </span>
                   ) : (
                     <button
@@ -860,7 +538,7 @@ export default function PersonalSignUpScreen() {
                       Verifying…
                     </span>
                   ) : (
-                    "Verify & Continue"
+                    "Verify & Login"
                   )}
                 </button>
               </div>

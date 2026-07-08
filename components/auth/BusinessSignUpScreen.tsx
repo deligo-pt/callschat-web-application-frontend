@@ -363,7 +363,7 @@ export default function BusinessSignUpScreen() {
 
                 <p className="text-center text-sm text-slate-500">
                   Already have an account?{" "}
-                  <Link href="/login" className="font-bold text-purple-600 hover:underline">Log in</Link>
+                  <Link href="/auth/business/login" className="font-bold text-purple-600 hover:underline">Log in</Link>
                 </p>
               </div>
             )}

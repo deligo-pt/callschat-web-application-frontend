@@ -59,11 +59,6 @@ export const BusinessService = {
     return response.data;
   },
 
-  switchMode: async (mode: 'PERSONAL' | 'BUSINESS') => {
-    const response = await apiClient.post('/business/switch-mode', { mode });
-    return response.data;
-  },
-
   getProfile: async (): Promise<{ success: boolean; data: BusinessProfileData }> => {
     const response = await apiClient.get('/business/profile');
     return response.data;

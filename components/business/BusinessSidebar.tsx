@@ -53,18 +53,14 @@ export function BusinessSidebar() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const fetchChannels = useCallback(async () => {
-    if (!workspace?.id) {
-      setIsLoadingChannels(false);
-      return;
-    }
     try {
       setIsLoadingChannels(true);
-      const res = await ChannelService.getChannels(workspace.id);
+      const res = await ChannelService.getChannels(workspace?.id || null);
       if (res?.success && Array.isArray(res.data)) {
         setChannels(res.data);
       }
     } catch (err) {
-      console.error("Failed to load workspace channels", err);
+      console.error("Failed to load business channels", err);
     } finally {
       setIsLoadingChannels(false);
     }
@@ -101,6 +97,17 @@ export function BusinessSidebar() {
 
   return (
     <div className="flex h-full w-full flex-col bg-[#11142D] text-[#CBD5E1] select-none">
+      {/* Back to Chats Inbox Bar */}
+      <div className="flex items-center justify-between bg-[#0B0D1E] px-4 py-2 border-b border-white/10 text-xs font-semibold text-[#8F95B2] shrink-0">
+        <button
+          onClick={() => router.push("/chats")}
+          className="flex items-center gap-1.5 hover:text-white transition-colors"
+        >
+          ← Back to All Messages
+        </button>
+        <span className="text-purple-400 font-bold">Business Channels</span>
+      </div>
+
       {/* Workspace Header & Settings Dropdown Trigger */}
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 shrink-0 hover:bg-white/5 transition-colors cursor-pointer group">
         <div className="flex items-center gap-3 overflow-hidden">
@@ -279,20 +286,18 @@ export function BusinessSidebar() {
       </div>
 
       {/* Channel Creation Modal */}
+      <CreateChannelModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        workspaceId={workspace?.id || null}
+        onChannelCreated={fetchChannels}
+      />
       {workspace?.id && (
-        <>
-          <CreateChannelModal
-            isOpen={isCreateModalOpen}
-            onClose={() => setIsCreateModalOpen(false)}
-            workspaceId={workspace.id}
-            onChannelCreated={fetchChannels}
-          />
-          <InviteMemberModal
-            isOpen={isInviteModalOpen}
-            onClose={() => setIsInviteModalOpen(false)}
-            workspaceId={workspace.id}
-          />
-        </>
+        <InviteMemberModal
+          isOpen={isInviteModalOpen}
+          onClose={() => setIsInviteModalOpen(false)}
+          workspaceId={workspace.id}
+        />
       )}
     </div>
   );

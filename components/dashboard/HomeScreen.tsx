@@ -7,6 +7,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
 
 // --- Types for Real-Time Data ---
 interface ActiveUser {
@@ -113,9 +114,9 @@ export default function HomeScreen() {
         <div className="px-6 pb-4 pt-10 md:pt-8">
           <div className="flex items-center justify-between">
             <h1 className="text-[26px] font-bold tracking-tight text-[#3B58F5]">
-              Chats
+              CallsChat
             </h1>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {/* Star/Story Icon */}
               <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
                 <Star className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
@@ -124,6 +125,7 @@ export default function HomeScreen() {
               
               {/* Notification Bell */}
               <NotificationDropdown />
+              <BusinessFeaturesMenu />
             </div>
           </div>
 

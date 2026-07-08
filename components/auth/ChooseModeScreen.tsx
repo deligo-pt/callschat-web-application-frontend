@@ -39,16 +39,27 @@ function BusinessFeatureItem({ label }: { label: string }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function ChooseModeScreen() {
+interface ChooseModeScreenProps {
+  authType?: "login" | "signup";
+}
+
+export default function ChooseModeScreen({ authType = "signup" }: ChooseModeScreenProps) {
   const router = useRouter();
   const [selectedMode, setSelectedMode] = React.useState<"PERSONAL" | "BUSINESS" | null>(null);
+
+  const isLogin = authType === "login";
 
   const handleContinue = () => {
     if (!selectedMode) return;
     sessionStorage.setItem("auth_account_mode", selectedMode);
     localStorage.setItem("auth_account_mode", selectedMode);
     localStorage.setItem("currentMode", selectedMode);
-    router.push("/signup");
+    
+    if (isLogin) {
+      router.push(selectedMode === "BUSINESS" ? "/auth/business/login" : "/auth/personal/login");
+    } else {
+      router.push(selectedMode === "BUSINESS" ? "/auth/business/signup" : "/auth/personal/signup");
+    }
   };
 
   return (
@@ -82,7 +93,9 @@ export default function ChooseModeScreen() {
             </h1>
 
             <p className="text-base text-blue-100/90 leading-relaxed font-normal">
-              Select your account type at sign-up to unlock the right experience for you — whether you&apos;re connecting with loved ones or running a business communication suite.
+              {isLogin
+                ? "Select your account type to sign in to your workspace or personal inbox — whether connecting with loved ones or managing business communications."
+                : "Select your account type at sign-up to unlock the right experience for you — whether you're connecting with loved ones or running a business communication suite."}
             </p>
 
             <div className="grid grid-cols-1 gap-4 pt-4">
@@ -138,10 +151,10 @@ export default function ChooseModeScreen() {
           <div className="mx-auto w-full max-w-lg space-y-8 my-auto pt-8">
             <div className="space-y-2">
               <h2 className="text-3xl font-extrabold tracking-tight text-[#0A2540]">
-                Choose Your Mode
+                {isLogin ? "Choose Login Mode" : "Choose Your Mode"}
               </h2>
               <p className="text-sm text-[#64748B] leading-relaxed">
-                Select how you&apos;ll use CallsChat
+                {isLogin ? "Select which account type you want to sign in to" : "Select how you'll use CallsChat"}
               </p>
             </div>
 
@@ -254,6 +267,17 @@ export default function ChooseModeScreen() {
                 Continue
                 <ArrowRight className="h-4 w-4" />
               </button>
+            </div>
+
+            {/* Switch between Login and Sign up */}
+            <div className="pt-4 text-center text-sm font-medium text-slate-500">
+              {isLogin ? "Don't have an account yet? " : "Already have an account? "}
+              <Link
+                href={isLogin ? "/signup" : "/login"}
+                className="font-bold text-blue-600 hover:underline transition-colors ml-1"
+              >
+                {isLogin ? "Sign up" : "Log in"}
+              </Link>
             </div>
           </div>
         </div>
