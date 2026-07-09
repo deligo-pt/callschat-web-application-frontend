@@ -36,6 +36,7 @@ import {
   Play,
   Edit2,
   PinOff,
+  Phone,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -95,12 +96,15 @@ export function BusinessChannelsModal({
   // Step 3 Invite Members
   const [contacts, setContacts] = useState<any[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [selectedPhones, setSelectedPhones] = useState<string[]>([]);
   const [contactSearch, setContactSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- Live Room State ---
   const [messages, setMessages] = useState<ChannelMessageData[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [channelMembers, setChannelMembers] = useState<any[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [blastMessage, setBlastMessage] = useState("");
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [showMediaInput, setShowMediaInput] = useState(false);
@@ -119,6 +123,14 @@ export function BusinessChannelsModal({
   const [editPostContent, setEditPostContent] = useState("");
   const [isUpdatingPost, setIsUpdatingPost] = useState(false);
   const [isDeletingPostId, setIsDeletingPostId] = useState<string | null>(null);
+
+  // --- Member Actions State ---
+  const [openMemberMenuId, setOpenMemberMenuId] = useState<string | null>(null);
+  const [isUpdatingMember, setIsUpdatingMember] = useState(false);
+  const [showInviteMembers, setShowInviteMembers] = useState(false);
+  const [inviteContactSearch, setInviteContactSearch] = useState("");
+  const [inviteSelectedMemberIds, setInviteSelectedMemberIds] = useState<string[]>([]);
+  const [inviteSelectedPhones, setInviteSelectedPhones] = useState<string[]>([]);
 
   // --- Edit Settings State ---
   const [editName, setEditName] = useState("");
@@ -147,9 +159,10 @@ export function BusinessChannelsModal({
 
   const fetchContactsForInvite = useCallback(async () => {
     try {
-      const [contactsRes, convsRes] = await Promise.all([
+      const [contactsRes, convsRes, unregRes] = await Promise.all([
         ContactService.fetchContacts().catch(() => ({ data: [] })),
         chatService.fetchMyConversations().catch(() => ({ data: [] })),
+        ContactService.listUnregisteredContacts({ limit: 100 }).catch(() => ({ data: { items: [] } })),
       ]);
 
       const map = new Map<string, any>();
@@ -172,6 +185,18 @@ export function BusinessChannelsModal({
               id: c.otherUserId,
               name: c.otherUserName || "Conversation User",
               avatarUrl: c.otherUserAvatar || null,
+            });
+          }
+        });
+      }
+      if (Array.isArray(unregRes?.data?.items)) {
+        unregRes.data.items.forEach((c: any) => {
+          if (c.phoneNumber) {
+            map.set(c.phoneNumber, {
+              id: c.phoneNumber, // Use phone number as ID to distinguish
+              name: c.name || c.phoneNumber,
+              avatarUrl: null,
+              isPhoneOnly: true,
             });
           }
         });
@@ -208,6 +233,20 @@ export function BusinessChannelsModal({
     }
   }, []);
 
+  const fetchChannelMembers = useCallback(async (channelId: string) => {
+    try {
+      setIsLoadingMembers(true);
+      const res = await ChannelService.getChannelMembers(channelId);
+      if (res?.success && Array.isArray(res.data)) {
+        setChannelMembers(res.data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch channel members", e);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!initialChannelId) return;
     const initChannelById = async () => {
@@ -226,6 +265,7 @@ export function BusinessChannelsModal({
           setEditWhoCanPost((found.whoCanPost as any) || "ADMIN_ONLY");
           setEditEnableReactions(found.enableReactions ?? true);
           fetchChannelMessages(found.id);
+          fetchChannelMembers(found.id);
         }
       } else if (!isLoadingChannels) {
         try {
@@ -244,6 +284,7 @@ export function BusinessChannelsModal({
             setEditWhoCanPost((ch.whoCanPost as any) || "ADMIN_ONLY");
             setEditEnableReactions(ch.enableReactions ?? true);
             fetchChannelMessages(ch.id);
+            fetchChannelMembers(ch.id);
           }
         } catch (err) {
           console.error("Failed to fetch initial channel by ID", err);
@@ -313,6 +354,7 @@ export function BusinessChannelsModal({
         enableReactions,
         defaultNotification,
         memberIds: selectedMemberIds,
+        phones: selectedPhones,
         isPrivate: whoCanJoin === "INVITE_ONLY",
       });
 
@@ -343,6 +385,8 @@ export function BusinessChannelsModal({
     setEnableReactions(true);
     setDefaultNotification("ALL_MESSAGES");
     setSelectedMemberIds([]);
+    setSelectedPhones([]);
+    setContactSearch("");
   };
 
   const handleSelectChannelToRoom = (ch: ChannelData) => {
@@ -362,6 +406,7 @@ export function BusinessChannelsModal({
     setEditWhoCanPost((ch.whoCanPost as any) || "ADMIN_ONLY");
     setEditEnableReactions(ch.enableReactions ?? true);
     fetchChannelMessages(ch.id);
+    fetchChannelMembers(ch.id);
   };
 
   const handleSendBlast = async (e: React.FormEvent) => {
@@ -493,6 +538,61 @@ export function BusinessChannelsModal({
     }
   };
 
+  const handleUpdateMemberRole = async (memberId: string, role: "MEMBER" | "MODERATOR" | "ADMIN") => {
+    if (!selectedChannel) return;
+    try {
+      setIsUpdatingMember(true);
+      const res = await ChannelService.updateChannelMemberRole(selectedChannel.id, memberId, role);
+      if (res?.success) {
+        setChannelMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, role } : m)));
+        toast.success(`Role updated to ${role}`);
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error?.message || "Failed to update role");
+    } finally {
+      setIsUpdatingMember(false);
+      setOpenMemberMenuId(null);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!selectedChannel) return;
+    if (!confirm("Are you sure you want to remove this member?")) return;
+    try {
+      setIsUpdatingMember(true);
+      const res = await ChannelService.removeChannelMember(selectedChannel.id, memberId);
+      if (res?.success) {
+        setChannelMembers((prev) => prev.filter((m) => m.id !== memberId));
+        toast.success("Member removed successfully");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error?.message || "Failed to remove member");
+    } finally {
+      setIsUpdatingMember(false);
+      setOpenMemberMenuId(null);
+    }
+  };
+
+  const handleInviteMembersToExistingChannel = async () => {
+    if (!selectedChannel || (inviteSelectedMemberIds.length === 0 && inviteSelectedPhones.length === 0)) return;
+    try {
+      setIsUpdatingMember(true);
+      const res = await ChannelService.addChannelMembers(selectedChannel.id, inviteSelectedMemberIds, inviteSelectedPhones);
+      if (res?.success) {
+        toast.success("Members invited successfully");
+        fetchChannelMembers(selectedChannel.id);
+        setShowInviteMembers(false);
+        setInviteSelectedMemberIds([]);
+        setInviteSelectedPhones([]);
+        setInviteContactSearch("");
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to invite members");
+    } finally {
+      setIsUpdatingMember(false);
+    }
+  };
+
   const handleOpenSettings = (ch: ChannelData) => {
     setSelectedChannel(ch);
     setEditName(ch.name);
@@ -555,6 +655,12 @@ export function BusinessChannelsModal({
 
   const filteredContacts = contacts.filter((c) =>
     c.name.toLowerCase().includes(contactSearch.toLowerCase())
+  );
+
+  const inviteFilteredContacts = contacts.filter(
+    (c) =>
+      c.name.toLowerCase().includes(inviteContactSearch.toLowerCase()) &&
+      !channelMembers.some((m) => m.id === c.id)
   );
 
   const modalContent = (
@@ -962,9 +1068,67 @@ export function BusinessChannelsModal({
 
                     {/* Contacts List with Round Circles */}
                     <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
-                      {filteredContacts.length === 0 ? (
+                      {contactSearch.match(/^\+?[1-9]\d{1,14}$/) && (
+                        <div
+                          onClick={() => {
+                            if (selectedPhones.includes(contactSearch)) {
+                              setSelectedPhones((prev) => prev.filter((p) => p !== contactSearch));
+                            } else {
+                              setSelectedPhones((prev) => [...prev, contactSearch]);
+                            }
+                          }}
+                          className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-3.5">
+                            <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                              <Phone className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <span className="block text-sm font-bold text-[#11142D]">{contactSearch}</span>
+                              <span className="block text-[10px] text-slate-500">Invite by phone number</span>
+                            </div>
+                          </div>
+                          <div className="shrink-0">
+                            {selectedPhones.includes(contactSearch) ? (
+                              <div className="h-6 w-6 rounded-full bg-[#3B58F5] text-white flex items-center justify-center shadow-xs">
+                                <Check className="h-3.5 w-3.5 stroke-[3]" />
+                              </div>
+                            ) : (
+                              <div className="h-6 w-6 rounded-full border-2 border-slate-300" />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedPhones.map((p) => {
+                        if (p === contactSearch) return null;
+                        return (
+                          <div
+                            key={p}
+                            onClick={() => setSelectedPhones((prev) => prev.filter((phone) => phone !== p))}
+                            className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center gap-3.5">
+                              <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                                <Phone className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <span className="block text-sm font-bold text-[#11142D]">{p}</span>
+                                <span className="block text-[10px] text-slate-500">Invite by phone number</span>
+                              </div>
+                            </div>
+                            <div className="shrink-0">
+                              <div className="h-6 w-6 rounded-full bg-[#3B58F5] text-white flex items-center justify-center shadow-xs">
+                                <Check className="h-3.5 w-3.5 stroke-[3]" />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {filteredContacts.length === 0 && !contactSearch.match(/^\+?[1-9]\d{1,14}$/) && selectedPhones.length === 0 ? (
                         <div className="py-12 text-center text-xs font-semibold text-slate-400">
-                          No contacts found. You can invite people anytime after creating the channel!
+                          No contacts found. Type a phone number to invite by phone.
                         </div>
                       ) : (
                         filteredContacts.map((c) => {
@@ -1643,73 +1807,21 @@ export function BusinessChannelsModal({
                             </div>
                           ))}
 
-                          {/* Sample Post 1 (Pinned) - Exact match to Figma screenshot when no/few messages */}
+                          {/* Empty State */}
                           {messages.length === 0 && (
-                            <>
-                              <div className="border border-slate-200 rounded-2xl p-5 bg-white shadow-2xs space-y-3.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-600 tracking-wide">
-                                    <Pin className="h-3.5 w-3.5 fill-current" />
-                                    PINNED POST
-                                  </span>
-                                  <button className="text-slate-400 hover:text-slate-600 p-1">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </button>
-                                </div>
-
-                                <p className="text-sm font-medium text-[#11142D] leading-relaxed">
-                                  🚀 Exciting news! We're launching our new product dashboard next week. Stay tuned for a
-                                  full feature reveal with screenshots and a live demo!
-                                </p>
-
-                                <div className="flex items-center justify-between text-xs text-slate-400 font-medium pt-1">
-                                  <span>👁️ 1,240</span>
-                                  <span>2h ago</span>
-                                </div>
-
-                                <div className="border-t border-slate-100 pt-3 grid grid-cols-2 text-xs font-bold text-slate-500">
-                                  <button className="flex items-center justify-center gap-1.5 hover:text-red-500 transition-colors py-1">
-                                    <Heart className="h-4 w-4" />
-                                    <span>89</span>
-                                  </button>
-                                  <button className="flex items-center justify-center gap-1.5 hover:text-indigo-600 transition-colors py-1">
-                                    <Share2 className="h-4 w-4" />
-                                    <span>Share</span>
-                                  </button>
-                                </div>
+                            <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+                              <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center">
+                                <MessageSquare className="h-8 w-8 text-slate-300" />
                               </div>
-
-                              {/* Sample Post 2 */}
-                              <div className="border border-slate-200 rounded-2xl p-5 bg-white shadow-2xs space-y-3.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold text-slate-400">QUARTERLY UPDATE</span>
-                                  <button className="text-slate-400 hover:text-slate-600 p-1">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </button>
-                                </div>
-
-                                <p className="text-sm font-medium text-[#11142D] leading-relaxed">
-                                  📊 Q3 results are in! We've achieved 40% growth in user engagement this quarter. Thank
-                                  you all for your incredible support — you make this possible.
+                              <div>
+                                <h3 className="text-sm font-bold text-[#11142D]">No posts yet</h3>
+                                <p className="text-xs font-medium text-slate-400 mt-1 max-w-[250px]">
+                                  {selectedChannel.myRole === 'ADMIN' || selectedChannel.myRole === 'MODERATOR' 
+                                    ? "Create the first post to welcome your members to this channel."
+                                    : "There are no posts in this channel yet."}
                                 </p>
-
-                                <div className="flex items-center justify-between text-xs text-slate-400 font-medium pt-1">
-                                  <span>👁️ 890</span>
-                                  <span>Yesterday</span>
-                                </div>
-
-                                <div className="border-t border-slate-100 pt-3 grid grid-cols-2 text-xs font-bold text-slate-500">
-                                  <button className="flex items-center justify-center gap-1.5 hover:text-red-500 transition-colors py-1">
-                                    <Heart className="h-4 w-4" />
-                                    <span>156</span>
-                                  </button>
-                                  <button className="flex items-center justify-center gap-1.5 hover:text-indigo-600 transition-colors py-1">
-                                    <Share2 className="h-4 w-4" />
-                                    <span>Share</span>
-                                  </button>
-                                </div>
                               </div>
-                            </>
+                            </div>
                           )}
                         </div>
                       )}
@@ -1721,22 +1833,177 @@ export function BusinessChannelsModal({
                     <div className="space-y-4 max-w-xl mx-auto">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-extrabold text-[#11142D]">
-                          Subscribers & Moderators ({(selectedChannel.memberCount || 1).toLocaleString()})
+                          Subscribers & Moderators ({(channelMembers.length || 1).toLocaleString()})
                         </span>
-                        <button
-                          onClick={() => {
-                            handleResetWizard();
-                            setActiveTab("create");
-                            setStep(3);
-                          }}
-                          className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-all"
-                        >
-                          <Plus className="h-3.5 w-3.5 stroke-[3]" />
-                          <span>Invite Members</span>
-                        </button>
+                        {selectedChannel.myRole === 'ADMIN' && (
+                          !showInviteMembers ? (
+                            <button
+                              onClick={() => setShowInviteMembers(true)}
+                              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-all"
+                            >
+                              <Plus className="h-3.5 w-3.5 stroke-[3]" />
+                              <span>Invite Members</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setShowInviteMembers(false)}
+                              className="text-xs font-bold text-slate-500 hover:text-slate-700"
+                            >
+                              Cancel
+                            </button>
+                          )
+                        )}
                       </div>
 
-                      <div className="relative">
+                      {showInviteMembers && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
+                          <h4 className="text-sm font-bold text-[#11142D]">Invite Contacts</h4>
+                          <div className="relative">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <input
+                              type="text"
+                              placeholder="Search contacts..."
+                              value={inviteContactSearch}
+                              onChange={(e) => setInviteContactSearch(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2.5 text-xs font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none bg-white"
+                            />
+                          </div>
+
+                          <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                            {inviteContactSearch.match(/^\+?[1-9]\d{1,14}$/) && (
+                              <div
+                                onClick={() => {
+                                  if (inviteSelectedPhones.includes(inviteContactSearch)) {
+                                    setInviteSelectedPhones((prev) => prev.filter((p) => p !== inviteContactSearch));
+                                  } else {
+                                    setInviteSelectedPhones((prev) => [...prev, inviteContactSearch]);
+                                  }
+                                }}
+                                className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors bg-white border border-slate-100 shadow-2xs"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
+                                    <Phone className="h-4 w-4" />
+                                  </div>
+                                  <div>
+                                    <span className="block text-xs font-bold text-[#11142D]">{inviteContactSearch}</span>
+                                    <span className="block text-[10px] text-slate-500">Invite by phone number</span>
+                                  </div>
+                                </div>
+                                <div className="shrink-0">
+                                  {inviteSelectedPhones.includes(inviteContactSearch) ? (
+                                    <div className="h-5 w-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                      <Check className="h-3 w-3 stroke-[3]" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-5 w-5 rounded-full border-2 border-slate-300" />
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {inviteSelectedPhones.map((p) => {
+                              if (p === inviteContactSearch) return null;
+                              return (
+                                <div
+                                  key={p}
+                                  onClick={() => setInviteSelectedPhones((prev) => prev.filter((phone) => phone !== p))}
+                                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors bg-white border border-slate-100 shadow-2xs"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
+                                      <Phone className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                      <span className="block text-xs font-bold text-[#11142D]">{p}</span>
+                                      <span className="block text-[10px] text-slate-500">Invite by phone number</span>
+                                    </div>
+                                  </div>
+                                  <div className="shrink-0">
+                                    <div className="h-5 w-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                      <Check className="h-3 w-3 stroke-[3]" />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {inviteFilteredContacts.length === 0 && !inviteContactSearch.match(/^\+?[1-9]\d{1,14}$/) && inviteSelectedPhones.length === 0 ? (
+                              <div className="py-4 text-center text-xs font-semibold text-slate-400">
+                                No new contacts found to invite. Type a valid phone number to invite by phone.
+                              </div>
+                            ) : (
+                              inviteFilteredContacts.map((c) => {
+                                const isSelected = c.isPhoneOnly 
+                                  ? inviteSelectedPhones.includes(c.id) 
+                                  : inviteSelectedMemberIds.includes(c.id);
+                                return (
+                                  <div
+                                    key={c.id}
+                                    onClick={() => {
+                                      if (c.isPhoneOnly) {
+                                        if (isSelected) {
+                                          setInviteSelectedPhones((prev) => prev.filter((p) => p !== c.id));
+                                        } else {
+                                          setInviteSelectedPhones((prev) => [...prev, c.id]);
+                                        }
+                                      } else {
+                                        if (isSelected) {
+                                          setInviteSelectedMemberIds((prev) => prev.filter((id) => id !== c.id));
+                                        } else {
+                                          setInviteSelectedMemberIds((prev) => [...prev, c.id]);
+                                        }
+                                      }
+                                    }}
+                                    className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors bg-white border border-slate-100 shadow-2xs"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="h-8 w-8 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
+                                        {c.avatarUrl ? (
+                                          <img src={c.avatarUrl} alt={c.name} className="h-full w-full object-cover" />
+                                        ) : (
+                                          <span>{c.name.charAt(0).toUpperCase()}</span>
+                                        )}
+                                      </div>
+                                      <span className="text-xs font-bold text-[#11142D]">{c.name}</span>
+                                    </div>
+                                    <div className="shrink-0">
+                                      {isSelected ? (
+                                        <div className="h-5 w-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                          <Check className="h-3 w-3 stroke-[3]" />
+                                        </div>
+                                      ) : (
+                                        <div className="h-5 w-5 rounded-full border-2 border-slate-300" />
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {(inviteSelectedMemberIds.length > 0 || inviteSelectedPhones.length > 0) && (
+                            <button
+                              onClick={handleInviteMembersToExistingChannel}
+                              disabled={isUpdatingMember}
+                              className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md"
+                            >
+                              {isUpdatingMember ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Plus className="h-4 w-4 stroke-[3]" />
+                                  Invite {inviteSelectedMemberIds.length + inviteSelectedPhones.length} Members
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {!showInviteMembers && (
+                        <>
+                          <div className="relative">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input
                           type="text"
@@ -1746,37 +2013,93 @@ export function BusinessChannelsModal({
                       </div>
 
                       <div className="space-y-2">
-                        {[
-                          { id: "owner-1", name: "You (Admin)", role: "OWNER & ADMIN", avatar: selectedChannel.avatarUrl },
-                          { id: "admin-2", name: "Sarah Jenkins", role: "MODERATOR", avatar: null },
-                          { id: "sub-3", name: "Alexander Wright", role: "SUBSCRIBER", avatar: null },
-                          { id: "sub-4", name: "David Kim", role: "SUBSCRIBER", avatar: null },
-                          { id: "sub-5", name: "Emily Watson", role: "SUBSCRIBER", avatar: null },
-                        ].map((m) => (
-                          <div
-                            key={m.id}
-                            className="flex items-center justify-between p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0 overflow-hidden">
-                                {m.avatar ? (
-                                  <img src={m.avatar} alt="" className="h-full w-full object-cover" />
-                                ) : (
-                                  <span>{m.name.charAt(0)}</span>
-                                )}
-                              </div>
-                              <div>
-                                <span className="block text-xs font-bold text-[#11142D]">{m.name}</span>
-                                <span className="block text-[10px] font-extrabold text-indigo-600 mt-0.5">{m.role}</span>
-                              </div>
-                            </div>
-
-                            <button className="text-slate-400 hover:text-slate-700 p-1">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </button>
+                        {isLoadingMembers ? (
+                          <div className="flex justify-center py-6">
+                            <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
                           </div>
-                        ))}
+                        ) : (
+                          channelMembers.map((m) => (
+                            <div
+                              key={m.id}
+                              className="flex items-center justify-between p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs relative"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0 overflow-hidden">
+                                  {m.avatarUrl ? (
+                                    <img src={m.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span>{m.name.charAt(0)}</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <span className="block text-xs font-bold text-[#11142D]">{m.name} {selectedChannel.ownerId === m.id ? "(Owner)" : ""}</span>
+                                  <span className="block text-[10px] font-extrabold text-indigo-600 mt-0.5">{m.role}</span>
+                                </div>
+                              </div>
+
+                              {selectedChannel.ownerId !== m.id && selectedChannel.myRole === 'ADMIN' && (
+                                <div className="relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenMemberMenuId(openMemberMenuId === m.id ? null : m.id)}
+                                    className="text-slate-400 hover:text-slate-700 p-1"
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </button>
+
+                                  <AnimatePresence>
+                                    {openMemberMenuId === m.id && (
+                                      <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                                        className="absolute right-0 top-8 z-50 w-44 bg-white rounded-2xl border border-slate-200 shadow-xl py-1.5 text-xs font-bold text-[#11142D]"
+                                      >
+                                        {m.role === "MEMBER" && (
+                                          <button
+                                            type="button"
+                                            disabled={isUpdatingMember}
+                                            onClick={() => handleUpdateMemberRole(m.id, "MODERATOR")}
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-50 transition-colors text-left"
+                                          >
+                                            <span>Make Moderator</span>
+                                          </button>
+                                        )}
+                                        {m.role === "MODERATOR" && (
+                                          <button
+                                            type="button"
+                                            disabled={isUpdatingMember}
+                                            onClick={() => handleUpdateMemberRole(m.id, "MEMBER")}
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-50 transition-colors text-left"
+                                          >
+                                            <span>Remove Moderator</span>
+                                          </button>
+                                        )}
+                                        <div className="border-t border-slate-100 my-1" />
+                                        <button
+                                          type="button"
+                                          disabled={isUpdatingMember}
+                                          onClick={() => handleRemoveMember(m.id)}
+                                          className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-red-50 text-red-600 transition-colors text-left"
+                                        >
+                                          {isUpdatingMember ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          )}
+                                          <span>Remove Member</span>
+                                        </button>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
                       </div>
+                        </>
+                      )}
                     </div>
                   )}
 

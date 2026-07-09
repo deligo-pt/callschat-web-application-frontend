@@ -32,6 +32,7 @@ export interface CreateChannelPayload {
   enableReactions?: boolean;
   defaultNotification?: string;
   memberIds?: string[];
+  phones?: string[];
   isPrivate?: boolean;
   workspaceId?: string | null;
 }
@@ -109,8 +110,8 @@ export const ChannelService = {
     return response.data;
   },
 
-  addChannelMembers: async (channelId: string, memberIds: string[]): Promise<{ success: boolean }> => {
-    const response = await apiClient.post(`/business/channels/${channelId}/members`, { memberIds });
+  addChannelMembers: async (channelId: string, memberIds: string[], phones?: string[]): Promise<{ success: boolean }> => {
+    const response = await apiClient.post(`/business/channels/${channelId}/members`, { memberIds, phones });
     return response.data;
   },
 
@@ -159,6 +160,23 @@ export const ChannelService = {
     messageId: string
   ): Promise<{ success: boolean; message: string }> => {
     const response = await apiClient.delete(`/business/channels/${channelId}/messages/${messageId}`);
+    return response.data;
+  },
+
+  updateChannelMemberRole: async (
+    channelId: string,
+    memberUserId: string,
+    role: 'MEMBER' | 'MODERATOR' | 'ADMIN'
+  ): Promise<{ success: boolean }> => {
+    const response = await apiClient.patch(`/business/channels/${channelId}/members/${memberUserId}`, { role });
+    return response.data;
+  },
+
+  removeChannelMember: async (
+    channelId: string,
+    memberUserId: string
+  ): Promise<{ success: boolean }> => {
+    const response = await apiClient.delete(`/business/channels/${channelId}/members/${memberUserId}`);
     return response.data;
   },
 };

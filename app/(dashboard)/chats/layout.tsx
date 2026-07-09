@@ -390,7 +390,9 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                   </Link>
 
                   <NotificationDropdown />
-                  <BusinessFeaturesMenu />
+                  {currentMode === "BUSINESS" && (
+                    <BusinessFeaturesMenu />
+                  )}
                 </div>
               </div>
 
