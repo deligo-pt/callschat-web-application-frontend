@@ -55,6 +55,13 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       case "GROUP_REMOVED":
         // Do nothing (just mark as read)
         break;
+      case "CHANNEL_INVITATION":
+        if (notification.routeId) {
+          router.push(`/business/channels/${notification.routeId}`);
+        } else {
+          router.push(`/business/channels`);
+        }
+        break;
       default:
         break;
     }
@@ -110,6 +117,15 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       textContent = (
         <>
           <span className="font-semibold text-foreground">{issuerName}</span> {t("msg_group_removed")}
+        </>
+      );
+      break;
+    case "CHANNEL_INVITATION":
+      Icon = Users;
+      iconClass = "text-indigo-600";
+      textContent = (
+        <>
+          <span className="font-semibold text-foreground">{issuerName}</span> {notification.content || "invited you to join a channel"}
         </>
       );
       break;

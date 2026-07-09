@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "../ui/button";
 import Modal from "./Modal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,9 +11,31 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const router = useRouter();
 
     const openModal = () => setIsDownloadModalOpen(true);
     const closeModal = () => setIsDownloadModalOpen(false);
+
+    const handleGettingStarted = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+        if (token) {
+            router.push("/chats");
+        } else {
+            router.push("/onboarding");
+        }
+    };
+
+    const handleMobileGettingStarted = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsOpen(false);
+        const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+        if (token) {
+            router.push("/chats");
+        } else {
+            router.push("/onboarding");
+        }
+    };
 
     const navLinks = [
         { label: "Features", href: "/#features" },
@@ -76,7 +99,7 @@ export default function Navbar() {
                     >
                         Download
                     </Button>
-                    <Link href="/onboarding">
+                    <Link href="/onboarding" onClick={handleGettingStarted}>
                         <Button
                             variant="outline"
                             className="rounded-xl border-primary text-primary px-6 py-2.5 text-base font-medium shadow-md transition-all duration-200 hover:bg-primary/10"
@@ -141,7 +164,7 @@ export default function Navbar() {
                                 >
                                     Download
                                 </Button>
-                                <Link href="/onboarding" className="w-full" onClick={() => setIsOpen(false)}>
+                                <Link href="/onboarding" className="w-full" onClick={handleMobileGettingStarted}>
                                     <Button
                                         variant="outline"
                                         className="w-full rounded-xl border-primary text-primary py-3 text-center font-medium shadow-md hover:bg-primary/10"

@@ -37,12 +37,17 @@ import {
   Edit2,
   PinOff,
   Phone,
+  ShieldCheck,
+  Copy,
+  Link as LinkIcon,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ChannelService, type ChannelData, type ChannelMessageData } from "@/services/channel.service";
+import { ChannelService, type ChannelData, type ChannelMessageData, type JoinRequestData, type ChannelInvitationData } from "@/services/channel.service";
 import { ContactService } from "@/services/contact.service";
 import { chatService } from "@/services/chat.service";
+import { cn } from "@/lib/utils";
 import { uploadToCloudinary } from "@/services/business.service";
 
 interface BusinessChannelsModalProps {
@@ -73,8 +78,20 @@ export function BusinessChannelsModal({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"list" | "create" | "room" | "settings">("list");
   const [channels, setChannels] = useState<ChannelData[]>([]);
+  const [myInvitations, setMyInvitations] = useState<ChannelInvitationData[]>([]);
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
   const [isLoadingChannels, setIsLoadingChannels] = useState(true);
   const [selectedChannel, setSelectedChannel] = useState<ChannelData | null>(null);
+
+  const canUserPostInSelectedChannel = React.useMemo(() => {
+    if (!selectedChannel) return false;
+    const role = selectedChannel.myRole || "ADMIN"; // Defaults to ADMIN for channel owners if role is missing
+    if (role === "ADMIN") return true;
+    if (selectedChannel.whoCanPost === "ADMIN_MODERATORS") {
+      return role === "ADMIN" || role === "MODERATOR";
+    }
+    return role === "ADMIN";
+  }, [selectedChannel]);
 
   // --- Create Wizard State (Steps 1 to 4) ---
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -109,7 +126,10 @@ export function BusinessChannelsModal({
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [showMediaInput, setShowMediaInput] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [adminSubTab, setAdminSubTab] = useState<"posts" | "members" | "settings">("posts");
+  const [adminSubTab, setAdminSubTab] = useState<"posts" | "members" | "settings" | "requests">("posts");
+  const [joinRequests, setJoinRequests] = useState<JoinRequestData[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
   const [showPostForm, setShowPostForm] = useState(false);
   const [postType, setPostType] = useState<"image" | "video" | "poll">("image");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
@@ -124,6 +144,17 @@ export function BusinessChannelsModal({
   const [isUpdatingPost, setIsUpdatingPost] = useState(false);
   const [isDeletingPostId, setIsDeletingPostId] = useState<string | null>(null);
 
+  // --- Post Share State ---
+  const [selectedSharePost, setSelectedSharePost] = useState<ChannelMessageData | null>(null);
+  const [shareTab, setShareTab] = useState<"contacts" | "external">("contacts");
+  const [shareContactSearch, setShareContactSearch] = useState("");
+  const [selectedShareContactIds, setSelectedShareContactIds] = useState<string[]>([]);
+  const [sharePhoneInput, setSharePhoneInput] = useState("");
+  const [shareNote, setShareNote] = useState("");
+  const [isSharingPost, setIsSharingPost] = useState(false);
+  const [postShareCounts, setPostShareCounts] = useState<Record<string, number>>({});
+  const viewedMessageIdsRef = useRef<Set<string>>(new Set());
+
   // --- Member Actions State ---
   const [openMemberMenuId, setOpenMemberMenuId] = useState<string | null>(null);
   const [isUpdatingMember, setIsUpdatingMember] = useState(false);
@@ -131,6 +162,9 @@ export function BusinessChannelsModal({
   const [inviteContactSearch, setInviteContactSearch] = useState("");
   const [inviteSelectedMemberIds, setInviteSelectedMemberIds] = useState<string[]>([]);
   const [inviteSelectedPhones, setInviteSelectedPhones] = useState<string[]>([]);
+  const [inviteRole, setInviteRole] = useState<"MEMBER" | "MODERATOR" | "ADMIN">("MEMBER");
+  const [manualPhoneInput, setManualPhoneInput] = useState("");
+  const [inviteManualPhone, setInviteManualPhone] = useState("");
 
   // --- Edit Settings State ---
   const [editName, setEditName] = useState("");
@@ -142,6 +176,7 @@ export function BusinessChannelsModal({
   const [editEnableReactions, setEditEnableReactions] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const fetchChannels = useCallback(async () => {
     try {
@@ -157,50 +192,146 @@ export function BusinessChannelsModal({
     }
   }, []);
 
+  const fetchMyInvitations = useCallback(async () => {
+    try {
+      setIsLoadingInvitations(true);
+      const res = await ChannelService.getMyChannelInvitations();
+      if (res?.success) {
+        setMyInvitations(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load channel invitations", err);
+    } finally {
+      setIsLoadingInvitations(false);
+    }
+  }, []);
+
+  const handleAcceptInvitation = async (invitationId: string) => {
+    try {
+      await ChannelService.acceptChannelInvitation(invitationId);
+      toast.success("Joined channel successfully!");
+      fetchMyInvitations();
+      fetchChannels();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to accept invitation");
+    }
+  };
+
+  const handleRejectInvitation = async (invitationId: string) => {
+    try {
+      await ChannelService.rejectChannelInvitation(invitationId);
+      toast.success("Invitation declined");
+      fetchMyInvitations();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to decline invitation");
+    }
+  };
+
   const fetchContactsForInvite = useCallback(async () => {
     try {
-      const [contactsRes, convsRes, unregRes] = await Promise.all([
-        ContactService.fetchContacts().catch(() => ({ data: [] })),
-        chatService.fetchMyConversations().catch(() => ({ data: [] })),
-        ContactService.listUnregisteredContacts({ limit: 100 }).catch(() => ({ data: { items: [] } })),
+      const [contactsRes, unregRes] = await Promise.all([
+        ContactService.fetchContacts().catch(() => ({ data: { contacts: [] } })),
+        ContactService.listUnregisteredContacts({ limit: 100 }).catch(() => ({ data: { contacts: [] } })),
       ]);
 
       const map = new Map<string, any>();
-      if (Array.isArray(contactsRes?.data)) {
-        contactsRes.data.forEach((c: any) => {
-          if (c.contactUserId || c.userId || c.id) {
-            const id = c.contactUserId || c.userId || c.id;
-            map.set(id, {
-              id,
-              name: c.customName || c.name || c.contactUser?.profile?.displayName || "Contact",
-              avatarUrl: c.avatarUrl || c.contactUser?.profile?.avatarUrl || null,
-            });
-          }
+
+      let contactList: any[] = [];
+      if (Array.isArray(contactsRes)) {
+        contactList = contactsRes;
+      } else if (contactsRes && Array.isArray(contactsRes.data)) {
+        contactList = contactsRes.data;
+      } else if (contactsRes && contactsRes.data && Array.isArray(contactsRes.data.contacts)) {
+        contactList = contactsRes.data.contacts;
+      } else if (contactsRes && contactsRes.data && Array.isArray(contactsRes.data.items)) {
+        contactList = contactsRes.data.items;
+      } else if (contactsRes && Array.isArray(contactsRes.contacts)) {
+        contactList = contactsRes.contacts;
+      } else if (contactsRes && Array.isArray(contactsRes.items)) {
+        contactList = contactsRes.items;
+      }
+
+      const getFullName = (profile: any) => {
+        if (!profile) return "";
+        if (profile.firstName || profile.lastName) {
+          return `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
+        }
+        return profile.displayName || profile.username || "";
+      };
+
+      if (Array.isArray(contactList)) {
+        contactList.forEach((c: any, idx: number) => {
+          const userId =
+            c.contact?.id ||
+            c.addressee?.id ||
+            c.addresseeId ||
+            c.userId ||
+            c.user?.id ||
+            c.contactId ||
+            c.id ||
+            `contact-${idx}`;
+          if (!userId) return;
+          const name =
+            c.customName ||
+            c.nickname ||
+            c.name ||
+            getFullName(c.contact?.profile) ||
+            getFullName(c.addressee?.profile) ||
+            getFullName(c.profile) ||
+            getFullName(c.user?.profile) ||
+            "Contact";
+          const phone =
+            c.contact?.phone ||
+            c.phoneNumber ||
+            c.phone ||
+            c.user?.phone ||
+            c.addressee?.phone ||
+            c.contactPhone ||
+            "";
+          const avatarUrl =
+            c.avatarUrl ||
+            c.contact?.profile?.avatarUrl ||
+            c.addressee?.profile?.avatarUrl ||
+            c.profile?.avatarUrl ||
+            c.user?.profile?.avatarUrl ||
+            null;
+
+          map.set(userId, {
+            id: userId,
+            name,
+            phone,
+            avatarUrl,
+            isPhoneOnly: false,
+          });
         });
       }
-      if (Array.isArray(convsRes?.data)) {
-        convsRes.data.forEach((c: any) => {
-          if (c.otherUserId) {
-            map.set(c.otherUserId, {
-              id: c.otherUserId,
-              name: c.otherUserName || "Conversation User",
-              avatarUrl: c.otherUserAvatar || null,
-            });
-          }
-        });
+
+      let unregList: any[] = [];
+      if (Array.isArray(unregRes)) {
+        unregList = unregRes;
+      } else if (unregRes && Array.isArray(unregRes.data)) {
+        unregList = unregRes.data;
+      } else if (unregRes && unregRes.data && Array.isArray(unregRes.data.contacts)) {
+        unregList = unregRes.data.contacts;
+      } else if (unregRes && Array.isArray((unregRes as any).contacts)) {
+        unregList = (unregRes as any).contacts;
       }
-      if (Array.isArray(unregRes?.data?.items)) {
-        unregRes.data.items.forEach((c: any) => {
-          if (c.phoneNumber) {
-            map.set(c.phoneNumber, {
-              id: c.phoneNumber, // Use phone number as ID to distinguish
-              name: c.name || c.phoneNumber,
+
+      if (Array.isArray(unregList)) {
+        unregList.forEach((c: any) => {
+          const phone = c.phoneNumber || c.phone;
+          if (phone && !map.has(phone)) {
+            map.set(phone, {
+              id: phone,
+              name: c.name || phone,
+              phone: phone,
               avatarUrl: null,
               isPhoneOnly: true,
             });
           }
         });
       }
+
       setContacts(Array.from(map.values()));
     } catch (e) {
       console.error("Failed to load contacts for invite", e);
@@ -208,11 +339,12 @@ export function BusinessChannelsModal({
   }, []);
 
   useEffect(() => {
-    if (isOpen || isEmbedded) {
+    if (isOpen || isEmbedded || step === 3 || showInviteMembers) {
       fetchChannels();
+      fetchMyInvitations();
       fetchContactsForInvite();
     }
-  }, [isOpen, isEmbedded, fetchChannels, fetchContactsForInvite]);
+  }, [isOpen, isEmbedded, step, showInviteMembers, fetchChannels, fetchMyInvitations, fetchContactsForInvite]);
 
   const fetchChannelMessages = useCallback(async (channelId: string) => {
     try {
@@ -247,8 +379,21 @@ export function BusinessChannelsModal({
     }
   }, []);
 
+  const deletedChannelIds = useRef<Set<string>>(new Set());
+  const hasInitializedCreate = useRef(false);
+
   useEffect(() => {
     if (!initialChannelId) return;
+    if (initialChannelId === "create") {
+      if (!hasInitializedCreate.current) {
+        setActiveTab("create");
+        setSelectedChannel(null);
+        hasInitializedCreate.current = true;
+      }
+      return;
+    }
+    if (deletedChannelIds.current.has(initialChannelId)) return;
+
     const initChannelById = async () => {
       const found = channels.find((c) => c.id === initialChannelId);
       if (found) {
@@ -293,6 +438,25 @@ export function BusinessChannelsModal({
     };
     initChannelById();
   }, [initialChannelId, channels, isLoadingChannels, selectedChannel?.id, fetchChannelMessages]);
+
+  useEffect(() => {
+    if (selectedChannel && messages.length > 0) {
+      messages.forEach((msg) => {
+        if (!viewedMessageIdsRef.current.has(msg.id)) {
+          viewedMessageIdsRef.current.add(msg.id);
+          ChannelService.incrementMessageViews(msg.channelId, msg.id)
+            .then((res) => {
+              if (res?.success && res.data?.viewsCount !== undefined) {
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === msg.id ? { ...m, viewsCount: res.data.viewsCount } : m))
+                );
+              }
+            })
+            .catch(() => {});
+        }
+      });
+    }
+  }, [step, selectedChannel, messages]);
 
   if (!isOpen && !isEmbedded) return null;
 
@@ -538,6 +702,137 @@ export function BusinessChannelsModal({
     }
   };
 
+  const handleLikePost = async (msg: ChannelMessageData) => {
+    try {
+      // Optimistic update
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msg.id) return m;
+          const currentLiked = m.isLikedByMe ?? false;
+          const currentCount = m.likesCount ?? 0;
+          return {
+            ...m,
+            isLikedByMe: !currentLiked,
+            likesCount: !currentLiked ? currentCount + 1 : Math.max(0, currentCount - 1),
+          };
+        })
+      );
+
+      const res = await ChannelService.toggleMessageReaction(msg.channelId, msg.id);
+      if (res?.success && res.data) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msg.id
+              ? { ...m, isLikedByMe: res.data.isLikedByMe, likesCount: res.data.likesCount }
+              : m
+          )
+        );
+      }
+    } catch (err) {
+      toast.error("Failed to update reaction");
+      fetchChannelMessages(msg.channelId);
+    }
+  };
+
+  const handleIncrementView = async (msg: ChannelMessageData) => {
+    try {
+      const res = await ChannelService.incrementMessageViews(msg.channelId, msg.id);
+      if (res?.success && res.data?.viewsCount !== undefined) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msg.id ? { ...m, viewsCount: res.data.viewsCount } : m))
+        );
+      }
+    } catch (err) {
+      // ignore errors on manual view increment
+    }
+  };
+
+  const handleOpenShareModal = (msg: ChannelMessageData) => {
+    setSelectedSharePost(msg);
+    setShareTab("contacts");
+    setShareContactSearch("");
+    setSelectedShareContactIds([]);
+    setSharePhoneInput("");
+    setShareNote("");
+    if (contacts.length === 0) {
+      fetchContactsForInvite();
+    }
+  };
+
+  const handleSharePostToContacts = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSharePost || !selectedChannel) return;
+    const cleanPhones = sharePhoneInput
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    if (selectedShareContactIds.length === 0 && cleanPhones.length === 0) {
+      toast.error("Please select at least one contact or enter a phone number to share.");
+      return;
+    }
+
+    setIsSharingPost(true);
+    try {
+      const channelUrl = `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/business/channels/${selectedChannel.id}`;
+      const shareMessageContent = `📢 Shared Post from #${selectedChannel.name}\n\n"${selectedSharePost.content}"\n\n${selectedSharePost.mediaUrl ? `🔗 Attached Media: ${selectedSharePost.mediaUrl}\n\n` : ""}${shareNote.trim() ? `💬 Note: ${shareNote.trim()}\n\n` : ""}👉 View Channel: ${channelUrl}`;
+
+      let successCount = 0;
+
+      // 1. Share to selected contacts from the list
+      for (const contactId of selectedShareContactIds) {
+        try {
+          const res = await chatService.initiateConversation(contactId);
+          const convId = res?.data?.conversationId ?? res?.conversationId ?? res?.data?.id;
+          if (convId) {
+            await chatService.sendMessage({
+              conversationId: convId,
+              ciphertext: shareMessageContent,
+              nonce: "shared_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+              mediaUrl: selectedSharePost.mediaUrl || null,
+              mediaType: selectedSharePost.mediaType || null,
+            });
+            successCount++;
+          }
+        } catch (err) {
+          console.error("Error sharing post to contact:", contactId, err);
+        }
+      }
+
+      // 2. Share to manual phone numbers entered
+      for (const phone of cleanPhones) {
+        try {
+          const res = await chatService.initiateConversation(phone);
+          const convId = res?.data?.conversationId ?? res?.conversationId ?? res?.data?.id;
+          if (convId) {
+            await chatService.sendMessage({
+              conversationId: convId,
+              ciphertext: shareMessageContent,
+              nonce: "shared_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+              mediaUrl: selectedSharePost.mediaUrl || null,
+              mediaType: selectedSharePost.mediaType || null,
+            });
+            successCount++;
+          }
+        } catch (err) {
+          console.error("Error sharing post to phone:", phone, err);
+        }
+      }
+
+      setPostShareCounts((prev) => ({
+        ...prev,
+        [selectedSharePost.id]: (prev[selectedSharePost.id] || 0) + (successCount || 1),
+      }));
+
+      toast.success(`Post successfully shared to ${successCount || (selectedShareContactIds.length + cleanPhones.length)} recipient(s)!`);
+      setSelectedSharePost(null);
+    } catch (err: any) {
+      toast.error("Failed to share post. Please try again.");
+    } finally {
+      setIsSharingPost(false);
+    }
+  };
+
   const handleUpdateMemberRole = async (memberId: string, role: "MEMBER" | "MODERATOR" | "ADMIN") => {
     if (!selectedChannel) return;
     try {
@@ -577,7 +872,7 @@ export function BusinessChannelsModal({
     if (!selectedChannel || (inviteSelectedMemberIds.length === 0 && inviteSelectedPhones.length === 0)) return;
     try {
       setIsUpdatingMember(true);
-      const res = await ChannelService.addChannelMembers(selectedChannel.id, inviteSelectedMemberIds, inviteSelectedPhones);
+      const res = await ChannelService.addChannelMembers(selectedChannel.id, inviteSelectedMemberIds, inviteSelectedPhones, inviteRole);
       if (res?.success) {
         toast.success("Members invited successfully");
         fetchChannelMembers(selectedChannel.id);
@@ -585,11 +880,55 @@ export function BusinessChannelsModal({
         setInviteSelectedMemberIds([]);
         setInviteSelectedPhones([]);
         setInviteContactSearch("");
+        setInviteRole("MEMBER");
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || "Failed to invite members");
     } finally {
       setIsUpdatingMember(false);
+    }
+  };
+
+  const fetchJoinRequests = useCallback(async (channelId: string) => {
+    try {
+      setIsLoadingRequests(true);
+      const res = await ChannelService.getJoinRequests(channelId);
+      if (res?.success && Array.isArray(res.data)) {
+        setJoinRequests(res.data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch join requests", e);
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  }, []);
+
+  const handleApproveRequest = async (requestId: string) => {
+    if (!selectedChannel) return;
+    try {
+      setIsProcessingRequest(requestId);
+      await ChannelService.approveJoinRequest(selectedChannel.id, requestId);
+      setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      fetchChannelMembers(selectedChannel.id);
+      toast.success("Join request approved");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to approve request");
+    } finally {
+      setIsProcessingRequest(null);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    if (!selectedChannel) return;
+    try {
+      setIsProcessingRequest(requestId);
+      await ChannelService.rejectJoinRequest(selectedChannel.id, requestId);
+      setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      toast.success("Join request rejected");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to reject request");
+    } finally {
+      setIsProcessingRequest(null);
     }
   };
 
@@ -637,15 +976,16 @@ export function BusinessChannelsModal({
 
   const handleDeleteChannel = async () => {
     if (!selectedChannel) return;
-    if (!confirm(`Are you sure you want to delete #${selectedChannel.name}?`)) return;
     try {
       setIsDeleting(true);
       await ChannelService.deleteChannel(selectedChannel.id);
+      deletedChannelIds.current.add(selectedChannel.id);
       setChannels((prev) => prev.filter((c) => c.id !== selectedChannel.id));
       toast.success("Channel deleted successfully");
       setSelectedChannel(null);
       setActiveTab("list");
       if (onChannelUpdated) onChannelUpdated();
+      if (onClose) onClose();
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || "Failed to delete channel.");
     } finally {
@@ -654,13 +994,17 @@ export function BusinessChannelsModal({
   };
 
   const filteredContacts = contacts.filter((c) =>
-    c.name.toLowerCase().includes(contactSearch.toLowerCase())
+    c.name?.toLowerCase().includes(contactSearch.toLowerCase()) ||
+    (c.phone && c.phone.toLowerCase().includes(contactSearch.toLowerCase())) ||
+    (c.id && typeof c.id === 'string' && c.id.toLowerCase().includes(contactSearch.toLowerCase()))
   );
 
   const inviteFilteredContacts = contacts.filter(
     (c) =>
-      c.name.toLowerCase().includes(inviteContactSearch.toLowerCase()) &&
-      !channelMembers.some((m) => m.id === c.id)
+      (c.name?.toLowerCase().includes(inviteContactSearch.toLowerCase()) ||
+        (c.phone && c.phone.toLowerCase().includes(inviteContactSearch.toLowerCase())) ||
+        (c.id && typeof c.id === 'string' && c.id.toLowerCase().includes(inviteContactSearch.toLowerCase()))) &&
+      !channelMembers.some((m) => m.id === c.id || (m as any).userId === c.id)
   );
 
   const modalContent = (
@@ -675,58 +1019,67 @@ export function BusinessChannelsModal({
         }
       >
         {/* Top Bar Header (Matches mobile Figma design headers) */}
-        <div className="flex items-center justify-between border-b border-[#F0F4FF] bg-white px-7 py-5 shrink-0">
-          <div className="flex items-center gap-3">
-            {activeTab !== "list" ? (
-              <button
-                onClick={() => {
-                  if (activeTab === "create" && step > 1) {
-                    setStep((step - 1) as any);
-                  } else if (initialChannelId && isEmbedded) {
-                    router.push("/business/channels");
-                  } else {
-                    setActiveTab("list");
-                  }
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 text-[#3B58F5] transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
-              </button>
-            ) : (
+        {(!isEmbedded || (activeTab !== "room" && activeTab !== "settings")) && (
+          <div className="flex items-center justify-between border-b border-[#F0F4FF] bg-white px-7 py-5 shrink-0">
+            <div className="flex items-center gap-3">
+              {activeTab !== "list" ? (
+                <button
+                  onClick={() => {
+                    if (activeTab === "create" && step > 1) {
+                      setStep((step - 1) as any);
+                    } else if (initialChannelId && isEmbedded) {
+                      router.push("/business/channels");
+                    } else {
+                      setActiveTab("list");
+                    }
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 text-[#3B58F5] transition-colors"
+                >
+                  <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
+                </button>
+              ) : (
+                <button
+                  onClick={onClose}
+                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 text-[#3B58F5] transition-colors"
+                >
+                  <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
+                </button>
+              )}
+
+              <div>
+                <h2 className="text-lg font-bold text-[#11142D] tracking-tight">
+                  {activeTab === "list" && "Business Channels"}
+                  {activeTab === "create" && step === 1 && "Channel Information"}
+                  {activeTab === "create" && step === 2 && "Channel Settings"}
+                  {activeTab === "create" && step === 3 && "Channel Settings"}
+                  {activeTab === "create" && step === 4 && "Business Channels"}
+                  {activeTab === "room" && selectedChannel && `#${selectedChannel.name}`}
+                  {activeTab === "settings" && "Channel Settings"}
+                </h2>
+                {activeTab === "list" && (
+                  <p className="text-xs font-medium text-slate-400">Broadcast to your followers</p>
+                )}
+              </div>
+            </div>
+
+            {!isEmbedded && (
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 text-[#3B58F5] transition-colors"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"
               >
-                <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
+                <X className="h-5 w-5" />
               </button>
             )}
-
-            <div>
-              <h2 className="text-lg font-bold text-[#11142D] tracking-tight">
-                {activeTab === "list" && "Business Channels"}
-                {activeTab === "create" && step === 1 && "Channel Information"}
-                {activeTab === "create" && step === 2 && "Channel Settings"}
-                {activeTab === "create" && step === 3 && "Channel Settings"}
-                {activeTab === "create" && step === 4 && "Business Channels"}
-                {activeTab === "room" && selectedChannel && `#${selectedChannel.name}`}
-                {activeTab === "settings" && "Channel Settings"}
-              </h2>
-              {activeTab === "list" && (
-                <p className="text-xs font-medium text-slate-400">Broadcast to your followers</p>
-              )}
-            </div>
           </div>
-
-          <button
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        )}
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-7">
+        <div
+          className={cn(
+            "flex-1 overflow-y-auto flex flex-col",
+            activeTab !== "room" && activeTab !== "settings" ? "p-4 sm:p-7" : isEmbedded ? "p-0" : "p-4 sm:p-7"
+          )}
+        >
           <AnimatePresence mode="wait">
             {/* 1. CHANNELS LIST (Figma Image 1) */}
             {activeTab === "list" && (
@@ -740,13 +1093,47 @@ export function BusinessChannelsModal({
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-extrabold text-[#3B58F5] tracking-wide">Your Channels</h3>
                   <button
-                    onClick={fetchChannels}
+                    onClick={() => {
+                      fetchChannels();
+                      fetchMyInvitations();
+                    }}
                     className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-[#3B58F5] transition-colors"
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingChannels ? "animate-spin" : ""}`} />
+                    <RefreshCw className={`h-3.5 w-3.5 ${(isLoadingChannels || isLoadingInvitations) ? "animate-spin" : ""}`} />
                     <span>Refresh</span>
                   </button>
                 </div>
+
+                {myInvitations.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-extrabold text-[#3B58F5] tracking-wide mb-3 flex items-center gap-2">
+                      <Bell className="h-4 w-4" /> Pending Invitations ({myInvitations.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {myInvitations.map((inv) => (
+                        <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-[#EEF2FF] border border-[#C7D2FE] shadow-sm gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 shrink-0 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
+                              {inv.channelAvatarUrl ? (
+                                <img src={inv.channelAvatarUrl} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-sm font-bold text-indigo-700">#{inv.channelName.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-[#11142D]"><span className="text-indigo-600">{inv.inviterName}</span> invited you to join <span className="text-indigo-600">{inv.channelName}</span></p>
+                              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">As {inv.role}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleAcceptInvitation(inv.id)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-colors">Join</button>
+                            <button onClick={() => handleRejectInvitation(inv.id)} className="flex-1 sm:flex-none px-4 py-2 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">Decline</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {isLoadingChannels ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -1054,20 +1441,89 @@ export function BusinessChannelsModal({
                 {/* STEP 3: Invite Members (Figma Image 4) */}
                 {step === 3 && (
                   <div className="space-y-6">
+                    {/* Dedicated CallsChat Number / Phone Number Input Field */}
+                    <div className="space-y-2 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                      <label className="block text-xs font-bold text-[#11142D]">
+                        Invite by CallsChat Number / Phone Number
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Enter CallsChat number (e.g., +1234567890)"
+                            value={manualPhoneInput}
+                            onChange={(e) => setManualPhoneInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && manualPhoneInput.trim()) {
+                                e.preventDefault();
+                                if (!selectedPhones.includes(manualPhoneInput.trim())) {
+                                  setSelectedPhones((prev) => [...prev, manualPhoneInput.trim()]);
+                                }
+                                setManualPhoneInput("");
+                              }
+                            }}
+                            className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2.5 text-xs font-semibold text-[#11142D] focus:border-[#3B58F5] focus:outline-none bg-white shadow-2xs"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (manualPhoneInput.trim()) {
+                              if (!selectedPhones.includes(manualPhoneInput.trim())) {
+                                setSelectedPhones((prev) => [...prev, manualPhoneInput.trim()]);
+                              }
+                              setManualPhoneInput("");
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0"
+                        >
+                          Add Number
+                        </button>
+                      </div>
+
+                      {/* Selected CallsChat Numbers Chips */}
+                      {selectedPhones.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {selectedPhones.map((phone) => (
+                            <div
+                              key={phone}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-[#3B58F5] text-xs font-bold"
+                            >
+                              <Phone className="h-3 w-3" />
+                              <span>{phone}</span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPhones((prev) => prev.filter((p) => p !== phone))}
+                                className="hover:bg-blue-200 rounded p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Search box */}
-                    <div className="relative">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Search contacts to invite..."
-                        value={contactSearch}
-                        onChange={(e) => setContactSearch(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 py-3.5 text-sm font-semibold text-[#11142D] placeholder-slate-400 focus:border-[#3B58F5] focus:outline-none"
-                      />
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-[#11142D]">
+                        Or select from your Contacts list
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search contacts by name or number..."
+                          value={contactSearch}
+                          onChange={(e) => setContactSearch(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 py-3.5 text-sm font-semibold text-[#11142D] placeholder-slate-400 focus:border-[#3B58F5] focus:outline-none"
+                        />
+                      </div>
                     </div>
 
                     {/* Contacts List with Round Circles */}
-                    <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                    <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                       {contactSearch.match(/^\+?[1-9]\d{1,14}$/) && (
                         <div
                           onClick={() => {
@@ -1128,19 +1584,31 @@ export function BusinessChannelsModal({
 
                       {filteredContacts.length === 0 && !contactSearch.match(/^\+?[1-9]\d{1,14}$/) && selectedPhones.length === 0 ? (
                         <div className="py-12 text-center text-xs font-semibold text-slate-400">
-                          No contacts found. Type a phone number to invite by phone.
+                          {contacts.length === 0
+                            ? "No contacts found. Use the input above to invite directly by CallsChat number."
+                            : "No contacts match your search."}
                         </div>
                       ) : (
                         filteredContacts.map((c) => {
-                          const isSelected = selectedMemberIds.includes(c.id);
+                          const isSelected = c.isPhoneOnly
+                            ? selectedPhones.includes(c.id)
+                            : selectedMemberIds.includes(c.id);
                           return (
                             <div
                               key={c.id}
                               onClick={() => {
-                                if (isSelected) {
-                                  setSelectedMemberIds((prev) => prev.filter((id) => id !== c.id));
+                                if (c.isPhoneOnly) {
+                                  if (isSelected) {
+                                    setSelectedPhones((prev) => prev.filter((phone) => phone !== c.id));
+                                  } else {
+                                    setSelectedPhones((prev) => [...prev, c.id]);
+                                  }
                                 } else {
-                                  setSelectedMemberIds((prev) => [...prev, c.id]);
+                                  if (isSelected) {
+                                    setSelectedMemberIds((prev) => prev.filter((id) => id !== c.id));
+                                  } else {
+                                    setSelectedMemberIds((prev) => [...prev, c.id]);
+                                  }
                                 }
                               }}
                               className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-colors"
@@ -1153,7 +1621,10 @@ export function BusinessChannelsModal({
                                     <span>{c.name.charAt(0).toUpperCase()}</span>
                                   )}
                                 </div>
-                                <span className="text-sm font-bold text-[#11142D]">{c.name}</span>
+                                <div>
+                                  <span className="block text-sm font-bold text-[#11142D]">{c.name}</span>
+                                  {c.phone && <span className="block text-[10px] text-slate-500">{c.phone}</span>}
+                                </div>
                               </div>
 
                               <div className="shrink-0">
@@ -1223,8 +1694,12 @@ export function BusinessChannelsModal({
                     <button
                       onClick={() => {
                         handleResetWizard();
-                        setActiveTab("list");
-                        fetchChannels();
+                        if (isEmbedded && onClose) {
+                          onClose();
+                        } else {
+                          setActiveTab("list");
+                          fetchChannels();
+                        }
                       }}
                       className="w-full rounded-2xl bg-[#3B58F5] py-4 text-sm font-bold text-white shadow-lg shadow-[#3B58F5]/25 hover:bg-[#2C48B8] transition-all mt-4"
                     >
@@ -1242,31 +1717,42 @@ export function BusinessChannelsModal({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="flex flex-col -m-7"
+                className={cn("flex flex-col flex-1", !isEmbedded && "-m-7")}
               >
-                {/* Top Banner Gradient (Matches Figma design header) */}
-                <div className="bg-gradient-to-r from-purple-500/25 via-indigo-500/15 to-blue-500/25 h-32 relative flex items-start justify-between p-5">
+                {/* Top Banner Gradient */}
+                <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 h-36 sm:h-44 relative flex items-start justify-between p-5 sm:p-6 shrink-0 overflow-hidden shadow-xs">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-3xl opacity-30 pointer-events-none" />
                   <button
-                    onClick={() => setActiveTab("list")}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/15 hover:bg-slate-900/25 text-white transition-all shadow-xs"
+                    onClick={() => {
+                      if (isEmbedded) {
+                        router.push("/business/channels");
+                      } else {
+                        setActiveTab("list");
+                      }
+                    }}
+                    className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/20 hover:bg-slate-900/35 text-white transition-all shadow-xs backdrop-blur-md"
+                    title="Back to Channels"
                   >
                     <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
                   </button>
 
-                  <div className="flex items-center gap-2.5">
+                  <div className="relative z-10 flex items-center gap-2.5">
+                    {canUserPostInSelectedChannel && (
+                      <button
+                        onClick={() => {
+                          setActiveTab("room");
+                          setAdminSubTab("posts");
+                          setShowPostForm(!showPostForm);
+                        }}
+                        className="flex h-10 px-4 items-center justify-center gap-2 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition-all shadow-xs backdrop-blur-md"
+                        title="New Post"
+                      >
+                        <Plus className="h-4 w-4 stroke-[3]" />
+                        <span className="hidden sm:inline">New Post</span>
+                      </button>
+                    )}
                     <button
-                      onClick={() => {
-                        setActiveTab("room");
-                        setAdminSubTab("posts");
-                        setShowPostForm(!showPostForm);
-                      }}
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/15 hover:bg-slate-900/25 text-white transition-all shadow-xs"
-                      title="New Post"
-                    >
-                      <Plus className="h-5 w-5 stroke-[2.5]" />
-                    </button>
-                    <button
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/15 hover:bg-slate-900/25 text-white transition-all shadow-xs"
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/20 hover:bg-slate-900/35 text-white transition-all shadow-xs backdrop-blur-md"
                       title="Notifications"
                     >
                       <Bell className="h-5 w-5" />
@@ -1275,38 +1761,38 @@ export function BusinessChannelsModal({
                 </div>
 
                 {/* Channel Profile Info Header */}
-                <div className="px-7 pb-4 border-b border-slate-100 bg-white">
-                  <div className="flex items-end justify-between -mt-10">
-                    <div className="h-20 w-20 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-3xl border-4 border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
+                <div className="px-5 sm:px-8 pb-5 border-b border-slate-100 bg-white shrink-0 shadow-2xs">
+                  <div className="flex items-end justify-between -mt-10 sm:-mt-12">
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-3xl sm:text-4xl border-4 border-white shadow-xl flex items-center justify-center overflow-hidden shrink-0">
                       {selectedChannel.avatarUrl ? (
                         <img src={selectedChannel.avatarUrl} alt="" className="h-full w-full object-cover" />
                       ) : (
                         <span>{selectedChannel.name.charAt(0).toUpperCase()}</span>
                       )}
                     </div>
-                    <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1 text-[11px] font-extrabold text-indigo-600 shadow-2xs">
-                      Admin Mode
+                    <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3.5 py-1 text-xs font-extrabold text-indigo-600 shadow-2xs">
+                      {selectedChannel.myRole === 'OWNER' ? 'Owner Mode' : selectedChannel.myRole === 'ADMIN' ? 'Admin Mode' : 'Subscriber'}
                     </span>
                   </div>
 
-                  <div className="mt-3">
-                    <h3 className="text-xl font-bold text-[#11142D] tracking-tight">{selectedChannel.name}</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  <div className="mt-3.5">
+                    <h3 className="text-xl sm:text-2xl font-black text-[#11142D] tracking-tight">{selectedChannel.name}</h3>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
                       {selectedChannel.description || "Latest product news & releases"}
                     </p>
                   </div>
 
-                  <div className="mt-3.5 flex items-center gap-6 text-xs text-slate-500 font-medium">
+                  <div className="mt-4 pt-3.5 flex items-center gap-6 sm:gap-8 text-xs sm:text-sm text-slate-500 font-medium border-t border-slate-100/80">
                     <span className="flex items-center gap-1.5">
                       <Users className="h-4 w-4 text-indigo-600" />
-                      <strong className="text-[#11142D] font-bold">
+                      <strong className="text-[#11142D] font-extrabold">
                         {(selectedChannel.memberCount || 1240).toLocaleString()}
                       </strong>{" "}
-                      followers
+                      subscribers
                     </span>
                     <span className="flex items-center gap-1.5">
                       <FileText className="h-4 w-4 text-indigo-600" />
-                      <strong className="text-[#11142D] font-bold">
+                      <strong className="text-[#11142D] font-extrabold">
                         {messages.length > 0 ? messages.length : 4}
                       </strong>{" "}
                       posts
@@ -1315,7 +1801,7 @@ export function BusinessChannelsModal({
                 </div>
 
                 {/* 3 Tabs Navigation Bar (Posts | Members | Settings) */}
-                <div className="flex items-center border-b border-slate-100 bg-white px-2 shrink-0">
+                <div className="flex items-center border-b border-slate-100 bg-white px-3 sm:px-6 shrink-0 overflow-x-auto no-scrollbar">
                   <button
                     onClick={() => {
                       setActiveTab("room");
@@ -1346,6 +1832,29 @@ export function BusinessChannelsModal({
                     <span>Members</span>
                   </button>
 
+                  {selectedChannel?.whoCanJoin === "REQUIRES_APPROVAL" && (
+                    <button
+                      onClick={() => {
+                        setActiveTab("room");
+                        setAdminSubTab("requests");
+                        fetchJoinRequests(selectedChannel.id);
+                      }}
+                      className={`relative flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 text-xs font-bold border-b-2 transition-all ${
+                        activeTab === "room" && adminSubTab === "requests"
+                          ? "border-amber-500 text-amber-600"
+                          : "border-transparent text-slate-400 hover:text-slate-600"
+                      }`}
+                    >
+                      <Bell className="h-4 w-4" />
+                      <span>Requests</span>
+                      {joinRequests.length > 0 && (
+                        <span className="absolute top-2 right-3 h-4 w-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+                          {joinRequests.length}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       setActiveTab("settings");
@@ -1364,23 +1873,25 @@ export function BusinessChannelsModal({
                 </div>
 
                 {/* TAB CONTENT */}
-                <div className="p-7 max-h-[480px] overflow-y-auto bg-[#F8FAFC]/50">
+                <div className={cn("p-4 sm:p-7 overflow-y-auto bg-[#F8FAFC]/50 flex-1", !isEmbedded && "max-h-[500px]")}>
                   {/* 1. POSTS SUB-TAB */}
                   {activeTab === "room" && adminSubTab === "posts" && (
-                    <div className="space-y-4 max-w-xl mx-auto">
-                      {/* Create Post Prompt Box (Figma match) */}
-                      <div
-                        onClick={() => setShowPostForm(!showPostForm)}
-                        className="border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3.5 shadow-2xs hover:border-indigo-300 transition-all cursor-pointer bg-white"
-                      >
-                        <div className="h-11 w-11 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
-                          <Plus className="h-6 w-6 stroke-[3]" />
-                        </div>
-                        <span className="text-sm font-semibold text-slate-400">Create a new post...</span>
-                      </div>
+                    <div className={cn("space-y-4 mx-auto transition-all", isEmbedded ? "max-w-3xl" : "max-w-xl")}>
+                      {canUserPostInSelectedChannel ? (
+                        <>
+                          {/* Create Post Prompt Box (Figma match) */}
+                          <div
+                            onClick={() => setShowPostForm(!showPostForm)}
+                            className="border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3.5 shadow-2xs hover:border-indigo-300 transition-all cursor-pointer bg-white"
+                          >
+                            <div className="h-11 w-11 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
+                              <Plus className="h-6 w-6 stroke-[3]" />
+                            </div>
+                            <span className="text-sm font-semibold text-slate-400">Create a new post...</span>
+                          </div>
 
-                      {/* Expandable Compose Post Box (Exact match to Figma Image 1, 2, 3) */}
-                      <AnimatePresence>
+                          {/* Expandable Compose Post Box (Exact match to Figma Image 1, 2, 3) */}
+                          <AnimatePresence>
                         {showPostForm && (
                           <motion.form
                             initial={{ opacity: 0, height: 0 }}
@@ -1603,6 +2114,22 @@ export function BusinessChannelsModal({
                           </motion.form>
                         )}
                       </AnimatePresence>
+                        </>
+                      ) : (
+                        <div className="border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between bg-white shadow-2xs text-slate-500">
+                          <div className="flex items-center gap-3.5">
+                            <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold shrink-0 shadow-xs">
+                              <ShieldCheck className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-bold text-[#11142D]">Broadcast Channel Policy</h4>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Only {selectedChannel?.whoCanPost === "ADMIN_MODERATORS" ? "Admins and Moderators" : "Channel Admins"} are permitted to post updates in this channel.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Posts Timeline */}
                       {isLoadingMessages ? (
@@ -1783,7 +2310,13 @@ export function BusinessChannelsModal({
                               ) : null}
 
                               <div className="flex items-center justify-between text-xs text-slate-400 font-medium pt-1">
-                                <span>👁️ 1,240</span>
+                                <button
+                                  onClick={() => handleIncrementView(msg)}
+                                  className="flex items-center gap-1 hover:text-slate-600 transition-colors"
+                                  title="Views count"
+                                >
+                                  <span>👁️ {(msg.viewsCount ?? 1).toLocaleString()}</span>
+                                </button>
                                 <span>
                                   {new Date(msg.createdAt).toLocaleDateString([], {
                                     month: "short",
@@ -1795,13 +2328,21 @@ export function BusinessChannelsModal({
                               </div>
 
                               <div className="border-t border-slate-100 pt-3 grid grid-cols-2 text-xs font-bold text-slate-500">
-                                <button className="flex items-center justify-center gap-1.5 hover:text-red-500 transition-colors py-1">
-                                  <Heart className="h-4 w-4" />
-                                  <span>89</span>
+                                <button
+                                  onClick={() => handleLikePost(msg)}
+                                  className={`flex items-center justify-center gap-1.5 transition-colors py-1 ${
+                                    msg.isLikedByMe ? "text-red-500 font-extrabold" : "hover:text-red-500"
+                                  }`}
+                                >
+                                  <Heart className={`h-4 w-4 ${msg.isLikedByMe ? "fill-red-500 text-red-500 scale-110 transition-transform" : ""}`} />
+                                  <span>{(msg.likesCount ?? 0) > 0 ? (msg.likesCount ?? 0).toLocaleString() : "Like"}</span>
                                 </button>
-                                <button className="flex items-center justify-center gap-1.5 hover:text-indigo-600 transition-colors py-1">
+                                <button
+                                  onClick={() => handleOpenShareModal(msg)}
+                                  className="flex items-center justify-center gap-1.5 hover:text-indigo-600 transition-colors py-1"
+                                >
                                   <Share2 className="h-4 w-4" />
-                                  <span>Share</span>
+                                  <span>{(postShareCounts[msg.id] || 0) > 0 ? `Share (${postShareCounts[msg.id]})` : "Share"}</span>
                                 </button>
                               </div>
                             </div>
@@ -1830,7 +2371,7 @@ export function BusinessChannelsModal({
 
                   {/* 2. MEMBERS SUB-TAB */}
                   {activeTab === "room" && adminSubTab === "members" && (
-                    <div className="space-y-4 max-w-xl mx-auto">
+                    <div className={cn("space-y-4 mx-auto transition-all", isEmbedded ? "max-w-3xl" : "max-w-xl")}>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-extrabold text-[#11142D]">
                           Subscribers & Moderators ({(channelMembers.length || 1).toLocaleString()})
@@ -1857,147 +2398,177 @@ export function BusinessChannelsModal({
 
                       {showInviteMembers && (
                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
-                          <h4 className="text-sm font-bold text-[#11142D]">Invite Contacts</h4>
-                          <div className="relative">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <input
-                              type="text"
-                              placeholder="Search contacts..."
-                              value={inviteContactSearch}
-                              onChange={(e) => setInviteContactSearch(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2.5 text-xs font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none bg-white"
-                            />
-                          </div>
+                          <h4 className="text-sm font-bold text-[#11142D]">Invite Contacts & Members</h4>
 
-                          <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                            {inviteContactSearch.match(/^\+?[1-9]\d{1,14}$/) && (
-                              <div
+                          {/* Dedicated CallsChat Number / Phone Number Input Field */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-[#11142D]">
+                              Invite by CallsChat Number / Phone Number
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <input
+                                  type="text"
+                                  placeholder="Enter CallsChat number (e.g., +1234567890)"
+                                  value={inviteManualPhone}
+                                  onChange={(e) => setInviteManualPhone(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && inviteManualPhone.trim()) {
+                                      e.preventDefault();
+                                      if (!inviteSelectedPhones.includes(inviteManualPhone.trim())) {
+                                        setInviteSelectedPhones((prev) => [...prev, inviteManualPhone.trim()]);
+                                      }
+                                      setInviteManualPhone("");
+                                    }
+                                  }}
+                                  className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2.5 text-xs font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none bg-white shadow-2xs"
+                                />
+                              </div>
+                              <button
+                                type="button"
                                 onClick={() => {
-                                  if (inviteSelectedPhones.includes(inviteContactSearch)) {
-                                    setInviteSelectedPhones((prev) => prev.filter((p) => p !== inviteContactSearch));
-                                  } else {
-                                    setInviteSelectedPhones((prev) => [...prev, inviteContactSearch]);
+                                  if (inviteManualPhone.trim()) {
+                                    if (!inviteSelectedPhones.includes(inviteManualPhone.trim())) {
+                                      setInviteSelectedPhones((prev) => [...prev, inviteManualPhone.trim()]);
+                                    }
+                                    setInviteManualPhone("");
                                   }
                                 }}
-                                className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors bg-white border border-slate-100 shadow-2xs"
+                                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0"
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
-                                    <Phone className="h-4 w-4" />
-                                  </div>
-                                  <div>
-                                    <span className="block text-xs font-bold text-[#11142D]">{inviteContactSearch}</span>
-                                    <span className="block text-[10px] text-slate-500">Invite by phone number</span>
-                                  </div>
-                                </div>
-                                <div className="shrink-0">
-                                  {inviteSelectedPhones.includes(inviteContactSearch) ? (
-                                    <div className="h-5 w-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                                      <Check className="h-3 w-3 stroke-[3]" />
-                                    </div>
-                                  ) : (
-                                    <div className="h-5 w-5 rounded-full border-2 border-slate-300" />
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {inviteSelectedPhones.map((p) => {
-                              if (p === inviteContactSearch) return null;
-                              return (
-                                <div
-                                  key={p}
-                                  onClick={() => setInviteSelectedPhones((prev) => prev.filter((phone) => phone !== p))}
-                                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors bg-white border border-slate-100 shadow-2xs"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
-                                      <Phone className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                      <span className="block text-xs font-bold text-[#11142D]">{p}</span>
-                                      <span className="block text-[10px] text-slate-500">Invite by phone number</span>
-                                    </div>
-                                  </div>
-                                  <div className="shrink-0">
-                                    <div className="h-5 w-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                                      <Check className="h-3 w-3 stroke-[3]" />
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-
-                            {inviteFilteredContacts.length === 0 && !inviteContactSearch.match(/^\+?[1-9]\d{1,14}$/) && inviteSelectedPhones.length === 0 ? (
-                              <div className="py-4 text-center text-xs font-semibold text-slate-400">
-                                No new contacts found to invite. Type a valid phone number to invite by phone.
-                              </div>
-                            ) : (
-                              inviteFilteredContacts.map((c) => {
-                                const isSelected = c.isPhoneOnly 
-                                  ? inviteSelectedPhones.includes(c.id) 
-                                  : inviteSelectedMemberIds.includes(c.id);
-                                return (
-                                  <div
-                                    key={c.id}
-                                    onClick={() => {
-                                      if (c.isPhoneOnly) {
-                                        if (isSelected) {
-                                          setInviteSelectedPhones((prev) => prev.filter((p) => p !== c.id));
-                                        } else {
-                                          setInviteSelectedPhones((prev) => [...prev, c.id]);
-                                        }
-                                      } else {
-                                        if (isSelected) {
-                                          setInviteSelectedMemberIds((prev) => prev.filter((id) => id !== c.id));
-                                        } else {
-                                          setInviteSelectedMemberIds((prev) => [...prev, c.id]);
-                                        }
-                                      }
-                                    }}
-                                    className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors bg-white border border-slate-100 shadow-2xs"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className="h-8 w-8 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
-                                        {c.avatarUrl ? (
-                                          <img src={c.avatarUrl} alt={c.name} className="h-full w-full object-cover" />
-                                        ) : (
-                                          <span>{c.name.charAt(0).toUpperCase()}</span>
-                                        )}
-                                      </div>
-                                      <span className="text-xs font-bold text-[#11142D]">{c.name}</span>
-                                    </div>
-                                    <div className="shrink-0">
-                                      {isSelected ? (
-                                        <div className="h-5 w-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                                          <Check className="h-3 w-3 stroke-[3]" />
-                                        </div>
-                                      ) : (
-                                        <div className="h-5 w-5 rounded-full border-2 border-slate-300" />
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })
-                            )}
+                                Add Number
+                              </button>
+                            </div>
                           </div>
 
-                          {(inviteSelectedMemberIds.length > 0 || inviteSelectedPhones.length > 0) && (
+                          {/* Selected CallsChat Numbers Chips */}
+                          {inviteSelectedPhones.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {inviteSelectedPhones.map((phone) => (
+                                <div
+                                  key={phone}
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold"
+                                >
+                                  <Phone className="h-3 w-3" />
+                                  <span>{phone}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setInviteSelectedPhones((prev) => prev.filter((p) => p !== phone))}
+                                    className="hover:bg-indigo-200 rounded p-0.5"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Contact Search and List */}
+                          <div className="space-y-2 pt-2 border-t border-slate-200/80">
+                            <label className="text-xs font-bold text-[#11142D]">
+                              Or select from your Contacts list
+                            </label>
+                            <div className="relative">
+                              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                              <input
+                                type="text"
+                                placeholder="Search contacts by name or number..."
+                                value={inviteContactSearch}
+                                onChange={(e) => setInviteContactSearch(e.target.value)}
+                                className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2 text-xs font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none bg-white"
+                              />
+                            </div>
+
+                            <div className="max-h-48 overflow-y-auto space-y-2 pr-1 pt-1">
+                              {inviteFilteredContacts.length === 0 ? (
+                                <div className="py-4 text-center text-xs font-semibold text-slate-400">
+                                  {contacts.length === 0
+                                    ? "No contacts found. Use the input above to invite directly by CallsChat number."
+                                    : "No contacts match your search."}
+                                </div>
+                              ) : (
+                                inviteFilteredContacts.map((c) => {
+                                  const isSelected = c.isPhoneOnly
+                                    ? inviteSelectedPhones.includes(c.id)
+                                    : inviteSelectedMemberIds.includes(c.id);
+                                  return (
+                                    <div
+                                      key={c.id}
+                                      onClick={() => {
+                                        if (c.isPhoneOnly) {
+                                          if (isSelected) {
+                                            setInviteSelectedPhones((prev) => prev.filter((p) => p !== c.id));
+                                          } else {
+                                            setInviteSelectedPhones((prev) => [...prev, c.id]);
+                                          }
+                                        } else {
+                                          if (isSelected) {
+                                            setInviteSelectedMemberIds((prev) => prev.filter((id) => id !== c.id));
+                                          } else {
+                                            setInviteSelectedMemberIds((prev) => [...prev, c.id]);
+                                          }
+                                        }
+                                      }}
+                                      className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors bg-white border border-slate-100 shadow-2xs"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
+                                          {c.avatarUrl ? (
+                                            <img src={c.avatarUrl} alt={c.name} className="h-full w-full object-cover" />
+                                          ) : (
+                                            <span>{c.name.charAt(0).toUpperCase()}</span>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <span className="block text-xs font-bold text-[#11142D]">{c.name}</span>
+                                          {c.phone && <span className="block text-[10px] text-slate-500">{c.phone}</span>}
+                                        </div>
+                                      </div>
+                                      <div className="shrink-0">
+                                        {isSelected ? (
+                                          <div className="h-5 w-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                            <Check className="h-3 w-3 stroke-[3]" />
+                                          </div>
+                                        ) : (
+                                          <div className="h-5 w-5 rounded-full border-2 border-slate-300" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3 pt-2">
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-xs font-bold text-[#11142D]">Invited as (Role)</label>
+                              <select
+                                value={inviteRole}
+                                onChange={(e) => setInviteRole(e.target.value as any)}
+                                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-xs font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none bg-white"
+                              >
+                                <option value="MEMBER">Member</option>
+                                <option value="MODERATOR">Moderator</option>
+                                <option value="ADMIN">Admin</option>
+                              </select>
+                            </div>
                             <button
                               onClick={handleInviteMembersToExistingChannel}
-                              disabled={isUpdatingMember}
-                              className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md"
+                              disabled={isUpdatingMember || (inviteSelectedMemberIds.length === 0 && inviteSelectedPhones.length === 0)}
+                              className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-md"
                             >
                               {isUpdatingMember ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <>
                                   <Plus className="h-4 w-4 stroke-[3]" />
-                                  Invite {inviteSelectedMemberIds.length + inviteSelectedPhones.length} Members
+                                  Send Invitations ({inviteSelectedMemberIds.length + inviteSelectedPhones.length})
                                 </>
                               )}
                             </button>
-                          )}
+                          </div>
                         </div>
                       )}
 
@@ -2103,9 +2674,85 @@ export function BusinessChannelsModal({
                     </div>
                   )}
 
+                  {/* JOIN REQUESTS SUB-TAB */}
+                  {activeTab === "room" && adminSubTab === "requests" && (
+                    <div className={cn("space-y-3 mx-auto transition-all", isEmbedded ? "max-w-3xl" : "max-w-xl")}>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-extrabold text-amber-600">Pending Join Requests</h4>
+                        <button
+                          onClick={() => fetchJoinRequests(selectedChannel.id)}
+                          className="text-xs font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-1"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${isLoadingRequests ? "animate-spin" : ""}`} />
+                          Refresh
+                        </button>
+                      </div>
+
+                      {isLoadingRequests ? (
+                        <div className="flex justify-center py-10">
+                          <Loader2 className="h-7 w-7 animate-spin text-amber-500" />
+                        </div>
+                      ) : joinRequests.length === 0 ? (
+                        <div className="text-center py-12 rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                          <Bell className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-sm font-bold text-slate-500">No pending requests</p>
+                          <p className="text-xs text-slate-400 mt-1">All join requests have been handled.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {joinRequests.map((req) => (
+                            <div key={req.id} className="flex items-center justify-between p-3.5 rounded-2xl bg-white border border-amber-100 shadow-sm">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-amber-100 text-amber-700 font-bold flex items-center justify-center text-sm shrink-0 overflow-hidden">
+                                  {req.avatarUrl ? (
+                                    <img src={req.avatarUrl} alt={req.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span>{req.name.charAt(0).toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-[#11142D]">{req.name}</p>
+                                  <p className="text-xs text-slate-400">
+                                    Requested {new Date(req.requestedAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={() => handleRejectRequest(req.id)}
+                                  disabled={isProcessingRequest === req.id}
+                                  className="h-8 w-8 rounded-full flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                                  title="Reject"
+                                >
+                                  {isProcessingRequest === req.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleApproveRequest(req.id)}
+                                  disabled={isProcessingRequest === req.id}
+                                  className="h-8 w-8 rounded-full flex items-center justify-center bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                                  title="Approve"
+                                >
+                                  {isProcessingRequest === req.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4 stroke-[2.5]" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* 3. SETTINGS SUB-TAB (Inside Admin View) */}
                   {activeTab === "settings" && (
-                    <form onSubmit={handleSaveSettings} className="max-w-md mx-auto space-y-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <form onSubmit={handleSaveSettings} className={cn("mx-auto space-y-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm transition-all", isEmbedded ? "max-w-2xl" : "max-w-md")}>
                       <div>
                         <label className="block text-xs font-bold text-[#11142D] mb-1">Channel Name</label>
                         <input
@@ -2194,7 +2841,7 @@ export function BusinessChannelsModal({
                         <button
                           type="button"
                           disabled={isDeleting}
-                          onClick={handleDeleteChannel}
+                          onClick={() => setShowDeleteConfirm(true)}
                           className="flex items-center gap-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2.5 text-xs font-bold transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -2224,6 +2871,405 @@ export function BusinessChannelsModal({
                     </form>
                   )}
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Delete Confirmation Modal */}
+          <AnimatePresence>
+            {showDeleteConfirm && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-[100] flex items-center justify-center bg-[#0F172A]/40 backdrop-blur-sm p-4"
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden"
+                >
+                  <div className="p-6 text-center space-y-4">
+                    <div className="h-14 w-14 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+                      <Trash2 className="h-7 w-7 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-[#11142D]">Delete Channel?</h3>
+                      <p className="text-sm font-medium text-slate-500 mt-2">
+                        Are you sure you want to delete <span className="font-bold text-slate-700">#{selectedChannel?.name}</span>? This action is permanent and cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 border-t border-slate-100 p-4 flex flex-col sm:flex-row items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={handleDeleteChannel}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs font-bold shadow-md transition-all"
+                    >
+                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Delete"}
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* POST SHARE MODAL */}
+          <AnimatePresence>
+            {selectedSharePost && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+                onClick={() => !isSharingPost && setSelectedSharePost(null)}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100 flex flex-col max-h-[85vh]"
+                >
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white shrink-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md">
+                        <Share2 className="h-5 w-5 stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-extrabold tracking-tight">Share Channel Post</h3>
+                        <p className="text-[11px] font-medium text-purple-100">Broadcast or forward to contacts & apps</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => !isSharingPost && setSelectedSharePost(null)}
+                      className="rounded-full p-1.5 hover:bg-white/20 text-white transition-colors"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Post Preview Card */}
+                  <div className="bg-slate-50 border-b border-slate-100 px-6 py-3.5 shrink-0">
+                    <div className="rounded-2xl bg-white border border-slate-200/80 p-3 shadow-xs flex gap-3.5 items-center">
+                      {selectedSharePost.mediaUrl ? (
+                        <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 border border-slate-100 bg-slate-900">
+                          <img src={selectedSharePost.mediaUrl} alt="" className="h-full w-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0 text-sm">
+                          #{selectedChannel?.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-indigo-600">
+                          <span>#{selectedChannel?.name}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-slate-400 font-medium">Post Preview</span>
+                        </div>
+                        <p className="text-xs font-bold text-[#11142D] line-clamp-2 mt-0.5">
+                          {selectedSharePost.content || "Attached Media Post"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tab Selector */}
+                  <div className="grid grid-cols-2 border-b border-slate-100 bg-white p-1.5 gap-1.5 shrink-0 px-6 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShareTab("contacts")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-extrabold transition-all",
+                        shareTab === "contacts"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                      )}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span>CallsChat & Contacts</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShareTab("external")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-extrabold transition-all",
+                        shareTab === "external"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                      )}
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      <span>Socials & Link</span>
+                    </button>
+                  </div>
+
+                  {/* Tab 1 Content: Internal Contacts & Phone */}
+                  {shareTab === "contacts" && (
+                    <form onSubmit={handleSharePostToContacts} className="flex flex-col flex-1 overflow-hidden">
+                      <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                        {/* Search Box */}
+                        <div>
+                          <label className="block text-xs font-extrabold text-[#11142D] mb-1.5">
+                            Search Contacts
+                          </label>
+                          <div className="relative">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <input
+                              type="text"
+                              placeholder="Search by contact name or phone number..."
+                              value={shareContactSearch}
+                              onChange={(e) => setShareContactSearch(e.target.value)}
+                              className="w-full rounded-2xl border border-slate-200 pl-10 pr-4 py-2.5 text-xs font-bold text-[#11142D] focus:border-indigo-600 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Contacts Checkbox List */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-extrabold text-slate-500">
+                            Select Recipients ({selectedShareContactIds.length} selected)
+                          </label>
+                          <div className="max-h-44 overflow-y-auto rounded-2xl border border-slate-100 p-2 divide-y divide-slate-50 bg-slate-50/50">
+                            {contacts
+                              .filter(
+                                (c) =>
+                                  !shareContactSearch ||
+                                  c.name.toLowerCase().includes(shareContactSearch.toLowerCase()) ||
+                                  (c.phone && c.phone.includes(shareContactSearch))
+                              )
+                              .map((c) => {
+                                const isChecked = selectedShareContactIds.includes(c.id);
+                                return (
+                                  <div
+                                    key={c.id}
+                                    onClick={() => {
+                                      setSelectedShareContactIds((prev) =>
+                                        isChecked ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                                      );
+                                    }}
+                                    className={cn(
+                                      "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors",
+                                      isChecked ? "bg-indigo-50/80 border border-indigo-200/60" : "hover:bg-white"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                        {c.avatarUrl ? (
+                                          <img src={c.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                                        ) : (
+                                          c.name.charAt(0).toUpperCase()
+                                        )}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-bold text-[#11142D] truncate">{c.name}</p>
+                                        <p className="text-[10px] font-medium text-slate-400 truncate">{c.phone || "CallsChat User"}</p>
+                                      </div>
+                                    </div>
+                                    <div
+                                      className={cn(
+                                        "h-5 w-5 rounded-lg flex items-center justify-center transition-all shrink-0",
+                                        isChecked ? "bg-indigo-600 text-white" : "border border-slate-300 bg-white"
+                                      )}
+                                    >
+                                      {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            {contacts.length === 0 && (
+                              <p className="text-center py-4 text-xs font-medium text-slate-400">
+                                No contacts loaded or found.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Manual Phone Input Box */}
+                        <div>
+                          <label className="block text-xs font-extrabold text-[#11142D] mb-1.5">
+                            Or enter CallsChat phone numbers / IDs (comma-separated)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. +1234567890, +9876543210"
+                            value={sharePhoneInput}
+                            onChange={(e) => setSharePhoneInput(e.target.value)}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Note Box */}
+                        <div>
+                          <label className="block text-xs font-extrabold text-[#11142D] mb-1">
+                            Add a personal note (optional)
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="Add your thoughts or why you're sharing this..."
+                            value={shareNote}
+                            onChange={(e) => setShareNote(e.target.value)}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-xs font-medium text-[#11142D] focus:border-indigo-600 focus:outline-none resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Submit Footer */}
+                      <div className="border-t border-slate-100 bg-slate-50 px-6 py-3.5 flex items-center justify-end gap-3 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSharePost(null)}
+                          disabled={isSharingPost}
+                          className="rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-200/60 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSharingPost}
+                          className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 text-xs font-extrabold shadow-md transition-all"
+                        >
+                          {isSharingPost ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Sharing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4" />
+                              <span>Share Post</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Tab 2 Content: External Link & Socials */}
+                  {shareTab === "external" && (
+                    <div className="p-6 space-y-5 flex-1 overflow-y-auto">
+                      {/* Copy Link Section */}
+                      <div>
+                        <label className="block text-xs font-extrabold text-[#11142D] mb-1.5">
+                          Direct Post URL
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 rounded-2xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 text-xs font-mono text-slate-600 truncate select-all">
+                            {typeof window !== "undefined"
+                              ? `${window.location.origin}/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`
+                              : `http://localhost:3000/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const url = typeof window !== "undefined"
+                                ? `${window.location.origin}/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`
+                                : `http://localhost:3000/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`;
+                              navigator.clipboard.writeText(url);
+                              toast.success("Post link copied to clipboard!");
+                            }}
+                            className="flex items-center gap-1.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-4 py-2.5 text-xs font-extrabold shrink-0 transition-colors border border-indigo-200/60 shadow-2xs"
+                          >
+                            <Copy className="h-4 w-4" />
+                            <span>Copy</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Native OS Share (If available) */}
+                      {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const url = `${window.location.origin}/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`;
+                              navigator.share({
+                                title: `${selectedChannel?.name} Post`,
+                                text: selectedSharePost.content || "Check out this channel post",
+                                url: url,
+                              }).catch(() => {});
+                            }}
+                            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white py-3 text-xs font-extrabold shadow-md transition-all"
+                          >
+                            <Share2 className="h-4 w-4" />
+                            <span>Share via Device Menu...</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Social Networks Grid */}
+                      <div>
+                        <label className="block text-xs font-extrabold text-[#11142D] mb-2.5">
+                          Share to Social Networks
+                        </label>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <a
+                            href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out this post on #${selectedChannel?.name}: "${selectedSharePost.content || ""}"\n\n👉 ${typeof window !== "undefined" ? window.location.origin : ""}/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2.5 rounded-2xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 px-3.5 py-3 text-xs font-bold text-[#128C7E] transition-all"
+                          >
+                            <MessageSquare className="h-4 w-4 shrink-0 text-[#25D366]" />
+                            <span>WhatsApp</span>
+                          </a>
+
+                          <a
+                            href={`https://t.me/share/url?url=${encodeURIComponent(`${typeof window !== "undefined" ? window.location.origin : ""}/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`)}&text=${encodeURIComponent(`Check out this post on #${selectedChannel?.name}: "${selectedSharePost.content || ""}"`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2.5 rounded-2xl bg-[#0088cc]/10 hover:bg-[#0088cc]/20 border border-[#0088cc]/30 px-3.5 py-3 text-xs font-bold text-[#0088cc] transition-all"
+                          >
+                            <Send className="h-4 w-4 shrink-0 text-[#0088cc]" />
+                            <span>Telegram</span>
+                          </a>
+
+                          <a
+                            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out this post on #${selectedChannel?.name}: "${selectedSharePost.content || ""}"`)}&url=${encodeURIComponent(`${typeof window !== "undefined" ? window.location.origin : ""}/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2.5 rounded-2xl bg-slate-900/10 hover:bg-slate-900/20 border border-slate-900/20 px-3.5 py-3 text-xs font-bold text-slate-900 transition-all"
+                          >
+                            <ExternalLink className="h-4 w-4 shrink-0 text-slate-800" />
+                            <span>Twitter (X)</span>
+                          </a>
+
+                          <a
+                            href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${typeof window !== "undefined" ? window.location.origin : ""}/business/channels/${selectedChannel?.id}?postId=${selectedSharePost.id}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2.5 rounded-2xl bg-[#0A66C2]/10 hover:bg-[#0A66C2]/20 border border-[#0A66C2]/30 px-3.5 py-3 text-xs font-bold text-[#0A66C2] transition-all"
+                          >
+                            <Globe className="h-4 w-4 shrink-0 text-[#0A66C2]" />
+                            <span>LinkedIn</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Close Footer for Tab 2 */}
+                      <div className="pt-3 flex justify-end border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSharePost(null)}
+                          className="rounded-xl bg-slate-100 hover:bg-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 transition-colors"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
