@@ -13,6 +13,7 @@ export interface VerificationRequestData {
   businessId: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   documentUrl?: string;
+  documents?: any;
   submittedAt: string;
 }
 

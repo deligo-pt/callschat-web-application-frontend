@@ -129,6 +129,19 @@ export default function BusinessSettingsPage() {
               <p className="text-xs text-[#8F95B2] italic">Loading profile details...</p>
             )}
           </div>
+
+          <div className="rounded-3xl bg-gradient-to-br from-[#1E1B4B] to-[#2E1065] p-6 text-white shadow-xs">
+            <h3 className="text-base font-bold text-white mb-1">Custom Business Username</h3>
+            <p className="text-xs text-purple-200 mb-4 leading-relaxed">
+              Create a unique @handle so clients and teams can easily find and mention your business across CallsChat.
+            </p>
+            <button
+              onClick={() => router.push("/business/username")}
+              className="w-full rounded-xl bg-[#2563EB] hover:bg-blue-700 py-2.5 text-xs font-bold text-white transition-all shadow-sm"
+            >
+              Manage @Username
+            </button>
+          </div>
         </div>
       </div>
     </div>

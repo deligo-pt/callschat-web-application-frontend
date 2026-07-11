@@ -702,20 +702,71 @@ export function VerificationStatus({ className, onBack }: VerificationStatusProp
           {currentStep === 4 && (
             <div className="flex flex-col gap-6">
               {profile?.isVerified || latestRequest?.status === "APPROVED" ? (
-                <Alert variant="success" className="rounded-[20px] p-6 shadow-sm border-emerald-500/30 bg-emerald-50">
-                  <CheckCircle2 className="h-6 w-6 text-[#2563EB]" strokeWidth={2.5} />
-                  <div>
-                    <AlertTitle className="text-[#0F172A] font-bold flex items-center gap-2">
-                      Your business is verified
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#2563EB]/10 px-2.5 py-0.5 text-[11px] font-extrabold text-[#2563EB]">
-                        Verified Badge Active
+                <>
+                  {/* Top Green Approved Box matching Image */}
+                  <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-[24px] p-8 flex flex-col items-center justify-center text-center shadow-xs">
+                    <div className="bg-[#DCFCE7] text-[#16A34A] rounded-full h-16 w-16 flex items-center justify-center mb-4 shadow-xs">
+                      <CheckCircle2 className="h-9 w-9" strokeWidth={2.5} />
+                    </div>
+                    <h3 className="text-[20px] font-extrabold text-[#16A34A] mb-1 flex items-center justify-center gap-1.5">
+                      Verification Approved{" "}
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-[#16A34A] text-white">
+                        <Check className="h-3.5 w-3.5" strokeWidth={3} />
                       </span>
-                    </AlertTitle>
-                    <AlertDescription className="text-emerald-800 mt-2 text-[13px] leading-relaxed">
-                      Your organization has successfully passed identity and compliance checks. Your verified badge is now displayed across all communications.
-                    </AlertDescription>
+                    </h3>
+                    <p className="text-[13px] font-medium text-[#16A34A] max-w-[340px] leading-relaxed mb-5">
+                      Your business is now verified. A blue verified badge has been added to your profile.
+                    </p>
+                    <div className="bg-[#2563EB] text-white font-bold text-[14px] px-6 py-2.5 rounded-full flex items-center gap-2 shadow-md shadow-blue-500/20 mb-4">
+                      <ShieldCheck className="h-4.5 w-4.5" />
+                      <span>{companyName || profile?.companyName || "Tech Zone"} · Verified</span>
+                    </div>
+                    <span className="bg-[#16A34A] text-white font-bold text-xs px-5 py-1.5 rounded-full shadow-xs">
+                      Approved
+                    </span>
                   </div>
-                </Alert>
+
+                  {/* Submission Summary Table Box matching Image */}
+                  <div className="bg-white border border-slate-200 rounded-[24px] p-6 shadow-xs">
+                    <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase mb-4 block">
+                      SUBMISSION SUMMARY
+                    </span>
+                    <div className="flex flex-col divide-y divide-slate-100 text-xs">
+                      <div className="flex items-center justify-between py-3">
+                        <span className="text-slate-500 font-medium">Documents Submitted</span>
+                        <span className="font-bold text-slate-900">
+                          {latestRequest?.documents
+                            ? typeof latestRequest.documents === "object" && !Array.isArray(latestRequest.documents)
+                              ? Object.keys(latestRequest.documents).length
+                              : Array.isArray(latestRequest.documents)
+                              ? latestRequest.documents.length
+                              : 1
+                            : latestRequest?.documentUrl
+                            ? 1
+                            : totalUploadedCount}{" "}
+                          documents
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-3">
+                        <span className="text-slate-500 font-medium">Identity Verification</span>
+                        <span className="font-bold text-slate-900">Submitted</span>
+                      </div>
+                      <div className="flex items-center justify-between py-3">
+                        <span className="text-slate-500 font-medium">Estimated Review Time</span>
+                        <span className="font-bold text-slate-900">24–72 Hours</span>
+                      </div>
+                      <div className="flex items-center justify-between py-3">
+                        <span className="text-slate-500 font-medium">Status</span>
+                        <span className="font-bold text-[#16A34A] flex items-center gap-1">
+                          <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#16A34A] text-white">
+                            <Check className="h-3 w-3" strokeWidth={3} />
+                          </span>
+                          Approved
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </>
               ) : latestRequest?.status === "REJECTED" ? (
                 <div className="space-y-4">
                   <Alert variant="destructive" className="rounded-[20px] p-6 shadow-sm">
