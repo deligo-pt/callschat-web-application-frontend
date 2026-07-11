@@ -20,6 +20,8 @@
     "group": "Group",
     "contacts": "Contacts",
     "media": "Media",
+    "channel": "Channel",
+    "communities": "Communities",
     "profile": "Profile"
   },
   "profile": {

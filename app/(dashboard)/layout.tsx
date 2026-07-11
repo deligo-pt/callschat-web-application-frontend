@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Inbox, Settings, CheckCircle2, Folder } from "lucide-react";
+import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Inbox, Settings, CheckCircle2, Folder, Share2, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { CallProvider } from "@/components/providers/CallProvider";
@@ -26,9 +26,6 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     if (!isLoading && isBusiness && workspace === null && !isOnboarding) {
       router.replace("/business/onboarding");
     }
-    if (!isLoading && isBusiness && workspace !== null && isOnboarding) {
-      router.replace("/business/dashboard");
-    }
   }, [isLoading, isBusiness, workspace, isOnboarding, router]);
 
   useEffect(() => {
@@ -45,19 +42,14 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
-  const navItems = isBusiness ? [
-    { name: "Dashboard", href: "/business/dashboard", icon: LayoutDashboard },
-    { name: "Inbox", href: "/business/inbox", icon: Inbox },
-    { name: tNav("message"), href: "/chats", icon: MessageSquare },
-    { name: "Teams", href: "/groups", icon: Users },
-    { name: "Analytics", href: "/business/analytics", icon: BarChart3 },
-    { name: "Settings", href: "/business/settings", icon: Settings },
-  ] : [
+  const navItems = [
     { name: tNav("message"), href: "/chats", icon: MessageSquare },
     { name: tNav("calls"), href: "/calls", icon: PhoneCall },
     { name: tNav("group"), href: "/groups", icon: Users },
     { name: tNav("contacts"), href: "/contacts", icon: Contact },
     { name: tNav("media"), href: "/media", icon: Folder },
+    { name: tNav("channel"), href: "/channels", icon: Share2 },
+    { name: tNav("communities"), href: "/communities", icon: UsersRound },
   ];
 
   if (isOnboarding) {
@@ -99,7 +91,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
           <WorkspaceSwitcher compact={true} />
         </div>
 
-        <div className="flex flex-1 flex-col items-center gap-2 w-full mt-2">
+        <div className="flex flex-1 flex-col items-center gap-2.5 w-full mt-2 overflow-y-auto scrollbar-hide px-2">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
@@ -108,21 +100,21 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
                 <Link 
                   key={item.name} 
                   href={item.href}
-                  className="group relative flex w-full flex-col items-center justify-center py-2"
+                  className="group relative flex w-full flex-col items-center justify-center py-1.5 transition-all"
                 >
                   <div 
                     className={cn(
-                      "flex h-[42px] w-[42px] items-center justify-center rounded-full transition-all duration-300 shadow-sm",
+                      "flex h-[46px] w-[46px] items-center justify-center rounded-[18px] transition-all duration-300 shadow-xs",
                       isActive 
-                        ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] border border-purple-100" : "bg-[#EEF2FF] text-[#2563EB] border border-[#E0E7FF]")
-                        : "bg-slate-50 border border-slate-100 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        ? "bg-[#EEF2FF] text-[#2563EB] border border-[#E0E7FF] shadow-blue-500/10"
+                        : "bg-[#F8FAFC] border border-transparent text-[#64748B] hover:bg-[#EEF2FF]/60 hover:text-[#2563EB]"
                     )}
                   >
-                    <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
+                    <Icon className="h-5 w-5" strokeWidth={isActive ? 2.3 : 1.8} />
                   </div>
                   <span className={cn(
-                    "text-[10px] font-bold mt-1.5",
-                    isActive ? (isBusiness ? "text-[#8B5CF6]" : "text-[#2563EB]") : "text-slate-400"
+                    "text-[11px] font-semibold mt-1.5 transition-colors",
+                    isActive ? "text-[#2563EB] font-bold" : "text-[#64748B] group-hover:text-[#2563EB]"
                   )}>
                     {item.name}
                   </span>
@@ -132,22 +124,22 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Profile Button at bottom */}
-        <div className="mt-auto w-full mb-4">
-          <Link href="/profile" className="flex flex-col w-full items-center justify-center py-2">
+        <div className="mt-auto w-full mb-2 px-2 pt-2">
+          <Link href="/profile" className="flex flex-col w-full items-center justify-center py-1.5 group">
             <div className={cn(
-              "flex h-[42px] w-[42px] items-center justify-center rounded-full transition-all duration-300 relative shadow-sm",
+              "flex h-[46px] w-[46px] items-center justify-center rounded-[18px] transition-all duration-300 relative shadow-xs",
               pathname.startsWith("/profile")
-                ? (isBusiness ? "bg-purple-50 text-[#8B5CF6] border border-purple-100" : "bg-[#EEF2FF] text-[#2563EB] border border-[#E0E7FF]")
-                : "bg-slate-50 border border-slate-100 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                ? "bg-[#EEF2FF] text-[#2563EB] border border-[#E0E7FF] shadow-blue-500/10"
+                : "bg-[#F8FAFC] border border-transparent text-[#64748B] hover:bg-[#EEF2FF]/60 hover:text-[#2563EB]"
             )}>
-              <UserCircle2 className="h-5 w-5" strokeWidth={pathname.startsWith("/profile") ? 2.5 : 2} />
+              <UserCircle2 className="h-5 w-5" strokeWidth={pathname.startsWith("/profile") ? 2.3 : 1.8} />
               {isBusiness && (
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#2563EB] ring-2 ring-white" />
               )}
             </div>
             <span className={cn(
-              "text-[10px] font-bold mt-1.5",
-              pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#2563EB]") : "text-slate-400"
+              "text-[11px] font-semibold mt-1.5 transition-colors",
+              pathname.startsWith("/profile") ? "text-[#2563EB] font-bold" : "text-[#64748B] group-hover:text-[#2563EB]"
             )}>
               {tNav("profile")}
             </span>
@@ -161,8 +153,8 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile Bottom Navigation Bar (Hidden on Desktop) */}
-      <nav className="absolute bottom-0 left-0 flex w-full items-center justify-between bg-white/95 backdrop-blur-md px-4 pb-8 pt-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] border-t border-[#F4F6FC] md:hidden z-20">
-        <div className="flex flex-col items-center gap-1">
+      <nav className="absolute bottom-0 left-0 flex w-full items-center justify-between overflow-x-auto scrollbar-hide bg-white/95 backdrop-blur-md px-4 pb-6 pt-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] border-t border-[#F4F6FC] md:hidden z-20 gap-4">
+        <div className="flex flex-col items-center gap-1 shrink-0">
           <WorkspaceSwitcher compact={true} className="h-9 w-9" />
           <span className="text-[9px] font-bold text-[#8F95B2]">Mode</span>
         </div>
@@ -171,25 +163,33 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
           const Icon = item.icon;
           
           return (
-            <Link key={item.name} href={item.href} className="flex flex-col items-center gap-1.5">
-              <div className="relative">
+            <Link key={item.name} href={item.href} className="flex flex-col items-center gap-1.5 shrink-0 min-w-[50px]">
+              <div className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-[12px] transition-colors",
+                isActive ? "bg-[#EEF2FF] text-[#2563EB]" : "text-[#64748B]"
+              )}>
                 <Icon 
-                  className={cn("h-6 w-6 transition-colors", isActive ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0] hover:text-[#3B58F5]")} 
-                  strokeWidth={isActive ? 2.5 : 2} 
+                  className="h-5 w-5" 
+                  strokeWidth={isActive ? 2.3 : 1.8} 
                 />
               </div>
-              <span className={cn("text-[10px] font-bold", isActive ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0]")}>
+              <span className={cn("text-[10px] font-semibold", isActive ? "text-[#2563EB] font-bold" : "text-[#64748B]")}>
                 {item.name}
               </span>
             </Link>
           );
         })}
-        <Link href="/profile" className="flex flex-col items-center gap-1.5">
-          <UserCircle2 
-            className={cn("h-6 w-6 transition-colors", pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0] hover:text-[#3B58F5]")} 
-            strokeWidth={pathname.startsWith("/profile") ? 2.5 : 2} 
-          />
-          <span className={cn("text-[10px] font-bold", pathname.startsWith("/profile") ? (isBusiness ? "text-[#8B5CF6]" : "text-[#3B58F5]") : "text-[#A0A6C0]")}>
+        <Link href="/profile" className="flex flex-col items-center gap-1.5 shrink-0 min-w-[50px]">
+          <div className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-[12px] transition-colors",
+            pathname.startsWith("/profile") ? "bg-[#EEF2FF] text-[#2563EB]" : "text-[#64748B]"
+          )}>
+            <UserCircle2 
+              className="h-5 w-5" 
+              strokeWidth={pathname.startsWith("/profile") ? 2.3 : 1.8} 
+            />
+          </div>
+          <span className={cn("text-[10px] font-semibold", pathname.startsWith("/profile") ? "text-[#2563EB] font-bold" : "text-[#64748B]")}>
             {tNav("profile")}
           </span>
         </Link>

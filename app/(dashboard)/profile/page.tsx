@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut, Briefcase, User, RefreshCw, X, Building2, Globe, MapPin, Sparkles, Search, Star, ChevronRight, Send, Bell, Clock } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut, Briefcase, User, RefreshCw, X, Building2, Globe, MapPin, Sparkles, Search, Star, ChevronRight, Send, Bell, Clock, ShieldCheck, AtSign, CreditCard, UserPlus, Copy, QrCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { LanguageSelector } from "@/components/i18n/LanguageSelector";
 import { InviteFriends } from "@/components/profile/InviteFriends";
 import { DisappearingMessages } from "@/components/profile/DisappearingMessages";
 import { BusinessDashboard } from "@/components/profile/BusinessDashboard";
+import { VerificationStatus } from "@/components/business/VerificationStatus";
 import { Locale } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<Locale, string> = {
@@ -50,10 +51,6 @@ export default function ProfilePage() {
   const t = useTranslations("profile");
   const tCommon = useTranslations("common");
 
-  // Controls which panel is rendered in the right column
-  type ActivePanel = "edit" | "language" | "invite" | "disappearing" | "dashboard";
-  const [activePanel, setActivePanel] = useState<ActivePanel>("edit");
-  
   // State for form fields
   const [userData, setUserData] = useState<UserProfileData | null>(null);
   const [formData, setFormData] = useState({
@@ -73,6 +70,11 @@ export default function ProfilePage() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const activeMode = currentMode || userData?.currentMode || (userData?.accountType === "BUSINESS" ? "BUSINESS" : "PERSONAL");
+
+  // Controls which panel is rendered in the right column
+  type ActivePanel = "contacts" | "edit" | "language" | "invite" | "disappearing" | "dashboard" | "verified" | "card";
+  const [activePanel, setActivePanel] = useState<ActivePanel>(activeMode === "BUSINESS" ? "contacts" : "edit");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   // Fetch initial profile data
   useEffect(() => {
@@ -240,7 +242,7 @@ export default function ProfilePage() {
 
         {/* User Summary */}
         <div className="flex flex-col items-center px-6 pt-4 pb-6">
-          <div className="h-20 w-20 rounded-full bg-[#EEF2FF] flex items-center justify-center border border-[#E0E7FF] mb-3 overflow-hidden">
+          <div className="h-20 w-20 rounded-full bg-[#EEF2FF] flex items-center justify-center border border-[#E0E7FF] mb-3 overflow-hidden shadow-sm">
             {avatarPreview ? (
               <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
             ) : (
@@ -249,7 +251,15 @@ export default function ProfilePage() {
           </div>
           <h2 className="text-[16px] font-bold text-[#0F172A]">{formData.displayName || "User"}</h2>
           <p className="text-[12px] font-medium text-slate-500 mt-1">{formData.phone || "+111 xxx 2345"}</p>
-          <div className="mt-2 rounded-full bg-[#EEF2FF] px-3 py-1 text-[10px] font-bold text-[#2563EB]">
+          {activeMode === "BUSINESS" && (
+            <span 
+              onClick={() => setActivePanel("edit")}
+              className="text-[12px] font-bold text-[#2563EB] hover:underline cursor-pointer mt-1"
+            >
+              {formData.username ? `@${formData.username}` : "techzone"}
+            </span>
+          )}
+          <div className="mt-1.5 rounded-full bg-[#EEF2FF] px-3 py-1 text-[10px] font-bold text-[#2563EB]">
             {activeMode === "BUSINESS" ? "Business" : "Personal"}
           </div>
         </div>
@@ -259,26 +269,89 @@ export default function ProfilePage() {
           {/* ACCOUNT */}
           <div className="flex flex-col">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("account")}</span>
-            <div className="flex flex-col gap-1">
-              <button className="flex items-center justify-between rounded-xl border border-blue-100 bg-white p-3 shadow-sm">
+            <div className="flex flex-col gap-1.5">
+              <button 
+                onClick={() => setActivePanel("edit")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-3 transition-all",
+                  activePanel === "edit" ? "border-blue-200 bg-[#EEF2FF]" : "border-slate-100 bg-white hover:bg-slate-50"
+                )}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB]">
-                    <User className="h-4 w-4" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] text-[#2563EB]">
+                    <Building2 className="h-4.5 w-4.5" />
                   </div>
-                  <div className="flex flex-col items-start">
-                    <span className="text-[13px] font-bold text-[#0F172A]">{t("title")}</span>
-                    <span className="text-[11px] font-medium text-slate-500">{t("edit_information")}</span>
+                  <div className="flex flex-col items-start leading-tight">
+                    <span className="text-[13px] font-bold text-[#0F172A]">{t("title") || "Business Profile"}</span>
+                    <span className="text-[11px] font-medium text-slate-500 mt-0.5">{t("edit_information") || "Edit your information"}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
               </button>
+
+              {activeMode === "BUSINESS" && (
+                <>
+                  <button 
+                    onClick={() => setActivePanel("verified")}
+                    className={cn(
+                      "flex items-center justify-between rounded-xl border p-3 transition-all",
+                      activePanel === "verified" ? "border-blue-200 bg-[#EEF2FF]" : "border-slate-100 bg-white hover:bg-slate-50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] text-[#2563EB]">
+                        <ShieldCheck className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="flex flex-col items-start leading-tight">
+                        <span className="text-[13px] font-bold text-[#0F172A]">Verified Business Account</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </button>
+
+                  <button 
+                    onClick={() => setActivePanel("edit")}
+                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] text-[#2563EB]">
+                        <AtSign className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="flex flex-col items-start leading-tight">
+                        <span className="text-[13px] font-bold text-[#0F172A]">Custom Business Username</span>
+                        <span className="text-[11px] font-medium text-slate-500 mt-0.5">{formData.username ? `@${formData.username}` : "@mybusiness"}</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </button>
+
+                  <button 
+                    onClick={() => setActivePanel("card")}
+                    className={cn(
+                      "flex items-center justify-between rounded-xl border p-3 transition-all",
+                      activePanel === "card" ? "border-blue-200 bg-[#EEF2FF]" : "border-slate-100 bg-white hover:bg-slate-50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] text-[#2563EB]">
+                        <CreditCard className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="flex flex-col items-start leading-tight">
+                        <span className="text-[13px] font-bold text-[#0F172A]">Digital Business Card</span>
+                        <span className="text-[11px] font-medium text-slate-500 mt-0.5">Tap to view & share</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
           {/* PREFERENCES */}
           <div className="flex flex-col">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("preferences")}</span>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
               <button
                 id="open-language-selector"
                 onClick={() => setActivePanel("language")}
@@ -291,29 +364,26 @@ export default function ProfilePage() {
               >
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full",
-                    activePanel === "language" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-slate-50 text-slate-500"
+                    "flex h-8 w-8 items-center justify-center rounded-lg",
+                    activePanel === "language" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-[#EEF2FF] text-[#2563EB]"
                   )}>
-                    <Globe className="h-4 w-4" />
+                    <Globe className="h-4.5 w-4.5" />
                   </div>
-                  <div className="flex flex-col items-start">
+                  <div className="flex flex-col items-start leading-tight">
                     <span className={cn(
                       "text-[13px] font-bold",
                       activePanel === "language" ? "text-[#2563EB]" : "text-[#0F172A]"
                     )}>{tCommon("language")}</span>
-                    <span className="text-[11px] font-medium text-slate-500">{LOCALE_LABELS[currentLocale]}</span>
+                    <span className="text-[11px] font-medium text-slate-500 mt-0.5">{LOCALE_LABELS[currentLocale]}</span>
                   </div>
                 </div>
-                <ChevronRight className={cn(
-                  "h-4 w-4 transition-colors",
-                  activePanel === "language" ? "text-[#2563EB]" : "text-slate-400"
-                )} />
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </button>
 
               <button
                 onClick={() => setActivePanel("invite")}
                 className={cn(
-                  "flex items-center justify-between rounded-xl border p-3 transition-colors mt-2",
+                  "flex items-center justify-between rounded-xl border p-3 transition-colors",
                   activePanel === "invite"
                     ? "border-blue-200 bg-[#EEF2FF]"
                     : "border-slate-100 bg-white hover:bg-slate-50"
@@ -321,46 +391,51 @@ export default function ProfilePage() {
               >
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full",
-                    activePanel === "invite" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-blue-50 text-blue-400"
+                    "flex h-8 w-8 items-center justify-center rounded-lg",
+                    activePanel === "invite" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-[#EEF2FF] text-[#2563EB]"
                   )}>
-                    <Send className="h-4 w-4" />
+                    <Send className="h-4.5 w-4.5" />
                   </div>
-                  <div className="flex flex-col items-start">
+                  <div className="flex flex-col items-start leading-tight">
                     <span className={cn(
                       "text-[13px] font-bold",
                       activePanel === "invite" ? "text-[#2563EB]" : "text-[#0F172A]"
                     )}>{tCommon("invite")}</span>
-                    <span className="text-[11px] font-medium text-slate-500">{t("invite_friend")}</span>
+                    <span className="text-[11px] font-medium text-slate-500 mt-0.5">{t("invite_friend")}</span>
                   </div>
                 </div>
-                <ChevronRight className={cn(
-                  "h-4 w-4 transition-colors",
-                  activePanel === "invite" ? "text-[#2563EB]" : "text-slate-400"
-                )} />
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </button>
               
-              <button className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors mt-2">
+              <div 
+                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-50 text-orange-400">
-                    <Bell className="h-4 w-4" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] text-[#2563EB]">
+                    <Bell className="h-4.5 w-4.5" />
                   </div>
-                  <div className="flex flex-col items-start">
+                  <div className="flex flex-col items-start leading-tight">
                     <span className="text-[13px] font-bold text-[#0F172A]">{tCommon("notifications")}</span>
-                    <span className="text-[11px] font-medium text-slate-500">{t("manage_alerts")}</span>
                   </div>
                 </div>
                 {/* Toggle switch */}
-                <div className="h-5 w-9 rounded-full bg-[#2563EB] relative cursor-pointer">
-                  <div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-white shadow-sm" />
+                <div className={cn(
+                  "h-5 w-9 rounded-full relative transition-colors duration-200 ease-in-out",
+                  notificationsEnabled ? "bg-[#2563EB]" : "bg-slate-200"
+                )}>
+                  <div className={cn(
+                    "absolute top-1 h-3 w-3 rounded-full bg-white shadow-sm transition-all duration-200 ease-in-out",
+                    notificationsEnabled ? "right-1" : "left-1"
+                  )} />
                 </div>
-              </button>
+              </div>
 
               {activeMode === "BUSINESS" && (
                 <button
                   onClick={() => setActivePanel("dashboard")}
                   className={cn(
-                    "flex items-center justify-between rounded-xl border p-3 transition-colors mt-2",
+                    "flex items-center justify-between rounded-xl border p-3 transition-colors",
                     activePanel === "dashboard"
                       ? "border-blue-200 bg-[#EEF2FF]"
                       : "border-slate-100 bg-white hover:bg-slate-50"
@@ -368,23 +443,20 @@ export default function ProfilePage() {
                 >
                   <div className="flex items-center gap-3">
                     <div className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full",
-                      activePanel === "dashboard" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-purple-50 text-purple-400"
+                      "flex h-8 w-8 items-center justify-center rounded-lg",
+                      activePanel === "dashboard" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-[#EEF2FF] text-[#2563EB]"
                     )}>
-                      <Briefcase className="h-4 w-4" />
+                      <Briefcase className="h-4.5 w-4.5" />
                     </div>
-                    <div className="flex flex-col items-start">
+                    <div className="flex flex-col items-start leading-tight">
                       <span className={cn(
                         "text-[13px] font-bold",
                         activePanel === "dashboard" ? "text-[#2563EB]" : "text-[#0F172A]"
                       )}>{tCommon("business_dashboard")}</span>
-                      <span className="text-[11px] font-medium text-slate-500">{t("analytical_insight")}</span>
+                      <span className="text-[11px] font-medium text-slate-500 mt-0.5">{t("analytical_insight")}</span>
                     </div>
                   </div>
-                  <ChevronRight className={cn(
-                    "h-4 w-4 transition-colors",
-                    activePanel === "dashboard" ? "text-[#2563EB]" : "text-slate-400"
-                  )} />
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
               )}
             </div>
@@ -405,22 +477,19 @@ export default function ProfilePage() {
               >
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full",
-                    activePanel === "disappearing" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-pink-50 text-pink-400"
+                    "flex h-8 w-8 items-center justify-center rounded-lg",
+                    activePanel === "disappearing" ? "bg-[#EEF2FF] text-[#2563EB]" : "bg-[#EEF2FF] text-[#2563EB]"
                   )}>
-                    <Clock className="h-4 w-4" />
+                    <Clock className="h-4.5 w-4.5" />
                   </div>
-                  <div className="flex flex-col items-start">
+                  <div className="flex flex-col items-start leading-tight">
                     <span className={cn(
                       "text-[13px] font-bold",
                       activePanel === "disappearing" ? "text-[#2563EB]" : "text-[#0F172A]"
                     )}>{tCommon("disappearing_messages")}</span>
                   </div>
                 </div>
-                <ChevronRight className={cn(
-                  "h-4 w-4 transition-colors",
-                  activePanel === "disappearing" ? "text-[#2563EB]" : "text-slate-400"
-                )} />
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </button>
             </div>
           </div>
@@ -432,10 +501,10 @@ export default function ProfilePage() {
               className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50 p-3 hover:bg-red-100 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-500">
-                  <LogOut className="h-4 w-4" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-red-500">
+                  <LogOut className="h-4.5 w-4.5" />
                 </div>
-                <div className="flex flex-col items-start">
+                <div className="flex flex-col items-start leading-tight">
                   <span className="text-[13px] font-bold text-red-600">{tCommon("logout")}</span>
                 </div>
               </div>
@@ -444,25 +513,129 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Right Column – switches between Edit Form and Language Selector */}
+      {/* Right Column – switches between panels */}
       <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-        {activePanel === "language" ? (
+        {activePanel === "contacts" && activeMode === "BUSINESS" ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white overflow-y-auto">
+            <div className="flex flex-col items-center text-center max-w-sm">
+              <div 
+                onClick={() => router.push("/contacts")}
+                className="mb-6 flex flex-col items-center justify-center h-[140px] w-[140px] rounded-2xl bg-[#2563EB] hover:bg-blue-700 transition-all cursor-pointer text-white shadow-lg shadow-blue-500/20 gap-2 group"
+              >
+                <UserPlus className="h-10 w-10 group-hover:scale-110 transition-transform" strokeWidth={2} />
+                <span className="text-[14px] font-bold tracking-tight">Add contact</span>
+              </div>
+              <p className="text-[14px] font-medium text-slate-500 leading-relaxed mb-6 max-w-[280px]">
+                {t("add_contact_desc") || "Add contacts and start chatting or calling them instantly."}
+              </p>
+              <button 
+                onClick={() => router.push("/contacts")}
+                className="rounded-full bg-[#0F172A] px-6 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-slate-800 shadow-sm"
+              >
+                + Add number
+              </button>
+            </div>
+          </div>
+        ) : activePanel === "language" ? (
           <LanguageSelector
             currentLocale={currentLocale}
-            onBack={() => setActivePanel("edit")}
+            onBack={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
           />
         ) : activePanel === "invite" ? (
           <InviteFriends
-            onBack={() => setActivePanel("edit")}
+            onBack={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
           />
         ) : activePanel === "disappearing" ? (
           <DisappearingMessages
-            onBack={() => setActivePanel("edit")}
+            onBack={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
           />
         ) : activePanel === "dashboard" && activeMode === "BUSINESS" ? (
           <BusinessDashboard
-            onBack={() => setActivePanel("edit")}
+            onBack={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
           />
+        ) : activePanel === "verified" && activeMode === "BUSINESS" ? (
+          <div className="flex-1 flex flex-col bg-[#F8FAFC] overflow-y-auto scrollbar-hide p-6 md:p-10">
+            <div className="max-w-3xl mx-auto w-full">
+              <div className="flex items-center gap-3 mb-8">
+                <button
+                  onClick={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
+                  aria-label="Go back"
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                  <span className="text-[15px] font-bold">Back</span>
+                </button>
+              </div>
+              <VerificationStatus />
+            </div>
+          </div>
+        ) : activePanel === "card" && activeMode === "BUSINESS" ? (
+          <div className="flex-1 flex flex-col items-center justify-center bg-[#F8FAFC] overflow-y-auto scrollbar-hide p-6 md:p-10">
+            <div className="max-w-md w-full">
+              <div className="flex items-center gap-3 mb-6">
+                <button
+                  onClick={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
+                  aria-label="Go back"
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                  <span className="text-[15px] font-bold">Back</span>
+                </button>
+              </div>
+              
+              {/* Digital Business Card Preview */}
+              <div className="rounded-3xl bg-gradient-to-br from-[#1E1B4B] via-[#2E1065] to-[#4C1D95] p-8 text-white shadow-2xl relative overflow-hidden border border-white/10">
+                <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-purple-500/20 blur-2xl pointer-events-none" />
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20">
+                      <Briefcase className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-purple-200">CallsChat Business</span>
+                      <p className="text-xs text-purple-300">Verified Organization</p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-md">
+                    Verified
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border-2 border-white/40 shadow-md shrink-0">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserCircle2 className="h-10 w-10 text-white/80" />
+                    )}
+                  </div>
+                  <div className="overflow-hidden">
+                    <h3 className="text-xl font-bold text-white truncate">{formData.displayName || "Business Account"}</h3>
+                    <p className="text-sm font-medium text-purple-200 truncate">{formData.username ? `@${formData.username}` : "techzone"}</p>
+                    <p className="text-xs text-purple-300 mt-0.5 truncate">{formData.phone || "+111 xxx 2345"}</p>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-6 mt-6 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-purple-300 tracking-wider">Digital Card ID</span>
+                    <p className="text-xs font-mono text-white mt-0.5">{userData?.id?.slice(0, 12) || "CC-BUS-982314"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(window.location.origin + `/profile`);
+                        toast.success("Card link copied to clipboard!");
+                      }}
+                      className="flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-md transition-colors"
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copy Link
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center overflow-y-auto scrollbar-hide py-16">
           <div className="w-full max-w-[440px] flex flex-col px-6">
