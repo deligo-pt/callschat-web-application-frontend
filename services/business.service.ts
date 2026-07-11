@@ -59,8 +59,13 @@ export const BusinessService = {
     return response.data;
   },
 
-  getProfile: async (): Promise<{ success: boolean; data: BusinessProfileData }> => {
+  getProfile: async (): Promise<{ success: boolean; data: BusinessProfileData; message?: string }> => {
     const response = await apiClient.get('/business/profile');
+    return response.data;
+  },
+
+  updateProfile: async (data: Partial<{ companyName: string; category: string; description: string | null; website: string | null; address: string | null }>): Promise<{ success: boolean; data: BusinessProfileData; message?: string }> => {
+    const response = await apiClient.patch('/business/profile', data);
     return response.data;
   },
 

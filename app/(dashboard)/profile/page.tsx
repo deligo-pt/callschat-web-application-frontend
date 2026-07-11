@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut, Briefcase, User, RefreshCw, X, Building2, Globe, MapPin, Sparkles, Search, Star, ChevronRight, Send, Bell, Clock, ShieldCheck, AtSign, CreditCard, UserPlus, Copy, QrCode } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MessageSquare, Edit2, UserCircle2, LogOut, Briefcase, User, RefreshCw, X, Building2, Globe, MapPin, Sparkles, Search, Star, ChevronRight, Send, Bell, Clock, ShieldCheck, AtSign, CreditCard, UserPlus, Copy, QrCode, ChevronDown, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { InviteFriends } from "@/components/profile/InviteFriends";
 import { DisappearingMessages } from "@/components/profile/DisappearingMessages";
 import { BusinessDashboard } from "@/components/profile/BusinessDashboard";
 import { VerificationStatus } from "@/components/business/VerificationStatus";
+import { BusinessService } from "@/services/business.service";
 import { Locale } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<Locale, string> = {
@@ -44,12 +45,13 @@ interface UserProfileData {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { currentMode, updateCurrentMode } = useUser();
+  const { currentMode, updateCurrentMode, businessProfile, refetchBusinessProfile, refetchUser } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const currentLocale = useLocale() as Locale;
   const t = useTranslations("profile");
   const tCommon = useTranslations("common");
+  const tContacts = useTranslations("contacts");
 
   // State for form fields
   const [userData, setUserData] = useState<UserProfileData | null>(null);
@@ -62,6 +64,10 @@ export default function ProfilePage() {
     country: "",
     timezone: "UTC",
     language: "en",
+    companyName: "",
+    category: "Technology",
+    description: "",
+    website: "",
   });
   
   // Avatar handling
@@ -87,20 +93,25 @@ export default function ProfilePage() {
         }
 
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-        const res = await fetch(`${baseUrl}/user/profile`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
+        const [res, bRes] = await Promise.all([
+          fetch(`${baseUrl}/user/profile`, {
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          }),
+          BusinessService.getProfile().catch(() => null)
+        ]);
         
         const data = await res.json();
+        const bData = bRes?.success ? bRes.data : businessProfile;
+
         if (data.success && data.data) {
           setUserData(data.data);
           if (data.data.currentMode) {
             updateCurrentMode(data.data.currentMode);
           }
           setFormData({
-            displayName: data.data.profile.displayName || "",
+            displayName: data.data.profile.displayName || bData?.companyName || "",
             username: data.data.profile.username || "",
             email: data.data.email || "",
             phone: data.data.phone || "",
@@ -108,6 +119,10 @@ export default function ProfilePage() {
             country: data.data.profile.country || "",
             timezone: data.data.profile.timezone || "UTC",
             language: data.data.profile.language || "en",
+            companyName: bData?.companyName || data.data.profile.displayName || "",
+            category: bData?.category || "Technology",
+            description: bData?.description || "",
+            website: bData?.website || "",
           });
           if (data.data.profile.avatarUrl) {
             setAvatarPreview(data.data.profile.avatarUrl);
@@ -146,9 +161,28 @@ export default function ProfilePage() {
 
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
         
+        if (activeMode === "BUSINESS") {
+          const cleanWebsite = formData.website?.trim() || null;
+          const cleanDesc = formData.description?.trim() || null;
+          const resBusiness = await BusinessService.updateProfile({
+            companyName: (formData.companyName || formData.displayName || "My Business").trim(),
+            category: (formData.category || "Technology").trim(),
+            description: cleanDesc,
+            website: cleanWebsite,
+          }).catch(err => {
+            console.error("Business profile update error:", err);
+            return null;
+          });
+          if (resBusiness && !resBusiness.success && resBusiness.message) {
+            toast.error(resBusiness.message);
+          }
+          await refetchBusinessProfile?.();
+        }
+
         // Build FormData
         const submitData = new FormData();
-        if (formData.displayName) submitData.append("displayName", formData.displayName);
+        const effectiveName = activeMode === "BUSINESS" ? (formData.companyName || formData.displayName) : formData.displayName;
+        if (effectiveName) submitData.append("displayName", effectiveName);
         if (formData.username) submitData.append("username", formData.username);
         if (formData.email !== undefined) submitData.append("email", formData.email);
         if (formData.bio) submitData.append("bio", formData.bio);
@@ -170,6 +204,7 @@ export default function ProfilePage() {
         
         if (data.success || res.ok) {
           toast.success("Profile updated successfully!");
+          await refetchUser?.();
         } else {
           toast.error(data.message || "Failed to update profile");
         }
@@ -526,7 +561,7 @@ export default function ProfilePage() {
                 <span className="text-[14px] font-bold tracking-tight">Add contact</span>
               </div>
               <p className="text-[14px] font-medium text-slate-500 leading-relaxed mb-6 max-w-[280px]">
-                {t("add_contact_desc") || "Add contacts and start chatting or calling them instantly."}
+                {t("add_contact_desc") || tContacts("add_contact_desc") || "Add contacts and start chatting or calling them instantly."}
               </p>
               <button 
                 onClick={() => router.push("/contacts")}
@@ -632,6 +667,154 @@ export default function ProfilePage() {
                       <Copy className="h-3.5 w-3.5" /> Copy Link
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : activeMode === "BUSINESS" ? (
+          <div className="flex-1 flex flex-col bg-[#F8FAFC] overflow-hidden relative">
+            {/* Top Bright Blue Header */}
+            <div className="bg-[#2563EB] py-4 px-6 md:px-8 flex items-center gap-3 text-white shrink-0 shadow-sm">
+              <button 
+                onClick={() => setActivePanel("contacts")} 
+                className="flex items-center gap-2 text-white hover:opacity-80 transition-opacity"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                <span className="text-[18px] md:text-[20px] font-bold tracking-wide">Profile</span>
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center scrollbar-hide">
+              <div className="w-full max-w-[560px] flex flex-col items-center">
+                {/* Avatar Section */}
+                <div className="flex flex-col items-center mb-8">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative flex h-20 w-20 md:h-24 md:w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-slate-100 border-2 border-white shadow-md transition-transform hover:scale-105"
+                  >
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Picture" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserCircle2 className="h-12 w-12 text-slate-400" strokeWidth={1.5} />
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-2.5 flex items-center gap-1.5 text-[13px] md:text-[14px] font-bold text-[#2563EB] hover:underline"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Picture
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleImageSelect}
+                    accept="image/jpeg,image/png,image/webp" 
+                    className="hidden" 
+                  />
+                </div>
+
+                {/* Card 1: BASIC INFORMATION */}
+                <div className="w-full rounded-[24px] border border-[#E6EAFA] bg-white p-6 md:p-8 shadow-xs flex flex-col gap-5 mb-6">
+                  <h3 className="text-[11px] font-bold tracking-wider text-[#8F95B2] uppercase">BASIC INFORMATION</h3>
+                  
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[12px] font-bold text-[#64748B]">Business Name</label>
+                    <div className="flex h-[46px] w-full items-center justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 transition-all focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/10">
+                      <input 
+                        type="text" 
+                        value={formData.companyName || formData.displayName} 
+                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value, displayName: e.target.value })} 
+                        placeholder="Enter business name" 
+                        className="w-full bg-transparent text-[13px] font-semibold text-[#0F172A] focus:outline-none placeholder:text-slate-400" 
+                      />
+                      <Pencil className="h-4 w-4 text-[#2563EB] shrink-0 ml-2 cursor-pointer" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[12px] font-bold text-[#64748B]">Business Category</label>
+                    <div className="relative flex h-[46px] w-full items-center justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 transition-all focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/10">
+                      <select 
+                        value={formData.category} 
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })} 
+                        className="w-full bg-transparent text-[13px] font-semibold text-[#0F172A] focus:outline-none appearance-none cursor-pointer pr-6"
+                      >
+                        <option value="Technology">Technology</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Education">Education</option>
+                        <option value="Retail & E-commerce">Retail & E-commerce</option>
+                        <option value="Real Estate">Real Estate</option>
+                        <option value="Media & Entertainment">Media & Entertainment</option>
+                        <option value="Food & Beverage">Food & Beverage</option>
+                        <option value="Consulting">Consulting</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B] pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[12px] font-bold text-[#64748B]">Business Description</label>
+                    <textarea 
+                      rows={3} 
+                      value={formData.description} 
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
+                      placeholder="Describe what your business does..." 
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 text-[13px] font-medium text-[#0F172A] placeholder:text-[#94A3B8] focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all resize-none" 
+                    />
+                  </div>
+                </div>
+
+                {/* Card 2: CONTACT INFORMATION */}
+                <div className="w-full rounded-[24px] border border-[#E6EAFA] bg-white p-6 md:p-8 shadow-xs flex flex-col gap-5 mb-8">
+                  <h3 className="text-[11px] font-bold tracking-wider text-[#8F95B2] uppercase">CONTACT INFORMATION</h3>
+                  
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[12px] font-bold text-[#64748B]">Business Email</label>
+                    <input 
+                      type="email" 
+                      value={formData.email} 
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                      placeholder="Enter your email" 
+                      className="h-[46px] w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 text-[13px] font-semibold text-[#0F172A] placeholder:text-[#94A3B8] focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all" 
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[12px] font-bold text-[#64748B]">Phone Number</label>
+                    <input 
+                      type="text" 
+                      value={formData.phone} 
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+                      placeholder="Enter your number" 
+                      className="h-[46px] w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 text-[13px] font-semibold text-[#0F172A] placeholder:text-[#94A3B8] focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all" 
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[12px] font-bold text-[#64748B]">Website</label>
+                    <input 
+                      type="text" 
+                      value={formData.website} 
+                      onChange={(e) => setFormData({ ...formData, website: e.target.value })} 
+                      placeholder="Enter your web link" 
+                      className="h-[46px] w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 text-[13px] font-semibold text-[#0F172A] placeholder:text-[#94A3B8] focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all" 
+                    />
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="w-full pb-12 flex justify-center">
+                  <button 
+                    onClick={handleSaveProfile} 
+                    disabled={isPending || isLoading} 
+                    className="flex h-[48px] w-full items-center justify-center rounded-xl bg-[#2563EB] text-[14px] font-bold text-white shadow-lg shadow-blue-500/25 transition-all hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save Change"}
+                  </button>
                 </div>
               </div>
             </div>
