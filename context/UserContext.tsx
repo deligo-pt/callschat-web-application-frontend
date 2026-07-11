@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import apiClient from "@/services/api.client";
 import { BusinessService, BusinessProfileData } from "@/services/business.service";
 import { WorkspaceService, WorkspaceData } from "@/services/workspace.service";
@@ -50,7 +50,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentMode, setCurrentModeState] = useState<'PERSONAL' | 'BUSINESS'>('PERSONAL');
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
 
-  const fetchBusinessProfile = async () => {
+  const fetchBusinessProfile = useCallback(async () => {
     try {
       const res = await BusinessService.getProfile();
       if (res?.success) {
@@ -59,9 +59,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       setBusinessProfile(null);
     }
-  };
+  }, []);
 
-  const fetchWorkspace = async () => {
+  const fetchWorkspace = useCallback(async () => {
     try {
       const res = await WorkspaceService.getMyWorkspace();
       if (res?.success) {
@@ -72,9 +72,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       setWorkspace(null);
     }
-  };
+  }, []);
 
-  const fetchQuickReplies = async () => {
+  const fetchQuickReplies = useCallback(async () => {
     try {
       const res = await AutomationService.getAutomations();
       if (res?.success && res.data?.quickReplies) {
@@ -85,7 +85,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       setQuickReplies([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (workspace?.id && currentMode === 'BUSINESS') {
@@ -93,19 +93,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (currentMode === 'PERSONAL') {
       setQuickReplies([]);
     }
-  }, [workspace?.id, currentMode]);
+  }, [workspace?.id, currentMode, fetchQuickReplies]);
 
-  const updateCurrentMode = (mode: 'PERSONAL' | 'BUSINESS') => {
+  const updateCurrentMode = useCallback((mode: 'PERSONAL' | 'BUSINESS') => {
     setCurrentModeState(mode);
     if (typeof window !== "undefined") {
       localStorage.setItem("currentMode", mode);
     }
     setUser((prev) => (prev ? { ...prev, currentMode: mode } : null));
-  };
+  }, []);
 
-
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     if (typeof window === "undefined") return;
     const token = localStorage.getItem("accessToken");
     if (!token) {
@@ -142,7 +140,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const savedMode = typeof window !== "undefined" ? localStorage.getItem("currentMode") as 'PERSONAL' | 'BUSINESS' : null;
@@ -152,7 +150,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchUser();
     fetchBusinessProfile();
     fetchWorkspace();
-  }, []);
+  }, [fetchUser, fetchBusinessProfile, fetchWorkspace]);
 
   return (
     <UserContext.Provider

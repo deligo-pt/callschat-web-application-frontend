@@ -64,12 +64,12 @@ export const BusinessService = {
     return response.data;
   },
 
-  updateProfile: async (data: Partial<{ companyName: string; category: string; description: string | null; website: string | null; address: string | null }>): Promise<{ success: boolean; data: BusinessProfileData; message?: string }> => {
+  updateProfile: async (data: Partial<{ companyName: string; category: string; description: string | null; website: string | null; address: string | null; operatingHours: Record<string, any> | null }>): Promise<{ success: boolean; data: BusinessProfileData; message?: string }> => {
     const response = await apiClient.patch('/business/profile', data);
     return response.data;
   },
 
-  submitVerification: async (data: { documentUrl: string }) => {
+  submitVerification: async (data: { documentUrl?: string | null; documents?: Record<string, string> | null }) => {
     const response = await apiClient.post('/business/verify', data);
     return response.data;
   },

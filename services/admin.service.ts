@@ -54,6 +54,7 @@ export interface PendingBusinessVerification {
   website?: string | null;
   address?: string | null;
   documentUrl?: string | null;
+  documents?: Record<string, string> | any | null;
   status?: string;
   submittedAt?: string | Date;
   createdAt: string | Date;

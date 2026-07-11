@@ -589,21 +589,7 @@ export default function ProfilePage() {
             onBack={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
           />
         ) : activePanel === "verified" && activeMode === "BUSINESS" ? (
-          <div className="flex-1 flex flex-col bg-[#F8FAFC] overflow-y-auto scrollbar-hide p-6 md:p-10">
-            <div className="max-w-3xl mx-auto w-full">
-              <div className="flex items-center gap-3 mb-8">
-                <button
-                  onClick={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")}
-                  aria-label="Go back"
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                  <span className="text-[15px] font-bold">Back</span>
-                </button>
-              </div>
-              <VerificationStatus />
-            </div>
-          </div>
+          <VerificationStatus onBack={() => setActivePanel(activeMode === "BUSINESS" ? "contacts" : "edit")} />
         ) : activePanel === "card" && activeMode === "BUSINESS" ? (
           <div className="flex-1 flex flex-col items-center justify-center bg-[#F8FAFC] overflow-y-auto scrollbar-hide p-6 md:p-10">
             <div className="max-w-md w-full">

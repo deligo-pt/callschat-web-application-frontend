@@ -231,7 +231,46 @@ export default function VerificationsQueuePage() {
                           <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                           <span>{formatDate(item.createdAt)}</span>
                         </div>
-                        {item.documentUrl ? (
+                        {item.documents && typeof item.documents === "object" && !Array.isArray(item.documents) && Object.keys(item.documents).length > 0 ? (
+                          <div className="flex flex-col gap-1.5 w-full">
+                            {Object.entries(item.documents).map(([key, url]: [string, any]) => {
+                              if (!url || typeof url !== "string") return null;
+                              const { viewUrl, downloadUrl } = formatCloudinaryDocLinks(url);
+                              const label = key
+                                .replace(/([A-Z])/g, " $1")
+                                .replace(/^./, (str) => str.toUpperCase())
+                                .trim();
+                              return (
+                                <div key={key} className="flex items-center justify-between gap-2 bg-slate-900/80 px-2 py-1 rounded border border-slate-800">
+                                  <span className="text-[11px] font-semibold text-slate-300 truncate max-w-[120px]" title={label}>
+                                    {label}
+                                  </span>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <a
+                                      href={viewUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 rounded bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-colors"
+                                      title="View preview"
+                                    >
+                                      <FileText className="h-2.5 w-2.5" />
+                                      View
+                                    </a>
+                                    <a
+                                      href={downloadUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center justify-center rounded bg-slate-800 p-1 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors"
+                                      title="Download File"
+                                    >
+                                      <Download className="h-3 w-3" />
+                                    </a>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : item.documentUrl ? (
                           (() => {
                             const { viewUrl, downloadUrl } = formatCloudinaryDocLinks(item.documentUrl);
                             return (
