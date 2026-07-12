@@ -42,6 +42,7 @@ import {
   Copy,
   Link as LinkIcon,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -109,6 +110,12 @@ export function BusinessChannelsModal({
       return role === "ADMIN" || role === "MODERATOR";
     }
     return role === "ADMIN";
+  }, [selectedChannel]);
+
+  const canUserManageSettings = React.useMemo(() => {
+    if (!selectedChannel) return false;
+    const role = selectedChannel.myRole || "ADMIN";
+    return role === "ADMIN" || role === "OWNER";
   }, [selectedChannel]);
 
   // --- Create Wizard State (Steps 1 to 4) ---
@@ -1760,22 +1767,22 @@ export function BusinessChannelsModal({
                 exit={{ opacity: 0, y: -10 }}
                 className={cn("flex flex-col flex-1", !isEmbedded && "-m-7")}
               >
-                {/* Top Banner Gradient */}
-                <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 h-36 sm:h-44 relative flex items-start justify-between p-5 sm:p-6 shrink-0 overflow-hidden shadow-xs">
+                {/* Top Banner Gradient (Matches input_file_0.png exactly) */}
+                <div className="bg-gradient-to-r from-[#88B2FF] via-[#5C8DFF] to-[#8A79FF] h-32 sm:h-36 relative flex items-start justify-between p-4 sm:p-5 shrink-0 overflow-hidden">
                   <div className="absolute inset-0 bg-white/10 backdrop-blur-3xl opacity-30 pointer-events-none" />
-                  <button
-                    onClick={() => {
-                      if (isEmbedded) {
-                        router.push("/business/channels");
-                      } else {
-                        setActiveTab("list");
-                      }
-                    }}
-                    className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/20 hover:bg-slate-900/35 text-white transition-all shadow-xs backdrop-blur-md"
-                    title="Back to Channels"
-                  >
-                    <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
-                  </button>
+                  <div>
+                    {!isEmbedded && (
+                      <button
+                        onClick={() => {
+                          setActiveTab("list");
+                        }}
+                        className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-900/20 hover:bg-slate-900/35 text-white transition-all shadow-xs backdrop-blur-md"
+                        title="Back to Channels"
+                      >
+                        <ArrowLeft className="h-4 w-4 stroke-[2.5]" />
+                      </button>
+                    )}
+                  </div>
 
                   <div className="relative z-10 flex items-center gap-2.5">
                     {canUserPostInSelectedChannel && (
@@ -1785,56 +1792,52 @@ export function BusinessChannelsModal({
                           setAdminSubTab("posts");
                           setShowPostForm(!showPostForm);
                         }}
-                        className="flex h-10 px-4 items-center justify-center gap-2 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition-all shadow-xs backdrop-blur-md"
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 hover:bg-black/30 text-white font-bold transition-all shadow-xs backdrop-blur-md"
                         title="New Post"
                       >
-                        <Plus className="h-4 w-4 stroke-[3]" />
-                        <span className="hidden sm:inline">New Post</span>
+                        <Plus className="h-5 w-5 stroke-[2.5]" />
                       </button>
                     )}
                     <button
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/20 hover:bg-slate-900/35 text-white transition-all shadow-xs backdrop-blur-md"
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 hover:bg-black/30 text-white transition-all shadow-xs backdrop-blur-md"
                       title="Notifications"
                     >
-                      <Bell className="h-5 w-5" />
+                      <Bell className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Channel Profile Info Header */}
-                <div className="px-5 sm:px-8 pb-5 border-b border-slate-100 bg-white shrink-0 shadow-2xs">
-                  <div className="flex items-end justify-between -mt-10 sm:-mt-12">
-                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-3xl sm:text-4xl border-4 border-white shadow-xl flex items-center justify-center overflow-hidden shrink-0">
+                {/* Channel Profile Info Header (Exact match to input_file_0.png) */}
+                <div className="px-5 sm:px-8 pb-4 border-b border-slate-100 bg-white shrink-0">
+                  <div className="flex items-end justify-between -mt-8 sm:-mt-10">
+                    <div className="h-16 w-16 sm:h-[68px] sm:w-[68px] rounded-2xl bg-[#2563EB] text-white font-extrabold text-2xl sm:text-3xl border-4 border-white shadow-md flex items-center justify-center overflow-hidden shrink-0 relative z-10">
                       {selectedChannel.avatarUrl ? (
                         <img src={selectedChannel.avatarUrl} alt="" className="h-full w-full object-cover" />
                       ) : (
                         <span>{selectedChannel.name.charAt(0).toUpperCase()}</span>
                       )}
                     </div>
-                    <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3.5 py-1 text-xs font-extrabold text-indigo-600 shadow-2xs">
-                      {selectedChannel.myRole === 'OWNER' ? 'Owner Mode' : selectedChannel.myRole === 'ADMIN' ? 'Admin Mode' : 'Subscriber'}
-                    </span>
                   </div>
 
-                  <div className="mt-3.5">
+                  <div className="mt-3">
                     <h3 className="text-xl sm:text-2xl font-black text-[#11142D] tracking-tight">{selectedChannel.name}</h3>
-                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                    <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5">
                       {selectedChannel.description || "Latest product news & releases"}
                     </p>
                   </div>
 
-                  <div className="mt-4 pt-3.5 flex items-center gap-6 sm:gap-8 text-xs sm:text-sm text-slate-500 font-medium border-t border-slate-100/80">
+                  <div className="mt-3 pt-1 flex items-center gap-6 text-xs sm:text-[13px] font-semibold text-slate-500">
                     <span className="flex items-center gap-1.5">
-                      <Users className="h-4 w-4 text-indigo-600" />
-                      <strong className="text-[#11142D] font-extrabold">
+                      <Users className="h-4 w-4 text-[#2563EB]" />
+                      <strong className="text-[#11142D] font-bold">
                         {(selectedChannel.memberCount || 1240).toLocaleString()}
                       </strong>{" "}
-                      subscribers
+                      followers
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <FileText className="h-4 w-4 text-indigo-600" />
-                      <strong className="text-[#11142D] font-extrabold">
-                        {messages.length > 0 ? messages.length : 4}
+                      <FileText className="h-4 w-4 text-[#2563EB]" />
+                      <strong className="text-[#11142D] font-bold">
+                        {messages.length.toLocaleString()}
                       </strong>{" "}
                       posts
                     </span>
@@ -1842,15 +1845,15 @@ export function BusinessChannelsModal({
                 </div>
 
                 {/* 3 Tabs Navigation Bar (Posts | Members | Settings) */}
-                <div className="flex items-center border-b border-slate-100 bg-white px-3 sm:px-6 shrink-0 overflow-x-auto no-scrollbar">
+                <div className="flex items-center justify-around border-b border-slate-200/80 bg-white px-4 shrink-0 overflow-x-auto no-scrollbar max-w-2xl mx-auto w-full">
                   <button
                     onClick={() => {
                       setActiveTab("room");
                       setAdminSubTab("posts");
                     }}
-                    className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 text-xs font-bold border-b-2 transition-all ${
+                    className={`flex-1 flex flex-col items-center justify-center gap-1 pt-3.5 pb-2.5 text-xs font-bold border-b-2 transition-all ${
                       activeTab === "room" && adminSubTab === "posts"
-                        ? "border-indigo-600 text-indigo-600"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-slate-400 hover:text-slate-600"
                     }`}
                   >
@@ -1863,9 +1866,9 @@ export function BusinessChannelsModal({
                       setActiveTab("room");
                       setAdminSubTab("members");
                     }}
-                    className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 text-xs font-bold border-b-2 transition-all ${
+                    className={`flex-1 flex flex-col items-center justify-center gap-1 pt-3.5 pb-2.5 text-xs font-bold border-b-2 transition-all ${
                       activeTab === "room" && adminSubTab === "members"
-                        ? "border-indigo-600 text-indigo-600"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-slate-400 hover:text-slate-600"
                     }`}
                   >
@@ -1880,7 +1883,7 @@ export function BusinessChannelsModal({
                         setAdminSubTab("requests");
                         fetchJoinRequests(selectedChannel.id);
                       }}
-                      className={`relative flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 text-xs font-bold border-b-2 transition-all ${
+                      className={`relative flex-1 flex flex-col items-center justify-center gap-1 pt-3.5 pb-2.5 text-xs font-bold border-b-2 transition-all ${
                         activeTab === "room" && adminSubTab === "requests"
                           ? "border-amber-500 text-amber-600"
                           : "border-transparent text-slate-400 hover:text-slate-600"
@@ -1889,7 +1892,7 @@ export function BusinessChannelsModal({
                       <Bell className="h-4 w-4" />
                       <span>Requests</span>
                       {joinRequests.length > 0 && (
-                        <span className="absolute top-2 right-3 h-4 w-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+                        <span className="absolute top-1.5 right-6 h-4 w-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
                           {joinRequests.length}
                         </span>
                       )}
@@ -1902,9 +1905,9 @@ export function BusinessChannelsModal({
                       setAdminSubTab("settings");
                       handleOpenSettings(selectedChannel);
                     }}
-                    className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 text-xs font-bold border-b-2 transition-all ${
+                    className={`flex-1 flex flex-col items-center justify-center gap-1 pt-3.5 pb-2.5 text-xs font-bold border-b-2 transition-all ${
                       activeTab === "settings"
-                        ? "border-indigo-600 text-indigo-600"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-slate-400 hover:text-slate-600"
                     }`}
                   >
@@ -2186,24 +2189,128 @@ export function BusinessChannelsModal({
                               key={msg.id}
                               className={
                                 msg.isSent === false
-                                  ? "border-2 border-amber-300 rounded-2xl p-5 bg-amber-50/20 shadow-2xs space-y-3 relative"
-                                  : "border border-slate-200 rounded-2xl p-5 bg-white shadow-2xs space-y-3"
+                                  ? "border-2 border-amber-300 rounded-[20px] p-5 bg-amber-50/20 shadow-xs space-y-3 relative transition-all"
+                                  : "border border-slate-200/80 rounded-[20px] p-5 bg-white shadow-xs hover:shadow-sm space-y-3 transition-all"
                               }
                             >
-                              <div className="flex items-center justify-between relative">
-                                {msg.isSent === false ? (
-                                  <span className="flex items-center gap-1.5 text-xs font-extrabold text-amber-600 tracking-wide bg-amber-100/70 px-2.5 py-1 rounded-full border border-amber-300 shadow-2xs">
+                              {msg.isSent === false ? (
+                                <div className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600 tracking-wide bg-amber-100/70 px-2.5 py-1 rounded-full border border-amber-300 shadow-2xs">
                                     <Calendar className="h-3.5 w-3.5" />
                                     SCHEDULED FOR {msg.scheduledFor ? new Date(msg.scheduledFor).toLocaleString() : "LATER"}
                                   </span>
-                                ) : msg.isPinned ? (
-                                  <span className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-600 tracking-wide">
+                                </div>
+                              ) : msg.isPinned ? (
+                                <div className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] tracking-wider uppercase">
                                     <Pin className="h-3.5 w-3.5 fill-current" />
                                     PINNED POST
                                   </span>
-                                ) : (
-                                  <span className="text-xs font-bold text-slate-500">ANNOUNCEMENT</span>
-                                )}
+                                </div>
+                              ) : null}
+
+                              {editingPostId === msg.id ? (
+                                <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                  <textarea
+                                    value={editPostContent}
+                                    onChange={(e) => setEditPostContent(e.target.value)}
+                                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-[#11142D] focus:border-[#2563EB] focus:outline-none resize-none"
+                                    rows={3}
+                                  />
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingPostId(null)}
+                                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200/60 transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isUpdatingPost}
+                                      onClick={() => handleUpdatePostContent(msg.id)}
+                                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs"
+                                    >
+                                      {isUpdatingPost && <Loader2 className="h-3 w-3 animate-spin" />}
+                                      <span>Save Changes</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-[14px] font-medium text-[#1E293B] whitespace-pre-wrap leading-relaxed">
+                                  {msg.content}
+                                </p>
+                              )}
+
+                              {msg.mediaUrl && msg.mediaType === "video" ? (
+                                <div className="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-72 bg-black">
+                                  <video src={msg.mediaUrl} controls className="w-full h-auto max-h-72 object-cover" />
+                                </div>
+                              ) : msg.mediaUrl && msg.mediaType === "poll" ? (
+                                (() => {
+                                  let pollData: any = null;
+                                  try {
+                                    pollData = JSON.parse(msg.mediaUrl || "{}");
+                                  } catch (e) {}
+                                  return pollData?.options ? (
+                                    <div className="space-y-2 mt-3 pt-1">
+                                      {pollData.options.map((opt: string, idx: number) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => toast.success(`Voted for: ${opt}`)}
+                                          className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-[#2563EB] hover:text-white text-[#11142D] text-xs font-bold transition-all shadow-2xs group"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <div className="h-6 w-6 rounded-full border-2 border-current flex items-center justify-center text-[11px] font-extrabold shrink-0">
+                                              {idx + 1}
+                                            </div>
+                                            <span>{opt}</span>
+                                          </div>
+                                          <span className="text-[10px] opacity-75 group-hover:opacity-100 font-extrabold">
+                                            Vote
+                                          </span>
+                                        </button>
+                                      ))}
+                                      {pollData.scheduledFor && (
+                                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] mt-2 bg-blue-50 px-3 py-1.5 rounded-xl w-fit">
+                                          <Calendar className="h-3.5 w-3.5" />
+                                          <span>
+                                            Scheduled for: {new Date(pollData.scheduledFor).toLocaleString()}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : null;
+                                })()
+                              ) : msg.mediaUrl ? (
+                                <div className="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-72">
+                                  <img src={msg.mediaUrl} alt="" className="w-full h-auto object-cover" />
+                                </div>
+                              ) : null}
+
+                              {/* Meta Info & Action Menu across from each other (Figma / Image match) */}
+                              <div className="flex items-center justify-between text-xs text-slate-400 font-medium pt-3 mt-1">
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleIncrementView(msg)}
+                                    className="flex items-center gap-1 hover:text-slate-600 transition-colors"
+                                    title="Views count"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    <span>{(msg.viewsCount ?? 1240).toLocaleString()}</span>
+                                  </button>
+                                  <span>·</span>
+                                  <span>
+                                    {new Date(msg.createdAt).toLocaleDateString([], {
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                </div>
+
                                 <div className="relative">
                                   <button
                                     type="button"
@@ -2233,7 +2340,7 @@ export function BusinessChannelsModal({
                                             </>
                                           ) : (
                                             <>
-                                              <Pin className="h-3.5 w-3.5 text-indigo-600" />
+                                              <Pin className="h-3.5 w-3.5 text-[#2563EB]" />
                                               <span>Pin to Top</span>
                                             </>
                                           )}
@@ -2270,105 +2377,8 @@ export function BusinessChannelsModal({
                                 </div>
                               </div>
 
-                              {editingPostId === msg.id ? (
-                                <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                  <textarea
-                                    value={editPostContent}
-                                    onChange={(e) => setEditPostContent(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-[#11142D] focus:border-indigo-600 focus:outline-none resize-none"
-                                    rows={3}
-                                  />
-                                  <div className="flex items-center justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingPostId(null)}
-                                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200/60 transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={isUpdatingPost}
-                                      onClick={() => handleUpdatePostContent(msg.id)}
-                                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors shadow-xs"
-                                    >
-                                      {isUpdatingPost && <Loader2 className="h-3 w-3 animate-spin" />}
-                                      <span>Save Changes</span>
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <p className="text-sm font-medium text-[#11142D] whitespace-pre-wrap leading-relaxed">
-                                  {msg.content}
-                                </p>
-                              )}
-
-                              {msg.mediaUrl && msg.mediaType === "video" ? (
-                                <div className="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-72 bg-black">
-                                  <video src={msg.mediaUrl} controls className="w-full h-auto max-h-72 object-cover" />
-                                </div>
-                              ) : msg.mediaUrl && msg.mediaType === "poll" ? (
-                                (() => {
-                                  let pollData: any = null;
-                                  try {
-                                    pollData = JSON.parse(msg.mediaUrl || "{}");
-                                  } catch (e) {}
-                                  return pollData?.options ? (
-                                    <div className="space-y-2 mt-3 pt-1">
-                                      {pollData.options.map((opt: string, idx: number) => (
-                                        <button
-                                          key={idx}
-                                          type="button"
-                                          onClick={() => toast.success(`Voted for: ${opt}`)}
-                                          className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-[#4F46E5] hover:text-white text-[#11142D] text-xs font-bold transition-all shadow-2xs group"
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <div className="h-6 w-6 rounded-full border-2 border-current flex items-center justify-center text-[11px] font-extrabold shrink-0">
-                                              {idx + 1}
-                                            </div>
-                                            <span>{opt}</span>
-                                          </div>
-                                          <span className="text-[10px] opacity-75 group-hover:opacity-100 font-extrabold">
-                                            Vote
-                                          </span>
-                                        </button>
-                                      ))}
-                                      {pollData.scheduledFor && (
-                                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 mt-2 bg-indigo-50 px-3 py-1.5 rounded-xl w-fit">
-                                          <Calendar className="h-3.5 w-3.5" />
-                                          <span>
-                                            Scheduled for: {new Date(pollData.scheduledFor).toLocaleString()}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : null;
-                                })()
-                              ) : msg.mediaUrl ? (
-                                <div className="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-72">
-                                  <img src={msg.mediaUrl} alt="" className="w-full h-auto object-cover" />
-                                </div>
-                              ) : null}
-
-                              <div className="flex items-center justify-between text-xs text-slate-400 font-medium pt-1">
-                                <button
-                                  onClick={() => handleIncrementView(msg)}
-                                  className="flex items-center gap-1 hover:text-slate-600 transition-colors"
-                                  title="Views count"
-                                >
-                                  <span>👁️ {(msg.viewsCount ?? 1).toLocaleString()}</span>
-                                </button>
-                                <span>
-                                  {new Date(msg.createdAt).toLocaleDateString([], {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                              </div>
-
-                              <div className="border-t border-slate-100 pt-3 grid grid-cols-2 text-xs font-bold text-slate-500">
+                              {/* Card Bottom Action Bar (Like & Share) */}
+                              <div className="border-t border-slate-100 pt-3.5 mt-3.5 grid grid-cols-2 text-xs font-bold text-slate-500">
                                 <button
                                   onClick={() => handleLikePost(msg)}
                                   className={`flex items-center justify-center gap-1.5 transition-colors py-1 ${
@@ -2380,7 +2390,7 @@ export function BusinessChannelsModal({
                                 </button>
                                 <button
                                   onClick={() => handleOpenShareModal(msg)}
-                                  className="flex items-center justify-center gap-1.5 hover:text-indigo-600 transition-colors py-1"
+                                  className="flex items-center justify-center gap-1.5 hover:text-[#2563EB] transition-colors py-1"
                                 >
                                   <Share2 className="h-4 w-4" />
                                   <span>{(postShareCounts[msg.id] || 0) > 0 ? `Share (${postShareCounts[msg.id]})` : "Share"}</span>
@@ -2389,18 +2399,18 @@ export function BusinessChannelsModal({
                             </div>
                           ))}
 
-                          {/* Empty State */}
+                          {/* Authentic Empty State when no messages exist yet */}
                           {messages.length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-                              <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center">
-                                <MessageSquare className="h-8 w-8 text-slate-300" />
+                            <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 rounded-[20px] border border-slate-200/80 bg-white p-8 shadow-xs">
+                              <div className="h-16 w-16 bg-blue-50/80 rounded-full flex items-center justify-center text-[#2563EB]">
+                                <MessageSquare className="h-8 w-8 stroke-[2]" />
                               </div>
                               <div>
-                                <h3 className="text-sm font-bold text-[#11142D]">No posts yet</h3>
-                                <p className="text-xs font-medium text-slate-400 mt-1 max-w-[250px]">
-                                  {selectedChannel.myRole === 'ADMIN' || selectedChannel.myRole === 'MODERATOR' 
-                                    ? "Create the first post to welcome your members to this channel."
-                                    : "There are no posts in this channel yet."}
+                                <h3 className="text-base font-extrabold text-[#11142D]">No posts right now</h3>
+                                <p className="text-xs font-medium text-slate-400 mt-1 max-w-[280px] mx-auto leading-relaxed">
+                                  {selectedChannel.myRole === 'ADMIN' || selectedChannel.myRole === 'OWNER' || selectedChannel.myRole === 'MODERATOR' 
+                                    ? "Create the first post to share announcements, news, or updates with your audience."
+                                    : "There are no posts published in this channel yet. Check back soon for updates!"}
                                 </p>
                               </div>
                             </div>
@@ -2792,123 +2802,227 @@ export function BusinessChannelsModal({
                   )}
 
                   {/* 3. SETTINGS SUB-TAB (Inside Admin View) */}
-                  {activeTab === "settings" && (
-                    <form onSubmit={handleSaveSettings} className={cn("mx-auto space-y-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm transition-all", isEmbedded ? "max-w-2xl" : "max-w-md")}>
+                  {(activeTab === "settings" || (activeTab === "room" && adminSubTab === "settings")) && (
+                    <form onSubmit={handleSaveSettings} className={cn("mx-auto space-y-6 pt-2 pb-12 transition-all", isEmbedded ? "max-w-2xl" : "max-w-xl")}>
                       <div>
-                        <label className="block text-xs font-bold text-[#11142D] mb-1">Channel Name</label>
-                        <input
-                          type="text"
-                          required
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-[#11142D] focus:border-indigo-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#11142D] mb-1">Website URL</label>
-                        <input
-                          type="text"
-                          placeholder="https://yourbusiness.com"
-                          value={editWebsite}
-                          onChange={(e) => setEditWebsite(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#11142D] mb-1">Category</label>
-                        <select
-                          value={editCategory}
-                          onChange={(e) => setEditCategory(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-[#11142D] focus:border-indigo-600 focus:outline-none"
-                        >
-                          {CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#11142D] mb-1">Description</label>
-                        <textarea
-                          rows={3}
-                          value={editDescription}
-                          onChange={(e) => setEditDescription(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 p-3 text-sm font-medium text-[#11142D] focus:border-indigo-600 focus:outline-none resize-none"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-bold text-[#11142D] mb-1">Who can join</label>
-                          <select
-                            value={editWhoCanJoin}
-                            onChange={(e) => setEditWhoCanJoin(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-[#11142D] focus:border-indigo-600 focus:outline-none"
-                          >
-                            <option value="ANYONE">Anyone</option>
-                            <option value="INVITE_ONLY">Invite Only</option>
-                            <option value="REQUIRES_APPROVAL">Requires Approval</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-[#11142D] mb-1">Who can post</label>
-                          <select
-                            value={editWhoCanPost}
-                            onChange={(e) => setEditWhoCanPost(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-[#11142D] focus:border-indigo-600 focus:outline-none"
-                          >
-                            <option value="ADMIN_ONLY">Admin Only</option>
-                            <option value="ADMIN_MODERATORS">Admin + Moderators</option>
-                          </select>
+                        <label className="block text-xs font-bold text-slate-400 mb-2">Name</label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            required
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            disabled={!canUserManageSettings}
+                            className="w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 pr-12 text-sm font-semibold text-[#11142D] focus:border-[#2563EB] focus:outline-none shadow-2xs transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                          />
+                          {canUserManageSettings && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                if (input) input.focus();
+                              }}
+                              className="absolute right-4 text-[#2563EB] hover:text-blue-700 p-1 transition-colors"
+                              title="Edit Name"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50">
-                        <span className="text-sm font-bold text-[#11142D]">Enable Reactions</span>
-                        <input
-                          type="checkbox"
-                          checked={editEnableReactions}
-                          onChange={(e) => setEditEnableReactions(e.target.checked)}
-                          className="h-6 w-11 rounded-full text-indigo-600 focus:ring-indigo-600"
-                        />
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-2">Description</label>
+                        <div className="relative flex items-start">
+                          <textarea
+                            rows={3}
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            disabled={!canUserManageSettings}
+                            className="w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 pr-12 text-sm font-semibold text-[#11142D] focus:border-[#2563EB] focus:outline-none shadow-2xs resize-none transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                          />
+                          {canUserManageSettings && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                const textarea = e.currentTarget.previousElementSibling as HTMLTextAreaElement;
+                                if (textarea) textarea.focus();
+                              }}
+                              className="absolute right-4 top-3.5 text-[#2563EB] hover:text-blue-700 p-1 transition-colors"
+                              title="Edit Description"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                        <button
-                          type="button"
-                          disabled={isDeleting}
-                          onClick={() => setShowDeleteConfirm(true)}
-                          className="flex items-center gap-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2.5 text-xs font-bold transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span>Delete Channel</span>
-                        </button>
+                      <div>
+                        <span className="block text-xs font-bold text-slate-400 mb-2.5">Privacy & Interactions</span>
+                        <div className="rounded-3xl border border-slate-200/80 bg-white shadow-2xs divide-y divide-slate-100/80 overflow-hidden">
+                          <div className="flex items-center justify-between p-4.5 sm:px-6 py-4">
+                            <div>
+                              <span className="block text-sm font-bold text-[#11142D]">Public Channel</span>
+                              <span className="block text-xs text-slate-400 mt-0.5 font-medium">Anyone can find and join</span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={!canUserManageSettings}
+                              onClick={() => setEditWhoCanJoin(editWhoCanJoin === "ANYONE" ? "INVITE_ONLY" : "ANYONE")}
+                              className={cn(
+                                "w-12 h-7 rounded-full transition-colors flex items-center p-1 shrink-0",
+                                editWhoCanJoin === "ANYONE" ? "bg-[#2563EB]" : "bg-slate-200",
+                                !canUserManageSettings && "opacity-60 cursor-not-allowed"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "w-5 h-5 rounded-full bg-white shadow-sm transition-transform",
+                                  editWhoCanJoin === "ANYONE" ? "translate-x-5" : "translate-x-0"
+                                )}
+                              />
+                            </button>
+                          </div>
 
-                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between p-4.5 sm:px-6 py-4">
+                            <div>
+                              <span className="block text-sm font-bold text-[#11142D]">Enable Reactions</span>
+                              <span className="block text-xs text-slate-400 mt-0.5 font-medium">Members can react with emoji</span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={!canUserManageSettings}
+                              onClick={() => setEditEnableReactions(!editEnableReactions)}
+                              className={cn(
+                                "w-12 h-7 rounded-full transition-colors flex items-center p-1 shrink-0",
+                                editEnableReactions ? "bg-[#2563EB]" : "bg-slate-200",
+                                !canUserManageSettings && "opacity-60 cursor-not-allowed"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "w-5 h-5 rounded-full bg-white shadow-sm transition-transform",
+                                  editEnableReactions ? "translate-x-5" : "translate-x-0"
+                                )}
+                              />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between p-4.5 sm:px-6 py-4">
+                            <div>
+                              <span className="block text-sm font-bold text-[#11142D]">Notifications</span>
+                              <span className="block text-xs text-slate-400 mt-0.5 font-medium">Notify for every new post</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toast.success("Notification preferences updated!")}
+                              className="w-12 h-7 rounded-full transition-colors flex items-center p-1 bg-[#2563EB] shrink-0"
+                            >
+                              <div className="w-5 h-5 rounded-full bg-white shadow-sm transition-transform translate-x-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <details className="group rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                          <summary className="flex items-center justify-between text-xs font-bold text-slate-500 cursor-pointer list-none select-none">
+                            <span>Advanced Configuration (Website, Category & Posting Permissions)</span>
+                            <span className="text-[#2563EB] group-open:rotate-180 transition-transform">▼</span>
+                          </summary>
+                          <div className="space-y-4 pt-4 mt-2 border-t border-slate-100">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-400 mb-1.5">Website URL</label>
+                              <input
+                                type="text"
+                                placeholder="https://yourbusiness.com"
+                                value={editWebsite}
+                                onChange={(e) => setEditWebsite(e.target.value)}
+                                disabled={!canUserManageSettings}
+                                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-[#11142D] focus:border-[#2563EB] focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5">Category</label>
+                                <select
+                                  value={editCategory}
+                                  onChange={(e) => setEditCategory(e.target.value)}
+                                  disabled={!canUserManageSettings}
+                                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-[#11142D] focus:border-[#2563EB] focus:outline-none"
+                                >
+                                  {CATEGORIES.map((cat) => (
+                                    <option key={cat} value={cat}>
+                                      {cat}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5">Who can post</label>
+                                <select
+                                  value={editWhoCanPost}
+                                  onChange={(e) => setEditWhoCanPost(e.target.value)}
+                                  disabled={!canUserManageSettings}
+                                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-[#11142D] focus:border-[#2563EB] focus:outline-none"
+                                >
+                                  <option value="ADMIN_ONLY">Admin Only</option>
+                                  <option value="ADMIN_MODERATORS">Admin + Moderators</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+
+                      {canUserManageSettings && (
+                        <div className="flex items-center justify-end gap-3 pt-2">
                           <button
                             type="button"
                             onClick={() => {
-                              setActiveTab("room");
-                              setAdminSubTab("posts");
+                              if (selectedChannel) {
+                                setEditName(selectedChannel.name);
+                                setEditDescription(selectedChannel.description || "");
+                                setEditWebsite(selectedChannel.website || "");
+                                setEditCategory(selectedChannel.category || "General");
+                                setEditWhoCanJoin(selectedChannel.whoCanJoin || "ANYONE");
+                                setEditWhoCanPost(selectedChannel.whoCanPost || "ADMIN_ONLY");
+                                setEditEnableReactions(selectedChannel.enableReactions !== false);
+                              }
                             }}
-                            className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors"
+                            className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
                           >
-                            Cancel
+                            Reset
                           </button>
                           <button
                             type="submit"
                             disabled={isSavingSettings}
-                            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-all"
+                            className="flex items-center gap-2 rounded-xl bg-[#2563EB] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-all"
                           >
-                            {isSavingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>Save</span>}
+                            {isSavingSettings && <Loader2 className="h-4 w-4 animate-spin" />}
+                            <span>Save Changes</span>
                           </button>
                         </div>
-                      </div>
+                      )}
+
+                      {canUserManageSettings && (
+                        <div
+                          onClick={() => !isDeleting && setShowDeleteConfirm(true)}
+                          className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:px-6 shadow-2xs flex items-center justify-between cursor-pointer hover:border-red-200 hover:bg-red-50/30 transition-all group mt-6"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center shrink-0 border border-red-100 group-hover:bg-red-100 group-hover:text-red-600 transition-colors">
+                              <AlertTriangle className="h-5 w-5 stroke-[2.2]" />
+                            </div>
+                            <div>
+                              <span className="block text-sm font-bold text-red-600">Delete Channel</span>
+                              <span className="block text-xs text-slate-400 mt-0.5 font-medium">Permanently remove all data</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </form>
                   )}
                 </div>

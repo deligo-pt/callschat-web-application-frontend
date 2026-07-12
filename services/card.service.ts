@@ -9,6 +9,7 @@ export interface DigitalCardData {
   phone: string;
   email: string;
   website: string;
+  address?: string | null;
   avatarUrl: string | null;
   isVerified: boolean;
   qrCodeDataUrl: string;
@@ -23,6 +24,7 @@ export interface UpdateDigitalCardPayload {
   phone?: string;
   email?: string;
   website?: string;
+  address?: string;
   displayName?: string;
   bio?: string;
 }

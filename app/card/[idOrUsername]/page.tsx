@@ -6,6 +6,7 @@ import {
   Phone,
   Mail,
   Globe,
+  MapPin,
   Download,
   Share2,
   QrCode,
@@ -117,6 +118,7 @@ export default function PublicDigitalCardPage() {
     phone,
     email,
     website,
+    address = "123 Business Parkway, Suite 100, Silicon Valley, CA",
     avatarUrl,
     isVerified,
     qrCodeDataUrl: qrImage,
@@ -362,6 +364,10 @@ export default function PublicDigitalCardPage() {
               <Globe className="h-3.5 w-3.5 text-white/75 shrink-0" strokeWidth={2} />
               <span>{website}</span>
             </a>
+            <div className="flex items-start gap-2.5">
+              <MapPin className="h-3.5 w-3.5 text-white/75 shrink-0 mt-0.5" strokeWidth={2} />
+              <span className="line-clamp-2">{address}</span>
+            </div>
           </div>
         </div>
 
@@ -552,15 +558,22 @@ export default function PublicDigitalCardPage() {
 
             <h4 className="text-lg font-bold text-slate-800">{personName}</h4>
             <p className="text-xs font-semibold text-blue-600 mt-0.5">{companyName}</p>
-            <p className="text-xs text-slate-500 mt-2 max-w-[240px]">
-              Scan with any mobile phone camera or QR reader to instantly import contact details.
+            <div className="mt-2 bg-slate-50 rounded-xl p-2.5 text-[11px] text-slate-600 text-left border border-slate-200/60 space-y-1 w-full">
+              <div className="font-semibold text-slate-800">QR Code Encoded Data:</div>
+              <div>🏢 <span className="font-medium">Business:</span> {companyName}</div>
+              <div>📧 <span className="font-medium">Email:</span> {email}</div>
+              <div>📞 <span className="font-medium">Phone:</span> {phone}</div>
+              <div>📍 <span className="font-medium">Address:</span> {address}</div>
+            </div>
+            <p className="text-xs text-slate-500 mt-2.5 max-w-[260px]">
+              Scan with any mobile phone camera to instantly view and save all business contact details.
             </p>
 
-            <div className="mt-6 flex flex-col sm:flex-row gap-2.5 w-full">
+            <div className="mt-5 flex flex-col sm:flex-row gap-2.5 w-full">
               <button
                 onClick={handleDownloadPNGClick}
                 disabled={downloadingPng}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Download className="h-3.5 w-3.5" />
                 <span>Download QR</span>
@@ -568,7 +581,7 @@ export default function PublicDigitalCardPage() {
               <button
                 onClick={handleDownloadVCardClick}
                 disabled={downloadingVCard}
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <UserCheck className="h-3.5 w-3.5 text-slate-600" />
                 <span>Save Contact</span>

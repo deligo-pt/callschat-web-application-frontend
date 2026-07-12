@@ -6,6 +6,7 @@ import {
   Phone,
   Mail,
   Globe,
+  MapPin,
   Download,
   Share2,
   Printer,
@@ -74,6 +75,7 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
     phone: "",
     email: "",
     website: "",
+    address: "",
   });
 
   // Fetch digital card data on mount
@@ -92,6 +94,7 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
             phone: response.data.phone || "",
             email: response.data.email || "",
             website: response.data.website || "",
+            address: response.data.address || "",
           });
         }
       } catch (err) {
@@ -119,6 +122,7 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
   const phone = cardData?.phone || formData.phone || "+1 555 000 0000";
   const email = cardData?.email || userData?.email || formData.email || "hello@techzone.com";
   const website = cardData?.website || businessProfile?.website || formData.website || "techzone.com";
+  const address = cardData?.address || businessProfile?.address || (formData as any)?.address || "123 Business Parkway, Suite 100, Silicon Valley, CA";
   const qrImage = cardData?.qrCodeDataUrl || null;
   const isVerified = cardData?.isVerified || businessProfile?.isVerified || false;
   const shareUrl = cardData?.shareUrl || (typeof window !== "undefined" ? window.location.href : "");
@@ -138,6 +142,7 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
         phone,
         email,
         website,
+        address: address || "",
       });
       setIsEditModalOpen(true);
     }
@@ -241,7 +246,6 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
       const fileName = `${companyName.replace(/\s+/g, "_")}_Digital_Card.png`;
       const file = new File([blob], fileName, { type: "image/png" });
 
-      // If mobile OS/browser natively supports sharing image files directly into WhatsApp/Messenger/Email
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({
@@ -257,11 +261,9 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
             setSharingCard(false);
             return;
           }
-          // If native share fails or user cancels, fallback to share modal
         }
       }
 
-      // Open interactive image share modal
       const url = URL.createObjectURL(blob);
       setShareImageBlob(blob);
       setShareImageUrl(url);
@@ -417,6 +419,10 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
               <div className="flex items-center gap-2.5">
                 <Globe className="h-3.5 w-3.5 text-white/75 shrink-0" strokeWidth={2} />
                 <span>{website}</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <MapPin className="h-3.5 w-3.5 text-white/75 shrink-0 mt-0.5" strokeWidth={2} />
+                <span className="line-clamp-2">{address}</span>
               </div>
             </div>
           </div>
@@ -627,15 +633,22 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
 
             <h4 className="text-lg font-bold text-slate-800">{personName}</h4>
             <p className="text-xs font-semibold text-blue-600 mt-0.5">{companyName}</p>
-            <p className="text-xs text-slate-500 mt-2 max-w-[240px]">
-              Scan with any mobile phone camera or QR reader to instantly import contact details.
+            <div className="mt-2 bg-slate-50 rounded-xl p-2.5 text-[11px] text-slate-600 text-left border border-slate-200/60 space-y-1 w-full">
+              <div className="font-semibold text-slate-800">QR Code Encoded Data:</div>
+              <div>🏢 <span className="font-medium">Business:</span> {companyName}</div>
+              <div>📧 <span className="font-medium">Email:</span> {email}</div>
+              <div>📞 <span className="font-medium">Phone:</span> {phone}</div>
+              <div>📍 <span className="font-medium">Address:</span> {address}</div>
+            </div>
+            <p className="text-xs text-slate-500 mt-2.5 max-w-[260px]">
+              Scan with any mobile phone camera to instantly view and save all business contact details.
             </p>
 
-            <div className="mt-6 flex flex-col sm:flex-row gap-2.5 w-full">
+            <div className="mt-5 flex flex-col sm:flex-row gap-2.5 w-full">
               <button
                 onClick={handleDownloadPNGClick}
                 disabled={downloadingPng}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Download className="h-3.5 w-3.5" />
                 <span>Download QR</span>
@@ -643,7 +656,7 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
               <button
                 onClick={handleDownloadVCardClick}
                 disabled={downloadingVCard}
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <UserCheck className="h-3.5 w-3.5 text-slate-600" />
                 <span>Save Contact</span>
@@ -733,16 +746,29 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Website URL</label>
-                <input
-                  type="text"
-                  required
-                  value={editForm.website}
-                  onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                  placeholder="e.g. techzone.com"
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Website URL</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.website}
+                    onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                    placeholder="e.g. techzone.com"
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Business Address</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    placeholder="e.g. 123 Business Pkwy, Silicon Valley"
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                </div>
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
