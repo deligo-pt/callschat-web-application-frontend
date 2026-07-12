@@ -58,6 +58,7 @@ interface ProfileContextType {
   handleSaveProfile: () => void;
   handleLogout: () => Promise<void>;
   businessProfile: any;
+  refreshProfile?: () => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextType | null>(null);
@@ -253,6 +254,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshProfile = async () => {
+    try {
+      await Promise.all([
+        refetchUser?.(),
+        refetchBusinessProfile?.(),
+      ]);
+    } catch (err) {
+      console.error("Failed to refresh profile:", err);
+    }
+  };
+
   return (
     <ProfileContext.Provider
       value={{
@@ -274,6 +286,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         handleSaveProfile,
         handleLogout,
         businessProfile,
+        refreshProfile,
       }}
     >
       {children}

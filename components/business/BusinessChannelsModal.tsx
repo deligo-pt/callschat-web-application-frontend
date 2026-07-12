@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   Camera,
   Check,
   ChevronRight,
@@ -67,6 +68,23 @@ const CATEGORIES = [
   "Product Updates",
   "Community",
 ];
+
+const CONTACT_AVATAR_COLORS = [
+  "bg-[#2563EB]",
+  "bg-[#8B5CF6]",
+  "bg-[#10B981]",
+  "bg-[#EF4444]",
+  "bg-[#F59E0B]",
+  "bg-[#EC4899]",
+  "bg-[#06B6D4]",
+];
+
+const getContactAvatarColor = (nameOrId: string, index: number) => {
+  if (!nameOrId) return CONTACT_AVATAR_COLORS[index % CONTACT_AVATAR_COLORS.length];
+  let hash = 0;
+  for (let i = 0; i < nameOrId.length; i++) hash = nameOrId.charCodeAt(i) + ((hash << 5) - hash);
+  return CONTACT_AVATAR_COLORS[Math.abs(hash) % CONTACT_AVATAR_COLORS.length];
+};
 
 export function BusinessChannelsModal({
   isOpen,
@@ -1020,8 +1038,11 @@ export function BusinessChannelsModal({
       >
         {/* Top Bar Header (Matches mobile Figma design headers) */}
         {(!isEmbedded || (activeTab !== "room" && activeTab !== "settings")) && (
-          <div className="flex items-center justify-between border-b border-[#F0F4FF] bg-white px-7 py-5 shrink-0">
-            <div className="flex items-center gap-3">
+          <div className={cn(
+            "flex items-center justify-between border-b px-7 py-5 shrink-0 transition-colors",
+            activeTab === "create" ? "border-[#2563EB] bg-[#2563EB] text-white shadow-sm" : "border-[#F0F4FF] bg-white text-[#11142D]"
+          )}>
+            <div className="flex items-center gap-3.5">
               {activeTab !== "list" ? (
                 <button
                   onClick={() => {
@@ -1033,7 +1054,10 @@ export function BusinessChannelsModal({
                       setActiveTab("list");
                     }
                   }}
-                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 text-[#3B58F5] transition-colors"
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+                    activeTab === "create" ? "hover:bg-blue-700/50 text-white" : "hover:bg-slate-100 text-[#3B58F5]"
+                  )}
                 >
                   <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
                 </button>
@@ -1047,12 +1071,12 @@ export function BusinessChannelsModal({
               )}
 
               <div>
-                <h2 className="text-lg font-bold text-[#11142D] tracking-tight">
+                <h2 className={cn("text-lg font-bold tracking-tight", activeTab === "create" ? "text-white text-xl" : "text-[#11142D]")}>
                   {activeTab === "list" && "Business Channels"}
                   {activeTab === "create" && step === 1 && "Channel Information"}
                   {activeTab === "create" && step === 2 && "Channel Settings"}
-                  {activeTab === "create" && step === 3 && "Channel Settings"}
-                  {activeTab === "create" && step === 4 && "Business Channels"}
+                  {activeTab === "create" && step === 3 && "Channels"}
+                  {activeTab === "create" && step === 4 && "Channels"}
                   {activeTab === "room" && selectedChannel && `#${selectedChannel.name}`}
                   {activeTab === "settings" && "Channel Settings"}
                 </h2>
@@ -1065,7 +1089,12 @@ export function BusinessChannelsModal({
             {!isEmbedded && (
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+                  activeTab === "create"
+                    ? "bg-blue-700/60 text-white hover:bg-blue-700 hover:text-white"
+                    : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+                )}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1589,7 +1618,7 @@ export function BusinessChannelsModal({
                             : "No contacts match your search."}
                         </div>
                       ) : (
-                        filteredContacts.map((c) => {
+                        filteredContacts.map((c, idx) => {
                           const isSelected = c.isPhoneOnly
                             ? selectedPhones.includes(c.id)
                             : selectedMemberIds.includes(c.id);
@@ -1611,10 +1640,16 @@ export function BusinessChannelsModal({
                                   }
                                 }
                               }}
-                              className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-colors"
+                              className={cn(
+                                "flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer shadow-2xs group",
+                                isSelected ? "border-blue-300 bg-blue-50/20" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                              )}
                             >
                               <div className="flex items-center gap-3.5">
-                                <div className="h-10 w-10 rounded-full bg-[#3B58F5] text-white font-bold flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                                <div className={cn(
+                                  "h-10 w-10 rounded-full text-white font-bold flex items-center justify-center overflow-hidden shrink-0 shadow-2xs text-sm",
+                                  getContactAvatarColor(c.name || c.id, idx)
+                                )}>
                                   {c.avatarUrl ? (
                                     <img src={c.avatarUrl} alt={c.name} className="h-full w-full object-cover" />
                                   ) : (
@@ -1629,11 +1664,11 @@ export function BusinessChannelsModal({
 
                               <div className="shrink-0">
                                 {isSelected ? (
-                                  <div className="h-6 w-6 rounded-full bg-[#3B58F5] text-white flex items-center justify-center shadow-xs">
+                                  <div className="h-6 w-6 rounded-full bg-[#2563EB] text-white flex items-center justify-center shadow-xs border-2 border-[#2563EB]">
                                     <Check className="h-3.5 w-3.5 stroke-[3]" />
                                   </div>
                                 ) : (
-                                  <div className="h-6 w-6 rounded-full border-2 border-slate-300" />
+                                  <div className="h-6 w-6 rounded-full border border-slate-300 bg-white" />
                                 )}
                               </div>
                             </div>
@@ -1648,10 +1683,12 @@ export function BusinessChannelsModal({
                         type="button"
                         disabled={isSubmitting}
                         onClick={executeCreateChannel}
-                        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#3B58F5] py-4 text-sm font-bold text-white shadow-lg shadow-[#3B58F5]/25 hover:bg-[#2C48B8] disabled:opacity-60 transition-all"
+                        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#2563EB] py-4 text-sm font-bold text-white shadow-lg shadow-[#2563EB]/25 hover:bg-blue-700 disabled:opacity-60 transition-all"
                       >
                         {isSubmitting ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : selectedMemberIds.length === 0 && selectedPhones.length === 0 ? (
+                          <span className="flex items-center gap-2">Continue <ArrowRight className="h-4 w-4 stroke-[2.5]" /></span>
                         ) : (
                           <span>Create Channel</span>
                         )}
@@ -1674,37 +1711,41 @@ export function BusinessChannelsModal({
                   <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="flex flex-col items-center justify-center py-12 text-center space-y-6"
+                    className="flex flex-col items-center justify-center py-16 text-center space-y-7 my-auto max-w-md mx-auto"
                   >
-                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-blue-100 text-[#3B58F5] shadow-xl shadow-blue-500/20 p-3">
-                      <div className="flex h-full w-full items-center justify-center rounded-full bg-[#3B58F5] text-white">
+                    <div className="relative flex items-center justify-center pt-6 pb-2">
+                      <div className="absolute w-36 h-36 rounded-full bg-blue-100/60 animate-pulse" />
+                      <div className="absolute w-28 h-28 rounded-full bg-blue-200/70" />
+                      <div className="relative z-10 w-20 h-20 rounded-full bg-[#2563EB] text-white flex items-center justify-center shadow-xl shadow-blue-500/35">
                         <Check className="h-10 w-10 stroke-[3]" />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-extrabold text-[#11142D] max-w-xs mx-auto leading-snug">
+                    <div className="space-y-2 pt-2">
+                      <h3 className="text-xl sm:text-2xl font-black text-[#11142D] tracking-tight max-w-sm mx-auto leading-snug">
                         Your channel has been created successfully!
                       </h3>
-                      <p className="text-xs font-medium text-slate-500 max-w-sm mx-auto">
-                        Start sharing content with your audience with your audience
+                      <p className="text-sm font-medium text-slate-500 max-w-sm mx-auto">
+                        Start sharing content with your audience
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        handleResetWizard();
-                        if (isEmbedded && onClose) {
-                          onClose();
-                        } else {
-                          setActiveTab("list");
-                          fetchChannels();
-                        }
-                      }}
-                      className="w-full rounded-2xl bg-[#3B58F5] py-4 text-sm font-bold text-white shadow-lg shadow-[#3B58F5]/25 hover:bg-[#2C48B8] transition-all mt-4"
-                    >
-                      Go to My Channels
-                    </button>
+                    <div className="w-full pt-4 max-w-xs mx-auto">
+                      <button
+                        onClick={() => {
+                          handleResetWizard();
+                          if (isEmbedded && onClose) {
+                            onClose();
+                          } else {
+                            setActiveTab("list");
+                            fetchChannels();
+                          }
+                        }}
+                        className="w-full rounded-2xl bg-[#2563EB] py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition-all"
+                      >
+                        Go to My Channels
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </motion.div>
