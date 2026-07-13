@@ -9,29 +9,22 @@ import {
   Search, 
   Megaphone, 
   Check, 
-  Plus, 
-  Sparkles, 
-  Building2, 
-  BookOpen, 
-  Newspaper, 
-  Users, 
-  Briefcase, 
-  Laptop, 
-  TrendingUp,
-  Globe
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { communityService } from "@/services/community.service";
 
 export interface CommunityItem {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   category: string;
   memberCount: number;
   groupCount?: number;
-  iconBg: string;
-  iconColor: string;
+  iconBg?: string;
+  iconColor?: string;
+  myRole?: string;
 }
 
 interface CreateCommunitiesUIProps {
@@ -62,6 +55,7 @@ const SUGGESTED_GROUPS_LIST: SuggestedGroup[] = [
 export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommunitiesUIProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [buttonStage, setButtonStage] = useState<"continue" | "create">("continue");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Step 1 State
   const [communityName, setCommunityName] = useState("");
@@ -88,7 +82,6 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
         ? prev.filter((id) => id !== groupId)
         : [...prev, groupId];
         
-      // If user toggles groups in step 2, we can switch button stage to 'create' after interaction or keep it responsive
       if (updated.length > 0 && buttonStage === "continue") {
         setButtonStage("create");
       }
@@ -96,28 +89,44 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
     });
   };
 
-  const handleStep2Action = () => {
+  const handleStep2Action = async () => {
     if (buttonStage === "continue") {
-      // First click on step 2 'Continue ->' transitions the button to 'Create' (Matching Image 3 -> Image 4)
       setButtonStage("create");
       toast.info("Review your selected groups and click Create when ready");
       return;
     }
 
-    // Finalize creation
-    const newComm: CommunityItem = {
-      id: `comm-${Date.now()}`,
-      name: communityName.trim(),
-      description: description.trim() || "Team collaboration hub",
-      category: category,
-      memberCount: 1,
-      groupCount: selectedGroupIds.length + 1, // +1 for required Announcements group
-      iconBg: "bg-blue-100",
-      iconColor: "text-blue-600",
-    };
+    if (isSubmitting) return;
 
-    toast.success(`🎉 "${newComm.name}" community created successfully!`);
-    onCommunityCreated(newComm);
+    setIsSubmitting(true);
+    try {
+      const selectedGroupNames = selectedGroupIds.map(
+        (id) => SUGGESTED_GROUPS_LIST.find((g) => g.id === id)?.name || id
+      );
+
+      const res = await communityService.createCommunity({
+        name: communityName.trim(),
+        description: description.trim() || undefined,
+        category,
+        groupNames: selectedGroupNames,
+      });
+
+      if (res.success && res.data) {
+        toast.success(`🎉 "${res.data.name}" community created successfully!`);
+        onCommunityCreated({
+          ...res.data,
+          iconBg: "bg-blue-100",
+          iconColor: "text-blue-600",
+        });
+      } else {
+        toast.error(res.error || "Failed to create community");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("An error occurred while creating the community");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filteredSuggestedGroups = SUGGESTED_GROUPS_LIST.filter((g) =>
@@ -125,7 +134,7 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
   );
 
   return (
-    <div className="flex flex-1 flex-col h-full w-full bg-white sm:bg-[#F8FAFC]/50 overflow-hidden relative">
+    <div className="flex flex-1 flex-col h-full w-full bg-white sm:bg-[#F8FAFC]/50 overflow-hidden relative select-none">
       {/* Blue Top Header Bar */}
       <header className="h-[68px] bg-[#2563EB] text-white px-6 sm:px-8 flex items-center gap-3.5 shrink-0 shadow-sm z-10 w-full">
         <button
@@ -136,7 +145,8 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
               onBack();
             }
           }}
-          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/15 transition-colors text-white"
+          disabled={isSubmitting}
+          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/15 transition-colors text-white disabled:opacity-50"
           title="Back"
         >
           <ArrowLeft className="h-5 w-5 stroke-[2.2]" />
@@ -296,12 +306,13 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
                   return (
                     <div
                       key={group.id}
-                      onClick={() => handleToggleGroup(group.id)}
+                      onClick={() => !isSubmitting && handleToggleGroup(group.id)}
                       className={cn(
                         "rounded-2xl border p-4 flex items-center justify-between transition-all cursor-pointer select-none",
                         isSelected
                           ? "border-[#2563EB] bg-[#EFF6FF]/40 shadow-xs"
-                          : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"
+                          : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]",
+                        isSubmitting ? "opacity-60 cursor-not-allowed" : ""
                       )}
                     >
                       <div className="flex items-center gap-3.5">
@@ -333,12 +344,18 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
               <button
                 type="button"
                 onClick={handleStep2Action}
+                disabled={isSubmitting}
                 className={cn(
-                  "h-12 w-full max-w-xs rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-[14px] shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2 group select-none",
+                  "h-12 w-full max-w-xs rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-[14px] shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2 group select-none disabled:opacity-75",
                   buttonStage === "create" ? "px-10" : ""
                 )}
               >
-                {buttonStage === "continue" ? (
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Creating Hub...</span>
+                  </>
+                ) : buttonStage === "continue" ? (
                   <>
                     <span>Continue</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
