@@ -56,6 +56,8 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
         // Do nothing (just mark as read)
         break;
       case "CHANNEL_INVITATION":
+      case "CHANNEL_MESSAGE":
+      case "CHANNEL_UPDATE":
         if (notification.routeId) {
           router.push(`/business/channels/${notification.routeId}`);
         } else {
@@ -121,11 +123,21 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       );
       break;
     case "CHANNEL_INVITATION":
+    case "CHANNEL_UPDATE":
       Icon = Users;
       iconClass = "text-indigo-600";
       textContent = (
         <>
-          <span className="font-semibold text-foreground">{issuerName}</span> {notification.content || "invited you to join a channel"}
+          <span className="font-semibold text-foreground">{issuerName}</span> {notification.content || "updated channel membership"}
+        </>
+      );
+      break;
+    case "CHANNEL_MESSAGE":
+      Icon = MessageCircle;
+      iconClass = "text-blue-600";
+      textContent = (
+        <>
+          <span className="font-semibold text-foreground">{issuerName}</span> {notification.content || "posted an update in a channel"}
         </>
       );
       break;

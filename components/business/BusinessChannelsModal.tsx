@@ -39,6 +39,9 @@ import {
   PinOff,
   Phone,
   ShieldCheck,
+  Shield,
+  ShieldOff,
+  UserMinus,
   Copy,
   Link as LinkIcon,
   ExternalLink,
@@ -51,6 +54,9 @@ import { ContactService } from "@/services/contact.service";
 import { chatService } from "@/services/chat.service";
 import { cn } from "@/lib/utils";
 import { uploadToCloudinary } from "@/services/business.service";
+import { useSocket } from "@/components/providers/SocketProvider";
+import { playNotificationSound } from "@/utils/sounds";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
 interface BusinessChannelsModalProps {
   isOpen: boolean;
@@ -87,6 +93,14 @@ const getContactAvatarColor = (nameOrId: string, index: number) => {
   return CONTACT_AVATAR_COLORS[Math.abs(hash) % CONTACT_AVATAR_COLORS.length];
 };
 
+function parseJwt(token: string) {
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch (e) {
+    return null;
+  }
+}
+
 export function BusinessChannelsModal({
   isOpen,
   onClose,
@@ -95,12 +109,96 @@ export function BusinessChannelsModal({
   initialChannelId,
 }: BusinessChannelsModalProps) {
   const router = useRouter();
+  const { socket } = useSocket();
   const [activeTab, setActiveTab] = useState<"list" | "create" | "room" | "settings">("list");
   const [channels, setChannels] = useState<ChannelData[]>([]);
   const [myInvitations, setMyInvitations] = useState<ChannelInvitationData[]>([]);
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
   const [isLoadingChannels, setIsLoadingChannels] = useState(true);
   const [selectedChannel, setSelectedChannel] = useState<ChannelData | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [isJoiningChannel, setIsJoiningChannel] = useState(false);
+  const [isLeavingChannel, setIsLeavingChannel] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  useEffect(() => {
+    if (selectedChannel) {
+      setIsSubscribed(Boolean(localStorage.getItem(`channel_sub_${selectedChannel.id}`)));
+    }
+  }, [selectedChannel?.id]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      const decoded = parseJwt(token);
+      if (decoded) {
+        setCurrentUserId(decoded.sub || decoded.id || "");
+      }
+    }
+  }, []);
+
+  // --- Real-time Socket Subscriptions for Business Channels ---
+  useEffect(() => {
+    if (!socket || !selectedChannel?.id || selectedChannel.id === "create") return;
+
+    socket.emit("channel:join_room", {
+      channelId: selectedChannel.id,
+      workspaceId: selectedChannel.workspaceId || undefined,
+    });
+    console.log(`📡 Joined real-time socket room for channel #${selectedChannel.name}`);
+  }, [socket, selectedChannel?.id, selectedChannel?.workspaceId, selectedChannel?.name]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleReceiveMessage = (newMsg: any) => {
+      if (!newMsg || !newMsg.id) return;
+
+      if (selectedChannel && newMsg.channelId === selectedChannel.id) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) {
+            return prev.map((m) => (m.id === newMsg.id ? newMsg : m));
+          }
+          const updated = [newMsg, ...prev];
+          return updated.sort((a, b) => {
+            if (a.isPinned !== b.isPinned) return (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0);
+            if (a.isSent !== b.isSent) return (a.isSent === false ? -1 : 1);
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+        });
+
+        if (newMsg.senderId !== currentUserId) {
+          playNotificationSound("message");
+          toast.info(`New post in #${selectedChannel.name}`, {
+            description: `${newMsg.senderName}: ${newMsg.content?.slice(0, 80) || "Shared media"}`,
+          });
+        }
+      } else {
+        if (newMsg.senderId !== currentUserId) {
+          playNotificationSound("message");
+          const targetChannel = channels.find((c) => c.id === newMsg.channelId);
+          const chName = targetChannel ? `#${targetChannel.name}` : "Business Channel";
+          toast.info(`New update in ${chName}`, {
+            description: `${newMsg.senderName}: ${newMsg.content?.slice(0, 60) || "Shared media"}`,
+            action: targetChannel
+              ? {
+                  label: "View",
+                  onClick: () => {
+                    handleSelectChannelToRoom(targetChannel);
+                  },
+                }
+              : undefined,
+          });
+        }
+      }
+    };
+
+    socket.on("channel:receive_message", handleReceiveMessage);
+    return () => {
+      socket.off("channel:receive_message", handleReceiveMessage);
+    };
+  }, [socket, selectedChannel?.id, selectedChannel?.name, channels, currentUserId]);
 
   const canUserPostInSelectedChannel = React.useMemo(() => {
     if (!selectedChannel) return false;
@@ -117,6 +215,12 @@ export function BusinessChannelsModal({
     const role = selectedChannel.myRole || "ADMIN";
     return role === "ADMIN" || role === "OWNER";
   }, [selectedChannel]);
+
+  const canUserManageMembers = React.useMemo(() => {
+    if (!selectedChannel) return false;
+    const role = selectedChannel.myRole || "ADMIN";
+    return role === "ADMIN" || role === "OWNER" || selectedChannel.ownerId === currentUserId;
+  }, [selectedChannel, currentUserId]);
 
   // --- Create Wizard State (Steps 1 to 4) ---
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -865,7 +969,8 @@ export function BusinessChannelsModal({
       const res = await ChannelService.updateChannelMemberRole(selectedChannel.id, memberId, role);
       if (res?.success) {
         setChannelMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, role } : m)));
-        toast.success(`Role updated to ${role}`);
+        toast.success(`Role updated to ${role === "MODERATOR" ? "Moderator" : "Member"}`);
+        fetchChannelMembers(selectedChannel.id);
       }
     } catch (e: any) {
       toast.error(e?.response?.data?.error?.message || "Failed to update role");
@@ -884,12 +989,93 @@ export function BusinessChannelsModal({
       if (res?.success) {
         setChannelMembers((prev) => prev.filter((m) => m.id !== memberId));
         toast.success("Member removed successfully");
+        fetchChannelMembers(selectedChannel.id);
       }
     } catch (e: any) {
       toast.error(e?.response?.data?.error?.message || "Failed to remove member");
     } finally {
       setIsUpdatingMember(false);
       setOpenMemberMenuId(null);
+    }
+  };
+
+  const handleToggleSubscribe = async () => {
+    if (!selectedChannel) return;
+    setIsSubscribing(true);
+    try {
+      const nextState = !isSubscribed;
+      setIsSubscribed(nextState);
+      if (nextState) {
+        localStorage.setItem(`channel_sub_${selectedChannel.id}`, "true");
+        toast.success(`Subscribed to notifications for #${selectedChannel.name}`);
+      } else {
+        localStorage.removeItem(`channel_sub_${selectedChannel.id}`);
+        toast.info(`Unsubscribed from notifications for #${selectedChannel.name}`);
+      }
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
+  const handleJoinChannel = async () => {
+    if (!selectedChannel) return;
+    try {
+      setIsJoiningChannel(true);
+      const res = await ChannelService.joinChannel(selectedChannel.id, selectedChannel.workspaceId);
+      if (res?.success) {
+        if (res.data?.status === "pending") {
+          toast.success("Join request submitted. Awaiting admin approval.");
+        } else {
+          toast.success(`Joined #${selectedChannel.name} successfully`);
+          setSelectedChannel((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isMember: true,
+                  memberCount: (prev.memberCount || 0) + 1,
+                }
+              : null
+          );
+          fetchChannelMembers(selectedChannel.id);
+          fetchChannels();
+        }
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error?.message || "Failed to join channel");
+    } finally {
+      setIsJoiningChannel(false);
+    }
+  };
+
+  const handleLeaveChannel = async () => {
+    if (!selectedChannel) return;
+    if (selectedChannel.ownerId === currentUserId) {
+      toast.error("Channel owners cannot leave their own channel. You can delete the channel in Settings instead.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to leave #${selectedChannel.name}?`)) return;
+    try {
+      setIsLeavingChannel(true);
+      const res = await ChannelService.leaveChannel(selectedChannel.id, selectedChannel.workspaceId);
+      if (res?.success) {
+        toast.success(`Left #${selectedChannel.name}`);
+        setSelectedChannel((prev) =>
+          prev
+            ? {
+                ...prev,
+                isMember: false,
+                memberCount: Math.max(0, (prev.memberCount || 1) - 1),
+              }
+            : null
+        );
+        fetchChannelMembers(selectedChannel.id);
+        fetchChannels();
+        setActiveTab("list");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error?.message || "Failed to leave channel");
+    } finally {
+      setIsLeavingChannel(false);
     }
   };
 
@@ -1785,62 +1971,131 @@ export function BusinessChannelsModal({
                   </div>
 
                   <div className="relative z-10 flex items-center gap-2.5">
-                    {canUserPostInSelectedChannel && (
+                    {!selectedChannel.isMember && selectedChannel.ownerId !== currentUserId ? (
                       <button
-                        onClick={() => {
-                          setActiveTab("room");
-                          setAdminSubTab("posts");
-                          setShowPostForm(!showPostForm);
-                        }}
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 hover:bg-black/30 text-white font-bold transition-all shadow-xs backdrop-blur-md"
-                        title="New Post"
+                        type="button"
+                        onClick={handleJoinChannel}
+                        disabled={isJoiningChannel}
+                        className="bg-[#4F46E5] hover:bg-[#4338CA] text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
                       >
-                        <Plus className="h-5 w-5 stroke-[2.5]" />
+                        {isJoiningChannel ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <span>Join</span>
+                        )}
                       </button>
+                    ) : (
+                      <>
+                        {canUserPostInSelectedChannel && (
+                          <button
+                            onClick={() => {
+                              setActiveTab("room");
+                              setAdminSubTab("posts");
+                              setShowPostForm(!showPostForm);
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 hover:bg-black/30 text-white font-bold transition-all shadow-xs backdrop-blur-md"
+                            title="New Post"
+                          >
+                            <Plus className="h-5 w-5 stroke-[2.5]" />
+                          </button>
+                        )}
+                        <NotificationDropdown
+                          channelId={selectedChannel.id}
+                          customTrigger={(unread) => (
+                            <button
+                              className="relative flex h-9 w-9 items-center justify-center rounded-full bg-black/20 hover:bg-black/30 text-white transition-all shadow-xs backdrop-blur-md"
+                              title="Channel Notifications"
+                            >
+                              <Bell className="h-4 w-4" />
+                              {unread > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-xs">
+                                  {unread}
+                                </span>
+                              )}
+                            </button>
+                          )}
+                        />
+                      </>
                     )}
-                    <button
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 hover:bg-black/30 text-white transition-all shadow-xs backdrop-blur-md"
-                      title="Notifications"
-                    >
-                      <Bell className="h-4 w-4" />
-                    </button>
                   </div>
                 </div>
 
                 {/* Channel Profile Info Header (Exact match to input_file_0.png) */}
-                <div className="px-5 sm:px-8 pb-4 border-b border-slate-100 bg-white shrink-0">
-                  <div className="flex items-end justify-between -mt-8 sm:-mt-10">
-                    <div className="h-16 w-16 sm:h-[68px] sm:w-[68px] rounded-2xl bg-[#2563EB] text-white font-extrabold text-2xl sm:text-3xl border-4 border-white shadow-md flex items-center justify-center overflow-hidden shrink-0 relative z-10">
-                      {selectedChannel.avatarUrl ? (
-                        <img src={selectedChannel.avatarUrl} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span>{selectedChannel.name.charAt(0).toUpperCase()}</span>
-                      )}
+                <div className="px-5 sm:px-8 pb-5 border-b border-slate-100 bg-white shrink-0">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-8 sm:-mt-10 relative z-10">
+                    {/* Left: Avatar & Title info */}
+                    <div className="flex flex-col items-start">
+                      <div className="h-16 w-16 sm:h-[68px] sm:w-[68px] rounded-2xl bg-[#2563EB] text-white font-extrabold text-2xl sm:text-3xl border-4 border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
+                        {selectedChannel.avatarUrl ? (
+                          <img src={selectedChannel.avatarUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span>{selectedChannel.name.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+
+                      <div className="mt-3">
+                        <h3 className="text-xl sm:text-2xl font-black text-[#11142D] tracking-tight">{selectedChannel.name}</h3>
+                        <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5">
+                          {selectedChannel.description || "Latest product news & releases"}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 pt-1 flex items-center gap-6 text-xs sm:text-[13px] font-semibold text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <Users className="h-4 w-4 text-[#2563EB]" />
+                          <strong className="text-[#11142D] font-bold">
+                            {(selectedChannel.memberCount || 1240).toLocaleString()}
+                          </strong>{" "}
+                          followers
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <FileText className="h-4 w-4 text-[#2563EB]" />
+                          <strong className="text-[#11142D] font-bold">
+                            {messages.length.toLocaleString()}
+                          </strong>{" "}
+                          posts
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-3">
-                    <h3 className="text-xl sm:text-2xl font-black text-[#11142D] tracking-tight">{selectedChannel.name}</h3>
-                    <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5">
-                      {selectedChannel.description || "Latest product news & releases"}
-                    </p>
-                  </div>
-
-                  <div className="mt-3 pt-1 flex items-center gap-6 text-xs sm:text-[13px] font-semibold text-slate-500">
-                    <span className="flex items-center gap-1.5">
-                      <Users className="h-4 w-4 text-[#2563EB]" />
-                      <strong className="text-[#11142D] font-bold">
-                        {(selectedChannel.memberCount || 1240).toLocaleString()}
-                      </strong>{" "}
-                      followers
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="h-4 w-4 text-[#2563EB]" />
-                      <strong className="text-[#11142D] font-bold">
-                        {messages.length.toLocaleString()}
-                      </strong>{" "}
-                      posts
-                    </span>
+                    {/* Right: Subscribe Box (matches input_file_0.png and input_file_1.png) */}
+                    {selectedChannel.ownerId !== currentUserId && (
+                      <div className="bg-[#F0F5FF] border border-[#DCE8FF] rounded-2xl p-2.5 sm:px-4 sm:py-3 flex items-center justify-between sm:justify-start gap-3 shadow-xs shrink-0 max-w-md w-full sm:w-auto self-start sm:self-center mt-2 sm:mt-0">
+                        <div className="h-10 w-10 rounded-xl bg-[#5850EC] flex items-center justify-center text-white shrink-0 shadow-sm">
+                          <Bell className="h-5 w-5" />
+                        </div>
+                        <div className="flex flex-col flex-1 mr-2">
+                          <span className="text-xs sm:text-sm font-bold text-[#11142D] leading-tight">
+                            {isSubscribed ? "Subscribed to updates" : "Subscribe to stay updated"}
+                          </span>
+                          <span className="text-[11px] sm:text-xs text-[#3B82F6] font-medium leading-tight mt-0.5">
+                            {isSubscribed ? "You will receive post notifications" : "Get notified when new posts are shared"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleToggleSubscribe}
+                          disabled={isSubscribing}
+                          className={cn(
+                            "px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all shrink-0 flex items-center gap-1.5",
+                            isSubscribed
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                              : "bg-[#4F46E5] hover:bg-[#4338CA] text-white"
+                          )}
+                        >
+                          {isSubscribing ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : isSubscribed ? (
+                            <>
+                              <Check className="h-3.5 w-3.5" />
+                              <span>Subscribed</span>
+                            </>
+                          ) : (
+                            <span>Subscribe</span>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2659,12 +2914,12 @@ export function BusinessChannelsModal({
                                 </div>
                               </div>
 
-                              {selectedChannel.ownerId !== m.id && selectedChannel.myRole === 'ADMIN' && (
+                              {canUserManageMembers && selectedChannel.ownerId !== m.id && m.id !== currentUserId && (
                                 <div className="relative">
                                   <button
                                     type="button"
                                     onClick={() => setOpenMemberMenuId(openMemberMenuId === m.id ? null : m.id)}
-                                    className="text-slate-400 hover:text-slate-700 p-1"
+                                    className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
                                   >
                                     <MoreHorizontal className="h-4 w-4" />
                                   </button>
@@ -2675,39 +2930,39 @@ export function BusinessChannelsModal({
                                         initial={{ opacity: 0, scale: 0.95, y: -4 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                                        className="absolute right-0 top-8 z-50 w-44 bg-white rounded-2xl border border-slate-200 shadow-xl py-1.5 text-xs font-bold text-[#11142D]"
+                                        className="absolute right-0 top-9 z-50 w-52 bg-white rounded-2xl border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.12)] p-2 space-y-1 text-xs font-bold"
                                       >
-                                        {m.role === "MEMBER" && (
+                                        {m.role !== "MODERATOR" ? (
                                           <button
                                             type="button"
                                             disabled={isUpdatingMember}
                                             onClick={() => handleUpdateMemberRole(m.id, "MODERATOR")}
-                                            className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-50 transition-colors text-left"
+                                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-50 text-[#11142D] transition-all text-left text-[13px] font-bold"
                                           >
+                                            <Shield className="h-4.5 w-4.5 text-[#2563EB] shrink-0 stroke-[2]" />
                                             <span>Make Moderator</span>
                                           </button>
-                                        )}
-                                        {m.role === "MODERATOR" && (
+                                        ) : (
                                           <button
                                             type="button"
                                             disabled={isUpdatingMember}
                                             onClick={() => handleUpdateMemberRole(m.id, "MEMBER")}
-                                            className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-50 transition-colors text-left"
+                                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-50 text-[#11142D] transition-all text-left text-[13px] font-bold"
                                           >
+                                            <ShieldOff className="h-4.5 w-4.5 text-slate-500 shrink-0 stroke-[2]" />
                                             <span>Remove Moderator</span>
                                           </button>
                                         )}
-                                        <div className="border-t border-slate-100 my-1" />
                                         <button
                                           type="button"
                                           disabled={isUpdatingMember}
                                           onClick={() => handleRemoveMember(m.id)}
-                                          className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-red-50 text-red-600 transition-colors text-left"
+                                          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-red-50 text-red-600 transition-all text-left text-[13px] font-bold"
                                         >
                                           {isUpdatingMember ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            <Loader2 className="h-4.5 w-4.5 animate-spin shrink-0 text-red-600" />
                                           ) : (
-                                            <Trash2 className="h-3.5 w-3.5" />
+                                            <UserMinus className="h-4.5 w-4.5 text-red-600 shrink-0 stroke-[2]" />
                                           )}
                                           <span>Remove Member</span>
                                         </button>
@@ -2720,6 +2975,24 @@ export function BusinessChannelsModal({
                           ))
                         )}
                       </div>
+
+                      {/* Leave Channel Button (Exact match to Screenshot 2) */}
+                      {selectedChannel.isMember && selectedChannel.ownerId !== currentUserId && (
+                        <div className="pt-8 pb-4 flex justify-center">
+                          <button
+                            type="button"
+                            onClick={handleLeaveChannel}
+                            disabled={isLeavingChannel}
+                            className="bg-[#D9531E] hover:bg-[#C2410C] text-white font-bold py-3 px-8 rounded-2xl shadow-md transition-all text-sm block w-fit min-w-[200px] text-center flex items-center justify-center gap-2"
+                          >
+                            {isLeavingChannel ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <span>Leave Channel</span>
+                            )}
+                          </button>
+                        </div>
+                      )}
                         </>
                       )}
                     </div>

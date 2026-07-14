@@ -7,6 +7,7 @@ import { useBusinessChannelsStore } from "@/store/useBusinessChannelsStore";
 import { ChannelService } from "@/services/channel.service";
 import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
 export default function BusinessChannelsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -57,9 +58,17 @@ export default function BusinessChannelsLayout({ children }: { children: React.R
               <button className="p-1.5 hover:bg-slate-50 rounded-full text-[#F59E0B] transition-colors">
                 <Star className="h-5 w-5 fill-[#F59E0B]" />
               </button>
-              <button className="p-1.5 hover:bg-slate-50 rounded-full text-slate-500 transition-colors">
-                <Bell className="h-5 w-5" />
-              </button>
+              <NotificationDropdown
+                onlyChannelTypes
+                customTrigger={(unread) => (
+                  <button className="relative p-1.5 hover:bg-slate-50 rounded-full text-slate-500 transition-colors" title="Channel Notifications">
+                    <Bell className="h-5 w-5" />
+                    {unread > 0 && (
+                      <span className="absolute top-1 right-1 flex h-2 w-2 rounded-full bg-red-500" />
+                    )}
+                  </button>
+                )}
+              />
             </div>
           </div>
 

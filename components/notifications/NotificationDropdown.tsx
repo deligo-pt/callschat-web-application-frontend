@@ -12,11 +12,17 @@ import { useTranslations } from "next-intl";
 
 
 
-export function NotificationDropdown() {
+export interface NotificationDropdownProps {
+  channelId?: string;
+  onlyChannelTypes?: boolean;
+  customTrigger?: React.ReactNode | ((unreadCount: number) => React.ReactNode);
+}
+
+export function NotificationDropdown({ channelId, onlyChannelTypes, customTrigger }: NotificationDropdownProps = {}) {
   const t = useTranslations("notifications");
   const {
-    notifications,
-    unreadCount,
+    notifications: rawNotifications,
+    unreadCount: totalUnreadCount,
     isLoading,
     hasMore,
     filter,
@@ -31,6 +37,25 @@ export function NotificationDropdown() {
   const [open, setOpen] = React.useState(false);
   const router = useRouter();
 
+  const notifications = React.useMemo(() => {
+    return rawNotifications.filter((n) => {
+      if (channelId) {
+        return n.routeId === channelId;
+      }
+      if (onlyChannelTypes) {
+        return n.type === "CHANNEL_INVITATION" || n.type === "CHANNEL_MESSAGE" || n.type === "CHANNEL_UPDATE";
+      }
+      return true;
+    });
+  }, [rawNotifications, channelId, onlyChannelTypes]);
+
+  const unreadCount = React.useMemo(() => {
+    if (channelId || onlyChannelTypes) {
+      return notifications.filter((n) => !n.isRead).length;
+    }
+    return totalUnreadCount;
+  }, [channelId, onlyChannelTypes, notifications, totalUnreadCount]);
+
   // Scroll listener for pagination
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const bottom =
@@ -41,19 +66,25 @@ export function NotificationDropdown() {
     }
   };
 
-
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
-          <Bell className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
-          {unreadCount > 0 && (
-            <div className="absolute right-2 top-2 flex h-3 w-3 items-center justify-center rounded-full border-2 border-[#F4F6FC] bg-red-500 text-[8px] font-bold text-white">
-              <span className="sr-only">Unread notifications</span>
-            </div>
-          )}
-        </button>
+        {customTrigger ? (
+          typeof customTrigger === "function" ? (
+            customTrigger(unreadCount)
+          ) : (
+            customTrigger
+          )
+        ) : (
+          <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
+            <Bell className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
+            {unreadCount > 0 && (
+              <div className="absolute right-2 top-2 flex h-3 w-3 items-center justify-center rounded-full border-2 border-[#F4F6FC] bg-red-500 text-[8px] font-bold text-white">
+                <span className="sr-only">Unread notifications</span>
+              </div>
+            )}
+          </button>
+        )}
       </PopoverTrigger>
 
       <PopoverContent className="w-[380px] p-0 rounded-2xl shadow-xl overflow-hidden border border-border mr-4 mt-2 bg-white" align="end">
@@ -106,7 +137,7 @@ export function NotificationDropdown() {
           {notifications.length === 0 && !isLoading ? (
             <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center">
               <Bell className="h-10 w-10 text-muted-foreground/30 mb-3" />
-              <p className="font-medium text-sm">{t("no_notifications")}</p>
+              <p className="font-medium text-sm">{channelId ? "No notifications for this channel" : t("no_notifications")}</p>
             </div>
           ) : (
             notifications.map((notification) => (
