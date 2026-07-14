@@ -4,11 +4,6 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { 
   ArrowLeft, 
   MoreVertical, 
-  Smile, 
-  Paperclip, 
-  Image as ImageIcon, 
-  Mic, 
-  Send, 
   Megaphone, 
   ShieldAlert, 
   ShieldCheck, 
@@ -20,6 +15,8 @@ import { CommunityItem } from "./CreateCommunitiesUI";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useGroupChat, GroupMessage } from "@/hooks/useGroupChat";
+import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
+import { GroupInput } from "@/components/group/GroupInput";
 
 interface CommunityGroupChatViewProps {
   group: CommunityDetailGroup;
@@ -52,6 +49,7 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
 
   // Real group chat hook fetching messages from database and subscribing via Socket.io
   const { messages: rawMessages, sendMessage, isReady, error } = useGroupChat(group.id, currentUserId);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   // Check user role from community / group attributes
   const isRealAdmin = useMemo(() => {
@@ -69,25 +67,25 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
     setIsAdminRole(isRealAdmin || true);
   }, [isRealAdmin]);
 
-  const [inputText, setInputText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [rawMessages]);
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputText.trim()) return;
-
+  const handleSendMessage = async (text: string, file: File | null) => {
     if (isAnnouncements && !isAdminRole) {
       toast.error("Only community admins can post in Announcements.");
       return;
     }
+    if (!text.trim() && !file) return;
 
-    const textToSend = inputText.trim();
-    setInputText("");
-    await sendMessage(textToSend);
+    setIsUploading(true);
+    try {
+      await sendMessage(text, file);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -181,42 +179,23 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
                 </span>
               </div>
             ) : (
-              rawMessages.map((msg: GroupMessage) => {
+              rawMessages.map((msg: GroupMessage, idx: number) => {
                 const isMe = msg.senderId === currentUserId || msg.id.startsWith("optimistic-");
-                const senderName = isMe 
-                  ? (isAnnouncements && isAdminRole ? "You (Admin)" : "You")
-                  : (msg.sender?.profile?.displayName || "Team Member");
-                const timeString = new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+                const prevMsg = idx > 0 ? rawMessages[idx - 1] : null;
+                const nextMsg = idx < rawMessages.length - 1 ? rawMessages[idx + 1] : null;
+                const isNextSameSender = nextMsg?.senderId === msg.senderId;
+                const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
 
-                if (isMe && !isAnnouncements) {
-                  // Right aligned blue bubble (self in normal group like input_file_1.png)
-                  return (
-                    <div key={msg.id} className="flex flex-col items-end ml-auto max-w-[85%] sm:max-w-[70%]">
-                      <div className="rounded-2xl rounded-tr-sm bg-[#2563EB] text-white p-4 shadow-sm w-full text-[13px] sm:text-[14px] leading-relaxed font-medium">
-                        <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                      </div>
-                      <span className="text-[11px] text-slate-400 font-medium mt-1.5 mr-1">
-                        {timeString}
-                      </span>
-                    </div>
-                  );
-                }
-
-                // Left aligned white bubble (Announcements or other members in normal group)
                 return (
-                  <div key={msg.id} className="flex flex-col items-start mr-auto max-w-[85%] sm:max-w-[70%] w-full">
-                    {/* Sender Name above box */}
-                    <span className={cn("text-[12px] font-bold mb-1 pl-1", isAnnouncements ? "text-[#2563EB]" : "text-emerald-600")}>
-                      {senderName}
-                    </span>
-                    
-                    <div className="rounded-2xl rounded-tl-sm bg-white border border-slate-200/80 p-4 shadow-sm w-full text-[13px] sm:text-[14px] text-[#0F172A] leading-relaxed font-medium">
-                      <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                      <span className="text-[11px] text-[#94A3B8] mt-2 block">
-                        {timeString}
-                      </span>
-                    </div>
-                  </div>
+                  <GroupMessageBubble
+                    key={msg.id}
+                    msg={msg}
+                    isMe={isMe}
+                    showAvatar={isFirstFromSender}
+                    isNextSameSender={isNextSameSender}
+                    isFirstFromSender={isFirstFromSender}
+                    groupId={group.id}
+                  />
                 );
               })
             )}
@@ -227,11 +206,11 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
       </div>
 
       {/* 3. Bottom Chat Input Area */}
-      <div className="bg-white border-t border-slate-200 px-4 sm:px-6 py-3.5 shrink-0 shadow-sm">
+      <div className="bg-white border-t border-slate-200 shrink-0 shadow-sm">
         <div className="w-full max-w-[680px] mx-auto">
           {isAnnouncements && !isAdminRole ? (
             /* Disabled / Read-Only Bar for Members inside Announcements */
-            <div className="flex items-center justify-between rounded-2xl bg-slate-100/80 border border-slate-200 px-4 py-3 text-center">
+            <div className="flex items-center justify-between rounded-2xl bg-slate-100/80 border border-slate-200 px-4 py-3 text-center my-3 mx-4">
               <div className="flex items-center gap-2.5 mx-auto text-xs font-bold text-slate-500">
                 <ShieldAlert className="h-4 w-4 text-[#2563EB] shrink-0" />
                 <span>Only community admins can send messages in this channel.</span>
@@ -248,61 +227,11 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
               </button>
             </div>
           ) : (
-            /* Active Input Bar matching exact mockup */
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1 text-slate-400">
-                <button
-                  type="button"
-                  onClick={() => toast.info("Emoji picker")}
-                  className="p-2 rounded-full hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                  title="Emoji"
-                >
-                  <Smile className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toast.info("Attach document")}
-                  className="p-2 rounded-full hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                  title="Attach file"
-                >
-                  <Paperclip className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toast.info("Attach image")}
-                  className="p-2 rounded-full hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                  title="Attach image"
-                >
-                  <ImageIcon className="h-5 w-5" />
-                </button>
-              </div>
-
-              <input
-                type="text"
-                placeholder={isAnnouncements ? "Post an announcement to all members..." : "Type a message..."}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 h-10 sm:h-11 rounded-full bg-[#F8FAFC] border border-slate-200 px-4 sm:px-5 text-sm font-medium text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#2563EB]/15 transition-all shadow-2xs"
-              />
-
-              <button
-                type="submit"
-                onClick={(e) => {
-                  if (!inputText.trim()) {
-                    e.preventDefault();
-                    toast.info("Voice note / Mic clip");
-                  }
-                }}
-                className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-[#2563EB] hover:bg-blue-700 text-white flex items-center justify-center transition-all shadow-md active:scale-95 shrink-0"
-                title={inputText.trim() ? "Send message" : "Voice message"}
-              >
-                {inputText.trim() ? (
-                  <Send className="h-4 w-4 sm:h-5 sm:w-5 -mr-0.5" />
-                ) : (
-                  <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
-                )}
-              </button>
-            </form>
+            <GroupInput
+              onSend={(text, file) => handleSendMessage(text, file)}
+              isReady={isReady}
+              isUploading={isUploading}
+            />
           )}
         </div>
       </div>

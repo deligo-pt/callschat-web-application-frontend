@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { groupService } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
-import { encryptGroupMessage, decryptGroupMessage, decryptMessage } from "@/utils/crypto";
+import { generateGroupKey, encryptMessage, encryptGroupMessage, decryptGroupMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
 
 export interface GroupMessage {
   id: string;
@@ -62,6 +62,27 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         setIsReady(false);
         setError(null);
 
+        // 0. Ensure local keypair exists before checking or creating group keys
+        const privKeyName = `privateKey_${currentUserId}`;
+        const pubKeyName = `publicKey_${currentUserId}`;
+        let localPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey");
+        let localPubKey = localStorage.getItem(pubKeyName) || localStorage.getItem("publicKey");
+
+        if (!localPrivKey || !localPubKey) {
+          console.log("[useGroupChat] Local keypair missing, generating new keypair for user:", currentUserId);
+          localPubKey = await generateAndStoreKeyPair(currentUserId);
+          localPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey");
+          const deviceId = `web-${currentUserId}`;
+          localStorage.setItem("deviceId", deviceId);
+          try {
+            if (localPubKey) {
+              await chatService.uploadPublicKey(deviceId, localPubKey);
+            }
+          } catch (e) {
+            console.warn("Failed to upload public key during group setup", e);
+          }
+        }
+
         // 1. Fetch group details to find the creator
         const groupRes = await groupService.fetchGroupDetails(groupId);
         if (!groupRes.success || !groupRes.data) {
@@ -71,10 +92,95 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
         // 2. Fetch the user's encrypted group key
         const keyRes = await groupService.fetchGroupKey(groupId);
-        if (!keyRes.success || !keyRes.data?.encryptedGroupKey) {
-          throw new Error("You do not have a cryptographic key for this group");
+        let encryptedGroupKey = keyRes.data?.encryptedGroupKey;
+        let keyNonce = keyRes.data?.keyNonce;
+
+        if (!encryptedGroupKey || !keyNonce) {
+          // If encryptedGroupKey is missing (e.g. for auto-created community groups or newly added groups),
+          // check if we can auto-initialize
+          const myRoleRes = await groupService.fetchGroupDetails(groupId);
+          const isCreatorOrAdmin = currentUserId === creatorId || myRoleRes.data?.myRole === 'ADMIN' || myRoleRes.data?.myRole === 'OWNER';
+          if (isCreatorOrAdmin && currentUserId) {
+            console.log("[useGroupChat] Auto-initializing E2EE group key for group:", groupId);
+            const myPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey") || localPrivKey;
+            if (!myPrivKey) {
+              throw new Error("Local private key missing for group key initialization");
+            }
+            const freshGroupKey = await generateGroupKey();
+            const membersRes = await groupService.fetchGroupMembers(groupId);
+            const memberList = membersRes.success && membersRes.data?.members ? membersRes.data.members : [{ userId: currentUserId }];
+
+            const rekeyPayload = [];
+            for (const m of memberList) {
+              const uId = (m as any).userId || (m as any).id;
+              if (!uId) continue;
+              const rKeyRes = await chatService.fetchRecipientKey(uId);
+              let pubKey = "";
+              if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
+                pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+              } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
+                pubKey = rKeyRes.data.publicKey;
+              }
+              if (!pubKey && uId === currentUserId) {
+                pubKey = localStorage.getItem(`publicKey_${currentUserId}`) || localStorage.getItem("publicKey") || "";
+              }
+              if (pubKey) {
+                try {
+                  const enc = await encryptMessage(freshGroupKey, pubKey, myPrivKey);
+                  rekeyPayload.push({
+                    userId: uId,
+                    encryptedGroupKey: enc.ciphertext,
+                    keyNonce: enc.nonce,
+                  });
+                  if (uId === currentUserId) {
+                    encryptedGroupKey = enc.ciphertext;
+                    keyNonce = enc.nonce;
+                  }
+                } catch (encErr) {
+                  console.warn(`[useGroupChat] Could not encrypt key for member ${uId}:`, encErr);
+                }
+              }
+            }
+
+            if (rekeyPayload.length > 0) {
+              await groupService.rekeyGroup(groupId, rekeyPayload);
+              console.log("[useGroupChat] Group successfully re-keyed automatically.");
+              groupKeyRef.current = freshGroupKey;
+              setIsReady(true);
+              // Directly fetch history now that key is set
+              const msgsRes = await groupService.fetchGroupMessages(groupId);
+              if (msgsRes.success && msgsRes.data) {
+                const decrypted = [];
+                for (const msg of msgsRes.data) {
+                  if (!msg.ciphertext || !msg.nonce) continue;
+                  try {
+                    const text = await decryptGroupMessage(msg.ciphertext, msg.nonce, freshGroupKey);
+                    decrypted.push({
+                      id: msg.id,
+                      groupId: msg.groupId,
+                      senderId: msg.senderId,
+                      text,
+                      createdAt: msg.createdAt,
+                      mediaUrl: msg.mediaUrl,
+                      mediaType: msg.mediaType,
+                      sender: msg.sender,
+                    });
+                  } catch (e) {
+                    console.warn("Could not decrypt history item:", msg.id);
+                  }
+                }
+                setMessages(decrypted);
+              } else {
+                setMessages([]);
+              }
+              return;
+            }
+          }
+
+          if (!encryptedGroupKey || !keyNonce) {
+            throw new Error("You do not have a cryptographic key for this group. An admin needs to initialize encryption.");
+          }
         }
-        const { encryptedGroupKey, keyNonce } = keyRes.data;
 
         // 3. Fetch creator's ALL public keys (key history) — newest last
         const creatorKeyRes = await chatService.fetchRecipientKey(creatorId);
@@ -103,8 +209,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
 
         // 4. Fetch my private key
-        const privKeyName = `privateKey_${currentUserId}`;
-        const myPrivKey = localStorage.getItem(privKeyName);
+        const myPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey") || localPrivKey;
         if (!myPrivKey) {
           throw new Error("Missing local private key");
         }

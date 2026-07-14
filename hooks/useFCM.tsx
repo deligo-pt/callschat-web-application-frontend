@@ -62,8 +62,12 @@ export const useFCM = () => {
         } else {
           console.log('[FCM] Notification permission not granted.');
         }
-      } catch (error) {
-        console.error('[FCM] An error occurred while retrieving token or requesting permission.', error);
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message?.includes('push service error') || error?.code === 'messaging/permission-blocked') {
+          console.debug('[FCM] Push notifications not available or blocked in this environment (' + (error?.message || error) + ')');
+        } else {
+          console.warn('[FCM] Could not initialize push notifications:', error?.message || error);
+        }
       }
     };
 

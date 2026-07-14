@@ -287,7 +287,9 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
       );
     }
 
-    // Document Card
+    // Document / Email Card
+    const fileName = msg.mediaUrl ? decodeURIComponent(msg.mediaUrl.split('/').pop()?.split('?')[0] || "Document") : "Document";
+    const isEmailFile = fileName.toLowerCase().endsWith('.eml') || fileName.toLowerCase().endsWith('.msg');
     return (
       <a
         key={mediaKey}
@@ -313,9 +315,9 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
           )}
         </div>
         <div className="flex flex-col flex-1 truncate">
-          <span className="text-sm font-semibold truncate leading-tight">Document</span>
+          <span className="text-sm font-semibold truncate leading-tight" title={fileName}>{fileName}</span>
           <span className={cn("text-xs font-medium", isMe ? "text-blue-100" : "text-slate-500")}>
-            {isOptimistic ? "Uploading..." : "Click to view"}
+            {isOptimistic ? "Uploading..." : isEmailFile ? "Email File · Click to open" : "Document · Click to open"}
           </span>
         </div>
         {!isOptimistic && (

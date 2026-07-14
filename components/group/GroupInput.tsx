@@ -181,7 +181,7 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
           ref={docInputRef}
           className="hidden"
           onChange={handleFileChange}
-          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx"
+          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,.eml,.msg,*/*"
         />
 
         {/* Attachment Buttons (hidden when recording) */}

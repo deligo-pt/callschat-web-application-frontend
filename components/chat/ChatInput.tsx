@@ -189,7 +189,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
           ref={docInputRef}
           className="hidden"
           onChange={handleFileChange}
-          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx"
+          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,.eml,.msg,*/*"
         />
 
         {/* Attachment Buttons (hidden when recording) */}
