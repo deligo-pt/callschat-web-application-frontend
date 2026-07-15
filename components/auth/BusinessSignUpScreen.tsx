@@ -233,236 +233,387 @@ export default function BusinessSignUpScreen() {
   const stepIndex = STEPS.indexOf(step);
 
   return (
-    <div className="flex min-h-screen w-full bg-[#F8FAFC] font-sans">
-      <div className="flex w-full min-h-screen">
+    <div className="flex min-h-screen w-full flex-col bg-gradient-to-b from-[#7C3AED] to-[#5B21B6] font-sans relative">
+      {/* Top Header Bar */}
+      <div className="absolute top-6 left-6 sm:left-12 flex items-center justify-between w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] z-20">
+        <button
+          type="button"
+          onClick={() => {
+            if (step === "DETAILS") setStep("OTP");
+            else if (step === "OTP") setStep("PHONE");
+            else router.back();
+          }}
+          className="flex items-center gap-2 text-sm sm:text-base font-semibold text-white/90 hover:text-white transition-colors cursor-pointer"
+        >
+          <ChevronLeft className="h-4 w-4" /> Back
+        </button>
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image src="/call_chats_logo.png" height={34} width={34} alt="CallsChat Logo" className="drop-shadow-sm" />
+          <span className="font-extrabold text-lg sm:text-xl text-white tracking-tight">
+            Calls<span className="text-purple-200">Chat</span>
+          </span>
+        </Link>
+      </div>
 
-        {/* Left brand column */}
-        <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between bg-gradient-to-br from-[#2D1B69] via-[#4A1D96] to-[#6D28D9] p-12 text-white relative overflow-hidden">
-          <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-purple-400/20 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-12 right-12 h-80 w-80 rounded-full bg-violet-500/20 blur-3xl pointer-events-none" />
-
-          <Link href="/" className="flex items-center gap-3 relative z-10">
-            <Image src="/call_chats_logo.png" height={56} width={56} alt="CallsChat" priority className="drop-shadow-md" />
-            <span className="text-2xl font-extrabold tracking-tight">Calls<span className="text-purple-300">Chat</span></span>
-          </Link>
-
-          <div className="my-auto max-w-lg relative z-10 space-y-8 py-12">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold backdrop-blur-md border border-white/15 text-purple-300">
-              <Briefcase className="h-3.5 w-3.5" /> Business Account
+      {/* Top Hero Header Section */}
+      <div className="flex flex-col items-center justify-center pt-16 pb-12 sm:pb-14 text-white px-4 relative z-10">
+        {step === "PHONE" && (
+          <>
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-sm">
+              <Briefcase className="h-7 w-7 text-white" strokeWidth={1.8} />
             </div>
-            <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight">
-              Power up your <br />
-              <span className="bg-gradient-to-r from-purple-300 via-violet-300 to-pink-200 bg-clip-text text-transparent">
-                business comms.
-              </span>
+            <h1 className="text-3xl sm:text-[36px] font-extrabold tracking-tight mb-2 text-center">
+              Create Business Account
             </h1>
-            <p className="text-base text-purple-100/90 leading-relaxed">
-              Manage customer support, team inboxes, automations, and analytics — all in one dedicated workspace.
+            <p className="text-purple-100 font-medium text-center text-sm sm:text-base">
+              Power up your business communications
             </p>
-            <div className="grid grid-cols-1 gap-3">
-              {[
-                "Dedicated team workspace",
-                "Customer support inbox",
-                "Automation & quick replies",
-                "Team management & roles",
-                "Analytics & insights",
-              ].map((f) => (
-                <div key={f} className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 border border-white/10">
-                  <span className="h-1.5 w-1.5 rounded-full bg-purple-400 shrink-0" />
-                  <span className="text-sm text-purple-100/90">{f}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          </>
+        )}
 
-          <div className="relative z-10 flex items-center justify-between border-t border-white/15 pt-6 text-xs text-purple-200/80">
-            <span>Your workspace, your rules</span>
-            <span>© 2026 CallsChat LLC</span>
-          </div>
-        </div>
+        {step === "OTP" && (
+          <>
+            <h1 className="text-3xl sm:text-[36px] font-extrabold tracking-tight mb-2 text-center">
+              Verify Your Phone
+            </h1>
+            <p className="text-purple-100 font-medium text-center text-sm sm:text-base">
+              We&apos;ve sent a code to <span className="font-bold text-white">{sentPhone}</span>
+            </p>
+          </>
+        )}
 
-        {/* Right form column */}
-        <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-12 lg:w-7/12 xl:w-1/2 lg:px-20 xl:px-28 bg-white relative">
+        {step === "DETAILS" && (
+          <>
+            <h1 className="text-3xl sm:text-[36px] font-extrabold tracking-tight mb-2 text-center">
+              Set Up Your Workspace
+            </h1>
+            <p className="text-purple-100 font-medium text-center text-sm sm:text-base">
+              Tell us about your business
+            </p>
+          </>
+        )}
+      </div>
 
-          <div className="absolute top-6 left-6 sm:left-12 flex items-center justify-between w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)]">
-            <button
-              onClick={() => step === "DETAILS" ? setStep("OTP") : step === "OTP" ? setStep("PHONE") : router.back()}
-              className="flex items-center gap-2 text-sm font-semibold text-[#4A1D96] hover:text-purple-700 transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" /> Back
-            </button>
-            <div className="lg:hidden flex items-center gap-2">
-              <Image src="/call_chats_logo.png" height={36} width={36} alt="Logo" />
-              <span className="font-bold text-lg text-[#2D1B69]">CallsChat</span>
-            </div>
-          </div>
-
-          <div className="mx-auto w-full max-w-md space-y-8 my-auto pt-8">
-
-            {/* Step bar */}
-            <div className="flex items-center gap-2">
-              {STEPS.map((_, i) => (
-                <div key={i} className={cn("h-1.5 flex-1 rounded-full transition-all duration-300", stepIndex >= i ? "bg-purple-600" : "bg-slate-200")} />
-              ))}
+      {/* Bottom White Card Section */}
+      <div className="flex-1 rounded-t-[2.5rem] sm:rounded-t-[3.5rem] bg-white px-6 py-10 sm:px-12 flex flex-col items-center shadow-2xl relative z-10 w-full">
+        
+        {/* ── STEP: PHONE ─────────────────────────────────────────── */}
+        {step === "PHONE" && (
+          <div className="w-full max-w-[420px] flex-1 flex flex-col pt-2 sm:pt-4">
+            <div className="space-y-1.5 mb-6">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#2D1B69]">
+                Enter your phone number
+              </h2>
+              <p className="text-sm font-medium text-[#64748B] leading-relaxed">
+                Make sure this number can receive SMS. You&apos;ll receive your activation code through it.
+              </p>
             </div>
 
-            {/* ── STEP: PHONE ── */}
-            {step === "PHONE" && (
-              <div className="space-y-6">
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-extrabold text-[#2D1B69]">Create Business Account</h2>
-                  <p className="text-sm text-slate-500">Enter your phone number to get started</p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 pl-1">Phone number</label>
-                  <div className="flex items-center gap-3">
-                    <div className="relative" ref={dropdownRef}>
-                      <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex h-12 w-[100px] items-center justify-between rounded-xl border border-purple-100 bg-purple-50/50 px-3 transition-all focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 hover:border-purple-200">
-                        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-                          <span className="text-lg">{getFlagEmoji(selectedCountry)}</span>
-                          <span className="text-sm">+{getCountryCallingCode(selectedCountry)}</span>
-                        </div>
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                      </button>
-                      {isDropdownOpen && (
-                        <div className="absolute left-0 top-14 z-50 flex max-h-72 w-64 flex-col rounded-xl bg-white py-2 shadow-xl border border-slate-100 overflow-hidden">
-                          <div className="px-3 pb-2 pt-1 shrink-0">
-                            <input type="text" placeholder="Search country…" value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)} autoFocus onClick={(e) => e.stopPropagation()}
-                              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30" />
-                          </div>
-                          <div className="flex-1 overflow-y-auto min-h-0">
-                            {filteredCountries.map((c) => {
-                              let cName = c as string;
-                              try { cName = regionNames.of(c as string) ?? c; } catch {}
-                              return (
-                                <button key={c} type="button" onClick={() => { setSelectedCountry(c); setIsDropdownOpen(false); setSearchQuery(""); }}
-                                  className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-purple-50 hover:text-purple-600">
-                                  <span className="text-base">{getFlagEmoji(c)}</span>
-                                  <span className="w-10 shrink-0 text-slate-400">+{getCountryCallingCode(c)}</span>
-                                  <span className="ml-auto text-xs font-medium truncate">{cName}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+            <div className="space-y-2 mb-8">
+              <label className="text-xs font-bold text-slate-700 pl-1">
+                Phone number
+              </label>
+              <div className="flex items-center gap-3">
+                {/* Country selector */}
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="flex h-13 w-[105px] items-center justify-between rounded-xl border border-purple-100 bg-[#F5F3FF] px-3 transition-all focus:border-purple-600 focus:bg-white focus:ring-2 focus:ring-purple-600/20 hover:border-purple-200 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                      <span className="text-lg">
+                        {getFlagEmoji(selectedCountry)}
+                      </span>
+                      <span className="text-sm">
+                        +{getCountryCallingCode(selectedCountry)}
+                      </span>
                     </div>
-                    <Input country={selectedCountry} value={phoneNumber} onChange={setPhoneNumber} placeholder="000 000 0000" disabled={isPending}
-                      className="flex h-12 flex-1 rounded-xl border border-purple-100 bg-purple-50/50 px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20" />
-                  </div>
-                </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                  </button>
 
-                <button type="button" onClick={handleRequestOTP} disabled={!phoneNumber || isPending}
-                  className={cn("w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200",
-                    phoneNumber && !isPending ? "bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.99]" : "cursor-not-allowed bg-slate-100 text-slate-400")}>
-                  {isPending ? <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Sending…</span> : "Continue"}
-                </button>
-
-                <p className="text-center text-sm text-slate-500">
-                  Already have an account?{" "}
-                  <Link href="/auth/business/login" className="font-bold text-purple-600 hover:underline">Log in</Link>
-                </p>
-              </div>
-            )}
-
-            {/* ── STEP: OTP ── */}
-            {step === "OTP" && (
-              <div className="space-y-6">
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-extrabold text-[#2D1B69]">Verify Your Phone</h2>
-                  <p className="text-sm text-slate-500">Code sent to <span className="font-bold text-slate-700">{sentPhone}</span></p>
-                </div>
-                <div className="flex justify-center gap-2 sm:gap-3">
-                  {otp.map((digit, idx) => (
-                    <input key={idx} id={`b-otp-${idx}`} type="text" inputMode="numeric" pattern="[0-9]*" maxLength={1} value={digit}
-                      disabled={isPending} onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)} onPaste={handleOtpPaste}
-                      className="h-12 w-10 sm:h-14 sm:w-12 rounded-xl border border-purple-100 bg-purple-50 text-center text-xl font-bold text-[#1E293B] transition-all focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20" />
-                  ))}
-                </div>
-                <div className="text-center text-sm text-slate-500">
-                  Didn&apos;t receive the code?{" "}
-                  {timer > 0 ? (
-                    <span className="font-bold text-purple-400 cursor-not-allowed">
-                      Resend ({Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, "0")})
-                    </span>
-                  ) : (
-                    <button type="button" onClick={handleRequestOTP} disabled={isPending} className="font-bold text-purple-600 hover:underline">Resend</button>
-                  )}
-                </div>
-                <button type="button" onClick={handleVerifyOTP} disabled={!isOtpComplete || isPending}
-                  className={cn("w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200",
-                    isOtpComplete && !isPending ? "bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.99]" : "cursor-not-allowed bg-slate-100 text-slate-400")}>
-                  {isPending ? <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Verifying…</span> : "Verify & Continue"}
-                </button>
-              </div>
-            )}
-
-            {/* ── STEP: DETAILS ── */}
-            {step === "DETAILS" && (
-              <div className="space-y-5">
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-extrabold text-[#2D1B69]">Set Up Your Workspace</h2>
-                  <p className="text-sm text-slate-500">Tell us about your business</p>
-                </div>
-
-                {/* Owner name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 pl-1">Your full name</label>
-                  <input type="text" placeholder="e.g. Sarah Connor" value={ownerName} disabled={isPending}
-                    onChange={(e) => setOwnerName(e.target.value)} autoFocus
-                    className="flex h-12 w-full rounded-xl border border-purple-100 bg-purple-50/50 px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20" />
-                </div>
-
-                {/* Company name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 pl-1">Company name</label>
-                  <input type="text" placeholder="e.g. Acme Corp" value={companyName} disabled={isPending}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    className="flex h-12 w-full rounded-xl border border-purple-100 bg-purple-50/50 px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20" />
-                </div>
-
-                {/* Business handle */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 pl-1">
-                    Business handle <span className="font-normal text-slate-400">(unique, like a username)</span>
-                  </label>
-                  <div className="relative">
-                    <AtSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                    <input type="text" placeholder="acme-corp" value={businessHandle} disabled={isPending}
-                      onChange={(e) => handleHandleChange(e.target.value)}
-                      className={cn(
-                        "flex h-12 w-full rounded-xl border pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:outline-none focus:ring-2",
-                        handleError
-                          ? "border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-purple-100 bg-purple-50/50 focus:border-purple-500 focus:bg-white focus:ring-purple-500/20"
-                      )} />
-                  </div>
-                  {handleError && <p className="text-xs text-red-500 pl-1">{handleError}</p>}
-                  {!handleError && businessHandle && (
-                    <p className="text-xs text-slate-400 pl-1">Your workspace will be @{businessHandle.toLowerCase()}</p>
+                  {isDropdownOpen && (
+                    <div className="absolute left-0 top-14 z-50 flex max-h-72 w-64 flex-col rounded-xl bg-white py-2 shadow-xl border border-slate-100 overflow-hidden">
+                      <div className="px-3 pb-2 pt-1 shrink-0">
+                        <input
+                          type="text"
+                          placeholder="Search country…"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600/30"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex-1 overflow-y-auto min-h-0">
+                        {filteredCountries.length > 0 ? (
+                          filteredCountries.map((c) => {
+                            let cName = c as string;
+                            try {
+                              cName = regionNames.of(c as string) ?? c;
+                            } catch {}
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCountry(c);
+                                  setIsDropdownOpen(false);
+                                  setSearchQuery("");
+                                }}
+                                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-purple-50 hover:text-purple-600 cursor-pointer"
+                              >
+                                <span className="text-base">
+                                  {getFlagEmoji(c)}
+                                </span>
+                                <span className="w-10 shrink-0 text-slate-400">
+                                  +{getCountryCallingCode(c)}
+                                </span>
+                                <span className="ml-auto text-xs font-medium truncate">
+                                  {cName}
+                                </span>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="px-4 py-4 text-center text-sm text-slate-500">
+                            No countries found
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                <button type="button" onClick={handleRegister} disabled={!isDetailsValid || isPending}
-                  className={cn("w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 mt-2",
-                    isDetailsValid && !isPending ? "bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.99]" : "cursor-not-allowed bg-slate-100 text-slate-400")}>
-                  {isPending ? <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Creating workspace…</span> : "Create Business Account"}
-                </button>
-
-                <p className="text-xs text-center text-slate-400 leading-relaxed">
-                  By continuing, you agree to our{" "}
-                  <Link href="/terms-of-service" className="text-purple-500 hover:underline">Terms of Service</Link>
-                  {" "}and{" "}
-                  <Link href="/privacy-policy" className="text-purple-500 hover:underline">Privacy Policy</Link>.
-                </p>
+                <Input
+                  country={selectedCountry}
+                  value={phoneNumber}
+                  onChange={setPhoneNumber}
+                  placeholder="000 000 0000"
+                  disabled={isPending}
+                  className="flex h-13 flex-1 rounded-xl border border-purple-100 bg-[#F5F3FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-purple-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20 hover:border-purple-200"
+                />
               </div>
-            )}
+            </div>
+
+            <div className="mt-auto pt-6 pb-6 space-y-6">
+              <button
+                type="button"
+                onClick={handleRequestOTP}
+                disabled={!phoneNumber || isPending}
+                className={cn(
+                  "w-full flex items-center justify-center gap-2 rounded-xl h-13 py-4 text-base font-bold transition-all duration-200 shadow-sm cursor-pointer",
+                  phoneNumber && !isPending
+                    ? "bg-[#7C3AED] text-white hover:bg-purple-700 active:scale-[0.99] shadow-lg shadow-purple-600/25"
+                    : "cursor-not-allowed bg-slate-100 text-slate-400"
+                )}
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Sending…
+                  </span>
+                ) : (
+                  "Continue"
+                )}
+              </button>
+
+              <p className="text-center text-sm font-medium text-slate-500">
+                Already have an account?{" "}
+                <Link
+                  href="/auth/business/login"
+                  className="font-bold text-[#7C3AED] hover:underline"
+                >
+                  Log in
+                </Link>
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ── STEP: OTP ───────────────────────────────────────────── */}
+        {step === "OTP" && (
+          <div className="w-full max-w-[420px] flex-1 flex flex-col pt-2 sm:pt-4">
+            <div className="space-y-1.5 mb-8">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#2D1B69]">
+                Enter the code below
+              </h2>
+              <p className="text-sm font-medium text-[#64748B]">
+                We sent a 6-digit verification code to your phone
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-2 sm:gap-3 mb-8">
+              {otp.map((digit, idx) => (
+                <input
+                  key={idx}
+                  id={`b-otp-${idx}`}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={1}
+                  value={digit}
+                  disabled={isPending}
+                  onChange={(e) => handleOtpChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                  onPaste={handleOtpPaste}
+                  className="h-13 w-11 sm:h-14 sm:w-13 rounded-xl border border-purple-100 bg-[#F5F3FF] text-center text-xl font-bold text-[#1E293B] transition-all focus:border-purple-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20"
+                />
+              ))}
+            </div>
+
+            <div className="text-center text-sm font-medium text-slate-500 mb-8">
+              Didn&apos;t receive the code?{" "}
+              {timer > 0 ? (
+                <span className="font-bold text-purple-400 cursor-not-allowed">
+                  Resend ({Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, "0")})
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRequestOTP}
+                  disabled={isPending}
+                  className="font-bold text-[#7C3AED] hover:underline cursor-pointer"
+                >
+                  Resend
+                </button>
+              )}
+            </div>
+
+            <div className="mt-auto pt-6 pb-6">
+              <button
+                type="button"
+                onClick={handleVerifyOTP}
+                disabled={!isOtpComplete || isPending}
+                className={cn(
+                  "w-full flex items-center justify-center gap-2 rounded-xl h-13 py-4 text-base font-bold transition-all duration-200 shadow-sm cursor-pointer",
+                  isOtpComplete && !isPending
+                    ? "bg-[#7C3AED] text-white hover:bg-purple-700 active:scale-[0.99] shadow-lg shadow-purple-600/25"
+                    : "cursor-not-allowed bg-slate-100 text-slate-400"
+                )}
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Verifying…
+                  </span>
+                ) : (
+                  "Verify & Continue"
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP: DETAILS ───────────────────────────────────────── */}
+        {step === "DETAILS" && (
+          <div className="w-full max-w-[420px] flex-1 flex flex-col pt-2 sm:pt-4">
+            <div className="space-y-1.5 mb-6">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#2D1B69]">
+                Workspace Details
+              </h2>
+              <p className="text-sm font-medium text-[#64748B]">
+                Tell us about your business workspace
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              {/* Owner name */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 pl-1">
+                  Your full name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sarah Connor"
+                  value={ownerName}
+                  disabled={isPending}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                  autoFocus
+                  className="flex h-13 w-full rounded-xl border border-purple-100 bg-[#F5F3FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-purple-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20 hover:border-purple-200"
+                />
+              </div>
+
+              {/* Company name */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 pl-1">
+                  Company name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Acme Corp"
+                  value={companyName}
+                  disabled={isPending}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="flex h-13 w-full rounded-xl border border-purple-100 bg-[#F5F3FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-purple-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20 hover:border-purple-200"
+                />
+              </div>
+
+              {/* Business handle */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 pl-1">
+                  Business handle <span className="font-normal text-slate-400">(unique username)</span>
+                </label>
+                <div className="relative">
+                  <AtSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="acme-corp"
+                    value={businessHandle}
+                    disabled={isPending}
+                    onChange={(e) => handleHandleChange(e.target.value)}
+                    className={cn(
+                      "flex h-13 w-full rounded-xl border pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:outline-none focus:ring-2",
+                      handleError
+                        ? "border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/20"
+                        : "border-purple-100 bg-[#F5F3FF] focus:border-purple-600 focus:bg-white focus:ring-purple-600/20 hover:border-purple-200"
+                    )}
+                  />
+                </div>
+                {handleError && <p className="text-xs font-semibold text-red-500 pl-1">{handleError}</p>}
+                {!handleError && businessHandle && (
+                  <p className="text-xs font-medium text-slate-500 pl-1">
+                    Your workspace will be @{businessHandle.toLowerCase()}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-auto pt-8 pb-6 space-y-4">
+              <button
+                type="button"
+                onClick={handleRegister}
+                disabled={!isDetailsValid || isPending}
+                className={cn(
+                  "w-full flex items-center justify-center gap-2 rounded-xl h-13 py-4 text-base font-bold transition-all duration-200 shadow-sm cursor-pointer",
+                  isDetailsValid && !isPending
+                    ? "bg-[#7C3AED] text-white hover:bg-purple-700 active:scale-[0.99] shadow-lg shadow-purple-600/25"
+                    : "cursor-not-allowed bg-slate-100 text-slate-400"
+                )}
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Creating workspace…
+                  </span>
+                ) : (
+                  "Create Business Account"
+                )}
+              </button>
+
+              <p className="text-xs text-center text-slate-400 leading-relaxed font-medium">
+                By continuing, you agree to our{" "}
+                <Link href="/terms-of-service" className="text-purple-600 hover:underline">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy-policy" className="text-purple-600 hover:underline">
+                  Privacy Policy
+                </Link>.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
