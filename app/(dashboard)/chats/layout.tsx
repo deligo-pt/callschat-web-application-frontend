@@ -421,14 +421,16 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
               <div className="mt-6">
                 <div className="px-6 mb-2 flex items-center justify-between">
                   <h2 className="text-[14px] font-bold text-[#3B58F5]">Messages</h2>
-                  <button
-                    onClick={() => setIsExploreOpen(true)}
-                    className="text-xs font-extrabold text-[#3B58F5] hover:underline flex items-center gap-1.5 focus:outline-none"
-                    title="Explore Official Businesses"
-                  >
-                    <Building2 className="h-3.5 w-3.5" />
-                    <span>Businesses</span>
-                  </button>
+                  {currentMode !== "BUSINESS" && (
+                    <button
+                      onClick={() => setIsExploreOpen(true)}
+                      className="text-xs font-extrabold text-[#3B58F5] hover:underline flex items-center gap-1.5 focus:outline-none"
+                      title="Explore Official Businesses"
+                    >
+                      <Building2 className="h-3.5 w-3.5" />
+                      <span>Businesses</span>
+                    </button>
+                  )}
                 </div>
 
                 {isLoading ? (

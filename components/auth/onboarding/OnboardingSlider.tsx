@@ -19,28 +19,28 @@ const SLIDES: SlideData[] = [
     title: "Secure Messaging",
     description: "End-to-end encrypted communication keeps your conversations completely private and secure.",
     icon: Shield,
-    gradientClass: "from-[#5D7BFF] to-[#3E4DEB] shadow-[#5D7BFF]/30",
+    gradientClass: "from-[#4F6EF7] via-[#3B52E8] to-[#2538D4] shadow-blue-500/30",
     buttonText: "Next",
   },
   {
     title: "Private Groups",
     description: "Create groups with hidden member information protection. Your privacy is our priority.",
     icon: Users,
-    gradientClass: "from-[#A155FF] to-[#7435FF] shadow-[#A155FF]/30",
+    gradientClass: "from-[#8B5CF6] via-[#7C3AED] to-[#6D28D9] shadow-purple-500/30",
     buttonText: "Next",
   },
   {
     title: "AI-Powered Tools",
     description: "Smart productivity features and AI communication tools to enhance your experience.",
     icon: Bot,
-    gradientClass: "from-[#DF4AEF] to-[#A035EC] shadow-[#DF4AEF]/30",
+    gradientClass: "from-[#E040FB] via-[#D946EF] to-[#9333EA] shadow-fuchsia-500/30",
     buttonText: "Next",
   },
   {
     title: "Business & Personal",
     description: "Manage both business and personal communication seamlessly in one powerful platform.",
     icon: Briefcase,
-    gradientClass: "from-[#C436D6] to-[#4F4CE7] shadow-[#C436D6]/30",
+    gradientClass: "from-[#EC4899] via-[#8B5CF6] to-[#3B82F6] shadow-pink-500/30",
     buttonText: "Next",
   }
 ];
@@ -69,15 +69,15 @@ export default function OnboardingSlider() {
   };
 
   if (!isMounted) {
-    return <div className="flex min-h-screen bg-zinc-100" />;
+    return <div className="flex min-h-screen w-full bg-[#F8FAFC]" />;
   }
 
   const slide = SLIDES[currentSlide];
   const Icon = slide.icon;
 
   const variants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 100 : -100,
+    enter: (dir: number) => ({
+      x: dir > 0 ? 80 : -80,
       opacity: 0,
     }),
     center: {
@@ -85,95 +85,98 @@ export default function OnboardingSlider() {
       x: 0,
       opacity: 1,
     },
-    exit: (direction: number) => ({
+    exit: (dir: number) => ({
       zIndex: 0,
-      x: direction < 0 ? 100 : -100,
+      x: dir < 0 ? 80 : -80,
       opacity: 0,
     }),
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-100 sm:p-6">
-      {/* Mobile constraint container simulating the 412x851 Figma dimensions on desktop */}
-      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-[851px] sm:w-[412px] sm:rounded-[2.5rem]">
-        
-        {/* Top Bar */}
-        <div className="flex h-16 w-full shrink-0 items-center justify-end px-6 pt-4 z-20">
-          {currentSlide < SLIDES.length - 1 && (
-            <button 
-              onClick={handleSkip}
-              className="text-sm font-medium text-[#8F95B2] transition-colors hover:text-gray-800"
-            >
-              Skip
-            </button>
-          )}
-        </div>
+    <div className="flex min-h-screen w-full flex-col bg-[#F8FAFC] text-[#0F172A] relative overflow-hidden font-sans selection:bg-blue-500 selection:text-white">
+      {/* Background Decorative Glows */}
+      <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 -right-32 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
-        {/* Main Content Area with Framer Motion */}
-        <div className="relative flex flex-1 flex-col items-center px-8 z-10">
-          <AnimatePresence initial={false} custom={direction} mode="wait">
-            <motion.div
-              key={currentSlide}
-              custom={direction}
-              variants={variants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{
-                x: { type: "spring", stiffness: 300, damping: 30 },
-                opacity: { duration: 0.2 },
-              }}
-              className="absolute inset-0 flex flex-col items-center text-center pt-[15%]"
-            >
-              {/* Large Icon Circle */}
-              <div 
-                className={cn(
-                  "mb-12 flex h-[180px] w-[180px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br shadow-xl",
-                  slide.gradientClass
-                )}
-              >
-                <Icon className="h-[72px] w-[72px] text-white" strokeWidth={1.5} />
-              </div>
+      {/* Top Bar with Skip Button */}
+      <div className="absolute top-0 left-0 w-full flex h-20 items-center justify-end px-6 sm:px-12 pt-4 z-30">
+        <button 
+          onClick={handleSkip}
+          className="text-sm sm:text-base font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-200/50 cursor-pointer"
+        >
+          Skip
+        </button>
+      </div>
 
-              {/* Text Content */}
-              <h2 className="mb-4 text-[26px] font-bold tracking-tight text-[#11142D]">
-                {slide.title}
-              </h2>
-              <p className="px-4 text-[15px] font-medium leading-[1.6] text-[#8F95B2]">
-                {slide.description}
-              </p>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Bottom Navigation Area */}
-        <div className="flex w-full shrink-0 flex-col items-center px-6 pb-12 z-20 bg-white">
-          
-          {/* Pagination Dots */}
-          <div className="mb-10 flex items-center justify-center gap-2">
-            {SLIDES.map((_, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "h-1.5 rounded-full transition-all duration-300",
-                  idx === currentSlide 
-                    ? "w-5 bg-[#3151EC]" 
-                    : "w-1.5 bg-[#E4E6F0]"
-                )}
-              />
-            ))}
-          </div>
-
-          {/* Action Button */}
-          <button
-            onClick={handleNext}
-            className="group flex w-full items-center justify-center rounded-[1rem] bg-[#2E54EB] py-[18px] text-[15px] font-semibold text-white shadow-lg shadow-[#2E54EB]/25 transition-all hover:bg-[#2546D2] active:scale-[0.98]"
+      {/* Main Slide Area */}
+      <div className="relative flex flex-1 flex-col items-center justify-center px-6 z-10 min-h-[calc(100vh-160px)]">
+        <AnimatePresence initial={false} custom={direction} mode="wait">
+          <motion.div
+            key={currentSlide}
+            custom={direction}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+              x: { type: "spring", stiffness: 300, damping: 30 },
+              opacity: { duration: 0.2 },
+            }}
+            className="flex flex-col items-center text-center max-w-lg mx-auto py-8"
           >
-            {slide.buttonText}
-            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" strokeWidth={3} />
-          </button>
+            {/* Large Icon Circle */}
+            <div 
+              className={cn(
+                "mb-10 sm:mb-12 flex h-[200px] w-[200px] sm:h-[220px] sm:w-[220px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br shadow-2xl transition-all duration-500",
+                slide.gradientClass
+              )}
+            >
+              <Icon className="h-24 w-24 sm:h-28 sm:w-28 text-white" strokeWidth={1.75} />
+            </div>
+
+            {/* Typography */}
+            <h2 className="mb-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-[#0A2540]">
+              {slide.title}
+            </h2>
+            <p className="max-w-[440px] px-4 text-base sm:text-lg font-medium leading-relaxed text-[#64748B]">
+              {slide.description}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom Action Area */}
+      <div className="flex w-full shrink-0 flex-col items-center pb-12 sm:pb-16 px-6 max-w-md mx-auto z-20">
+        
+        {/* Pagination Dots */}
+        <div className="mb-8 sm:mb-10 flex items-center justify-center gap-2">
+          {SLIDES.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => {
+                setDirection(idx > currentSlide ? 1 : -1);
+                setCurrentSlide(idx);
+              }}
+              className={cn(
+                "h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none",
+                idx === currentSlide 
+                  ? "w-8 bg-[#2563EB] shadow-sm shadow-blue-500/30" 
+                  : "w-2 bg-[#E2E8F0] hover:bg-[#CBD5E1]"
+              )}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
         </div>
 
+        {/* Action Button */}
+        <button
+          onClick={handleNext}
+          className="group flex w-full max-w-[380px] items-center justify-center rounded-2xl bg-[#2563EB] py-4 sm:py-5 text-base sm:text-lg font-bold text-white shadow-xl shadow-blue-600/25 transition-all hover:bg-[#1D4ED8] hover:shadow-2xl hover:shadow-blue-600/35 active:scale-[0.98] cursor-pointer"
+        >
+          {slide.buttonText}
+          <ChevronRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" strokeWidth={2.5} />
+        </button>
       </div>
     </div>
   );
