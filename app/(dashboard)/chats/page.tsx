@@ -283,19 +283,47 @@ function ChatsContent() {
     );
   }
 
+  // Preserve existing initial/empty UI exactly as is for Business mode
+  if (currentMode === "BUSINESS") {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center bg-white">
+        <div className="mb-6 mt-10 flex justify-center w-full max-w-sm">
+          <img 
+            src="/welcome-illustration.png" 
+            alt="Welcome Illustration" 
+            className="w-full h-auto object-contain"
+          />
+        </div>
+        
+        <h1 className="text-[28px] font-bold text-[#0F172A] mb-4 tracking-tight">Welcome to CallsChat.</h1>
+        <h2 className="text-[18px] font-semibold text-[#1E3A8A] mb-4">You&apos;re all set.</h2>
+        <p className="text-[14px] font-medium text-slate-600 max-w-md mx-auto leading-relaxed">
+          Start a conversation, make a call, or create a group to connect with your friends and team.
+        </p>
+
+        <ExploreBusinessesModal isOpen={isExploreOpen} onClose={() => setIsExploreOpen(false)} />
+      </div>
+    );
+  }
+
+  // Personal mode initial UI matching Figma node 1247-2566 ("Sign up home page")
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center bg-white">
-      <div className="mb-6 mt-10 flex justify-center w-full max-w-sm">
+    <div className="flex h-full w-full flex-col items-center justify-center p-6 sm:p-12 text-center bg-[#F8FAFC] relative overflow-y-auto">
+      <div className="mb-6 flex justify-center w-full max-w-[340px] sm:max-w-[380px]">
         <img 
           src="/welcome-illustration.png" 
           alt="Welcome Illustration" 
-          className="w-full h-auto object-contain"
+          className="w-full h-auto object-contain transition-transform duration-500 hover:scale-[1.02] drop-shadow-xs"
         />
       </div>
       
-      <h1 className="text-[28px] font-bold text-[#0F172A] mb-4 tracking-tight">Welcome to CallsChat.</h1>
-      <h2 className="text-[18px] font-semibold text-[#1E3A8A] mb-4">You're all set.</h2>
-      <p className="text-[14px] font-medium text-slate-600 max-w-md mx-auto leading-relaxed">
+      <h1 className="text-3xl sm:text-[34px] font-extrabold text-[#0F172A] mb-2 tracking-tight leading-tight">
+        Welcome to CallsChat.
+      </h1>
+      <h2 className="text-xl sm:text-[22px] font-bold text-[#2563EB] mb-3 tracking-tight">
+        You&apos;re all set.
+      </h2>
+      <p className="text-sm sm:text-[15px] font-medium text-[#64748B] max-w-[440px] mx-auto leading-relaxed">
         Start a conversation, make a call, or create a group to connect with your friends and team.
       </p>
 

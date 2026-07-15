@@ -50,7 +50,12 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     { name: tNav("media"), href: "/media", icon: Folder },
     { name: tNav("channel"), href: "/channels", icon: Share2 },
     { name: tNav("communities"), href: "/communities", icon: UsersRound },
-  ];
+  ].filter(item => {
+    if (!isBusiness && (item.href === "/channels" || item.href === "/communities")) {
+      return false;
+    }
+    return true;
+  });
 
   if (isOnboarding) {
     return (
