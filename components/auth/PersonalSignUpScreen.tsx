@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronLeft, User, Shield, Camera, Info, X, Image as ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronLeft, User, Shield, Camera, Info, X, Image as ImageIcon, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Country } from "react-phone-number-input";
@@ -362,39 +362,298 @@ export default function PersonalSignUpScreen() {
     otp.every((d) => d.length === 1) && !!sentPhone;
 
   // ── Render ────────────────────────────────────────────────────────────
-  if (step === "PROFILE") {
-    return (
-      <div className="flex min-h-screen w-full flex-col bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] font-sans">
-        {/* Hidden File Input */}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          accept="image/*" 
-          onChange={handlePhotoUpload} 
-          className="hidden" 
-        />
+  return (
+    <div className="flex min-h-screen w-full flex-col bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] font-sans relative">
+      {/* Hidden File Input for Profile step */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        onChange={handlePhotoUpload}
+        className="hidden"
+      />
 
-        {/* Top Header Section */}
-        <div className="flex flex-col items-center justify-center pt-16 pb-12 text-white px-4">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 text-center">
-            Set up your profile
-          </h1>
-          <p className="text-blue-100 font-medium text-center">
-            Let others know who you are
-          </p>
-        </div>
+      {/* Top Header Bar */}
+      <div className="absolute top-6 left-6 sm:left-12 flex items-center justify-between w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] z-20">
+        <button
+          type="button"
+          onClick={() => {
+            if (step === "OTP") setStep("PHONE");
+            else if (step === "PROFILE") setStep("OTP");
+            else router.back();
+          }}
+          className="flex items-center gap-2 text-sm sm:text-base font-semibold text-white/90 hover:text-white transition-colors cursor-pointer"
+        >
+          <ChevronLeft className="h-4 w-4" /> Back
+        </button>
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image src="/call_chats_logo.png" height={34} width={34} alt="CallsChat Logo" className="drop-shadow-sm" />
+          <span className="font-extrabold text-lg sm:text-xl text-white tracking-tight">
+            Calls<span className="text-[#93C5FD]">Chat</span>
+          </span>
+        </Link>
+      </div>
 
-        {/* Bottom White Section */}
-        <div className="flex-1 rounded-t-[2.5rem] sm:rounded-t-[3.5rem] bg-white px-6 py-10 sm:px-12 flex flex-col items-center shadow-2xl relative">
-          <div className="w-full max-w-[400px] flex-1 flex flex-col pt-4 sm:pt-6">
+      {/* Top Hero Header Section */}
+      <div className="flex flex-col items-center justify-center pt-16 pb-12 sm:pb-14 text-white px-4 relative z-10">
+        {step === "PHONE" && (
+          <>
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-sm">
+              <MessageSquare className="h-7 w-7 text-white" strokeWidth={1.8} />
+            </div>
+            <h1 className="text-3xl sm:text-[36px] font-extrabold tracking-tight mb-2 text-center">
+              Create Account
+            </h1>
+            <p className="text-blue-100 font-medium text-center text-sm sm:text-base">
+              Join CallsChat today
+            </p>
+          </>
+        )}
 
+        {step === "OTP" && (
+          <>
+            <h1 className="text-3xl sm:text-[36px] font-extrabold tracking-tight mb-2 text-center">
+              Verify Your Phone
+            </h1>
+            <p className="text-blue-100 font-medium text-center text-sm sm:text-base">
+              We&apos;ve sent a code to <span className="font-bold text-white">{sentPhone}</span>
+            </p>
+          </>
+        )}
+
+        {step === "PROFILE" && (
+          <>
+            <h1 className="text-3xl sm:text-[36px] font-extrabold tracking-tight mb-2 text-center">
+              Set up your profile
+            </h1>
+            <p className="text-blue-100 font-medium text-center text-sm sm:text-base">
+              Let others know who you are
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Bottom White Card Section */}
+      <div className="flex-1 rounded-t-[2.5rem] sm:rounded-t-[3.5rem] bg-white px-6 py-10 sm:px-12 flex flex-col items-center shadow-2xl relative z-10 w-full">
+        
+        {/* ── STEP: PHONE ─────────────────────────────────────────── */}
+        {step === "PHONE" && (
+          <div className="w-full max-w-[420px] flex-1 flex flex-col pt-2 sm:pt-4">
+            <div className="space-y-1.5 mb-6">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172A]">
+                Enter your phone number
+              </h2>
+              <p className="text-sm font-medium text-[#64748B] leading-relaxed">
+                Make sure this number can receive SMS. You&apos;ll receive your activation code through it.
+              </p>
+            </div>
+
+            <div className="space-y-2 mb-8">
+              <label className="text-xs font-bold text-slate-700 pl-1">
+                Phone number
+              </label>
+              <div className="flex items-center gap-3">
+                {/* Country selector */}
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="flex h-13 w-[105px] items-center justify-between rounded-xl border border-indigo-100 bg-[#EEF2FF] px-3 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                      <span className="text-lg">
+                        {getFlagEmoji(selectedCountry)}
+                      </span>
+                      <span className="text-sm">
+                        +{getCountryCallingCode(selectedCountry)}
+                      </span>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                  </button>
+
+                  {isDropdownOpen && (
+                    <div className="absolute left-0 top-14 z-50 flex max-h-72 w-64 flex-col rounded-xl bg-white py-2 shadow-xl border border-slate-100 overflow-hidden">
+                      <div className="px-3 pb-2 pt-1 shrink-0">
+                        <input
+                          type="text"
+                          placeholder="Search country…"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex-1 overflow-y-auto min-h-0">
+                        {filteredCountries.length > 0 ? (
+                          filteredCountries.map((c) => {
+                            let cName = c as string;
+                            try {
+                              cName = regionNames.of(c as string) ?? c;
+                            } catch {}
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCountry(c);
+                                  setIsDropdownOpen(false);
+                                  setSearchQuery("");
+                                }}
+                                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-indigo-50 hover:text-blue-600 cursor-pointer"
+                              >
+                                <span className="text-base">
+                                  {getFlagEmoji(c)}
+                                </span>
+                                <span className="w-10 shrink-0 text-slate-400">
+                                  +{getCountryCallingCode(c)}
+                                </span>
+                                <span className="ml-auto text-xs font-medium truncate">
+                                  {cName}
+                                </span>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="px-4 py-4 text-center text-sm text-slate-500">
+                            No countries found
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Input
+                  country={selectedCountry}
+                  value={phoneNumber}
+                  onChange={setPhoneNumber}
+                  placeholder="000 000 0000"
+                  disabled={isPending}
+                  className="flex h-13 flex-1 rounded-xl border border-indigo-100 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200"
+                />
+              </div>
+            </div>
+
+            <div className="mt-auto pt-6 pb-6 space-y-6">
+              <button
+                type="button"
+                onClick={handleRequestOTP}
+                disabled={!phoneNumber || isPending}
+                className={cn(
+                  "w-full flex items-center justify-center gap-2 rounded-xl h-13 py-4 text-base font-bold transition-all duration-200 shadow-sm cursor-pointer",
+                  phoneNumber && !isPending
+                    ? "bg-[#2563EB] text-white hover:bg-blue-700 active:scale-[0.99] shadow-lg shadow-blue-600/25"
+                    : "cursor-not-allowed bg-slate-100 text-slate-400"
+                )}
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Sending…
+                  </span>
+                ) : (
+                  "Continue"
+                )}
+              </button>
+
+              <p className="text-center text-sm font-medium text-slate-500">
+                Already have an account?{" "}
+                <Link
+                  href="/auth/personal/login"
+                  className="font-bold text-[#2563EB] hover:underline"
+                >
+                  Log in
+                </Link>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP: OTP ───────────────────────────────────────────── */}
+        {step === "OTP" && (
+          <div className="w-full max-w-[420px] flex-1 flex flex-col pt-2 sm:pt-4">
+            <div className="space-y-1.5 mb-8">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172A]">
+                Enter the code below
+              </h2>
+              <p className="text-sm font-medium text-[#64748B]">
+                We sent a 6-digit verification code to your phone
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-2 sm:gap-3 mb-8">
+              {otp.map((digit, idx) => (
+                <input
+                  key={idx}
+                  id={`p-otp-${idx}`}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={1}
+                  value={digit}
+                  disabled={isPending}
+                  onChange={(e) => handleOtpChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                  onPaste={handleOtpPaste}
+                  className="h-13 w-11 sm:h-14 sm:w-13 rounded-xl border border-indigo-100 bg-[#EEF2FF] text-center text-xl font-bold text-[#1E293B] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              ))}
+            </div>
+
+            <div className="text-center text-sm font-medium text-slate-500 mb-8">
+              Didn&apos;t receive the code?{" "}
+              {timer > 0 ? (
+                <span className="font-bold text-blue-400 cursor-not-allowed">
+                  Resend ({Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, "0")})
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRequestOTP}
+                  disabled={isPending}
+                  className="font-bold text-[#2563EB] hover:underline cursor-pointer"
+                >
+                  Resend
+                </button>
+              )}
+            </div>
+
+            <div className="mt-auto pt-6 pb-6">
+              <button
+                type="button"
+                onClick={handleVerifyOTP}
+                disabled={!isOtpComplete || isPending}
+                className={cn(
+                  "w-full flex items-center justify-center gap-2 rounded-xl h-13 py-4 text-base font-bold transition-all duration-200 shadow-sm cursor-pointer",
+                  isOtpComplete && !isPending
+                    ? "bg-[#2563EB] text-white hover:bg-blue-700 active:scale-[0.99] shadow-lg shadow-blue-600/25"
+                    : "cursor-not-allowed bg-slate-100 text-slate-400"
+                )}
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Verifying…
+                  </span>
+                ) : (
+                  "Verify & Continue"
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP: PROFILE ───────────────────────────────────────── */}
+        {step === "PROFILE" && (
+          <div className="w-full max-w-[420px] flex-1 flex flex-col pt-2 sm:pt-4">
             {/* Avatar Section */}
-            <div className="flex justify-center mb-10">
+            <div className="flex justify-center mb-8">
               <div className="relative group">
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsPhotoPickerOpen(true)}
-                  className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-[6px] border-[#EEF2FF] bg-[#E2E8F0] transition-all hover:border-blue-100 shadow-sm"
+                  className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-[6px] border-[#EEF2FF] bg-[#E2E8F0] transition-all hover:border-blue-100 shadow-sm cursor-pointer"
                 >
                   {photoPreview ? (
                     <img src={photoPreview} alt="Profile preview" className="h-full w-full object-cover" />
@@ -402,11 +661,11 @@ export default function PersonalSignUpScreen() {
                     <User className="h-16 w-16 text-slate-500" strokeWidth={1.5} />
                   )}
                 </button>
-                
-                <button 
+
+                <button
                   type="button"
                   onClick={() => setIsPhotoPickerOpen(true)}
-                  className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-[#2563EB] shadow-md text-white transition-transform hover:scale-110 active:scale-95"
+                  className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-[#2563EB] shadow-md text-white transition-transform hover:scale-110 active:scale-95 cursor-pointer"
                 >
                   <Camera className="h-4 w-4" />
                 </button>
@@ -414,7 +673,7 @@ export default function PersonalSignUpScreen() {
             </div>
 
             {/* Form Fields */}
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 pl-1">
                   First Name
@@ -425,7 +684,7 @@ export default function PersonalSignUpScreen() {
                   value={firstName}
                   disabled={isPending}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="flex h-12 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
+                  className="flex h-13 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
                 />
               </div>
 
@@ -439,13 +698,13 @@ export default function PersonalSignUpScreen() {
                   value={lastName}
                   disabled={isPending}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="flex h-12 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
+                  className="flex h-13 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
                 />
               </div>
             </div>
 
             {/* Info Box */}
-            <div className="mt-8 flex items-start gap-3 rounded-xl border border-blue-50 bg-[#EEF2FF] p-4">
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-blue-50 bg-[#EEF2FF] p-4">
               <Info className="h-4 w-4 text-[#2563EB] shrink-0 mt-0.5" />
               <p className="text-xs font-medium leading-relaxed text-[#2563EB]">
                 Your name will be visible to your contacts. You can change it anytime in settings.
@@ -453,15 +712,15 @@ export default function PersonalSignUpScreen() {
             </div>
 
             {/* Action Buttons */}
-            <div className="mt-auto space-y-4 pt-12 pb-6">
+            <div className="mt-auto pt-8 pb-6 space-y-4">
               <button
                 type="button"
                 onClick={() => handleRegisterAndSetup(false)}
                 disabled={!firstName || !lastName || isPending}
                 className={cn(
-                  "w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 shadow-sm",
+                  "w-full flex items-center justify-center gap-2 rounded-xl h-13 py-4 text-base font-bold transition-all duration-200 shadow-sm cursor-pointer",
                   firstName && lastName && !isPending
-                    ? "bg-[#2563EB] text-white hover:bg-blue-700 active:scale-[0.99]"
+                    ? "bg-[#2563EB] text-white hover:bg-blue-700 active:scale-[0.99] shadow-lg shadow-blue-600/25"
                     : "cursor-not-allowed bg-slate-100 text-slate-400"
                 )}
               >
@@ -480,15 +739,14 @@ export default function PersonalSignUpScreen() {
                   type="button"
                   onClick={() => handleRegisterAndSetup(true)}
                   disabled={isPending}
-                  className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                  className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   Skip for now
                 </button>
               </div>
             </div>
-
           </div>
-        </div>
+        )}
 
         {/* Photo Picker Modal / Dialog */}
         <AnimatePresence>
@@ -512,18 +770,18 @@ export default function PersonalSignUpScreen() {
               >
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
                   <h3 className="text-lg font-bold text-slate-800">Select Profile Picture</h3>
-                  <button 
+                  <button
                     onClick={() => setIsPhotoPickerOpen(false)}
-                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                   >
                     <X className="h-5 w-5" />
                   </button>
                 </div>
 
                 <div className="space-y-3">
-                  <button 
+                  <button
                     onClick={handleCameraClick}
-                    className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-500/40 hover:bg-blue-50/50"
+                    className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-500/40 hover:bg-blue-50/50 cursor-pointer"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-[#2563EB]">
                       <Camera className="h-5 w-5" />
@@ -533,10 +791,10 @@ export default function PersonalSignUpScreen() {
                       <span className="block text-xs text-slate-500">Use device camera</span>
                     </div>
                   </button>
-                  
-                  <button 
+
+                  <button
                     onClick={handleGalleryClick}
-                    className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-500/40 hover:bg-blue-50/50"
+                    className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-500/40 hover:bg-blue-50/50 cursor-pointer"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600">
                       <ImageIcon className="h-5 w-5" />
@@ -551,322 +809,6 @@ export default function PersonalSignUpScreen() {
             </div>
           )}
         </AnimatePresence>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-screen w-full bg-[#F8FAFC] font-sans">
-      <div className="flex w-full min-h-screen">
-
-        {/* Left brand column */}
-        <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between bg-gradient-to-br from-[#0A2540] via-[#102A63] to-[#1A62E8] p-12 text-white relative overflow-hidden">
-          <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-12 right-12 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-
-          <Link href="/" className="flex items-center gap-3 relative z-10">
-            <Image
-              src="/call_chats_logo.png"
-              height={56}
-              width={56}
-              alt="CallsChat"
-              priority
-              className="drop-shadow-md"
-            />
-            <span className="text-2xl font-extrabold tracking-tight text-white">
-              Calls<span className="text-[#1AC1F2]">Chat</span>
-            </span>
-          </Link>
-
-          <div className="my-auto max-w-lg relative z-10 space-y-8 py-12">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold backdrop-blur-md border border-white/15 text-[#1AC1F2]">
-              <User className="h-3.5 w-3.5" /> Personal Account
-            </div>
-            <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight">
-              Secure private <br />
-              <span className="bg-gradient-to-r from-blue-300 via-[#1AC1F2] to-indigo-200 bg-clip-text text-transparent">
-                communication.
-              </span>
-            </h1>
-            <p className="text-base text-blue-100/90 leading-relaxed">
-              Chat securely with friends and family using end-to-end encryption. Your messages stay between you.
-            </p>
-            <div className="grid grid-cols-1 gap-3">
-              {[
-                "End-to-end encrypted messaging",
-                "HD voice & video calls",
-                "Private group chats",
-                "Secure media sharing",
-              ].map((feat) => (
-                <div
-                  key={feat}
-                  className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 border border-white/10"
-                >
-                  <Shield className="h-4 w-4 text-[#1AC1F2] shrink-0" />
-                  <span className="text-sm text-blue-100/90">{feat}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative z-10 flex items-center justify-between border-t border-white/15 pt-6 text-xs text-blue-200/80">
-            <span>Personal accounts are free forever</span>
-            <span>© 2026 CallsChat LLC</span>
-          </div>
-        </div>
-
-        {/* Right form column */}
-        <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-12 lg:w-7/12 xl:w-1/2 lg:px-20 xl:px-28 bg-white relative">
-
-          {/* Top bar */}
-          <div className="absolute top-6 left-6 sm:left-12 flex items-center justify-between w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)]">
-            <button
-              onClick={() =>
-                step === "OTP"
-                  ? setStep("PHONE")
-                  : router.back()
-              }
-              className="flex items-center gap-2 text-sm font-semibold text-[#102A63] hover:text-primary transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" /> Back
-            </button>
-            <div className="lg:hidden flex items-center gap-2">
-              <Image
-                src="/call_chats_logo.png"
-                height={36}
-                width={36}
-                alt="Logo"
-              />
-              <span className="font-bold text-lg text-[#0A2540]">
-                CallsChat
-              </span>
-            </div>
-          </div>
-
-          <div className="mx-auto w-full max-w-md space-y-8 my-auto pt-8">
-
-            {/* Step indicator */}
-            <div className="flex items-center gap-2">
-              {["PHONE", "OTP", "PROFILE"].map((s, i) => (
-                <React.Fragment key={s}>
-                  <div
-                    className={cn(
-                      "h-1.5 flex-1 rounded-full transition-all duration-300",
-                      ["PHONE", "OTP", "PROFILE"].indexOf(step) >= i
-                        ? "bg-primary"
-                        : "bg-slate-200"
-                    )}
-                  />
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* ── STEP: PHONE ─────────────────────────────────────────── */}
-            {step === "PHONE" && (
-              <div className="space-y-6">
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-extrabold text-[#0A2540]">
-                    Create Personal Account
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    Enter your phone number to get started
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 pl-1">
-                    Phone number
-                  </label>
-                  <div className="flex items-center gap-3">
-                    {/* Country selector */}
-                    <div className="relative" ref={dropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex h-12 w-[100px] items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200"
-                      >
-                        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-                          <span className="text-lg">
-                            {getFlagEmoji(selectedCountry)}
-                          </span>
-                          <span className="text-sm">
-                            +{getCountryCallingCode(selectedCountry)}
-                          </span>
-                        </div>
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                      </button>
-
-                      {isDropdownOpen && (
-                        <div className="absolute left-0 top-14 z-50 flex max-h-72 w-64 flex-col rounded-xl bg-white py-2 shadow-xl border border-slate-100 overflow-hidden">
-                          <div className="px-3 pb-2 pt-1 shrink-0">
-                            <input
-                              type="text"
-                              placeholder="Search country…"
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
-                              autoFocus
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          <div className="flex-1 overflow-y-auto min-h-0">
-                            {filteredCountries.length > 0 ? (
-                              filteredCountries.map((c) => {
-                                let cName = c as string;
-                                try {
-                                  cName = regionNames.of(c as string) ?? c;
-                                } catch {}
-                                return (
-                                  <button
-                                    key={c}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedCountry(c);
-                                      setIsDropdownOpen(false);
-                                      setSearchQuery("");
-                                    }}
-                                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-indigo-50 hover:text-blue-600"
-                                  >
-                                    <span className="text-base">
-                                      {getFlagEmoji(c)}
-                                    </span>
-                                    <span className="w-10 shrink-0 text-slate-400">
-                                      +{getCountryCallingCode(c)}
-                                    </span>
-                                    <span className="ml-auto text-xs font-medium truncate">
-                                      {cName}
-                                    </span>
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <div className="px-4 py-4 text-center text-sm text-slate-500">
-                                No countries found
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <Input
-                      country={selectedCountry}
-                      value={phoneNumber}
-                      onChange={setPhoneNumber}
-                      placeholder="000 000 0000"
-                      disabled={isPending}
-                      className="flex h-12 flex-1 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleRequestOTP}
-                  disabled={!phoneNumber || isPending}
-                  className={cn(
-                    "w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 shadow-sm",
-                    phoneNumber && !isPending
-                      ? "bg-primary text-white hover:bg-blue-700 active:scale-[0.99]"
-                      : "cursor-not-allowed bg-slate-100 text-slate-400"
-                  )}
-                >
-                  {isPending ? (
-                    <span className="flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Sending…
-                    </span>
-                  ) : (
-                    "Continue"
-                  )}
-                </button>
-
-                <p className="text-center text-sm text-slate-500">
-                  Already have an account?{" "}
-                  <Link
-                    href="/auth/personal/login"
-                    className="font-bold text-blue-600 hover:underline"
-                  >
-                    Log in
-                  </Link>
-                </p>
-              </div>
-            )}
-
-            {/* ── STEP: OTP ───────────────────────────────────────────── */}
-            {step === "OTP" && (
-              <div className="space-y-6">
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-extrabold text-[#0A2540]">
-                    Verify Your Phone
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    We sent a 6-digit code to{" "}
-                    <span className="font-bold text-slate-700">{sentPhone}</span>
-                  </p>
-                </div>
-
-                <div className="flex justify-center gap-2 sm:gap-3">
-                  {otp.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      id={`p-otp-${idx}`}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={1}
-                      value={digit}
-                      disabled={isPending}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                      onPaste={handleOtpPaste}
-                      className="h-12 w-10 sm:h-14 sm:w-12 rounded-xl border border-indigo-100 bg-[#EEF2FF] text-center text-xl font-bold text-[#1E293B] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                  ))}
-                </div>
-
-                <div className="text-center text-sm text-slate-500">
-                  Didn&apos;t receive the code?{" "}
-                  {timer > 0 ? (
-                    <span className="font-bold text-blue-400 cursor-not-allowed">
-                      Resend ({Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, "0")})
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleRequestOTP}
-                      disabled={isPending}
-                      className="font-bold text-blue-600 hover:underline"
-                    >
-                      Resend
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleVerifyOTP}
-                  disabled={!isOtpComplete || isPending}
-                  className={cn(
-                    "w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 shadow-sm",
-                    isOtpComplete && !isPending
-                      ? "bg-primary text-white hover:bg-blue-700 active:scale-[0.99]"
-                      : "cursor-not-allowed bg-slate-100 text-slate-400"
-                  )}
-                >
-                  {isPending ? (
-                    <span className="flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Verifying…
-                    </span>
-                  ) : (
-                    "Verify & Continue"
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
