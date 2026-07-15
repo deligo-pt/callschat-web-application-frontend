@@ -87,9 +87,11 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <div className="mb-4">
-          <WorkspaceSwitcher compact={true} />
-        </div>
+        {!isBusiness && (
+          <div className="mb-4">
+            <WorkspaceSwitcher compact={true} />
+          </div>
+        )}
 
         <div className="flex flex-1 flex-col items-center gap-2.5 w-full mt-2 overflow-y-auto scrollbar-hide px-2">
           {navItems.map((item) => {
@@ -154,10 +156,12 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Navigation Bar (Hidden on Desktop) */}
       <nav className="absolute bottom-0 left-0 flex w-full items-center justify-between overflow-x-auto scrollbar-hide bg-white/95 backdrop-blur-md px-4 pb-6 pt-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] border-t border-[#F4F6FC] md:hidden z-20 gap-4">
-        <div className="flex flex-col items-center gap-1 shrink-0">
-          <WorkspaceSwitcher compact={true} className="h-9 w-9" />
-          <span className="text-[9px] font-bold text-[#8F95B2]">Mode</span>
-        </div>
+        {!isBusiness && (
+          <div className="flex flex-col items-center gap-1 shrink-0">
+            <WorkspaceSwitcher compact={true} className="h-9 w-9" />
+            <span className="text-[9px] font-bold text-[#8F95B2]">Mode</span>
+          </div>
+        )}
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;
