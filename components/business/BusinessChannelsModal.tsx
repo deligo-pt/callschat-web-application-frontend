@@ -746,6 +746,9 @@ export function BusinessChannelsModal({
 
       if (res?.success && res.data) {
         setMessages((prev) => {
+          if (prev.some((m) => m.id === res.data.id)) {
+            return prev.map((m) => (m.id === res.data.id ? res.data : m));
+          }
           const updated = [res.data, ...prev];
           return updated.sort((a, b) => {
             if (a.isPinned !== b.isPinned) return (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0);

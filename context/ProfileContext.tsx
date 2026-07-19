@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { BusinessService } from "@/services/business.service";
+import { UserService } from "@/services/user.service";
 
 // Define the shape of the user profile from the API
 export interface UserProfileData {
@@ -56,6 +57,7 @@ interface ProfileContextType {
   setNotificationsEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSaveProfile: () => void;
+  updateUserEmail: (newEmail: string | null) => Promise<boolean>;
   handleLogout: () => Promise<void>;
   businessProfile: any;
   refreshProfile?: () => Promise<void>;
@@ -101,39 +103,33 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-        const [res, bRes] = await Promise.all([
-          fetch(`${baseUrl}/user/profile`, {
-            headers: {
-              "Authorization": `Bearer ${token}`
-            }
-          }),
+        const [data, bRes] = await Promise.all([
+          UserService.getProfile().catch(() => null),
           BusinessService.getProfile().catch(() => null)
         ]);
 
-        const data = await res.json();
         const bData = bRes?.success ? bRes.data : businessProfile;
 
-        if (data.success && data.data) {
+        if (data && data.success && data.data) {
           setUserData(data.data);
           if (data.data.currentMode) {
             updateCurrentMode(data.data.currentMode);
           }
           setFormData({
-            displayName: data.data.profile.displayName || bData?.companyName || "",
-            username: data.data.profile.username || "",
+            displayName: data.data.profile?.displayName || bData?.companyName || "",
+            username: data.data.profile?.username || "",
             email: data.data.email || "",
             phone: data.data.phone || "",
-            bio: data.data.profile.bio || "",
-            country: data.data.profile.country || "",
-            timezone: data.data.profile.timezone || "UTC",
-            language: data.data.profile.language || "en",
-            companyName: bData?.companyName || data.data.profile.displayName || "",
+            bio: data.data.profile?.bio || "",
+            country: data.data.profile?.country || "",
+            timezone: data.data.profile?.timezone || "UTC",
+            language: data.data.profile?.language || "en",
+            companyName: bData?.companyName || data.data.profile?.displayName || "",
             category: bData?.category || "Technology",
             description: bData?.description || "",
             website: bData?.website || "",
           });
-          if (data.data.profile.avatarUrl) {
+          if (data.data.profile?.avatarUrl) {
             setAvatarPreview(data.data.profile.avatarUrl);
           }
         } else {
@@ -199,26 +195,43 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         if (formData.language) submitData.append("language", formData.language);
         if (avatarFile) submitData.append("avatar", avatarFile);
 
-        const res = await fetch(`${baseUrl}/user/profile`, {
-          method: "PATCH",
-          headers: {
-            "Authorization": `Bearer ${token}`
-          },
-          body: submitData
+        const data = await UserService.updateProfile(submitData).catch((err: any) => {
+          console.error("Profile update error:", err);
+          return err?.response?.data || null;
         });
 
-        const data = await res.json();
-
-        if (data.success || res.ok) {
+        if (data && data.success) {
+          if (data.data) {
+            setUserData(prev => prev ? { ...prev, email: data.data.email !== undefined ? data.data.email : prev.email } : prev);
+          }
           toast.success("Profile updated successfully!");
           await refetchUser?.();
         } else {
-          toast.error(data.message || "Failed to update profile");
+          toast.error(data?.error?.message || data?.message || "Failed to update profile");
         }
       } catch (error) {
         toast.error("Network error while updating profile");
       }
     });
+  };
+
+  const updateUserEmail = async (newEmail: string | null): Promise<boolean> => {
+    try {
+      const res = await UserService.updateEmail({ email: newEmail });
+      if (res && res.success) {
+        setFormData(prev => ({ ...prev, email: res.data.email || "" }));
+        setUserData(prev => prev ? { ...prev, email: res.data.email } : prev);
+        toast.success("Email address updated successfully!");
+        await refetchUser?.();
+        return true;
+      } else {
+        toast.error(res?.error?.message || res?.message || "Failed to update email address");
+        return false;
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Error updating email address");
+      return false;
+    }
   };
 
   const handleLogout = async () => {
@@ -284,6 +297,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setNotificationsEnabled,
         handleImageSelect,
         handleSaveProfile,
+        updateUserEmail,
         handleLogout,
         businessProfile,
         refreshProfile,
