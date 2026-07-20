@@ -182,9 +182,7 @@ export const CollaborationService = {
     if (ticketId) formData.append('ticketId', ticketId);
     if (workspaceId) formData.append('workspaceId', workspaceId);
 
-    const response = await apiClient.post('/business/files/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await apiClient.post('/business/files/upload', formData);
     return response.data;
   },
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export const GroupIncomingModal = () => {
   const { incomingGroupCall, acceptGroupCall, rejectGroupCall } = useCallContext();
@@ -61,7 +62,7 @@ export const GroupIncomingModal = () => {
           <div className="absolute -inset-4 rounded-full border-2 border-[#3B58F5]/50 animate-pulse" />
           
           <img 
-            src={avatarUrl} 
+            src={getOptimizedImageUrl(avatarUrl)} 
             alt={displayName}
             className="relative h-28 w-28 rounded-full object-cover border-4 border-[#1D2A54] shadow-xl"
           />

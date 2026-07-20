@@ -11,11 +11,7 @@ export const UserService = {
   },
 
   updateProfile: async (formData: FormData) => {
-    const response = await apiClient.patch('/user/profile', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await apiClient.patch('/user/profile', formData);
     return response.data;
   },
 

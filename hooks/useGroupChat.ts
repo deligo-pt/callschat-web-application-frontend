@@ -447,6 +447,22 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
 
       const optimisticId = `optimistic-${Date.now()}`;
+      let optimisticMediaType: string | undefined = undefined;
+      let optimisticMediaUrl: string | undefined = undefined;
+      if (file) {
+        optimisticMediaUrl = URL.createObjectURL(file);
+        if (file.type.startsWith("image")) optimisticMediaType = "image";
+        else if (file.type.startsWith("video")) optimisticMediaType = "video";
+        else if (file.type.startsWith("audio")) optimisticMediaType = "audio";
+        else optimisticMediaType = "document";
+      } else if (text) {
+        const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
+        if (urlMatch && urlMatch[0]) {
+          optimisticMediaUrl = urlMatch[0];
+          optimisticMediaType = "link";
+        }
+      }
+
       setMessages((prev) => [
         ...prev,
         {
@@ -455,6 +471,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           senderId: currentUserIdRef.current,
           text: file ? "Uploading media..." : text,
           createdAt: new Date().toISOString(),
+          mediaUrl: optimisticMediaUrl,
+          mediaType: optimisticMediaType as any,
           // Don't populate sender so it looks like "You"
         },
       ]);
@@ -471,6 +489,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             mediaType = uploadRes.data.mediaType;
           }
           setIsUploading(false);
+        } else if (text) {
+          const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
+          if (urlMatch && urlMatch[0]) {
+            mediaUrl = urlMatch[0];
+            mediaType = 'link';
+          }
         }
 
         let ciphertext, nonce;

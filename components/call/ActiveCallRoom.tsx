@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
 import { InviteParticipantModal } from "./InviteParticipantModal";
 import { InviteParticipantSidebar } from "./InviteParticipantSidebar";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
 // Inner layout — must be a child of <LiveKitRoom> so LiveKit hooks work
@@ -336,7 +337,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
                 <div className="relative mb-6">
                   <div className="absolute -inset-2 rounded-full bg-[#3B58F5] opacity-60 blur-lg animate-pulse"></div>
                   <img 
-                    src={finalSingleAvatarUrl} 
+                    src={getOptimizedImageUrl(finalSingleAvatarUrl)} 
                     alt="Avatar" 
                     className="relative h-44 w-44 rounded-full object-cover border-[3px] border-[#3B58F5] shadow-2xl"
                   />
@@ -393,7 +394,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
                     <div key={p.identity || idx} className="flex flex-col items-center">
                        <div className="relative mb-4">
                           <img 
-                            src={av} 
+                            src={getOptimizedImageUrl(av)} 
                             alt={name} 
                             className="relative h-32 w-32 md:h-40 md:w-40 rounded-full object-cover border-[3px] border-[#3B58F5] shadow-2xl"
                           />

@@ -23,6 +23,7 @@ import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
 import { MediaGallery } from "@/components/chat/MediaGallery";
 import { useTranslations } from "next-intl";
 import { useGroupStore } from "@/hooks/useGroupStore";
+import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 
 function parseJwt(token: string) {
   try {
@@ -399,7 +400,7 @@ export default function GroupChatPage() {
             
             <div className="flex items-center gap-3">
               <img
-                src={avatarImage}
+                src={getOptimizedImageUrl(avatarImage)}
                 alt={groupName}
                 className="h-10 w-10 rounded-full object-cover border border-white/20"
               />
@@ -716,11 +717,11 @@ export default function GroupChatPage() {
                 title="Click to change group photo"
               >
                 <img
-                  src={avatarImage}
+                  src={getOptimizedImageUrl(avatarImage)}
                   alt={groupName}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold">
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold pointer-events-none">
                   {isUploadingAvatar ? (
                     <Loader2 className="h-6 w-6 animate-spin" />
                   ) : (
@@ -793,7 +794,7 @@ export default function GroupChatPage() {
                     <div key={m.id} className="w-20 h-20 shrink-0 rounded-xl bg-[#F4F6FC] overflow-hidden border border-[#EEF2FF] relative group cursor-pointer" onClick={() => setGalleryOpen(true)}>
                       {m.mediaType?.includes('video') ? (
                         <>
-                          <video src={m.mediaUrl} className="w-full h-full object-cover" />
+                          <video src={getRawMediaUrl(m.mediaUrl)} className="w-full h-full object-cover" />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                             <div className="w-6 h-6 rounded-full bg-white/80 flex items-center justify-center">
                               <div className="w-0 h-0 border-t-[4px] border-t-transparent border-l-[6px] border-l-[#3B58F5] border-b-[4px] border-b-transparent ml-0.5" />
@@ -801,7 +802,7 @@ export default function GroupChatPage() {
                           </div>
                         </>
                       ) : (
-                        <img src={m.mediaUrl} className="w-full h-full object-cover" alt="Media" />
+                        <img src={getOptimizedImageUrl(m.mediaUrl)} className="w-full h-full object-cover" alt="Media" />
                       )}
                     </div>
                   ))
@@ -834,7 +835,7 @@ export default function GroupChatPage() {
                   return (
                     <div key={member.id || index} className="flex items-center justify-between px-6 py-3 hover:bg-[#F4F6FC] transition-colors cursor-pointer">
                       <div className="flex items-center gap-3">
-                        <img src={mAvatar} alt={mName} className="w-10 h-10 rounded-full object-cover" />
+                        <img src={getOptimizedImageUrl(mAvatar)} alt={mName} className="w-10 h-10 rounded-full object-cover" />
                         <span className="text-[14px] font-semibold text-[#11142D]">{mName}</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -938,7 +939,7 @@ export default function GroupChatPage() {
                 return (
                   <div key={member.id || idx} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col gap-3.5 transition-all hover:shadow-md">
                     <div className="flex items-start gap-3.5">
-                      <img src={mAvatar} alt={mName} className="w-12 h-12 rounded-full object-cover border border-gray-100 shrink-0 shadow-sm" />
+                      <img src={getOptimizedImageUrl(mAvatar)} alt={mName} className="w-12 h-12 rounded-full object-cover border border-gray-100 shrink-0 shadow-sm" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <h4 className="text-[15px] font-bold text-gray-900 truncate">{mName} {isMe && "(You)"}</h4>
@@ -1055,7 +1056,7 @@ export default function GroupChatPage() {
                       return (
                         <div key={contact.id || cId} className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F8FAFC] transition-colors">
                           <div className="flex items-center gap-3">
-                            <img src={cAvatar} alt={cName} className="w-10 h-10 rounded-full object-cover" />
+                            <img src={getOptimizedImageUrl(cAvatar)} alt={cName} className="w-10 h-10 rounded-full object-cover" />
                             <span className="text-[14px] font-bold text-[#11142D]">{cName}</span>
                           </div>
                           {isAlreadyMember ? (

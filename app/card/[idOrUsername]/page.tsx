@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { CardService, type DigitalCardData } from "@/services/card.service";
 import { toBlob } from "html-to-image";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export default function PublicDigitalCardPage() {
   const params = useParams();
@@ -303,7 +304,7 @@ export default function PublicDigitalCardPage() {
           <div className="flex items-start justify-between mb-6">
             <div className="h-12 w-12 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center font-bold text-lg text-white shadow-inner border border-white/30 overflow-hidden shrink-0">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+                <img src={getOptimizedImageUrl(avatarUrl)} alt="Avatar" className="h-full w-full object-cover" />
               ) : (
                 <span>{circleBadgeText}</span>
               )}
@@ -436,7 +437,7 @@ export default function PublicDigitalCardPage() {
             {/* Card Image Preview */}
             <div className="mt-4 w-full rounded-2xl border border-slate-200/80 bg-slate-50 p-3 shadow-inner">
               <img
-                src={shareImageUrl}
+                src={getOptimizedImageUrl(shareImageUrl)}
                 alt="Digital Card Preview"
                 className="w-full rounded-xl shadow-md border border-slate-200/60 object-contain max-h-[220px]"
               />

@@ -6,6 +6,7 @@ import { useParticipants } from "@livekit/components-react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { useContacts, Contact } from "@/hooks/useContacts";
 import { toast } from "sonner";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface InviteParticipantSidebarProps {
   open: boolean;
@@ -173,7 +174,7 @@ export const InviteParticipantSidebar = ({
                     <li key={contact.userId} className="flex items-center justify-between px-6 py-3 hover:bg-[#F4F7FE] transition-colors">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="relative shrink-0">
-                          <img src={avatarUrl} alt={contact.name} className="h-10 w-10 rounded-full object-cover" />
+                          <img src={getOptimizedImageUrl(avatarUrl)} alt={contact.name} className="h-10 w-10 rounded-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[15px] font-bold text-[#1D2A54] truncate">{contact.name}</p>

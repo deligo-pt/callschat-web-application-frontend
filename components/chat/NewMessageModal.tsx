@@ -19,6 +19,7 @@ import { BusinessService } from "@/services/business.service";
 import { CustomerService } from "@/services/customer-support.service";
 import { chatService } from "@/services/chat.service";
 import { useUser } from "@/context/UserContext";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -135,7 +136,7 @@ function Avatar({
     <div className="relative">
       {src ? (
         <img
-          src={src}
+          src={getOptimizedImageUrl(src)}
           alt={name}
           className={`${dim} rounded-full object-cover border border-[#E6EAFA]`}
         />

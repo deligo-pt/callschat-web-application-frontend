@@ -15,6 +15,7 @@ import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
 import { ChannelInput } from "@/components/business/ChannelInput";
 import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
 import { HuddleOverlay } from "@/components/business/HuddleOverlay";
+import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 
 function ChatsContent() {
   const router = useRouter();
@@ -227,7 +228,7 @@ function ChatsContent() {
             messages.map((m) => (
               <div key={m.id} className="flex items-start gap-3 group">
                 {m.avatar ? (
-                  <img src={m.avatar} alt={m.sender} className="h-9 w-9 shrink-0 rounded-full object-cover shadow-sm bg-purple-100" />
+                  <img src={getOptimizedImageUrl(m.avatar)} alt={m.sender} className="h-9 w-9 shrink-0 rounded-full object-cover shadow-sm bg-purple-100" />
                 ) : (
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-600 text-white font-bold text-xs shadow-sm">
                     {m.sender.charAt(0)}
@@ -248,13 +249,13 @@ function ChatsContent() {
                             isMe={m.sender === (user?.profile?.displayName || user?.profile?.username || "You")}
                           />
                         ) : m.mediaType?.startsWith("image") || m.mediaType === "image" ? (
-                          <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer">
-                            <img src={m.mediaUrl} alt="Attached Image" className="rounded-lg max-w-sm w-full object-cover max-h-[300px]" />
+                          <a href={getRawMediaUrl(m.mediaUrl)} target="_blank" rel="noopener noreferrer">
+                            <img src={getOptimizedImageUrl(m.mediaUrl)} alt="Attached Image" className="rounded-lg max-w-sm w-full object-cover max-h-[300px]" />
                           </a>
                         ) : m.mediaType?.startsWith("video") || m.mediaType === "video" ? (
-                          <video src={m.mediaUrl} controls className="rounded-lg max-w-sm w-full max-h-[300px]" />
+                          <video src={getRawMediaUrl(m.mediaUrl)} controls className="rounded-lg max-w-sm w-full max-h-[300px]" />
                         ) : (
-                          <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-lg text-xs transition-colors">
+                          <a href={getRawMediaUrl(m.mediaUrl)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-lg text-xs transition-colors">
                             📎 Download Attachment
                           </a>
                         )}

@@ -9,6 +9,7 @@ import { chatService } from "@/services/chat.service";
 import { motion } from "framer-motion";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { decryptMessage } from "@/utils/crypto";
+import { getOptimizedImageUrl } from "@/utils/image";
 import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
 import { usePresence } from "@/context/PresenceContext";
 import { useUser } from "@/context/UserContext";
@@ -465,7 +466,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                     {filteredConversations.map((conv, index) => {
                       const isActive = pathname === `/chats/${conv.id}`;
                       const avatarUrl =
-                        conv.otherUserAvatar ||
+                        getOptimizedImageUrl(conv.otherUserAvatar, 52, 52) ||
                         `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=F4F6FC&color=3B58F5`;
 
                       return (
@@ -495,7 +496,7 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
                                 )}
                               >
                                 <img
-                                  src={avatarUrl}
+                                  src={getOptimizedImageUrl(avatarUrl)}
                                   alt={conv.otherUserName}
                                   className="h-[52px] w-[52px] rounded-full object-cover bg-[#F4F6FC]"
                                 />

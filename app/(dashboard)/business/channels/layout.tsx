@@ -8,6 +8,7 @@ import { ChannelService } from "@/services/channel.service";
 import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export default function BusinessChannelsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -120,7 +121,7 @@ export default function BusinessChannelsLayout({ children }: { children: React.R
                   <div className="flex items-center gap-3.5 min-w-0">
                     <div className={cn("h-11 w-11 shrink-0 rounded-full overflow-hidden text-white font-bold flex items-center justify-center shadow-xs text-base", colorClass)}>
                       {ch.avatarUrl ? (
-                        <img src={ch.avatarUrl} alt={ch.name} className="h-full w-full object-cover" />
+                        <img src={getOptimizedImageUrl(ch.avatarUrl)} alt={ch.name} className="h-full w-full object-cover" />
                       ) : (
                         <span>{ch.name.charAt(0).toUpperCase()}</span>
                       )}

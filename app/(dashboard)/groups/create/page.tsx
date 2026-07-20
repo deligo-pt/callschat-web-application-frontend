@@ -11,6 +11,7 @@ import { useContacts } from "@/hooks/useContacts";
 import { generateGroupKey, encryptMessage } from "@/utils/crypto";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useGroupStore } from "@/hooks/useGroupStore";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 function parseJwt(token: string) {
   try {
@@ -242,7 +243,7 @@ export default function CreateGroupPage() {
                 ) : (
                   <Users className="h-8 w-8 text-[#3B58F5]" />
                 )}
-                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold">
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold pointer-events-none">
                   <Camera className="h-4 w-4 mb-0.5" />
                   Upload
                 </div>
@@ -342,7 +343,7 @@ export default function CreateGroupPage() {
                         >
                           <div className="flex items-center gap-3">
                             {contact.avatarUrl ? (
-                              <img src={contact.avatarUrl} className="h-9 w-9 rounded-full object-cover bg-slate-100" />
+                              <img src={getOptimizedImageUrl(contact.avatarUrl)} className="h-9 w-9 rounded-full object-cover bg-slate-100" />
                             ) : (
                               <div className={cn("h-9 w-9 rounded-full flex items-center justify-center text-white font-bold text-[12px]", contact.color)}>
                                 {contact.initials}

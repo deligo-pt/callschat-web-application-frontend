@@ -4,6 +4,7 @@ import { MessageCircle, PhoneMissed, UserPlus, Users, UserMinus, Info } from "lu
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface NotificationItemProps {
   notification: AppNotification;
@@ -70,7 +71,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
   };
 
   const issuerName = notification.issuer?.profile?.displayName || "Someone";
-  const avatarUrl = notification.issuer?.profile?.avatarUrl;
+  const avatarUrl = getOptimizedImageUrl(notification.issuer?.profile?.avatarUrl, 48, 48);
 
   let Icon = Info;
   let iconClass = "text-gray-500";
@@ -159,9 +160,9 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       )}
     >
       <div className="shrink-0 relative">
-        {avatarUrl ? (
+        {avatarUrl && avatarUrl !== '/default-avatar.png' ? (
           <img
-            src={avatarUrl}
+            src={getOptimizedImageUrl(avatarUrl)}
             alt={issuerName}
             className="h-12 w-12 rounded-full object-cover border border-border"
           />

@@ -53,10 +53,12 @@ import { ChannelService, type ChannelData, type ChannelMessageData, type JoinReq
 import { ContactService } from "@/services/contact.service";
 import { chatService } from "@/services/chat.service";
 import { cn } from "@/lib/utils";
-import { uploadToCloudinary } from "@/services/business.service";
+import { uploadMedia } from "@/services/business.service";
+import { getOptimizedImageUrl } from "@/utils/image";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { playNotificationSound } from "@/utils/sounds";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { getRawMediaUrl } from "@/utils/image";
 
 interface BusinessChannelsModalProps {
   isOpen: boolean;
@@ -594,11 +596,11 @@ export function BusinessChannelsModal({
     if (!file) return;
     try {
       setIsUploadingPhoto(true);
-      const url = await uploadToCloudinary(file);
-      setAvatarUrl(url);
+      const { key } = await uploadMedia(file);
+      setAvatarUrl(key);
       toast.success("Channel photo uploaded!");
     } catch (err: any) {
-      toast.error(err.message || "Failed to upload photo to Cloudinary");
+      toast.error(err.message || "Failed to upload photo");
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -609,11 +611,11 @@ export function BusinessChannelsModal({
     if (!file) return;
     try {
       setIsUploadingMedia(true);
-      const url = await uploadToCloudinary(file);
-      setMediaUrlInput(url);
+      const { key } = await uploadMedia(file);
+      setMediaUrlInput(key);
       toast.success(postType === "video" ? "Video uploaded successfully!" : "Image uploaded successfully!");
     } catch (err: any) {
-      toast.error(err.message || "Failed to upload file to Cloudinary");
+      toast.error(err.message || "Failed to upload file");
     } finally {
       setIsUploadingMedia(false);
     }
@@ -1340,7 +1342,7 @@ export function BusinessChannelsModal({
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 shrink-0 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
                               {inv.channelAvatarUrl ? (
-                                <img src={inv.channelAvatarUrl} alt="" className="h-full w-full object-cover" />
+                                <img src={getOptimizedImageUrl(inv.channelAvatarUrl)} alt="" className="h-full w-full object-cover" />
                               ) : (
                                 <span className="text-sm font-bold text-indigo-700">#{inv.channelName.charAt(0).toUpperCase()}</span>
                               )}
@@ -1383,7 +1385,7 @@ export function BusinessChannelsModal({
                           <div className="flex items-center gap-3.5 min-w-0">
                             <div className="h-14 w-14 shrink-0 rounded-full overflow-hidden bg-gradient-to-tr from-blue-500 to-indigo-600 text-white font-bold flex items-center justify-center shadow-sm">
                               {ch.avatarUrl ? (
-                                <img src={ch.avatarUrl} alt={ch.name} className="h-full w-full object-cover" />
+                                <img src={getOptimizedImageUrl(ch.avatarUrl)} alt={ch.name} className="h-full w-full object-cover" />
                               ) : (
                                 <span className="text-lg">#{ch.name.charAt(0).toUpperCase()}</span>
                               )}
@@ -1446,7 +1448,7 @@ export function BusinessChannelsModal({
                         {isUploadingPhoto ? (
                           <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
                         ) : avatarUrl ? (
-                          <img src={avatarUrl} alt="Channel Logo" className="h-full w-full object-cover" />
+                          <img src={getOptimizedImageUrl(avatarUrl)} alt="Channel Logo" className="h-full w-full object-cover" />
                         ) : (
                           <ImageIcon className="h-10 w-10 text-slate-300 group-hover:text-[#3B58F5] transition-colors" />
                         )}
@@ -1847,7 +1849,7 @@ export function BusinessChannelsModal({
                                   getContactAvatarColor(c.name || c.id, idx)
                                 )}>
                                   {c.avatarUrl ? (
-                                    <img src={c.avatarUrl} alt={c.name} className="h-full w-full object-cover" />
+                                    <img src={getOptimizedImageUrl(c.avatarUrl)} alt={c.name} className="h-full w-full object-cover" />
                                   ) : (
                                     <span>{c.name.charAt(0).toUpperCase()}</span>
                                   )}
@@ -2030,7 +2032,7 @@ export function BusinessChannelsModal({
                     <div className="flex flex-col items-start">
                       <div className="h-16 w-16 sm:h-[68px] sm:w-[68px] rounded-2xl bg-[#2563EB] text-white font-extrabold text-2xl sm:text-3xl border-4 border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
                         {selectedChannel.avatarUrl ? (
-                          <img src={selectedChannel.avatarUrl} alt="" className="h-full w-full object-cover" />
+                          <img src={getOptimizedImageUrl(selectedChannel.avatarUrl)} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <span>{selectedChannel.name.charAt(0).toUpperCase()}</span>
                         )}
@@ -2502,7 +2504,7 @@ export function BusinessChannelsModal({
 
                               {msg.mediaUrl && msg.mediaType === "video" ? (
                                 <div className="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-72 bg-black">
-                                  <video src={msg.mediaUrl} controls className="w-full h-auto max-h-72 object-cover" />
+                                  <video src={getRawMediaUrl(msg.mediaUrl)} controls className="w-full h-auto max-h-72 object-cover" />
                                 </div>
                               ) : msg.mediaUrl && msg.mediaType === "poll" ? (
                                 (() => {
@@ -2543,7 +2545,7 @@ export function BusinessChannelsModal({
                                 })()
                               ) : msg.mediaUrl ? (
                                 <div className="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-72">
-                                  <img src={msg.mediaUrl} alt="" className="w-full h-auto object-cover" />
+                                  <img src={getOptimizedImageUrl(msg.mediaUrl)} alt="" className="w-full h-auto object-cover" />
                                 </div>
                               ) : null}
 
@@ -2824,7 +2826,7 @@ export function BusinessChannelsModal({
                                       <div className="flex items-center gap-3">
                                         <div className="h-8 w-8 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center overflow-hidden shrink-0 text-xs">
                                           {c.avatarUrl ? (
-                                            <img src={c.avatarUrl} alt={c.name} className="h-full w-full object-cover" />
+                                            <img src={getOptimizedImageUrl(c.avatarUrl)} alt={c.name} className="h-full w-full object-cover" />
                                           ) : (
                                             <span>{c.name.charAt(0).toUpperCase()}</span>
                                           )}
@@ -2906,7 +2908,7 @@ export function BusinessChannelsModal({
                               <div className="flex items-center gap-3">
                                 <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0 overflow-hidden">
                                   {m.avatarUrl ? (
-                                    <img src={m.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                    <img src={getOptimizedImageUrl(m.avatarUrl)} alt="" className="h-full w-full object-cover" />
                                   ) : (
                                     <span>{m.name.charAt(0)}</span>
                                   )}
@@ -3032,7 +3034,7 @@ export function BusinessChannelsModal({
                               <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-full bg-amber-100 text-amber-700 font-bold flex items-center justify-center text-sm shrink-0 overflow-hidden">
                                   {req.avatarUrl ? (
-                                    <img src={req.avatarUrl} alt={req.name} className="h-full w-full object-cover" />
+                                    <img src={getOptimizedImageUrl(req.avatarUrl)} alt={req.name} className="h-full w-full object-cover" />
                                   ) : (
                                     <span>{req.name.charAt(0).toUpperCase()}</span>
                                   )}
@@ -3397,7 +3399,7 @@ export function BusinessChannelsModal({
                     <div className="rounded-2xl bg-white border border-slate-200/80 p-3 shadow-xs flex gap-3.5 items-center">
                       {selectedSharePost.mediaUrl ? (
                         <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 border border-slate-100 bg-slate-900">
-                          <img src={selectedSharePost.mediaUrl} alt="" className="h-full w-full object-cover" />
+                          <img src={getOptimizedImageUrl(selectedSharePost.mediaUrl)} alt="" className="h-full w-full object-cover" />
                         </div>
                       ) : (
                         <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0 text-sm">
@@ -3499,7 +3501,7 @@ export function BusinessChannelsModal({
                                     <div className="flex items-center gap-3 min-w-0">
                                       <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
                                         {c.avatarUrl ? (
-                                          <img src={c.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                                          <img src={getOptimizedImageUrl(c.avatarUrl)} alt="" className="h-full w-full rounded-full object-cover" />
                                         ) : (
                                           c.name.charAt(0).toUpperCase()
                                         )}

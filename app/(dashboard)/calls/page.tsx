@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useCallContext } from "@/components/providers/CallContext";
 import { CallService, CallHistoryItem } from "@/services/call.service";
 import { NewCallModal } from "@/components/call/NewCallModal";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 function formatCallTimeOnly(dateStr: string) {
   if (!dateStr) return "";
@@ -191,7 +192,7 @@ export default function CallsPage() {
                   >
                     <div className="flex items-center gap-4 min-w-0 pr-2">
                       <div className="relative shrink-0">
-                        <img src={avatarUrl} alt={displayName} className="h-[48px] w-[48px] rounded-full object-cover bg-gray-100" />
+                        <img src={getOptimizedImageUrl(avatarUrl)} alt={displayName} className="h-[48px] w-[48px] rounded-full object-cover bg-gray-100" />
                         {!isGroup && peer?.isOnline && (
                           <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#22C55E]" />
                         )}

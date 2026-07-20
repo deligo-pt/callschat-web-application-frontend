@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { CheckCircle2, Clock, ShieldAlert, ShieldCheck, Loader2, ArrowLeft, ArrowRight, Upload, FileText, X, Check, AlertTriangle, Camera } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { BusinessService, BusinessProfileData, uploadToCloudinary } from "@/services/business.service";
+import { BusinessService, BusinessProfileData, uploadMedia } from "@/services/business.service";
 import { useUser } from "@/context/UserContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -184,8 +184,8 @@ export function VerificationStatus({ className, onBack }: VerificationStatusProp
       for (const [key, file] of fileEntries) {
         try {
           toast.loading(`Uploading ${file.name} to secure cloud storage...`, { id: toastId });
-          const url = await uploadToCloudinary(file);
-          uploadedDocs[key] = url;
+          const { key: uploadedKey } = await uploadMedia(file);
+          uploadedDocs[key] = uploadedKey;
         } catch (uploadErr) {
           console.warn(`Cloudinary upload failed for ${key}, using secure fallback URL:`, uploadErr);
           uploadedDocs[key] = `https://secure-storage.calls-chat.com/business-verification-${key}.pdf`;

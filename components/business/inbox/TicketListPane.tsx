@@ -6,6 +6,7 @@ import { Loader2, Inbox, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Ticket } from "@/services/support.service";
 import type { InboxFilter } from "@/app/(dashboard)/business/inbox/page";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -85,7 +86,7 @@ function TicketCard({ ticket, isActive, onSelect, currentUserId }: TicketCardPro
       <div className="flex items-center gap-2">
         {ticket.customer.avatarUrl ? (
           <img
-            src={ticket.customer.avatarUrl}
+            src={getOptimizedImageUrl(ticket.customer.avatarUrl)}
             alt={ticket.customer.name}
             className="h-8 w-8 rounded-full object-cover shrink-0"
           />

@@ -14,6 +14,7 @@ import "react-phone-number-input/style.css";
 import { useTranslations } from "next-intl";
 import { ContactService } from "@/services/contact.service";
 import { toast } from "sonner";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export default function ContactsPage() {
   const t = useTranslations("contacts");
@@ -205,7 +206,7 @@ export default function ContactsPage() {
                           <div className="relative shrink-0">
                             {contact.avatarUrl ? (
                               <img 
-                                src={contact.avatarUrl} 
+                                src={getOptimizedImageUrl(contact.avatarUrl)} 
                                 alt={contact.name} 
                                 className="h-[42px] w-[42px] rounded-full object-cover"
                               />

@@ -10,6 +10,7 @@ import { groupService, GroupItem } from "@/services/group.service";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { useGroupStore } from "@/hooks/useGroupStore";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -109,7 +110,7 @@ export default function FavoritesPage() {
                     <div className="relative shrink-0">
                       {contact.avatarUrl ? (
                         <img
-                          src={contact.avatarUrl}
+                          src={getOptimizedImageUrl(contact.avatarUrl)}
                           alt={contact.name}
                           className="h-[46px] w-[46px] rounded-full object-cover"
                         />
@@ -165,7 +166,7 @@ export default function FavoritesPage() {
                       <div className="relative shrink-0">
                         {group.avatarUrl ? (
                           <img
-                            src={group.avatarUrl}
+                            src={getOptimizedImageUrl(group.avatarUrl)}
                             alt={group.name}
                             className="h-[46px] w-[46px] rounded-full object-cover"
                           />

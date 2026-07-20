@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ContactService } from '@/services/contact.service';
 import { toast } from 'sonner';
+import { getOptimizedImageUrl } from '@/utils/image';
 
 export interface Contact {
   id: string;
@@ -62,7 +63,8 @@ export function useContacts() {
         const userId = u.addressee?.id || u.addresseeId || u.userId || u.user?.id || u.contact?.userId || u.contact?.id || u.contactId || u.id || id;
         const name = u.customName || u.name || getFullName(u.addressee?.profile) || getFullName(u.contact?.profile) || getFullName(u.profile) || getFullName(u.user?.profile) || "Unknown";
         const phone = u.contact?.phone || u.phoneNumber || u.phone || u.user?.phone || u.addressee?.phone || "No phone number";
-        const avatarUrl = u.avatarUrl || u.addressee?.profile?.avatarUrl || u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || u.user?.profile?.avatarUrl || null;
+        const rawAvatarUrl = u.avatarUrl || u.addressee?.profile?.avatarUrl || u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || u.user?.profile?.avatarUrl || null;
+        const avatarUrl = rawAvatarUrl ? getOptimizedImageUrl(rawAvatarUrl, 52, 52) : null;
         const isFavourite = u.isFavourite || false;
         const isOnline = u.addressee?.profile?.isOnline || u.contact?.profile?.isOnline || u.profile?.isOnline || u.user?.profile?.isOnline || false;
 

@@ -64,12 +64,8 @@ export const chatService = {
   uploadMedia: async (conversationId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post(`/conversations/${conversationId}/upload`, formData, {
-      headers: {
-        'Content-Type': undefined, // Allow browser to set the multipart/form-data boundary
-      },
-    });
-    return response.data;
+    const response = await apiClient.post(`/conversations/${conversationId}/upload`, formData);
+    return response.data; // { success, data: { mediaUrl, mediaType } }
   },
 
   fetchConversationMedia: async (conversationId: string, page: number = 1) => {

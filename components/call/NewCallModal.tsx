@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Phone, Video, Loader2 } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface Contact {
   id: string;
@@ -191,7 +192,7 @@ export function NewCallModal({ isOpen, onClose, callType }: NewCallModalProps) {
                       <div className="relative shrink-0">
                         {c.avatarUrl ? (
                           <img
-                            src={c.avatarUrl}
+                            src={getOptimizedImageUrl(c.avatarUrl)}
                             alt={c.name}
                             className="h-10 w-10 rounded-full object-cover border border-[#E6EAFA]"
                           />

@@ -56,7 +56,15 @@ export default function SetupProfileScreen() {
         formData.append("lastName", lastName.trim());
 
         if (fileInputRef.current?.files?.[0]) {
-          formData.append("profileImage", fileInputRef.current.files[0]);
+          const mediaForm = new FormData();
+          mediaForm.append("file", fileInputRef.current.files[0]);
+          const uploadRes = await apiClient.post("/media/upload", mediaForm);
+          if (uploadRes.data?.success && uploadRes.data?.data?.key) {
+            formData.append("profileImage", uploadRes.data.data.key);
+          } else {
+            toast.error("Failed to upload profile image");
+            return;
+          }
         }
 
         const res = await apiClient.patch("/user/profile/setup", formData, {

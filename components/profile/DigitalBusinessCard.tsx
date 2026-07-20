@@ -26,6 +26,7 @@ import { useProfile } from "@/context/ProfileContext";
 import { toast } from "sonner";
 import { CardService, type DigitalCardData } from "@/services/card.service";
 import { toBlob, toPng } from "html-to-image";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface DigitalBusinessCardProps {
   onBack?: () => void;
@@ -512,7 +513,7 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
             {/* Card Image Preview */}
             <div className="mt-4 w-full rounded-2xl border border-slate-200/80 bg-slate-50 p-3 shadow-inner">
               <img
-                src={shareImageUrl}
+                src={getOptimizedImageUrl(shareImageUrl)}
                 alt="Digital Card Preview"
                 className="w-full rounded-xl shadow-md border border-slate-200/60 object-contain max-h-[220px]"
               />

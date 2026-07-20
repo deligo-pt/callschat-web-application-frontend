@@ -8,6 +8,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { useContacts, Contact } from "@/hooks/useContacts";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -299,7 +300,7 @@ export const InviteParticipantModal = ({
                     {/* Avatar + online indicator */}
                     <div className="relative shrink-0">
                       <img
-                        src={avatarUrl}
+                        src={getOptimizedImageUrl(avatarUrl)}
                         alt={contact.name}
                         className="h-11 w-11 rounded-full object-cover border-2 border-white/10"
                       />

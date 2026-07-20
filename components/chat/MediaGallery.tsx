@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, FileIcon, ImageIcon, Music, Play, ExternalLink, Link as LinkIcon } from "lucide-react";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
+import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 
 interface MediaItem {
   id: string;
@@ -107,7 +108,7 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                   {imagesAndVideos.map((item) => (
                     <a 
                       key={item.id} 
-                      href={item.mediaUrl} 
+                      href={getRawMediaUrl(item.mediaUrl)} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="relative aspect-square rounded-xl overflow-hidden group bg-[#F3F4F6]"
@@ -115,7 +116,7 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                       {item.mediaType.includes('video') ? (
                         <>
                           <video 
-                            src={item.mediaUrl} 
+                            src={getRawMediaUrl(item.mediaUrl)} 
                             className="w-full h-full object-cover" 
                           />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
@@ -124,7 +125,7 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                         </>
                       ) : (
                         <img 
-                          src={item.mediaUrl} 
+                          src={getOptimizedImageUrl(item.mediaUrl)} 
                           alt="Media" 
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
                         />
@@ -182,7 +183,7 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                         </div>
                       ) : (
                         <a 
-                          href={item.mediaUrl} 
+                          href={getRawMediaUrl(item.mediaUrl)} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex-1 min-w-0 flex items-center gap-3 group"
@@ -234,7 +235,7 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                   {links.map((item) => (
                     <a 
                       key={item.id}
-                      href={item.mediaUrl}
+                      href={getRawMediaUrl(item.mediaUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-[#E5E7EB]/50 transition-all hover:shadow-md hover:border-[#3B58F5]/30 group"

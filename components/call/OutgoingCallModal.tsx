@@ -3,6 +3,7 @@
 import React from "react";
 import { PhoneOff } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export const OutgoingCallModal = () => {
   const { outgoingCall, cancelOutgoingCall } = useCallContext();
@@ -11,7 +12,9 @@ export const OutgoingCallModal = () => {
 
   // Auto-generate avatar if none provided
   const displayName = outgoingCall.receiverName || outgoingCall.receiverId;
-  const avatarUrl = outgoingCall.receiverAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff&size=128`;
+  const avatarUrl = outgoingCall.receiverAvatar
+    ? getOptimizedImageUrl(outgoingCall.receiverAvatar, 80, 80)
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff&size=128`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
@@ -39,7 +42,7 @@ export const OutgoingCallModal = () => {
           <div className="absolute -inset-4 rounded-full border-2 border-[#3B58F5]/50 animate-pulse" />
           
           <img 
-            src={avatarUrl} 
+            src={getOptimizedImageUrl(avatarUrl)} 
             alt={displayName}
             className="relative h-28 w-28 rounded-full object-cover border-4 border-[#1D2A54] shadow-xl"
           />

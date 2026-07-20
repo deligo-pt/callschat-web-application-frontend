@@ -16,6 +16,15 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+
+    // When the body is FormData, delete the default Content-Type so the
+    // browser can set it automatically with the correct multipart boundary.
+    // Without this, the global 'application/json' header overrides it,
+    // causing the server to return 406 Not Acceptable.
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
     return config;
   },
   (error) => {

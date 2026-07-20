@@ -10,6 +10,7 @@ import { useQuickReply, QuickReplyDropdown } from "@/components/business/QuickRe
 import { toast } from "sonner";
 import { CollaborationService } from "@/services/collaboration.service";
 import { ScheduleSendPopover } from "@/components/business/ScheduleSendPopover";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -191,7 +192,7 @@ export function ThreadPane({
           <>
             {ticket.customer.avatarUrl ? (
               <img
-                src={ticket.customer.avatarUrl}
+                src={getOptimizedImageUrl(ticket.customer.avatarUrl)}
                 alt={ticket.customer.name}
                 className="h-9 w-9 rounded-full object-cover"
               />

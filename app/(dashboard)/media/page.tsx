@@ -8,6 +8,7 @@ import { chatService } from "@/services/chat.service";
 import { useContacts, type Contact } from "@/hooks/useContacts";
 import { useAllMedia, type MediaItem } from "@/hooks/useAllMedia";
 import { useTranslations } from "next-intl";
+import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 
 export default function MediaPage() {
   const t = useTranslations("media");
@@ -100,7 +101,7 @@ export default function MediaPage() {
   };
 
   const mediaGroups = groupMediaByDate(media.filter(m => m.mediaType === 'image' || m.mediaType === 'video'));
-  const docsGroups = groupMediaByDate(media.filter(m => m.mediaType === 'document' || m.mediaType === 'raw' || m.mediaType === 'file' || (!m.mediaType.startsWith('image') && !m.mediaType.startsWith('video') && !m.mediaType.startsWith('audio') && m.mediaType !== 'emoji' && m.mediaType !== 'call')));
+  const docsGroups = groupMediaByDate(media.filter(m => m.mediaType === 'document' || m.mediaType === 'raw' || m.mediaType === 'file' || (!m.mediaType.startsWith('image') && !m.mediaType.startsWith('video') && !m.mediaType.startsWith('audio') && m.mediaType !== 'emoji' && m.mediaType !== 'call' && m.mediaType !== 'link')));
   const linksGroups = groupMediaByDate(media.filter(m => m.mediaType === 'link'));
 
   return (
@@ -151,7 +152,7 @@ export default function MediaPage() {
                         <div className="flex items-center gap-3 overflow-hidden">
                           <div className="relative shrink-0">
                             {contact.avatarUrl ? (
-                              <img src={contact.avatarUrl} alt={contact.name} className="h-[42px] w-[42px] rounded-full object-cover" />
+                              <img src={getOptimizedImageUrl(contact.avatarUrl)} alt={contact.name} className="h-[42px] w-[42px] rounded-full object-cover" />
                             ) : (
                               <div className={cn("flex h-[42px] w-[42px] items-center justify-center rounded-full text-[14px] font-bold text-white", getRandomColor(contact.name))}>
                                 {getInitials(contact.name)}
@@ -248,14 +249,14 @@ export default function MediaPage() {
                       >
                         {item.mediaType === 'image' ? (
                           <img 
-                            src={item.mediaUrl} 
+                            src={getOptimizedImageUrl(item.mediaUrl)} 
                             alt="Media" 
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           />
                         ) : item.mediaType === 'video' ? (
                           <div className="relative h-full w-full">
                             <video 
-                              src={item.mediaUrl} 
+                              src={getRawMediaUrl(item.mediaUrl)} 
                               className="h-full w-full object-cover" 
                             />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/30">
@@ -288,7 +289,7 @@ export default function MediaPage() {
                     {group.items.map((item) => (
                       <a 
                         key={item.id}
-                        href={item.mediaUrl}
+                        href={getRawMediaUrl(item.mediaUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-[#E5E7EB]/50 transition-shadow hover:shadow-md group"
@@ -330,7 +331,7 @@ export default function MediaPage() {
                     {group.items.map((item) => (
                       <a 
                         key={item.id}
-                        href={item.mediaUrl}
+                        href={getRawMediaUrl(item.mediaUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-[#E5E7EB]/50 transition-all hover:shadow-md hover:border-[#3B58F5]/30 group"

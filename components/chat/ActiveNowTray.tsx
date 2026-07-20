@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { chatService } from "@/services/chat.service";
 import { usePresence } from "@/context/PresenceContext";
 import { Loader2 } from "lucide-react";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // =============================================================================
 // ActiveNowTray
@@ -61,8 +62,9 @@ export function ActiveNowTray() {
       <div className="flex items-center gap-3 overflow-x-auto px-6 pb-3 scrollbar-none">
         {activeUsers.map((user) => {
           const avatarSrc =
-            user.avatar ??
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=EEF2FB&color=3B58F5&bold=true`;
+            user.avatar
+              ? getOptimizedImageUrl(user.avatar, 52, 52)
+              : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=EEF2FB&color=3B58F5&bold=true`;
 
           return (
             <button
@@ -75,7 +77,7 @@ export function ActiveNowTray() {
               {/* Thick emerald ring = online indicator (matches image) */}
               <div className="rounded-full border-[3px] border-emerald-500 p-[2.5px] bg-white shadow-sm">
                 <img
-                  src={avatarSrc}
+                  src={getOptimizedImageUrl(avatarSrc)}
                   alt={user.name}
                   width={52}
                   height={52}

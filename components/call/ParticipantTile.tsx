@@ -6,6 +6,7 @@ import { Track } from "livekit-client";
 import { Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useContacts } from "@/hooks/useContacts";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface ParticipantTileProps {
   trackRef: TrackReferenceOrPlaceholder;
@@ -82,7 +83,7 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className 
               </>
             )}
             <img
-              src={avatarUrl}
+              src={getOptimizedImageUrl(avatarUrl)}
               alt={name}
               className="relative h-24 w-24 md:h-32 md:w-32 rounded-full object-cover border-4 border-[#3B58F5] shadow-lg"
             />

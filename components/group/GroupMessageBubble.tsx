@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
+import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
 import {
   Phone,
@@ -25,6 +26,27 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useCallContext } from "@/components/providers/CallContext";
+
+const formatTextWithLinks = (text: string) => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.split(urlRegex).map((part, i) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a 
+          key={i} 
+          href={part} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
 
 interface GroupMessageBubbleProps {
   msg: {
@@ -266,7 +288,7 @@ export function GroupMessageBubble({
         <div className="relative mb-1">
           <img
             key={mediaKey}
-            src={msg.mediaUrl}
+            src={getOptimizedImageUrl(msg.mediaUrl)}
             alt="Attached Image"
             className={cn("rounded-lg max-w-sm w-full cursor-pointer object-cover", isOptimistic && "opacity-70 blur-[2px]")}
           />
@@ -286,7 +308,7 @@ export function GroupMessageBubble({
         <div className="relative mb-1">
           <video
             key={mediaKey}
-            src={msg.mediaUrl}
+            src={getRawMediaUrl(msg.mediaUrl)}
             controls={!isOptimistic}
             className={cn("rounded-lg max-w-sm w-full max-h-[300px]", isOptimistic && "opacity-70 blur-[2px]")}
           />
@@ -302,7 +324,7 @@ export function GroupMessageBubble({
     }
 
     if (msg.mediaType?.startsWith("audio") || msg.mediaType === "audio") {
-      return <VoiceMessagePlayer key={`voice-${msg.id}`} src={msg.mediaUrl} messageId={msg.id} isMe={isMe} />;
+      return <VoiceMessagePlayer key={`voice-${msg.id}`} src={getRawMediaUrl(msg.mediaUrl)} messageId={msg.id} isMe={isMe} />;
     }
 
     // Document / Email Card
@@ -311,7 +333,7 @@ export function GroupMessageBubble({
     return (
       <a
         key={mediaKey}
-        href={isOptimistic ? undefined : msg.mediaUrl}
+        href={isOptimistic ? undefined : getRawMediaUrl(msg.mediaUrl)}
         target={isOptimistic ? undefined : "_blank"}
         rel="noopener noreferrer"
         className={cn(
@@ -419,7 +441,7 @@ export function GroupMessageBubble({
                 className="whitespace-pre-wrap font-medium"
                 style={{ wordBreak: "break-word" }}
               >
-                {msg.text}
+                {formatTextWithLinks(msg.text)}
               </span>
             )
           )}

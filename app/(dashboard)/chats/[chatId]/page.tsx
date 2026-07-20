@@ -31,6 +31,7 @@ import { usePresence } from "@/context/PresenceContext";
 import { toast } from "sonner";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { isMessageExpired } from "@/components/chat/DisappearingMessagesModal";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 function parseJwt(token: string) {
   try {
@@ -473,7 +474,7 @@ export default function ChatRoomPage() {
               >
                 {recipient?.avatarUrl ? (
                   <img
-                    src={recipient.avatarUrl}
+                    src={getOptimizedImageUrl(recipient.avatarUrl)}
                     alt={recipient.name}
                     className="h-full w-full rounded-full object-cover"
                   />

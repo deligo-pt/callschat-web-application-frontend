@@ -12,6 +12,7 @@ import { NotificationDropdown } from "@/components/notifications/NotificationDro
 import { useTranslations } from "next-intl";
 import { useGroupStore } from "@/hooks/useGroupStore";
 import { useSocket } from "@/components/providers/SocketProvider";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
@@ -215,7 +216,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
                       <div className="relative shrink-0">
                         {group.avatarUrl ? (
                           <img 
-                            src={group.avatarUrl} 
+                            src={getOptimizedImageUrl(group.avatarUrl)} 
                             alt={group.name} 
                             className="h-[48px] w-[48px] rounded-full object-cover bg-slate-100"
                           />

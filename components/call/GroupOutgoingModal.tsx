@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { PhoneOff } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export const GroupOutgoingModal = () => {
   const { outgoingGroupCall, cancelGroupCall } = useCallContext();
@@ -25,7 +26,7 @@ export const GroupOutgoingModal = () => {
         
         if (data.success && data.data) {
           setGroupName(data.data.name || "Group Call");
-          setGroupAvatar(data.data.avatarUrl || "");
+          setGroupAvatar(getOptimizedImageUrl(data.data.avatarUrl, 80, 80));
         }
       } catch (err) {
         console.error("Failed to fetch group profile", err);
@@ -50,7 +51,7 @@ export const GroupOutgoingModal = () => {
           <div className="absolute -inset-4 rounded-full border-2 border-[#3B58F5]/50 animate-pulse" />
           
           <img 
-            src={avatarUrl} 
+            src={getOptimizedImageUrl(avatarUrl)} 
             alt={displayName}
             className="relative h-32 w-32 rounded-full object-cover border-4 border-[#1D2A54] shadow-2xl"
           />

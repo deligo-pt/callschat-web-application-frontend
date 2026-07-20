@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { BusinessService } from "@/services/business.service";
 import { UserService } from "@/services/user.service";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // Define the shape of the user profile from the API
 export interface UserProfileData {
@@ -130,7 +131,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
             website: bData?.website || "",
           });
           if (data.data.profile?.avatarUrl) {
-            setAvatarPreview(data.data.profile.avatarUrl);
+            setAvatarPreview(getOptimizedImageUrl(data.data.profile.avatarUrl, 200, 200));
           }
         } else {
           toast.error("Failed to load profile data");
@@ -193,7 +194,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         if (formData.country) submitData.append("country", formData.country);
         if (formData.timezone) submitData.append("timezone", formData.timezone);
         if (formData.language) submitData.append("language", formData.language);
-        if (avatarFile) submitData.append("avatar", avatarFile);
+        if (avatarFile) {
+          submitData.append("avatar", avatarFile);
+        }
 
         const data = await UserService.updateProfile(submitData).catch((err: any) => {
           console.error("Profile update error:", err);

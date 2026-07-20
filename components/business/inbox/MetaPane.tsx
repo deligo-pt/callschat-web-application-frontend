@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Ticket, TicketStatus } from "@/services/support.service";
 import { WorkspaceService } from "@/services/workspace.service";
 import apiClient from "@/services/api.client";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
 // Workspace members helper type
@@ -237,7 +238,7 @@ export function MetaPane({
           <p className="text-[10px] font-bold text-[#8F95B2] uppercase tracking-wide mb-2">Customer</p>
           <div className="flex items-center gap-2">
             {ticket.customer.avatarUrl ? (
-              <img src={ticket.customer.avatarUrl} alt={ticket.customer.name} className="h-9 w-9 rounded-full object-cover" />
+              <img src={getOptimizedImageUrl(ticket.customer.avatarUrl)} alt={ticket.customer.name} className="h-9 w-9 rounded-full object-cover" />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-sm font-bold shrink-0">
                 {ticket.customer.name.charAt(0).toUpperCase()}

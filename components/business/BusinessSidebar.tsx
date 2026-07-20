@@ -21,6 +21,7 @@ import { chatService } from "@/services/chat.service";
 import { UserPlus } from "lucide-react";
 import { CreateChannelModal } from "./CreateChannelModal";
 import { InviteMemberModal } from "./InviteMemberModal";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface Conversation {
   id: string;
@@ -253,7 +254,7 @@ export function BusinessSidebar() {
                     >
                       <div className="relative shrink-0">
                         <img
-                          src={avatarUrl}
+                          src={getOptimizedImageUrl(avatarUrl)}
                           alt={conv.otherUserName}
                           className="h-6 w-6 rounded-full object-cover bg-white/10"
                         />

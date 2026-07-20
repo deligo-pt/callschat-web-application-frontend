@@ -7,6 +7,7 @@ import { BusinessService } from "@/services/business.service";
 import { chatService } from "@/services/chat.service";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface BusinessDirectoryItem {
   workspaceId: string;
@@ -157,7 +158,7 @@ export function ExploreBusinessesModal({ isOpen, onClose }: ExploreBusinessesMod
                         <div className="relative shrink-0">
                           {b.avatarUrl ? (
                             <img
-                              src={b.avatarUrl}
+                              src={getOptimizedImageUrl(b.avatarUrl)}
                               alt={b.name}
                               className="h-13 w-13 rounded-2xl object-cover border border-[#E6EAFA]"
                             />

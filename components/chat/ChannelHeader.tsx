@@ -16,6 +16,7 @@ import { ChannelService } from "@/services/channel.service";
 import { MeetingService } from "@/services/meeting.service";
 import { useMeetingStore } from "@/hooks/useMeetingStore";
 import { useUser } from "@/context/UserContext";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 interface ChannelHeaderProps {
   channelId: string;
@@ -64,7 +65,9 @@ export function ChannelHeader({
               name: c.name,
               role: c.role || "Member",
               isOnline: c.isOnline || false,
-              avatarUrl: c.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=8B5CF6&color=fff`,
+              avatarUrl: c.avatarUrl
+                ? getOptimizedImageUrl(c.avatarUrl, 40, 40)
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=8B5CF6&color=fff`,
             };
           });
           setMembers(formatted);
@@ -203,7 +206,7 @@ export function ChannelHeader({
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <img
-                        src={member.avatarUrl}
+                        src={getOptimizedImageUrl(member.avatarUrl)}
                         alt={member.name}
                         className="h-9 w-9 rounded-full object-cover"
                       />

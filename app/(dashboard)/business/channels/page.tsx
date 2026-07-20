@@ -7,6 +7,7 @@ import { ChannelService } from "@/services/channel.service";
 import { useUser } from "@/context/UserContext";
 import { Loader2, RefreshCw, ChevronRight, Plus, Lock, Hash } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export default function BusinessChannelsExplorePage() {
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function BusinessChannelsExplorePage() {
                     <div className="flex items-start justify-between mb-4">
                       <div className="h-14 w-14 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-tr from-blue-500 to-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
                         {ch.avatarUrl ? (
-                          <img src={ch.avatarUrl} alt={ch.name} className="h-full w-full object-cover" />
+                          <img src={getOptimizedImageUrl(ch.avatarUrl)} alt={ch.name} className="h-full w-full object-cover" />
                         ) : (
                           <span className="text-2xl">#{ch.name.charAt(0).toUpperCase()}</span>
                         )}

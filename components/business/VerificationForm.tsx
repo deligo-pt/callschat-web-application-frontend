@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Upload, FileText, CheckCircle2, Loader2, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { uploadToCloudinary, BusinessService } from "@/services/business.service";
+import { uploadMedia, BusinessService } from "@/services/business.service";
 import { cn } from "@/lib/utils";
 
 interface VerificationFormProps {
@@ -83,7 +83,7 @@ export function VerificationForm({ onSuccess, className }: VerificationFormProps
 
     try {
       // Step 1: Upload to Cloudinary
-      const secureUrl = await uploadToCloudinary(selectedFile);
+      const { key: secureUrl } = await uploadMedia(selectedFile);
       
       toast.loading("Submitting verification request to compliance server...", { id: toastId });
 

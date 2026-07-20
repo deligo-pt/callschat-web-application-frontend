@@ -4,7 +4,8 @@ import * as React from "react";
 import { Search, Bell, MessageSquare, PhoneCall, Users, Contact, UserCircle2, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { getOptimizedImageUrl } from "@/utils/image";
 import { useRouter } from "next/navigation";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
@@ -159,7 +160,7 @@ export default function HomeScreen() {
                 <div key={user.id} className="relative flex shrink-0 flex-col items-center">
                   <div className="relative rounded-full border-[2.5px] border-[#22C55E] p-0.5 transition-transform hover:scale-105 cursor-pointer">
                     <img 
-                      src={user.avatarUrl} 
+                      src={getOptimizedImageUrl(user.avatarUrl, 52, 52)} 
                       alt={user.name} 
                       className="h-[52px] w-[52px] rounded-full object-cover"
                     />
@@ -190,7 +191,7 @@ export default function HomeScreen() {
                   {/* Avatar */}
                   <div className="relative shrink-0">
                     <img 
-                      src={msg.avatarUrl} 
+                      src={getOptimizedImageUrl(msg.avatarUrl, 54, 54)} 
                       alt={msg.senderName} 
                       className="h-[54px] w-[54px] rounded-full object-cover"
                     />

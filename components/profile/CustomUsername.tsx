@@ -118,9 +118,7 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
       // 1. Update backend directly via FormData multipart patch to ensure profile updates cleanly
       const updateForm = new FormData();
       updateForm.append("username", clean);
-      await apiClient.patch("/user/profile", updateForm, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await apiClient.patch("/user/profile", updateForm);
 
       // 2. Update context state
       setFormData({ ...formData, username: clean });
