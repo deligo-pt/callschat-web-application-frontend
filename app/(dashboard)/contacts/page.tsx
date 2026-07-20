@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, MessageSquare, Phone, Search, Users, Video, Plus, X, Star, Bell, UserPlus, User } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useState } from "react";
 import { chatService } from "@/services/chat.service";
 import { useContacts, type Contact } from "@/hooks/useContacts";
@@ -155,9 +157,11 @@ export default function ContactsPage() {
         <div className="flex flex-col bg-white px-6 pt-8 pb-4 shrink-0">
           <div className="flex items-center justify-between">
             <h1 className="text-[28px] font-bold text-[#3B58F5]">{tNav("contacts")}</h1>
-            <div className="flex items-center gap-3">
-              <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
-              <Bell className="h-6 w-6 text-[#3B58F5]" />
+            <div className="flex items-center gap-2">
+              <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
+                <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
+              </Link>
+              <NotificationDropdown />
             </div>
           </div>
 
