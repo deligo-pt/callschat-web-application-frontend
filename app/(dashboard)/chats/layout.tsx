@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare, UserPlus } from "lucide-react";
 import Link from "next/link";
@@ -43,7 +43,7 @@ interface Conversation {
   } | null;
 }
 
-export default function ChatsLayout({ children }: { children: React.ReactNode }) {
+function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -627,5 +627,13 @@ export default function ChatsLayout({ children }: { children: React.ReactNode })
       {/* New Message / Business Discovery Command Palette */}
       <NewMessageModal isOpen={isNewMessageOpen} onClose={() => setIsNewMessageOpen(false)} />
     </div>
+  );
+}
+
+export default function ChatsLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="h-full w-full bg-[#F8FAFC]"></div>}>
+      <ChatsLayoutContent>{children}</ChatsLayoutContent>
+    </Suspense>
   );
 }

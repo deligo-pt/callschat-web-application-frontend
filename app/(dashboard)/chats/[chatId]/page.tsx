@@ -131,6 +131,14 @@ function BusinessChatHeader({
 // ---------------------------------------------------------------------------
 
 export default function ChatRoomPage() {
+  return (
+    <React.Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-[#F8FAFC]"><Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" /></div>}>
+      <ChatRoomPageContent />
+    </React.Suspense>
+  );
+}
+
+function ChatRoomPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
