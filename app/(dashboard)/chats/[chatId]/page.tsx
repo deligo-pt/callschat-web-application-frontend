@@ -26,6 +26,7 @@ import { ChatOptionsMenu } from "@/components/chat/ChatOptionsMenu";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MediaGallery } from "@/components/chat/MediaGallery";
+import { ContactProfileModal } from "@/components/chat/ContactProfileModal";
 import { Images } from "lucide-react";
 import { usePresence } from "@/context/PresenceContext";
 import { toast } from "sonner";
@@ -57,6 +58,7 @@ interface UserProfile {
   name: string;
   avatarUrl: string;
   isOnline: boolean;
+  phone?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +155,7 @@ export default function ChatRoomPage() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [isContactProfileOpen, setIsContactProfileOpen] = useState(false);
 
   // B2C: track whether we know the bizHandle for this conversation
   // (needed to route ALL subsequent messages through contactBusiness REST API).
@@ -254,6 +257,7 @@ export default function ChatRoomPage() {
                   conv.otherUserAvatar ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName || "U")}&background=F4F6FC&color=3B58F5`,
                 isOnline: conv.otherUserOnline || false,
+                phone: undefined, // Will be updated when we fetch from /contacts below or you can just leave it since the name shows
               });
               setIsInitializing(false);
               return;
@@ -303,6 +307,7 @@ export default function ChatRoomPage() {
                 userProfile.avatarUrl ||
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=F4F6FC&color=3B58F5`,
               isOnline: userProfile.isOnline || false,
+              phone: match.contact?.phone || match.phoneNumber || match.addressee?.phone || undefined,
             });
           } else {
             setRecipient({
@@ -555,6 +560,7 @@ export default function ChatRoomPage() {
                 setBlockStatus={setBlockStatus}
                 disappearAfterSeconds={disappearAfterSeconds}
                 onDisappearUpdated={setDisappearAfterSeconds}
+                onViewContact={() => setIsContactProfileOpen(true)}
               />
             )}
           </div>
@@ -777,6 +783,41 @@ export default function ChatRoomPage() {
           conversationId={conversationId}
           open={galleryOpen}
           onOpenChange={setGalleryOpen}
+        />
+      )}
+
+      {/* ── Contact Profile Modal ─────────────────────────────────────────── */}
+      {!isBizChat && recipient && (
+        <ContactProfileModal
+          isOpen={isContactProfileOpen}
+          onClose={() => setIsContactProfileOpen(false)}
+          peerId={recipient.id}
+          name={recipient.name}
+          avatarUrl={recipient.avatarUrl}
+          isOnline={recipient.isOnline}
+          phone={recipient.phone}
+          isBlocked={blockStatus?.isBlocked}
+          isBlockedByMe={blockStatus?.isBlockedByMe}
+          onBlockUser={async () => {
+             // This leverages the logic in ChatActionModals if we wanted, but since it's separate, 
+             // we'll just toggle it here, or we can use the same state.
+             // But actually, ChatActionModals handles blocking via setIsBlockUserOpen.
+             // We can just rely on the ChatOptionsMenu's block/unblock for now, or implement a quick toggle here:
+             try {
+                const token = localStorage.getItem("accessToken");
+                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+                if (blockStatus?.isBlockedByMe) {
+                  await fetch(`${baseUrl}/user/block/${recipient.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                  toast.success("Contact unblocked successfully.");
+                } else {
+                  await fetch(`${baseUrl}/user/block/${recipient.id}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+                  toast.success("Contact blocked successfully.");
+                }
+                setBlockStatus(prev => prev ? { ...prev, isBlockedByMe: !prev.isBlockedByMe, isBlocked: !prev.isBlockedByMe || prev.hasBlockedMe } : { isBlocked: true, isBlockedByMe: true, hasBlockedMe: false });
+             } catch (e: any) {
+                toast.error("Failed to update block status.");
+             }
+          }}
         />
       )}
     </div>

@@ -48,6 +48,7 @@ export interface ChatOptionsMenuProps {
   disappearAfterSeconds?: number | null;
   /** Called after successful update so the parent can re-sync state. */
   onDisappearUpdated?: (newValue: number | null) => void;
+  onViewContact?: () => void;
 }
 
 export function ChatOptionsMenu({
@@ -59,6 +60,7 @@ export function ChatOptionsMenu({
   setBlockStatus,
   disappearAfterSeconds: initialDisappear = null,
   onDisappearUpdated,
+  onViewContact,
 }: ChatOptionsMenuProps) {
   const t = useTranslations("options");
   const tNotif = useTranslations("notifications");
@@ -106,7 +108,10 @@ export function ChatOptionsMenu({
           className="w-[280px] bg-white text-[#11142D] border border-[#EEF2FF] shadow-2xl rounded-2xl p-2 font-medium"
         >
           {/* Action Items */}
-          <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
+          <DropdownMenuItem 
+            className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]"
+            onClick={onViewContact}
+          >
             <User
               className="h-[18px] w-[18px] text-[#3B58F5]"
               strokeWidth={2.5}
