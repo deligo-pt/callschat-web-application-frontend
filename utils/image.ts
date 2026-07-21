@@ -19,6 +19,8 @@ export function getOptimizedImageUrl(key?: string | null, width = 0, height = 0)
   } else if (key.startsWith('http')) {
     // If it's already a full HTTP URL (e.g. Google OAuth photo or external), return it directly
     return key;
+  } else if (key.startsWith('blob:')) {
+    return key;
   }
 
   // If width/height are 0, serve the original raw size
@@ -45,6 +47,8 @@ export function getRawMediaUrl(key?: string | null): string {
       rawKey = key.slice(prefix.length);
     }
   } else if (key.startsWith('http')) {
+    return key;
+  } else if (key.startsWith('blob:')) {
     return key;
   }
   
