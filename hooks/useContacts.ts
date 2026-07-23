@@ -60,13 +60,52 @@ export function useContacts() {
 
       const mappedContacts = contactsArray.map((u: any, idx: number) => {
         const id = u.id || u._id || u.addressee?.id || u.contact?.id || `contact-${idx}`;
-        const userId = u.addressee?.id || u.addresseeId || u.userId || u.user?.id || u.contact?.userId || u.contact?.id || u.contactId || u.id || id;
-        const name = u.customName || u.name || getFullName(u.addressee?.profile) || getFullName(u.contact?.profile) || getFullName(u.profile) || getFullName(u.user?.profile) || "Unknown";
-        const phone = u.contact?.phone || u.phoneNumber || u.phone || u.user?.phone || u.addressee?.phone || "No phone number";
-        const rawAvatarUrl = u.avatarUrl || u.addressee?.profile?.avatarUrl || u.contact?.profile?.avatarUrl || u.profile?.avatarUrl || u.user?.profile?.avatarUrl || null;
+        
+        let targetUserId = "";
+        let targetProfile = null;
+        let targetPhone = "";
+        
+        // Find the user ID from token
+        let myId = "";
+        if (typeof window !== "undefined") {
+          const token = localStorage.getItem("accessToken");
+          if (token) {
+            try {
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              myId = payload.sub || payload.id || "";
+            } catch (e) {}
+          }
+        }
+
+        if (u.requesterId && u.addresseeId) {
+          if (myId && u.requesterId === myId) {
+            targetUserId = u.addresseeId;
+            targetProfile = u.addressee?.profile;
+            targetPhone = u.addressee?.phone;
+          } else if (myId && u.addresseeId === myId) {
+            targetUserId = u.requesterId;
+            targetProfile = u.contact?.profile;
+            targetPhone = u.contact?.phone;
+          } else {
+            targetUserId = u.addresseeId;
+            targetProfile = u.addressee?.profile;
+            targetPhone = u.addressee?.phone;
+          }
+        } else {
+          targetUserId = u.addressee?.id || u.addresseeId || u.userId || u.user?.id || u.contact?.userId || u.contact?.id || u.contactId || u.id || id;
+          targetProfile = u.addressee?.profile || u.contact?.profile || u.profile || u.user?.profile;
+          targetPhone = u.contact?.phone || u.phoneNumber || u.phone || u.user?.phone || u.addressee?.phone;
+        }
+
+        const userId = targetUserId;
+        const name = u.customName || u.name || getFullName(targetProfile) || "Unknown";
+        const phone = targetPhone || "No phone number";
+        const rawAvatarUrl = u.avatarUrl || targetProfile?.avatarUrl || null;
         const avatarUrl = rawAvatarUrl ? getOptimizedImageUrl(rawAvatarUrl, 52, 52) : null;
         const isFavourite = u.isFavourite || false;
         const isOnline = u.addressee?.profile?.isOnline || u.contact?.profile?.isOnline || u.profile?.isOnline || u.user?.profile?.isOnline || false;
+
+        console.log(`[DEBUG Contacts] id=${id}, targetUserId=${targetUserId}, name=${name}, isFavourite=${isFavourite}`);
 
         return {
           id,
@@ -125,6 +164,13 @@ export function useContacts() {
 
   useEffect(() => {
     fetchContacts();
+    
+    const handleUpdate = () => {
+      fetchContacts();
+    };
+
+    window.addEventListener('contactsUpdated', handleUpdate);
+    return () => window.removeEventListener('contactsUpdated', handleUpdate);
   }, [fetchContacts]);
 
   const handleToggleFavourite = async (contactId: string, currentStatus: boolean) => {

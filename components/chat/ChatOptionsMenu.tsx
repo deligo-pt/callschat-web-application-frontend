@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ContactService } from "@/services/contact.service";
+import { useContacts } from "@/hooks/useContacts";
 import { ChatActionModals } from "./ChatActionModals";
 import { DisappearingMessagesModal } from "./DisappearingMessagesModal";
 import { useTranslations } from "next-intl";
@@ -79,17 +80,25 @@ export function ChatOptionsMenu({
   const [liveTranslation, setLiveTranslation] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
 
+  const { contacts, fetchContacts } = useContacts();
+  const contact = contacts.find((c) => c.userId === peerId);
+  const isFavourite = contact?.isFavourite || false;
+
   const [isFavouriting, setIsFavouriting] = useState(false);
 
-  const handleAddToFavourites = async () => {
+  const handleToggleFavourites = async () => {
     if (isFavouriting) return;
     setIsFavouriting(true);
     try {
-      await ContactService.toggleFavouriteByUser(peerId, true);
-      toast.success(t("add_to_favorites"));
+      await ContactService.toggleFavouriteByUser(peerId, !isFavourite);
+      await fetchContacts(); // Refresh to update local state
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent('contactsUpdated'));
+      }
+      toast.success(isFavourite ? t("remove_from_favorites") : t("add_to_favorites"));
     } catch (error: any) {
-      console.error("Failed to add to favourites:", error);
-      toast.error(error?.response?.data?.message || "Failed to add to favourites");
+      console.error("Failed to toggle favourites:", error);
+      toast.error(error?.response?.data?.message || "Failed to update favourite status");
     } finally {
       setIsFavouriting(false);
     }
@@ -223,14 +232,14 @@ export function ChatOptionsMenu({
           </DropdownMenuItem>
           <DropdownMenuItem 
             className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]"
-            onClick={handleAddToFavourites}
+            onClick={handleToggleFavourites}
             disabled={isFavouriting}
           >
             <Star
-              className="h-[18px] w-[18px] text-[#FFB020]"
+              className={`h-[18px] w-[18px] ${isFavourite ? "fill-[#FFB020] text-[#FFB020]" : "text-[#FFB020]"}`}
               strokeWidth={2.5}
             />
-            <span className="text-[14.5px]">{isFavouriting ? tNotif("adding") : t("add_to_favorites")}</span>
+            <span className="text-[14.5px]">{isFavouriting ? tNotif("adding") : isFavourite ? t("remove_from_favorites") : t("add_to_favorites")}</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />

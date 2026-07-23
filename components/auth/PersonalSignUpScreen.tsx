@@ -387,7 +387,7 @@ export default function PersonalSignUpScreen() {
           <ChevronLeft className="h-4 w-4" /> Back
         </button>
         <Link href="/" className="flex items-center gap-2.5">
-          <Image src="/call_chats_logo.png" height={34} width={34} alt="CallsChat Logo" className="drop-shadow-sm" />
+          <Image src="/call_chats_logo.png" height={34} width={34} alt="CallsChat Logo" className="drop-shadow-sm" style={{ width: "auto", height: "auto" }} />
           <span className="font-extrabold text-lg sm:text-xl text-white tracking-tight">
             Calls<span className="text-[#93C5FD]">Chat</span>
           </span>

@@ -28,7 +28,7 @@ export default function Footer() {
                     <div className="flex flex-col items-start max-w-md">
                         {/* Logo Section — click returns to the homepage */}
                         <Link href="/" className="flex items-center -ml-2">
-                            <Image src="/call_chats_logo.png" height={70} width={70} alt="CallsChat Logo" priority />
+                            <Image src="/call_chats_logo.png" height={70} width={70} alt="CallsChat Logo" priority style={{ width: "auto", height: "auto" }} />
                             <span className="text-2xl font-bold text-[#0A2540] -ml-2">
                                 <span className="text-2xl">Calls<span className="text-[#1A62E8]">Chat</span></span>
                             </span>

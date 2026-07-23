@@ -263,6 +263,7 @@ export default function PersonalLoginScreen() {
             width={34}
             alt="CallsChat Logo"
             className="drop-shadow-sm"
+            style={{ width: "auto", height: "auto" }}
           />
           <span className="font-extrabold text-lg sm:text-xl text-white tracking-tight">
             Calls<span className="text-[#1AC1F2]">Chat</span>
