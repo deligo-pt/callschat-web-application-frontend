@@ -13,6 +13,7 @@ export interface ChatMessage {
   mediaUrl?: string;
   mediaType?: 'image' | 'video' | 'audio' | 'document' | 'link' | string | null;
   isEdited?: boolean;
+  isDeleted?: boolean;
 }
 
 export interface PinnedMessage {
@@ -166,6 +167,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     createdAt: msg.createdAt,
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
+                    isDeleted: msg.isDeleted,
                   };
                 }
 
@@ -261,6 +263,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     createdAt: msg.createdAt,
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
+                    isDeleted: msg.isDeleted,
                   };
                 } catch {
                   return {
@@ -272,6 +275,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     createdAt: msg.createdAt,
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
+                    isDeleted: msg.isDeleted,
                   };
                 }
               })
@@ -569,15 +573,28 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       );
     };
 
+    const handleMessageUnsent = (payload: any) => {
+      if (payload.conversationId !== conversationId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === payload.messageId
+            ? { ...m, isDeleted: true, text: "", mediaUrl: undefined, mediaType: undefined }
+            : m
+        )
+      );
+    };
+
     socket.on("chat:receive_message", handleReceiveMessage);
     socket.on("NEW_MESSAGE", handleReceiveMessage);
     socket.on("chat:message_edited", handleMessageEdited);
+    socket.on("chat:message_unsent", handleMessageUnsent);
     socket.on("chat:error", handleChatError);
 
     return () => {
       socket.off("chat:receive_message", handleReceiveMessage);
       socket.off("NEW_MESSAGE", handleReceiveMessage);
       socket.off("chat:message_edited", handleMessageEdited);
+      socket.off("chat:message_unsent", handleMessageUnsent);
       socket.off("chat:error", handleChatError);
     };
   }, [socket, isConnected, conversationId]);
@@ -796,6 +813,25 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [sendMessage]
   );
 
+  const unsendMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await chatService.unsendMessage(conversationId, messageId);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, isDeleted: true, text: "", mediaUrl: undefined, mediaType: undefined }
+              : m
+          )
+        );
+      } catch (err) {
+        console.error("Failed to unsend message", err);
+        toast.error("Failed to unsend message");
+      }
+    },
+    [conversationId]
+  );
+
   return {
     messages,
     setMessages,
@@ -804,6 +840,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     editMessage,
     pinnedMessages,
     pinMessage,
+    unsendMessage,
     isUploading,
     isReady: !!(myPrivateKey && (recipientPublicKey || isBizChat) && isConnected && conversationId),
   };

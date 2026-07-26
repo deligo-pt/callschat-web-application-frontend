@@ -99,14 +99,13 @@ export default function Navbar() {
                     >
                         Download
                     </Button>
-                    <Link href="/onboarding" onClick={handleGettingStarted}>
-                        <Button
-                            variant="outline"
-                            className="rounded-xl border-primary text-primary px-6 py-2.5 text-base font-medium shadow-md transition-all duration-200 hover:bg-primary/10"
-                        >
-                            Getting Started
-                        </Button>
-                    </Link>
+                    <Button
+                        variant="outline"
+                        onClick={handleGettingStarted}
+                        className="rounded-xl border-primary text-primary px-6 py-2.5 text-base font-medium shadow-md transition-all duration-200 hover:bg-primary/10"
+                    >
+                        Getting Started
+                    </Button>
                 </div>
 
                 {/* Mobile Hamburger Menu Button */}
@@ -164,14 +163,13 @@ export default function Navbar() {
                                 >
                                     Download
                                 </Button>
-                                <Link href="/onboarding" className="w-full" onClick={handleMobileGettingStarted}>
-                                    <Button
-                                        variant="outline"
-                                        className="w-full rounded-xl border-primary text-primary py-3 text-center font-medium shadow-md hover:bg-primary/10"
-                                    >
-                                        Getting Started
-                                    </Button>
-                                </Link>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleMobileGettingStarted}
+                                    className="w-full rounded-xl border-primary text-primary py-3 text-center font-medium shadow-md hover:bg-primary/10"
+                                >
+                                    Getting Started
+                                </Button>
                             </div>
                         </div>
                     </motion.div>

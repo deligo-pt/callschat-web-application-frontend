@@ -9,6 +9,7 @@ export const GroupIncomingModal = () => {
   const { incomingGroupCall, acceptGroupCall, rejectGroupCall } = useCallContext();
   const [groupName, setGroupName] = useState<string>("Group Call");
   const [groupAvatar, setGroupAvatar] = useState<string>("");
+  const [members, setMembers] = useState<{ id: string; name: string; avatarUrl: string | null }[]>([]);
 
   useEffect(() => {
     if (!incomingGroupCall?.groupId) return;
@@ -19,17 +20,32 @@ export const GroupIncomingModal = () => {
         if (!token) return;
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
         
-        const res = await fetch(`${baseUrl}/groups/${incomingGroupCall.groupId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const [res, membersRes] = await Promise.all([
+          fetch(`${baseUrl}/groups/${incomingGroupCall.groupId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${baseUrl}/groups/${incomingGroupCall.groupId}/members`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        ]);
+        
         const data = await res.json();
+        const membersData = await membersRes.json();
         
         if (data.success && data.data) {
           setGroupName(data.data.name || "Group Call");
           setGroupAvatar(data.data.avatarUrl || "");
         }
+
+        if (membersData.success && membersData.data && Array.isArray(membersData.data.members)) {
+          setMembers(membersData.data.members.slice(0, 4).map((m: any) => ({
+            id: m.userId || m.id,
+            name: m.user?.name || m.name || m.profile?.name || "Unknown",
+            avatarUrl: m.user?.avatarUrl || m.avatarUrl || m.profile?.avatarUrl || null
+          })));
+        }
       } catch (err) {
-        console.error("Failed to fetch group profile", err);
+        console.error("Failed to fetch group profile or members", err);
       }
     };
 
@@ -57,15 +73,33 @@ export const GroupIncomingModal = () => {
         </div>
 
         {/* Pulsing Avatar Area */}
-        <div className="relative mb-8 z-10">
-          <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-75" style={{ animationDuration: '2s' }} />
-          <div className="absolute -inset-4 rounded-full border-2 border-[#3B58F5]/50 animate-pulse" />
-          
-          <img 
-            src={getOptimizedImageUrl(avatarUrl)} 
-            alt={displayName}
-            className="relative h-28 w-28 rounded-full object-cover border-4 border-[#1D2A54] shadow-xl"
-          />
+        <div className="flex flex-wrap justify-center gap-3 mb-8 z-10 w-full max-w-[240px]">
+          {members.length > 0 ? (
+            members.map((m, idx) => {
+              const mAvatar = m.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=3B58F5&color=fff&size=128`;
+              return (
+                <div key={m.id || idx} className="relative">
+                  <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-50" style={{ animationDuration: '2s', animationDelay: `${idx * 0.2}s` }} />
+                  <img 
+                    src={getOptimizedImageUrl(mAvatar)} 
+                    alt={m.name}
+                    className="relative h-16 w-16 rounded-full object-cover border-2 border-[#1D2A54] shadow-xl"
+                  />
+                </div>
+              );
+            })
+          ) : (
+            <div className="relative mb-8 z-10 flex justify-center w-full">
+              <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-75" style={{ animationDuration: '2s' }} />
+              <div className="absolute -inset-4 rounded-full border-2 border-[#3B58F5]/50 animate-pulse" />
+              
+              <img 
+                src={getOptimizedImageUrl(avatarUrl)} 
+                alt={displayName}
+                className="relative h-28 w-28 rounded-full object-cover border-4 border-[#1D2A54] shadow-xl"
+              />
+            </div>
+          )}
         </div>
         
         {/* Caller Info */}

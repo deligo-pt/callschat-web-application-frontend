@@ -27,7 +27,7 @@ export default function BusinessSignUpScreen() {
   const [isPending, startTransition] = React.useTransition();
 
   // Phone
-  const [phoneNumber, setPhoneNumber] = React.useState<string | undefined>();
+  const [phoneNumber, setPhoneNumber] = React.useState<string>("");
   const [selectedCountry, setSelectedCountry] = React.useState<Country>("US");
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -69,8 +69,13 @@ export default function BusinessSignUpScreen() {
 
   React.useEffect(() => {
     if (step !== "OTP") return;
-    const id = setInterval(() => setTimer((t) => { if (t <= 1) { clearInterval(id); return 0; } return t - 1; }), 1000);
+    setTimer(60);
+    const id = setInterval(() => setTimer((t) => {
+      if (t <= 1) { clearInterval(id); return 0; }
+      return t - 1;
+    }), 1000);
     return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   // Sanitise handle as user types
@@ -388,7 +393,7 @@ export default function BusinessSignUpScreen() {
                 <Input
                   country={selectedCountry}
                   value={phoneNumber}
-                  onChange={setPhoneNumber}
+                  onChange={(v) => setPhoneNumber(v || "")}
                   placeholder="000 000 0000"
                   disabled={isPending}
                   className="flex h-13 flex-1 rounded-xl border border-purple-100 bg-[#F5F3FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-purple-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20 hover:border-purple-200"

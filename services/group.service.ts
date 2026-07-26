@@ -180,4 +180,14 @@ export const groupService = {
       return { success: false };
     }
   },
+
+  async unsendMessage(groupId: string, messageId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await apiClient.delete(`/groups/${groupId}/messages/${messageId}/unsend`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to unsend message ${messageId} in group ${groupId}`, error);
+      return { success: false, error: error.response?.data?.message || 'Failed to unsend message' };
+    }
+  },
 };

@@ -13,9 +13,10 @@ interface ParticipantTileProps {
   disableOverlay?: boolean;
   hideName?: boolean;
   className?: string;
+  groupMembers?: any[];
 }
 
-export function ParticipantTile({ trackRef, disableOverlay, hideName, className }: ParticipantTileProps) {
+export function ParticipantTile({ trackRef, disableOverlay, hideName, className, groupMembers = [] }: ParticipantTileProps) {
   const { participant } = trackRef;
   const isSpeaking = useIsSpeaking(participant);
   const { contacts } = useContacts();
@@ -41,13 +42,17 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className 
     // Fallback to contacts lookup
     if (name === participant.identity || name === "Unknown" || name === participant.name || !avatarUrl.includes("ui-avatars.com") === false) {
       const contact = contacts.find(c => c.userId === participant.identity);
-      if (contact) {
+      const groupMember = groupMembers.find(m => m.id === participant.identity);
+
+      if (contact || groupMember) {
         if (!name || name === participant.identity || name === "Unknown" || name === participant.name) {
-          name = contact.name;
+          name = contact?.name || groupMember?.name || name;
         }
         // Update avatar fallback string
-        if (contact.avatarUrl && avatarUrl.includes("ui-avatars.com")) {
+        if (contact?.avatarUrl && avatarUrl.includes("ui-avatars.com")) {
           avatarUrl = contact.avatarUrl;
+        } else if (groupMember?.avatarUrl && avatarUrl.includes("ui-avatars.com")) {
+          avatarUrl = groupMember.avatarUrl;
         } else if (!avatarUrl.includes("ui-avatars.com")) {
            // keep current avatar
         } else {

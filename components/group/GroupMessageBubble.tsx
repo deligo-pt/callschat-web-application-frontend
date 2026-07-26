@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Clock,
   Edit2,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -63,6 +64,7 @@ interface GroupMessageBubbleProps {
       } | null;
     };
     isEdited?: boolean;
+    isDeleted?: boolean;
   };
   isMe: boolean;
   showAvatar: boolean;
@@ -73,6 +75,7 @@ interface GroupMessageBubbleProps {
   onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
   onUnpin?: () => void;
   onEdit?: (messageId: string, newText: string) => void;
+  onUnsend?: (messageId: string) => void;
 }
 
 export function GroupMessageBubble({
@@ -86,6 +89,7 @@ export function GroupMessageBubble({
   onPin,
   onUnpin,
   onEdit,
+  onUnsend,
 }: GroupMessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -109,6 +113,28 @@ export function GroupMessageBubble({
       }
     } catch (e) {}
     return null;
+  }
+
+  if (msg.isDeleted) {
+    return (
+      <div className={cn("flex w-full mb-4 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+        <div className={cn("flex flex-col max-w-[65%]", isMe ? "items-end" : "items-start")}>
+          {!isMe && (isFirstFromSender || showAvatar) && (
+            <span className="text-[12px] font-bold text-[#2563EB] mb-1 pl-1">
+              {msg.sender?.profile?.displayName || "Unknown"}
+            </span>
+          )}
+          <div
+            className={cn(
+              "px-4 py-2.5 text-[14px] italic text-[#8F95B2] bg-[#F8FAFC] border border-[#E2E8F0] rounded-[20px]",
+              isMe ? "rounded-tr-sm" : "rounded-tl-sm"
+            )}
+          >
+            🚫 This message was deleted
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const renderOptionsMenu = () => (
@@ -143,6 +169,13 @@ export function GroupMessageBubble({
               >
                 <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
                 <span>Edit message</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onUnsend?.(msg.id)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                <span>Unsend for everyone</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 bg-slate-100" />
             </>

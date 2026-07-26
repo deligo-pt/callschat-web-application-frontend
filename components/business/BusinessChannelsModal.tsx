@@ -196,9 +196,23 @@ export function BusinessChannelsModal({
       }
     };
 
+    const handleMessageUnsent = (payload: any) => {
+      if (selectedChannel && payload.channelId === selectedChannel.id) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === payload.messageId
+              ? { ...m, isDeleted: true, content: "", mediaUrl: undefined, mediaType: undefined }
+              : m
+          )
+        );
+      }
+    };
+
     socket.on("channel:receive_message", handleReceiveMessage);
+    socket.on("channel:message_unsent", handleMessageUnsent);
     return () => {
       socket.off("channel:receive_message", handleReceiveMessage);
+      socket.off("channel:message_unsent", handleMessageUnsent);
     };
   }, [socket, selectedChannel?.id, selectedChannel?.name, channels, currentUserId]);
 
@@ -808,6 +822,27 @@ export function BusinessChannelsModal({
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || "Failed to delete post.");
+    } finally {
+      setIsDeletingPostId(null);
+      setOpenActionMenuId(null);
+    }
+  };
+
+  const handleUnsendPost = async (msgId: string) => {
+    if (!selectedChannel) return;
+    try {
+      setIsDeletingPostId(msgId);
+      const res = await ChannelService.unsendChannelMessage(selectedChannel.id, msgId);
+      if (res?.success) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, isDeleted: true, content: "", mediaUrl: undefined, mediaType: undefined } : m
+          )
+        );
+        toast.success("Message unsent for everyone");
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Failed to unsend message.");
     } finally {
       setIsDeletingPostId(null);
       setOpenActionMenuId(null);
@@ -2469,7 +2504,11 @@ export function BusinessChannelsModal({
                                 </div>
                               ) : null}
 
-                              {editingPostId === msg.id ? (
+                              {msg.isDeleted ? (
+                                <div className="italic text-[#8F95B2] bg-[#F8FAFC] border border-[#E2E8F0] px-4 py-2.5 rounded-[12px] text-sm text-center">
+                                  🚫 This post was deleted
+                                </div>
+                              ) : editingPostId === msg.id ? (
                                 <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                                   <textarea
                                     value={editPostContent}
@@ -2630,6 +2669,15 @@ export function BusinessChannelsModal({
                                             <Trash2 className="h-3.5 w-3.5" />
                                           )}
                                           <span>Delete Post</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isDeletingPostId === msg.id}
+                                          onClick={() => handleUnsendPost(msg.id)}
+                                          className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-red-50 text-red-600 transition-colors text-left"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                          <span>Unsend for everyone</span>
                                         </button>
                                       </motion.div>
                                     )}

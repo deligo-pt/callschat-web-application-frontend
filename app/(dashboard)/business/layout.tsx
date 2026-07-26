@@ -14,7 +14,8 @@ export default function BusinessSectionLayout({ children }: { children: React.Re
     if (!isLoading && currentMode === "BUSINESS" && workspace === null && pathname !== "/business/onboarding") {
       router.replace("/business/onboarding");
     }
-  }, [isLoading, currentMode, workspace, pathname, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, currentMode, workspace, pathname]);
 
   if (isLoading || (currentMode === "BUSINESS" && workspace === undefined && pathname !== "/business/onboarding")) {
     return (

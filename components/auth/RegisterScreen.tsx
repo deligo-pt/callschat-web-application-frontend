@@ -18,7 +18,8 @@ export default function RegisterScreen() {
       toast.error("Session expired. Please verify your phone number again.");
       router.replace("/login");
     }
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRegister = () => {
     if (!name.trim()) return;

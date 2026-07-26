@@ -55,6 +55,7 @@ export interface ChannelMessageData {
   isLikedByMe?: boolean;
   scheduledFor?: string | null;
   createdAt: string;
+  isDeleted?: boolean;
 }
 
 export interface ChannelMemberData {
@@ -187,6 +188,14 @@ export const ChannelService = {
     messageId: string
   ): Promise<{ success: boolean; message: string }> => {
     const response = await apiClient.delete(`/business/channels/${channelId}/messages/${messageId}`);
+    return response.data;
+  },
+
+  unsendChannelMessage: async (
+    channelId: string,
+    messageId: string
+  ): Promise<{ success: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/business/channels/${channelId}/messages/${messageId}/unsend`);
     return response.data;
   },
 

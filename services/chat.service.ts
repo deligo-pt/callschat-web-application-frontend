@@ -119,5 +119,10 @@ export const chatService = {
     const response = await apiClient.post(`/conversations/${conversationId}/ephemeral-cleanup`);
     return response.data;
   },
+
+  unsendMessage: async (conversationId: string, messageId: string) => {
+    const response = await apiClient.delete(`/conversations/${conversationId}/messages/${messageId}/unsend`);
+    return response.data;
+  },
 };
 

@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
   useLocalParticipant,
   useRemoteParticipants,
   useTracks,
+  useMediaDeviceSelect,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import "@livekit/components-styles";
@@ -23,6 +24,10 @@ import {
   MoreVertical,
   Volume2,
   VolumeX,
+  ChevronDown,
+  Maximize2,
+  PictureInPicture,
+  SwitchCamera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
@@ -38,12 +43,51 @@ interface CustomCallLayoutProps {
   inviteOpen: boolean;
   onOpenInvite: () => void;
   onCloseInvite: () => void;
+  isSpeakerMuted: boolean;
+  setIsSpeakerMuted: (muted: boolean) => void;
 }
-const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCallLayoutProps) => {
-  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected } = useCallContext();
+const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMuted, setIsSpeakerMuted }: CustomCallLayoutProps) => {
+  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected, isCallMinimized, setIsCallMinimized } = useCallContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const { contacts } = useContacts();
-  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
+
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeCall?.isGroup && activeCall.groupId) {
+      const fetchGroupMembers = async () => {
+        try {
+          const token = localStorage.getItem("accessToken");
+          if (!token) return;
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+          const res = await fetch(`${baseUrl}/groups/${activeCall.groupId}/members`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (data.success && data.data && Array.isArray(data.data.members)) {
+             setGroupMembers(data.data.members.map((m: any) => ({
+               id: m.userId || m.id,
+               name: m.user?.name || m.name || m.profile?.name || "Unknown",
+               avatarUrl: m.user?.avatarUrl || m.avatarUrl || m.profile?.avatarUrl || null
+             })));
+          }
+        } catch(err) {
+          console.error("Failed to fetch group members", err);
+        }
+      };
+      fetchGroupMembers();
+    }
+  }, [activeCall?.isGroup, activeCall?.groupId]);
+
+  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind: 'videoinput' });
+
+  const handleSwitchCamera = () => {
+    if (devices && devices.length > 1) {
+      const currentIndex = devices.findIndex((d) => d.deviceId === activeDeviceId);
+      const nextIndex = (currentIndex + 1) % devices.length;
+      setActiveMediaDevice(devices[nextIndex].deviceId);
+    }
+  };
 
   // -------------------------------------------------------------------------
   // Phase 5: Dynamic Grid Engine
@@ -108,6 +152,23 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
     (t) => t.source === Track.Source.Camera && t.participant.isCameraEnabled,
   );
 
+  const toggleNativePiP = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        const videos = document.getElementsByTagName('video');
+        if (videos.length > 0) {
+          // Find the active remote speaker video, or fallback to the first video
+          const activeVideo = Array.from(videos).find(v => v.srcObject) || videos[0];
+          await activeVideo.requestPictureInPicture();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle Native PiP", err);
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   // Shared control dock
   // ─────────────────────────────────────────────────────────────────────────
@@ -132,6 +193,17 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
           {isCameraEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
         </button>
         <span className="text-[13px] font-medium text-white/50">Video</span>
+      </div>
+
+      <div className="flex flex-col items-center gap-2">
+        <button
+          onClick={handleSwitchCamera}
+          className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 transition-all duration-300"
+          aria-label="Switch camera"
+        >
+          <SwitchCamera className="h-6 w-6" />
+        </button>
+        <span className="text-[13px] font-medium text-white/50">Switch</span>
       </div>
 
       <div className="flex flex-col items-center gap-2">
@@ -176,6 +248,19 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
         </button>
         <span className="text-[13px] font-medium text-[#EF4444]">End</span>
       </div>
+
+      {!compact && (
+        <div className="flex flex-col items-center gap-2 hidden md:flex">
+          <button
+            onClick={toggleNativePiP}
+            className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 transition-all duration-300"
+            title="Pop out video (Native PiP)"
+          >
+            <PictureInPicture className="h-6 w-6" />
+          </button>
+          <span className="text-[13px] font-medium text-white/50">Pop Out</span>
+        </div>
+      )}
     </div>
   );
 
@@ -249,6 +334,13 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
                 <p className="text-xs font-semibold text-white/70 bg-[#3B58F5]/40 px-3 py-1 rounded-full">📷 Video On · {formatDuration(duration)}</p>
               </div>
               <div className="flex gap-3">
+                <button
+                  onClick={() => setIsCallMinimized(true)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-md"
+                  title="Minimize Call"
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </button>
                 <button onClick={onOpenInvite} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-md">
                   <UserPlus className="h-5 w-5" />
                 </button>
@@ -261,7 +353,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
             {/* Video grid */}
             <div className={cn("absolute inset-0 z-0", gridClass)}>
               {tracks.map((trackRef, idx) => (
-                <ParticipantTile key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} trackRef={trackRef} />
+                <ParticipantTile key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} trackRef={trackRef} groupMembers={groupMembers} />
               ))}
             </div>
 
@@ -312,6 +404,13 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
             </div>
 
             <div className="flex gap-4">
+              <button
+                onClick={() => setIsCallMinimized(true)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+                title="Minimize Call"
+              >
+                <ChevronDown className="h-5 w-5" />
+              </button>
               <button
                 onClick={onOpenInvite}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
@@ -378,12 +477,14 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
                   
                   if (!isLocal && (name === p.identity || name === "Unknown" || name === p.name || !pAvatar)) {
                     const contact = contacts.find(c => c.userId === p.identity);
-                    if (contact) {
+                    const groupMember = groupMembers.find(m => m.id === p.identity);
+                    
+                    if (contact || groupMember) {
                       if (!name || name === p.identity || name === "Unknown" || name === p.name) {
-                        name = contact.name;
+                        name = contact?.name || groupMember?.name || name;
                       }
-                      if (!pAvatar && contact.avatarUrl) {
-                        pAvatar = contact.avatarUrl;
+                      if (!pAvatar) {
+                        pAvatar = contact?.avatarUrl || groupMember?.avatarUrl || pAvatar;
                       }
                     }
                   }
@@ -442,6 +543,13 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
         </div>
 
         <div className="flex gap-4">
+          <button
+            onClick={() => setIsCallMinimized(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+            title="Minimize Call"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
           {!activeCall?.isGroup && (
             <button
               onClick={onOpenInvite}
@@ -509,14 +617,38 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite }: CustomCal
 // ---------------------------------------------------------------------------
 
 export const ActiveCallRoom = () => {
-  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected } = useCallContext();
+  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected, isCallMinimized, setIsCallMinimized } = useCallContext();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
 
   if (!activeCall) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black pointer-events-auto">
-      <LiveKitRoom
+    <div 
+      className={cn(
+        "z-[100] bg-black pointer-events-auto transition-all duration-300 overflow-hidden shadow-2xl",
+        isCallMinimized
+          ? "fixed bottom-6 right-6 w-56 h-80 rounded-2xl cursor-pointer hover:scale-105 active:scale-95 group border-2 border-white/20"
+          : "fixed inset-0 flex items-center justify-center"
+      )}
+      onClick={() => {
+        if (isCallMinimized) setIsCallMinimized(false);
+      }}
+    >
+      {isCallMinimized && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md shadow-lg">
+            <Maximize2 className="h-6 w-6" />
+          </div>
+          <span className="text-white text-xs font-semibold mt-2 drop-shadow-md">Tap to Expand</span>
+        </div>
+      )}
+      
+      <div className={cn(
+        "w-full h-full relative",
+        isCallMinimized && "pointer-events-none" // Disable interaction in UI when minimized so clicks bubble to expand
+      )}>
+        <LiveKitRoom
         video={activeCall.callType === "VIDEO"}
         audio={true}
         token={activeCall.token}
@@ -533,10 +665,12 @@ export const ActiveCallRoom = () => {
            inviteOpen={inviteOpen} 
            onOpenInvite={() => setInviteOpen(true)} 
            onCloseInvite={() => setInviteOpen(false)}
+           isSpeakerMuted={isSpeakerMuted}
+           setIsSpeakerMuted={setIsSpeakerMuted}
         />
 
         {/* System Integrity Control: renders remote audio tracks */}
-        <RoomAudioRenderer />
+        <RoomAudioRenderer muted={isSpeakerMuted} />
 
         {/* Fallback modal for VIDEO calls */}
         {!activeCall.isGroup && activeCall.callType === "VIDEO" && (
@@ -548,6 +682,7 @@ export const ActiveCallRoom = () => {
           />
         )}
       </LiveKitRoom>
+      </div>
     </div>
   );
 };

@@ -127,7 +127,7 @@ export default function GroupChatPage() {
     }
   }, []);
 
-  const { messages, sendMessage, editMessage, isReady, error, getGroupKey, isUploading, pinnedMessages, pinMessage } = useGroupChat(groupId, currentUserId);
+  const { messages, sendMessage, editMessage, unsendMessage, isReady, error, getGroupKey, isUploading, pinnedMessages, pinMessage } = useGroupChat(groupId, currentUserId);
 
   // ── Re-sync Group Keys ─────────────────────────────────────────────────────
   // When decryption fails (usually after a keypair regeneration), admins can
@@ -209,7 +209,7 @@ export default function GroupChatPage() {
     return () => {
       socket.off("group:member_removed", handleMemberRemoved);
     };
-  }, [socket, groupId, currentUserId, router]);
+  }, [socket, groupId, currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const fetchGroupData = async () => {
@@ -681,6 +681,7 @@ export default function GroupChatPage() {
                     )
                   }
                   onEdit={(msgId, newText) => editMessage(msgId, newText)}
+                  onUnsend={unsendMessage}
                 />
               );
             })

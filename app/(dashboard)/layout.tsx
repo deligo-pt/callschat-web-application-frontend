@@ -26,7 +26,8 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     if (!isLoading && isBusiness && workspace === null && !isOnboarding) {
       router.replace("/business/onboarding");
     }
-  }, [isLoading, isBusiness, workspace, isOnboarding, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isBusiness, workspace, isOnboarding]);
 
   useEffect(() => {
     const handleWorkspaceChange = (e: any) => {
@@ -40,7 +41,8 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
       window.addEventListener('workspaceModeChanged', handleWorkspaceChange);
       return () => window.removeEventListener('workspaceModeChanged', handleWorkspaceChange);
     }
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const navItems = [
     { name: tNav("message"), href: "/chats", icon: MessageSquare },

@@ -19,6 +19,7 @@ export interface GroupMessage {
     } | null;
   };
   isEdited?: boolean;
+  isDeleted?: boolean;
 }
 
 const parseEditedText = (rawText: string) => {
@@ -276,6 +277,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                   mediaUrl: msg.mediaUrl,
                   mediaType: msg.mediaType,
                   sender: msg.sender,
+                  isDeleted: msg.isDeleted,
                 };
               } catch (err) {
                 return {
@@ -288,6 +290,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                   mediaUrl: msg.mediaUrl,
                   mediaType: msg.mediaType,
                   sender: msg.sender,
+                  isDeleted: msg.isDeleted,
                 };
               }
             })
@@ -426,13 +429,26 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
     };
 
+    const handleMessageUnsent = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === payload.messageId
+            ? { ...m, isDeleted: true, text: "", mediaUrl: undefined, mediaType: undefined }
+            : m
+        )
+      );
+    };
+
     socket.on("group:receive_message", handleReceiveMessage);
     socket.on("group:message_edited", handleMessageEdited);
+    socket.on("group:message_unsent", handleMessageUnsent);
     socket.on("group:error", handleGroupError);
 
     return () => {
       socket.off("group:receive_message", handleReceiveMessage);
       socket.off("group:message_edited", handleMessageEdited);
+      socket.off("group:message_unsent", handleMessageUnsent);
       socket.off("group:error", handleGroupError);
     };
   }, [socket, isConnected, groupId]);
@@ -610,10 +626,29 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     [socket, isConnected, groupId]
   );
 
+  const unsendMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await groupService.unsendMessage(groupId, messageId);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, isDeleted: true, text: "", mediaUrl: undefined, mediaType: undefined }
+              : m
+          )
+        );
+      } catch (err) {
+        console.error("Failed to unsend message", err);
+      }
+    },
+    [groupId]
+  );
+
   return {
     messages,
     sendMessage,
     editMessage,
+    unsendMessage,
     isReady,
     error,
     isUploading,

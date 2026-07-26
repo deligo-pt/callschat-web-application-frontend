@@ -34,6 +34,8 @@ export interface CallContextType {
    * Guards against the DataChannel error → onDisconnected → double-hangup cascade.
    */
   onLiveKitDisconnected: () => void;
+  isCallMinimized: boolean;
+  setIsCallMinimized: (val: boolean) => void;
 }
 
 export const CallContext = createContext<CallContextType | null>(null);

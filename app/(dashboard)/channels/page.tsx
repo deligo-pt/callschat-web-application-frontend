@@ -13,7 +13,8 @@ export default function ChannelsPage() {
     if (currentMode === "BUSINESS") {
       router.replace("/business/channels");
     }
-  }, [currentMode, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMode]);
 
   return (
     <div className="hidden flex-1 flex-col items-center justify-center bg-white md:flex w-full h-full">

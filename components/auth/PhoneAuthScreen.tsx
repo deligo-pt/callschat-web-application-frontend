@@ -28,7 +28,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   const [isPending, startTransition] = React.useTransition();
 
   // Phone Step State
-  const [phoneNumber, setPhoneNumber] = React.useState<string | undefined>();
+  const [phoneNumber, setPhoneNumber] = React.useState<string | undefined>("");
   const [selectedCountry, setSelectedCountry] = React.useState<Country>("US");
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -51,19 +51,16 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
   }, []);
 
   React.useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (step === "OTP") {
-      interval = setInterval(() => {
-        setTimer((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (step !== "OTP") return;
+    setTimer(60);
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) { clearInterval(interval); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   const countries = getCountries();
@@ -452,7 +449,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                     <Input
                       country={selectedCountry}
                       value={phoneNumber}
-                      onChange={setPhoneNumber}
+                      onChange={(v) => setPhoneNumber(v || "")}
                       placeholder="000 000 0000"
                       disabled={isPending}
                       className="flex h-12 flex-1 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200"

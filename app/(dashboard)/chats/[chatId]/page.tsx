@@ -164,6 +164,11 @@ function ChatRoomPageContent() {
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [isContactProfileOpen, setIsContactProfileOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // B2C: track whether we know the bizHandle for this conversation
   // (needed to route ALL subsequent messages through contactBusiness REST API).
@@ -352,7 +357,7 @@ function ChatRoomPageContent() {
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
 
-  const { messages, sendMessage, editMessage, pinnedMessages, pinMessage, clearMessages, isReady, isUploading } =
+  const { messages, sendMessage, editMessage, pinnedMessages, pinMessage, clearMessages, isReady, isUploading, unsendMessage } =
     useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -480,7 +485,7 @@ function ChatRoomPageContent() {
               <div
                 className={cn(
                   "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E6EAFA]",
-                  (!blockStatus?.isBlocked && (isUserOnline(recipientId) || recipient?.isOnline))
+                  (!blockStatus?.isBlocked && ((isMounted && isUserOnline(recipientId)) || recipient?.isOnline))
                     ? "border-[2.5px] border-emerald-400 p-[2px]"
                     : ""
                 )}
@@ -496,7 +501,7 @@ function ChatRoomPageContent() {
                     {recipient?.name?.charAt(0) || "U"}
                   </div>
                 )}
-                {(!blockStatus?.isBlocked && (isUserOnline(recipientId) || recipient?.isOnline)) && (
+                {(!blockStatus?.isBlocked && ((isMounted && isUserOnline(recipientId)) || recipient?.isOnline)) && (
                   <span
                     aria-hidden="true"
                     className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#254BCC] bg-emerald-400"
@@ -513,7 +518,7 @@ function ChatRoomPageContent() {
                   </span>
                 ) : blockStatus?.isBlocked ? (
                   <span className="text-[12px] font-medium text-white/50">Offline</span>
-                ) : isUserOnline(recipientId) || recipient?.isOnline ? (
+                ) : (isMounted && isUserOnline(recipientId)) || recipient?.isOnline ? (
                   <span className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Active now
@@ -763,6 +768,7 @@ function ChatRoomPageContent() {
                       "You"
                     )
                   }
+                  onUnsend={unsendMessage}
                 />
               );
             })

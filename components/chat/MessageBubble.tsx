@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2, Pin, PinOff, Clock } from "lucide-react";
+import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2, Pin, PinOff, Clock, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -43,6 +43,7 @@ interface MessageBubbleProps {
     mediaUrl?: string;
     mediaType?: string | null;
     isEdited?: boolean;
+    isDeleted?: boolean;
   };
   isMe: boolean;
   showTail: boolean;
@@ -53,9 +54,10 @@ interface MessageBubbleProps {
   isPinned?: boolean;
   onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
   onUnpin?: () => void;
+  onUnsend?: (messageId: string) => void;
 }
 
-export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit, isPinned, onPin, onUnpin }: MessageBubbleProps) {
+export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit, isPinned, onPin, onUnpin, onUnsend }: MessageBubbleProps) {
   const { initiateCall } = useCallContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -79,6 +81,23 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
       }
     } catch (e) {}
     return null;
+  }
+
+  if (msg.isDeleted) {
+    return (
+      <div className={cn("flex w-full z-10 my-1 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+        <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
+          <div
+            className={cn(
+              "px-4 py-2.5 text-[14px] italic text-[#8F95B2] bg-[#F8FAFC] border border-[#E2E8F0] rounded-[16px]",
+              isMe ? "rounded-br-[4px]" : "rounded-bl-[4px]"
+            )}
+          >
+            🚫 This message was deleted
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const renderOptionsMenu = () => {
@@ -115,6 +134,13 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
                 >
                   <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
                   <span>Edit message</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onUnsend?.(msg.id)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Unsend for everyone</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-1 bg-slate-100" />
               </>

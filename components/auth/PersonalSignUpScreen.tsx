@@ -35,7 +35,7 @@ export default function PersonalSignUpScreen() {
   const [isPending, startTransition] = React.useTransition();
 
   // Phone step
-  const [phoneNumber, setPhoneNumber] = React.useState<string | undefined>();
+  const [phoneNumber, setPhoneNumber] = React.useState<string>("");
   const [selectedCountry, setSelectedCountry] = React.useState<Country>("US");
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -118,16 +118,15 @@ export default function PersonalSignUpScreen() {
   // ── OTP countdown ─────────────────────────────────────────────────────
   React.useEffect(() => {
     if (step !== "OTP") return;
+    setTimer(60);
     const interval = setInterval(() => {
       setTimer((t) => {
-        if (t <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
+        if (t <= 1) { clearInterval(interval); return 0; }
         return t - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   // ── Handlers ─────────────────────────────────────────────────────────
@@ -527,7 +526,7 @@ export default function PersonalSignUpScreen() {
                 <Input
                   country={selectedCountry}
                   value={phoneNumber}
-                  onChange={setPhoneNumber}
+                  onChange={(v) => setPhoneNumber(v || "")}
                   placeholder="000 000 0000"
                   disabled={isPending}
                   className="flex h-13 flex-1 rounded-xl border border-indigo-100 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-200"

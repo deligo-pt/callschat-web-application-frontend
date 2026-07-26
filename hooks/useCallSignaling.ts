@@ -26,6 +26,7 @@ export interface ActiveCall {
   roomName: string;
   callType: 'AUDIO' | 'VIDEO';
   isGroup?: boolean;
+  groupId?: string;
   peerName?: string;
   peerAvatar?: string;
 }
@@ -66,6 +67,7 @@ export const useCallSignaling = () => {
   const [incomingGroupCall, setIncomingGroupCall] = useState<IncomingGroupCall | null>(null);
   const [outgoingGroupCall, setOutgoingGroupCall] = useState<OutgoingGroupCall | null>(null);
   const [activeGroupCalls, setActiveGroupCalls] = useState<string[]>([]);
+  const [isCallMinimized, setIsCallMinimized] = useState<boolean>(false);
   
   const pendingPeerRef = useRef<{ name?: string; avatar?: string }>({});
   const pendingCancelRef = useRef<boolean>(false);
@@ -226,6 +228,7 @@ export const useCallSignaling = () => {
             roomName: prev.roomName!,
             callType: prev.callType,
             isGroup: true,
+            groupId: payload.groupId,
           });
           return null;
         }
@@ -495,8 +498,9 @@ export const useCallSignaling = () => {
             token: response.token,
             serverUrl: response.livekitUrl,
             roomName: response.roomName,
-            callType: 'VIDEO',
+            callType: response.callType || 'AUDIO',
             isGroup: true,
+            groupId: groupId,
           });
         }
       });
@@ -525,8 +529,9 @@ export const useCallSignaling = () => {
             token: response.token,
             serverUrl: response.livekitUrl,
             roomName: response.roomName,
-            callType: 'VIDEO',
+            callType: response.callType || 'AUDIO',
             isGroup: true,
+            groupId: groupId,
           });
         }
       });
@@ -604,5 +609,7 @@ export const useCallSignaling = () => {
     joinGroupCall,
     leaveGroupCall,
     onLiveKitDisconnected,
+    isCallMinimized,
+    setIsCallMinimized,
   };
 };
