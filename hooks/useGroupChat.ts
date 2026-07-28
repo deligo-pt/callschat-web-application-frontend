@@ -118,7 +118,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               const rKeyRes = await chatService.fetchRecipientKey(uId);
               let pubKey = "";
               if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
-                pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+                pubKey = rKeyRes.data[0].publicKey;
               } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
                 pubKey = rKeyRes.data.publicKey;
               }

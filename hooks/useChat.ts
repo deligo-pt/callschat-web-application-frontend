@@ -120,8 +120,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         const res = await chatService.fetchRecipientKey(activePeerId);
         // Guard: if backend returns empty array (no key registered), do not set any key
         if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          // Grab the last key in the array (most recently inserted)
-          setRecipientPublicKey(res.data[res.data.length - 1].publicKey);
+          // Grab the first key in the array (most recently inserted, ordered by desc)
+          setRecipientPublicKey(res.data[0].publicKey);
         } else if (res?.success && res?.data?.publicKey) {
           setRecipientPublicKey(res.data.publicKey);
         }
@@ -204,7 +204,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     try {
                       const res = await chatService.fetchRecipientKey(uid);
                       if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                        return res.data[res.data.length - 1].publicKey;
+                        return res.data[0].publicKey;
                       } else if (res?.success && res?.data?.publicKey) {
                         return res.data.publicKey;
                       }
@@ -227,7 +227,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     try {
                       const res = await chatService.fetchRecipientKey(targetUserId);
                       if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                        const latestKey = res.data[res.data.length - 1].publicKey;
+                        const latestKey = res.data[0].publicKey;
                         if (latestKey && latestKey !== peerPubKey) {
                           text = await decryptMessage(msg.ciphertext, msg.nonce, latestKey, myPrivateKey);
                           console.log(`[History] Decrypted msg ${msg.id} with rotated peer key.`);
@@ -369,7 +369,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               console.log(`[Socket] Target user (${targetUserId}) key needed, fetching...`);
               const res = await chatService.fetchRecipientKey(targetUserId);
               if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                pubKeyToUse = res.data[res.data.length - 1].publicKey;
+                pubKeyToUse = res.data[0].publicKey;
               } else if (res?.success && res?.data?.publicKey) {
                 pubKeyToUse = res.data.publicKey;
               }
@@ -398,7 +398,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             try {
               const res = await chatService.fetchRecipientKey(targetUserId);
               if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                const latestKey = res.data[res.data.length - 1].publicKey;
+                const latestKey = res.data[0].publicKey;
                 if (latestKey && latestKey !== pubKeyToUse) {
                   text = await decryptMessage(payload.ciphertext, payload.nonce, latestKey, privKey);
                   console.log("✅ [Socket] Successfully decrypted with latest key!");
@@ -682,7 +682,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             try {
               const res = await chatService.fetchRecipientKey(activePeerId);
               if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                pubKeyToUse = res.data[res.data.length - 1].publicKey;
+                pubKeyToUse = res.data[0].publicKey;
               } else if (res?.success && res?.data?.publicKey) {
                 pubKeyToUse = res.data.publicKey;
               }
