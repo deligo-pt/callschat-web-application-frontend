@@ -294,7 +294,7 @@ export default function CreateGroupPage() {
           {step === 2 && (
             <div className="flex flex-col items-center w-full animate-in fade-in duration-300 h-full">
               <h2 className="text-[18px] font-bold text-[#0F172A] mb-1">Add Members</h2>
-              <p className="text-[12px] font-medium text-slate-500 mb-6">Select contacts to add to the group</p>
+              <p className="text-[12px] font-medium text-slate-500 mb-6">Select contacts to add to the group (optional)</p>
 
               <div className="w-full flex flex-col flex-1 min-h-0">
                 <div className="relative mb-4 shrink-0">
@@ -467,12 +467,11 @@ export default function CreateGroupPage() {
             }}
             disabled={
               (step === 1 && !groupName.trim()) || 
-              (step === 2 && selectedMembers.length === 0) ||
               isCreating
             }
             className={cn(
               "w-full flex items-center justify-center py-3 rounded-xl font-bold text-[13px] transition-colors",
-              ((step === 1 && !groupName.trim()) || (step === 2 && selectedMembers.length === 0) || isCreating)
+              ((step === 1 && !groupName.trim()) || isCreating)
                 ? "bg-[#E2E8F0] text-slate-400 cursor-not-allowed"
                 : "bg-[#3B58F5] hover:bg-blue-700 text-white shadow-sm"
             )}
