@@ -34,18 +34,8 @@ export const chatService = {
   ) => {
     const payload = typeof params === 'string' ? { targetUserId: params } : { ...params };
     
-    // Automatically apply default disappearing messages setting for new 1v1 conversations
-    if (payload.targetUserId && !payload.groupId && !payload.workspaceId && payload.disappearAfterSeconds === undefined) {
-      if (typeof window !== 'undefined') {
-        const defaultTimer = localStorage.getItem('callschat_default_disappear_seconds');
-        if (defaultTimer && defaultTimer !== 'null' && defaultTimer !== '0') {
-          const seconds = parseInt(defaultTimer, 10);
-          if (!isNaN(seconds) && seconds > 0) {
-            payload.disappearAfterSeconds = seconds;
-          }
-        }
-      }
-    }
+    // The backend will automatically apply the global disappearing timer to messages
+    // when they are sent, so we do not need to read it from localStorage here.
 
     const response = await apiClient.post('/conversations/initiate', payload);
     return response.data;

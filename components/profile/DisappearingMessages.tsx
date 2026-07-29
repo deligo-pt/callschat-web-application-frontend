@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Shield, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { chatService } from "@/services/chat.service";
+import { UserService } from "@/services/user.service";
 
 interface TimerOption {
   label: string;
@@ -13,14 +13,10 @@ interface TimerOption {
 }
 
 const TIMER_OPTIONS: TimerOption[] = [
-  { label: "Off",      sublabel: "Messages stay forever",   value: null    },
-  { label: "30 Seconds", sublabel: "30 seconds",            value: 30      },
-  { label: "1 Minute", sublabel: "60 seconds",              value: 60      },
-  { label: "5 Minutes", sublabel: "5 minutes",              value: 300     },
-  { label: "1 Hour",   sublabel: "60 minutes",              value: 3600    },
-  { label: "24 Hours", sublabel: "Disappear after a day",   value: 86400   },
-  { label: "7 Days",   sublabel: "Disappear after a week",  value: 604800  },
-  { label: "90 Days",  sublabel: "Disappear after 90 days", value: 2592000 },
+  { label: "Off",      sublabel: "Default — messages stay forever",    value: null    },
+  { label: "24 hours", sublabel: "Messages disappear after 1 day",    value: 86400   },
+  { label: "7 days",   sublabel: "Messages disappear after 1 week",   value: 604800  },
+  { label: "90 days",  sublabel: "Messages disappear after 90 days",  value: 7776000 },
 ];
 
 interface DisappearingMessagesProps {
@@ -44,29 +40,37 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
     }
   }, []);
 
-  const handleSelect = async (value: number | null) => {
-    setSelectedTimer(value);
-    if (typeof window !== "undefined") {
-      if (value === null) {
-        localStorage.removeItem("callschat_default_disappear_seconds");
-      } else {
-        localStorage.setItem("callschat_default_disappear_seconds", String(value));
-      }
-    }
-    toast.success("Default disappearing messages timer updated");
+  const [isSaving, setIsSaving] = useState(false);
 
-    // Proactively sync this global setting to all existing 1v1 conversations
+  const handleSelect = async (value: number | null) => {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
-      const convsRes = await chatService.fetchMyConversations();
-      if (convsRes?.success && Array.isArray(convsRes.data)) {
-        for (const conv of convsRes.data) {
-          if (!conv.workspaceId && conv.context !== "BUSINESS" && !conv.groupId) {
-            void chatService.setDisappearSettings(conv.id, value).catch(() => {});
-          }
+      // 1. Persist to backend — this also bulk-updates ALL personal conversations
+      await UserService.updatePrivacy({ defaultDisappearingTimer: value });
+
+      // 2. Mirror in localStorage for fast client-side reads
+      if (typeof window !== "undefined") {
+        if (value === null) {
+          localStorage.removeItem("callschat_default_disappear_seconds");
+        } else {
+          localStorage.setItem("callschat_default_disappear_seconds", String(value));
         }
       }
+
+      setSelectedTimer(value);
+
+      const label = value === 86400 ? "24 hours" : value === 604800 ? "7 days" : "90 days";
+      if (value === null) {
+        toast.success("Disappearing messages turned off for all chats.");
+      } else {
+        toast.success(`Disappearing messages set to ${label} for all your chats.`);
+      }
     } catch (e) {
-      console.error("Failed to sync global disappearing timer to existing chats:", e);
+      console.error("Failed to update global disappearing timer:", e);
+      toast.error("Failed to update setting. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -105,10 +109,10 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
             </div>
             <div className="flex flex-col">
               <h3 className="text-[16px] font-bold text-[#1E1B4B] mb-1">
-                Enhanced Privacy
+                Global Setting
               </h3>
               <p className="text-[13px] text-[#4C1D95]/80 font-medium leading-relaxed">
-                Messages will automatically disappear after the selected time. This feature works for both you and your chat partner, ensuring complete privacy.
+                This setting applies to <strong>all your personal conversations</strong>. When enabled, new messages in every chat will automatically disappear after the selected time — just like WhatsApp's global disappearing messages.
               </p>
             </div>
           </div>
@@ -124,8 +128,9 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
                   key={String(option.value)}
                   onClick={() => handleSelect(option.value)}
                   type="button"
+                  disabled={isSaving || selectedTimer === option.value}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer",
+                    "flex w-full items-center justify-between rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed",
                     isSelected
                       ? "bg-[#EEF2FF] border-2 border-[#3B82F6] shadow-sm"
                       : "bg-white border border-[#E2E8F0] hover:bg-slate-50 shadow-sm"

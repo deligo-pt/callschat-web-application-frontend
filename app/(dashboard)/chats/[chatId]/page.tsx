@@ -361,12 +361,13 @@ function ChatRoomPageContent() {
     useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
-  // Re-render every second so messages disappear exactly when they expire.
+  // Always runs every second so BOTH conversation-level AND per-message timers
+  // are re-evaluated. Without this, messages sent under a now-disabled
+  // conversation timer would never get re-filtered out of the list.
   useEffect(() => {
-    if (!disappearAfterSeconds) return;
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, [disappearAfterSeconds]);
+  }, []);
 
   // ── Socket: listen for real-time disappear setting changes ───────────────
   const { socket } = useSocket();
@@ -601,37 +602,30 @@ function ChatRoomPageContent() {
       )}
 
       {/* ── Ephemeral Banner ──────────────────────────────────────────────── */}
-      {!isBizChat && disappearAfterSeconds && (
+      {!isBizChat && (disappearAfterSeconds || messages.some((m) => (m as any).disappearAfterSeconds)) && (
         <div className="shrink-0 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-violet-50 px-5 py-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {/* Animated flame icon */}
-            <span className="relative flex h-5 w-5 items-center justify-center">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-300 opacity-40" />
-              <span className="text-[15px]">🔥</span>
-            </span>
+            <span className="text-[15px]" role="img" aria-label="timer">⏱️</span>
             <span className="text-[12px] font-bold text-[#6D28D9]">
-              Ephemeral Chat
+              Disappearing messages
             </span>
-            <span className="text-[11px] font-medium text-purple-400">·</span>
-            <span className="text-[11px] font-medium text-[#7C3AED]">
-              Messages disappear after{" "}
-              {disappearAfterSeconds === 30
-                ? "30 seconds"
-                : disappearAfterSeconds === 60
-                  ? "1 minute"
-                  : disappearAfterSeconds === 300
-                    ? "5 minutes"
-                    : disappearAfterSeconds === 3600
-                      ? "1 hour"
-                      : disappearAfterSeconds === 86400
-                        ? "24 hours"
-                        : disappearAfterSeconds === 604800
-                          ? "7 days"
-                          : "90 days"}
-            </span>
+            {disappearAfterSeconds && (
+              <>
+                <span className="text-[11px] font-medium text-purple-400">·</span>
+                <span className="text-[11px] font-medium text-[#7C3AED]">
+                  {disappearAfterSeconds === 86400
+                    ? "24 hours"
+                    : disappearAfterSeconds === 604800
+                      ? "7 days"
+                      : disappearAfterSeconds === 2592000
+                        ? "90 days"
+                        : `${disappearAfterSeconds}s`}
+                </span>
+              </>
+            )}
           </div>
-          <span className="text-[10px] font-bold text-purple-300 uppercase tracking-widest">
-            Secret
+          <span className="text-[10px] font-medium text-purple-400">
+            New messages auto-delete
           </span>
         </div>
       )}
@@ -730,7 +724,13 @@ function ChatRoomPageContent() {
           </div>
         ) : (
           messages
-            .filter((msg) => !isMessageExpired(msg.createdAt, disappearAfterSeconds))
+            .filter((msg) => {
+              // Use the per-message timer first (stamped at send time).
+              // Fall back to the conversation-level timer for messages sent before
+              // the per-message stamping was introduced.
+              const timer = (msg as any).disappearAfterSeconds ?? disappearAfterSeconds;
+              return !isMessageExpired(msg.createdAt, timer);
+            })
             .map((msg, index, visibleMsgs) => {
               const isMe = msg.senderId === currentUserId;
               const showTail =
@@ -746,6 +746,7 @@ function ChatRoomPageContent() {
                   peerId={recipientId}
                   peerName={isBizChat ? bizName : recipient?.name}
                   peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
+                  disappearAfterSeconds={(msg as any).disappearAfterSeconds ?? disappearAfterSeconds ?? null}
                   onEdit={(msgId, newText) => editMessage(msgId, newText)}
                   isPinned={isPinned}
                   onPin={(dur, previewText, previewMedia) =>

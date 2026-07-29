@@ -25,14 +25,10 @@ interface TimerOption {
 }
 
 const TIMER_OPTIONS: TimerOption[] = [
-  { label: "Off",      sublabel: "Messages stay forever",   value: null    },
-  { label: "30s",      sublabel: "30 seconds (testing)",    value: 30      },
-  { label: "1 min",    sublabel: "60 seconds",              value: 60      },
-  { label: "5 min",    sublabel: "5 minutes",               value: 300     },
-  { label: "1 hour",   sublabel: "60 minutes",              value: 3600    },
-  { label: "24 hours", sublabel: "Disappear after a day",   value: 86400   },
-  { label: "7 days",   sublabel: "Disappear after a week",  value: 604800  },
-  { label: "90 days",  sublabel: "Disappear after 90 days", value: 2592000 },
+  { label: "Off",     sublabel: "Messages stay forever",     value: null    },
+  { label: "24 hours", sublabel: "Messages disappear after 1 day",  value: 86400   },
+  { label: "7 days",  sublabel: "Messages disappear after 1 week", value: 604800  },
+  { label: "90 days", sublabel: "Messages disappear after 90 days", value: 7776000 },
 ];
 
 // ---------------------------------------------------------------------------

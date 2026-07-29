@@ -108,7 +108,7 @@ export function ChatOptionsMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-0">
+          <button data-testid="chat-options-btn" className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-0">
             <MoreVertical className="h-5 w-5" strokeWidth={2.5} />
           </button>
         </DropdownMenuTrigger>

@@ -14,6 +14,8 @@ export interface ChatMessage {
   mediaType?: 'image' | 'video' | 'audio' | 'document' | 'link' | string | null;
   isEdited?: boolean;
   isDeleted?: boolean;
+  /** Per-message disappear timer in seconds, stamped at send time. */
+  disappearAfterSeconds?: number | null;
 }
 
 export interface PinnedMessage {
@@ -168,6 +170,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
                     isDeleted: msg.isDeleted,
+                    disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
                   };
                 }
 
@@ -264,6 +267,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
                     isDeleted: msg.isDeleted,
+                    disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
                   };
                 } catch {
                   return {
@@ -276,6 +280,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     mediaUrl: msg.mediaUrl,
                     mediaType: msg.mediaType,
                     isDeleted: msg.isDeleted,
+                    disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
                   };
                 }
               })
@@ -453,6 +458,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
+                disappearAfterSeconds: payload.disappearAfterSeconds,
               };
               return updated;
             }
@@ -469,6 +475,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
+                disappearAfterSeconds: payload.disappearAfterSeconds,
               },
             ];
           });
@@ -491,6 +498,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
+                disappearAfterSeconds: payload.disappearAfterSeconds,
               },
             ];
           });
@@ -512,6 +520,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               createdAt: payload.createdAt || new Date().toISOString(),
               mediaUrl: payload.mediaUrl,
               mediaType: payload.mediaType,
+              disappearAfterSeconds: payload.disappearAfterSeconds,
             },
           ];
         });
@@ -529,6 +538,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               createdAt: payload.createdAt || new Date().toISOString(),
               mediaUrl: payload.mediaUrl,
               mediaType: payload.mediaType,
+              disappearAfterSeconds: payload.disappearAfterSeconds,
             },
           ];
         });

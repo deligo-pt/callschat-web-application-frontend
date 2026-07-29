@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
@@ -55,12 +55,44 @@ interface MessageBubbleProps {
   onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
   onUnpin?: () => void;
   onUnsend?: (messageId: string) => void;
+  /** Per-message disappear timer in seconds, or null if not set. */
+  disappearAfterSeconds?: number | null;
 }
 
-export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit, isPinned, onPin, onUnpin, onUnsend }: MessageBubbleProps) {
+export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit, isPinned, onPin, onUnpin, onUnsend, disappearAfterSeconds }: MessageBubbleProps) {
   const { initiateCall } = useCallContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
+  // Live countdown in seconds remaining (null = not disappearing)
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!disappearAfterSeconds) {
+      setSecondsLeft(null);
+      return;
+    }
+    const expiresAt = new Date(msg.createdAt).getTime() + disappearAfterSeconds * 1000;
+    const calc = () => {
+      const remaining = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
+  }, [disappearAfterSeconds, msg.createdAt]);
+
+  /** Format remaining seconds into a human-readable WhatsApp-style label. */
+  const formatCountdown = (secs: number): string => {
+    if (secs <= 0) return "0s";
+    const d = Math.floor(secs / 86400);
+    const h = Math.floor((secs % 86400) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+    if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    if (m > 0) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+    return `${s}s`;
+  };
 
   if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
     try {
@@ -464,8 +496,34 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
           )}
         </div>
         
-        {/* Timestamp outside the bubble */}
-        <div className={cn("flex items-center gap-1 mt-1 px-1", isMe ? "justify-end text-gray-500" : "justify-start text-gray-500")}>
+        {/* Timestamp + disappear countdown outside the bubble */}
+        <div className={cn("flex items-center gap-1.5 mt-1 px-1", isMe ? "justify-end text-gray-500" : "justify-start text-gray-500")}>
+          {/* WhatsApp-style countdown badge */}
+          {secondsLeft !== null && (
+            <span
+              title={`This message will disappear in ${formatCountdown(secondsLeft)}`}
+              className={cn(
+                "flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full",
+                isMe
+                  ? "bg-white/20 text-white"
+                  : "bg-purple-100 text-purple-700"
+              )}
+            >
+              {/* Spinning clock icon */}
+              <svg
+                className="w-3 h-3 animate-spin-slow"
+                style={{ animation: "spin 4s linear infinite" }}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>{formatCountdown(secondsLeft)}</span>
+            </span>
+          )}
           <span className="text-[11px] font-medium flex items-center gap-1">
             {msg.isEdited && <span className="italic font-normal">(edited)</span>}
             {isMe ? "Sent" : formatTime(msg.createdAt)}

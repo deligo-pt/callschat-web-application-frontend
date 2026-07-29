@@ -20,6 +20,11 @@ export const UserService = {
     return response.data;
   },
 
+  updatePrivacy: async (data: any) => {
+    const response = await apiClient.patch('/user/profile/privacy', data);
+    return response.data;
+  },
+
   checkUsername: async (username: string) => {
     const response = await apiClient.get(`/user/username/check?username=${encodeURIComponent(username)}`);
     return response.data;
