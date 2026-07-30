@@ -66,14 +66,14 @@ export default function OnboardingSlider() {
 
   const handleNext = () => {
     if (currentSlide === SLIDES.length - 1) {
-      router.push("/permissions");
+      router.push("/connect");
     } else {
       goTo(currentSlide + 1);
     }
   };
 
   const handleSkip = () => {
-    router.push("/permissions");
+    router.push("/connect");
   };
 
   const slide = SLIDES[currentSlide];
@@ -85,14 +85,8 @@ export default function OnboardingSlider() {
       <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       <div className="absolute top-1/3 -right-32 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
-      {/* Top Bar with Skip Button */}
+      {/* Top Bar for future use if needed */}
       <div className="absolute top-0 left-0 w-full flex h-20 items-center justify-end px-6 sm:px-12 pt-4 z-30">
-        <button
-          onClick={handleSkip}
-          className="text-sm sm:text-base font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-200/50 cursor-pointer"
-        >
-          Skip
-        </button>
       </div>
 
       {/* Main Slide Area */}
@@ -158,6 +152,13 @@ export default function OnboardingSlider() {
             className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1"
             strokeWidth={2.5}
           />
+        </button>
+
+        <button
+          onClick={handleSkip}
+          className="mt-4 text-sm sm:text-base font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors px-4 py-2 rounded-lg hover:bg-slate-200/50 cursor-pointer"
+        >
+          Skip
         </button>
       </div>
     </div>
