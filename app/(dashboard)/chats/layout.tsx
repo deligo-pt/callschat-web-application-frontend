@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { cn } from "@/lib/utils";
-import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare, UserPlus } from "lucide-react";
+import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare, UserPlus , Heart} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chatService } from "@/services/chat.service";
@@ -65,7 +65,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const { currentMode } = useUser();
   const { socket } = useSocket();
 
-  const isRootChatsPage = pathname === "/chats";
+  const basePath = pathname.startsWith("/business") ? "/business/chats" : "/chats";
+  const isRootChatsPage = pathname === basePath;
 
   // Parse JWT to get current user ID
   const parseJwt = (token: string) => {
@@ -203,8 +204,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       if (data.success) {
         setConversations(prev => prev.filter(c => c.id !== conversationId));
-        if (pathname === `/chats/${conversationId}`) {
-          router.push('/chats');
+        if (pathname === `${basePath}/${conversationId}`) {
+          router.push(basePath);
         }
       }
     } catch (err) {
@@ -387,7 +388,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 </h1>
                 <div className="flex items-center gap-2">
                   <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
-                    <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
+                    <Heart className="h-5 w-5 fill-red-500 text-red-500" />
                   </Link>
 
                   <NotificationDropdown />
@@ -464,7 +465,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 ) : (
                   <div className="flex flex-col">
                     {filteredConversations.map((conv, index) => {
-                      const isActive = pathname === `/chats/${conv.id}`;
+                      const isActive = pathname === `${basePath}/${conv.id}`;
                       const avatarUrl =
                         getOptimizedImageUrl(conv.otherUserAvatar, 52, 52) ||
                         `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=F4F6FC&color=3B58F5`;
@@ -479,7 +480,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                           onMouseLeave={() => setMenuOpenForId(null)}
                         >
                           <Link
-                            href={`/chats/${conv.id}?recipientId=${conv.otherUserId}`}
+                            href={`${basePath}/${conv.id}?recipientId=${conv.otherUserId}`}
                             className={cn(
                               "flex w-full items-center gap-4 px-6 py-3.5 transition-colors",
                               isActive ? "bg-[#EEF2FF]" : "hover:bg-[#F4F7FE]"

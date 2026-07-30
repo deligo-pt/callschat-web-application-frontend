@@ -88,7 +88,7 @@ export function BusinessSidebar() {
 
   const handleChannelClick = (channel: ChannelData) => {
     router.push(
-      `/chats?channelId=${channel.id}&channelName=${encodeURIComponent(
+      `/business/chats?channelId=${channel.id}&channelName=${encodeURIComponent(
         channel.name
       )}&channelDesc=${encodeURIComponent(channel.description || "")}&isPrivate=${
         channel.isPrivate
@@ -101,7 +101,7 @@ export function BusinessSidebar() {
       {/* Back to Chats Inbox Bar */}
       <div className="flex items-center justify-between bg-[#0B0D1E] px-4 py-2 border-b border-white/10 text-xs font-semibold text-[#8F95B2] shrink-0">
         <button
-          onClick={() => router.push("/chats")}
+          onClick={() => router.push("/business/chats")}
           className="flex items-center gap-1.5 hover:text-white transition-colors"
         >
           ← Back to All Messages
@@ -233,7 +233,7 @@ export function BusinessSidebar() {
                 </div>
               ) : (
                 conversations.map((conv) => {
-                  const isActive = !activeChannelId && pathname === `/chats/${conv.id}`;
+                  const isActive = !activeChannelId && pathname === `/business/chats/${conv.id}`;
                   const isOnline = isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline;
                   const avatarUrl =
                     conv.otherUserAvatar ||
@@ -244,7 +244,7 @@ export function BusinessSidebar() {
                   return (
                     <Link
                       key={conv.id}
-                      href={`/chats/${conv.id}?recipientId=${conv.otherUserId}`}
+                      href={`/business/chats/${conv.id}?recipientId=${conv.otherUserId}`}
                       className={cn(
                         "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all group",
                         isActive

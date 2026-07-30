@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
 import {
   Send,
@@ -70,11 +70,19 @@ function BusinessChatHeader({
   bizHandle,
   bizVerified,
   onBack,
+  recipientId,
+  recipient,
+  initiateCall,
+  blockStatus,
 }: {
   bizName: string;
   bizHandle: string;
   bizVerified: boolean;
   onBack: () => void;
+  recipientId?: string;
+  recipient?: UserProfile | null;
+  initiateCall?: any;
+  blockStatus?: any;
 }) {
   return (
     <div className="flex items-center justify-between bg-gradient-to-r from-[#1D2A8A] via-[#254BCC] to-[#3B58F5] px-4 py-3 shadow-md z-20 shrink-0 text-white">
@@ -113,9 +121,40 @@ function BusinessChatHeader({
         </div>
       </div>
 
-      {/* Right side – no calls for business chats */}
       <div className="flex items-center gap-1">
-        <div className="flex items-center gap-1.5 rounded-full bg-white/10 border border-white/20 px-3 py-1.5">
+        {recipientId && initiateCall && (
+          <>
+            <button
+              onClick={() =>
+                initiateCall(
+                  recipientId,
+                  "VIDEO",
+                  bizName || recipient?.name,
+                  recipient?.avatarUrl,
+                )
+              }
+              disabled={blockStatus?.isBlocked}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+            >
+              <Video className="h-5 w-5" strokeWidth={2} />
+            </button>
+            <button
+              onClick={() =>
+                initiateCall(
+                  recipientId,
+                  "AUDIO",
+                  bizName || recipient?.name,
+                  recipient?.avatarUrl,
+                )
+              }
+              disabled={blockStatus?.isBlocked}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+            >
+              <Phone className="h-5 w-5" strokeWidth={2} />
+            </button>
+          </>
+        )}
+        <div className="flex items-center gap-1.5 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 ml-1">
           <Lock className="h-3 w-3 text-white/80" />
           <span className="text-[11px] font-semibold text-white/80">
             Secure
@@ -142,6 +181,8 @@ function ChatRoomPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const basePath = pathname.startsWith("/business") ? "/business/chats" : "/chats";
   const { initiateCall } = useCallContext();
   const { isUserOnline } = usePresence();
 
@@ -256,8 +297,6 @@ function ChatRoomPageContent() {
                 bizHandleRef.current = handle;
               }
               setBizTicketCreated(true);
-              setIsInitializing(false);
-              return;
             }
             
             if (conv?.otherUserId) {
@@ -468,16 +507,20 @@ function ChatRoomPageContent() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       {isBizChat ? (
         <BusinessChatHeader
-          bizName={bizName || bizHandle}
-          bizHandle={bizHandle}
+          bizName={bizName || bizHandle || recipient?.name || "Unknown"}
+          bizHandle={bizHandle || resolvedBizHandle}
           bizVerified={bizVerified}
-          onBack={() => router.push("/chats")}
+          onBack={() => router.push(basePath)}
+          recipientId={recipientId}
+          recipient={recipient}
+          initiateCall={initiateCall}
+          blockStatus={blockStatus}
         />
       ) : (
         <div className="flex items-center justify-between bg-[#254BCC] px-4 py-3 shadow-md z-20 shrink-0 text-white">
           <div className="flex items-center gap-3">
             <Link
-              href="/chats"
+              href={basePath}
               className="md:hidden rounded-full p-2 transition-colors hover:bg-white/10"
             >
               <ArrowLeft className="h-6 w-6 text-white" strokeWidth={2.5} />

@@ -45,8 +45,8 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navItems = [
-    { name: tNav("message"), href: "/chats", icon: MessageSquare },
-    { name: tNav("calls"), href: "/calls", icon: PhoneCall },
+    { name: tNav("message"), href: isBusiness ? "/business/chats" : "/chats", icon: MessageSquare },
+    { name: tNav("calls"), href: isBusiness ? "/business/calls" : "/calls", icon: PhoneCall },
     { name: tNav("group"), href: "/groups", icon: Users },
     { name: tNav("contacts"), href: "/contacts", icon: Contact },
     { name: tNav("media"), href: "/media", icon: Folder },

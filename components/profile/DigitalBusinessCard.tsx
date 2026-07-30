@@ -177,7 +177,15 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
     try {
       setDownloadingPng(true);
       if (cardRef.current) {
-        const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 3 });
+        const filter = (node: HTMLElement) => {
+          const exclusionClasses = ['remove-me', 'secret-div'];
+          if (node.classList && exclusionClasses.some((classname) => node.classList.contains(classname))) return false;
+          if (node.tagName === 'SCRIPT' || node.tagName === 'IFRAME') return false;
+          if (node.tagName === 'LINK' && (node as HTMLLinkElement).href?.startsWith('chrome-extension://')) return false;
+          if (node.tagName === 'IMG' && (node as HTMLImageElement).src?.startsWith('chrome-extension://')) return false;
+          return true;
+        };
+        const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true, filter });
         const link = document.createElement("a");
         link.download = `${companyName.replace(/\s+/g, "_")}_Business_Card.png`;
         link.href = dataUrl;
@@ -235,7 +243,6 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
     try {
       setSharingCard(true);
       const blob = await toBlob(cardRef.current, {
-        cacheBust: true,
         pixelRatio: 3,
         backgroundColor: "transparent",
       });

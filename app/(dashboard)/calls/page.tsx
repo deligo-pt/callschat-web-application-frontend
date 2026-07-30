@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Search, Users, Star, Bell, VideoIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useCallContext } from "@/components/providers/CallContext";
 import { CallService, CallHistoryItem } from "@/services/call.service";
@@ -25,6 +26,8 @@ function formatDuration(seconds: number | null) {
 }
 
 export default function CallsPage() {
+  const pathname = usePathname();
+  const chatBasePath = pathname.startsWith("/business") ? "/business/chats" : "/chats";
   const [filter, setFilter] = useState<"all" | "missed">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [calls, setCalls] = useState<CallHistoryItem[]>([]);
@@ -89,7 +92,7 @@ export default function CallsPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-[28px] font-extrabold tracking-tight text-[#3B58F5]">Calls</h1>
             <div className="flex items-center gap-2">
-              <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
+              <Link href={`${chatBasePath}/favorites`} className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
                 <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
               </Link>
               <NotificationDropdown />

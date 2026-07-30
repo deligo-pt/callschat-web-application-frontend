@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, MessageSquare, Phone, Search, Users, Video, Plus, X, Star, Bell, UserPlus, User } from "lucide-react";
+import { ArrowLeft, MessageSquare, Phone, Search, Users, Video, Plus, X, Star, Bell, UserPlus, User , Heart} from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
@@ -159,7 +159,7 @@ export default function ContactsPage() {
             <h1 className="text-[28px] font-bold text-[#3B58F5]">{tNav("contacts")}</h1>
             <div className="flex items-center gap-2">
               <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
-                <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
+                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
               </Link>
               <NotificationDropdown />
             </div>

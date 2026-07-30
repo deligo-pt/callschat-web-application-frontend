@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, Star, Bell, ChevronRight, Globe, UsersRound } from "lucide-react";
+import { Search, Plus, Star, Bell, ChevronRight, Globe, UsersRound , Heart} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CommunityItem } from "./CreateCommunitiesUI";
 import Link from "next/link";
@@ -42,7 +42,7 @@ export function CommunitiesSidebar({
               className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full"
               title="Favorites"
             >
-              <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
+              <Heart className="h-5 w-5 fill-red-500 text-red-500" />
             </Link>
             <NotificationDropdown />
           </div>

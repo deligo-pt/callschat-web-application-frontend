@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useContacts } from "@/hooks/useContacts";
 import { cn } from "@/lib/utils";
@@ -95,7 +95,7 @@ export default function FavoritesPage() {
         {/* Favorite Contacts Section */}
         <div className="mt-6 px-6">
           <div className="flex items-center gap-2 mb-4">
-            <Star className="h-5 w-5 fill-[#FFA500] text-[#FFA500]" />
+            <Heart className="h-5 w-5 fill-red-500 text-red-500" />
             <h2 className="text-[15px] font-bold text-[#1D2A54]">Favorite Contacts</h2>
           </div>
 
@@ -147,7 +147,7 @@ export default function FavoritesPage() {
         {/* Favorite Groups Section */}
         <div className="mt-8 px-6">
           <div className="flex items-center gap-2 mb-4">
-            <Star className="h-5 w-5 fill-[#FFA500] text-[#FFA500]" />
+            <Heart className="h-5 w-5 fill-red-500 text-red-500" />
             <h2 className="text-[15px] font-bold text-[#1D2A54]">Favorite Groups</h2>
           </div>
 

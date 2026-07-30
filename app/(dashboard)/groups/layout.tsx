@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Search, Users, Plus, Loader2, MoreVertical, Trash2, Star } from "lucide-react";
+import { Search, Users, Plus, Loader2, MoreVertical, Trash2, Star , Heart} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -155,7 +155,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
             <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">{tNav("group")}</h1>
             <div className="flex items-center gap-2">
               <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
-                <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
+                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
               </Link>
               <NotificationDropdown />
             </div>
