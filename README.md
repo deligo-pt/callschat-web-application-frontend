@@ -125,11 +125,13 @@ LIVEKIT_API_SECRET="your_livekit_api_secret"
 
 
 # ==========================================
-# 3. CLOUDINARY MEDIA UPLOAD
+# 3. RUSTFS & IMGPROXY MEDIA STORAGE
 # ==========================================
-# Cloudinary cloud name and upload preset for chat attachments & avatars
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME="your_cloudinary_cloud_name"
-NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET="your_cloudinary_upload_preset"
+# Self-hosted S3-compatible storage (RustFS) and Imgproxy for dynamic resizing
+NEXT_PUBLIC_RUSTFS_URL="http://localhost:9100"
+NEXT_PUBLIC_S3_BUCKET="calls-chat-media"
+NEXT_PUBLIC_IMGPROXY_URL="http://localhost:8080"
+NEXT_PUBLIC_API_URL="http://localhost:8000/api/v1"
 
 
 # ==========================================
