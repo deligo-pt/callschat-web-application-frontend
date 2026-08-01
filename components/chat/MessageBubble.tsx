@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2, Pin, PinOff, Clock, Trash2 } from "lucide-react";
+import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2, Pin, PinOff, Clock, Trash2, Check, CheckCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -44,6 +44,12 @@ interface MessageBubbleProps {
     mediaType?: string | null;
     isEdited?: boolean;
     isDeleted?: boolean;
+    receipts?: {
+      id: string;
+      userId: string;
+      deliveredAt: string | null;
+      seenAt: string | null;
+    }[];
   };
   isMe: boolean;
   showTail: boolean;
@@ -65,6 +71,14 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
   const [editText, setEditText] = useState(msg.text);
   // Live countdown in seconds remaining (null = not disappearing)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  const getMessageStatus = () => {
+    if (!msg.receipts || msg.receipts.length === 0) return "SENT";
+    if (msg.receipts.some((r) => r.seenAt)) return "SEEN";
+    if (msg.receipts.some((r) => r.deliveredAt)) return "DELIVERED";
+    return "SENT";
+  };
+  const status = getMessageStatus();
 
   useEffect(() => {
     if (!disappearAfterSeconds) {
@@ -526,7 +540,14 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
           )}
           <span className="text-[11px] font-medium flex items-center gap-1">
             {msg.isEdited && <span className="italic font-normal">(edited)</span>}
-            {isMe ? "Sent" : formatTime(msg.createdAt)}
+            {formatTime(msg.createdAt)}
+            {isMe && (
+              <span className="ml-0.5 inline-flex items-center">
+                {status === "SENT" && <Check className="w-3.5 h-3.5" />}
+                {status === "DELIVERED" && <CheckCheck className="w-3.5 h-3.5" />}
+                {status === "SEEN" && <CheckCheck className="w-3.5 h-3.5 text-[#3B58F5]" />}
+              </span>
+            )}
           </span>
         </div>
       </div>

@@ -195,6 +195,7 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
                     isNextSameSender={isNextSameSender}
                     isFirstFromSender={isFirstFromSender}
                     groupId={group.id}
+                    groupMembersCount={group.memberCount}
                   />
                 );
               })

@@ -17,6 +17,8 @@ import {
   Clock,
   Edit2,
   Trash2,
+  Check,
+  CheckCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -65,6 +67,12 @@ interface GroupMessageBubbleProps {
     };
     isEdited?: boolean;
     isDeleted?: boolean;
+    receipts?: {
+      id: string;
+      userId: string;
+      deliveredAt: string | null;
+      seenAt: string | null;
+    }[];
   };
   isMe: boolean;
   showAvatar: boolean;
@@ -76,6 +84,7 @@ interface GroupMessageBubbleProps {
   onUnpin?: () => void;
   onEdit?: (messageId: string, newText: string) => void;
   onUnsend?: (messageId: string) => void;
+  groupMembersCount?: number;
 }
 
 export function GroupMessageBubble({
@@ -90,9 +99,27 @@ export function GroupMessageBubble({
   onUnpin,
   onEdit,
   onUnsend,
+  groupMembersCount,
 }: GroupMessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
+
+  const getMessageStatus = () => {
+    if (!msg.receipts || msg.receipts.length === 0) return "SENT";
+    
+    // For groups, if everyone else has seen it, it's SEEN
+    // If everyone else has it delivered, it's DELIVERED
+    const expected = groupMembersCount ? Math.max(1, groupMembersCount - 1) : 1; // fallback to 1 if unknown
+    
+    const seenCount = msg.receipts.filter(r => r.seenAt).length;
+    if (seenCount >= expected) return "SEEN";
+    
+    const deliveredCount = msg.receipts.filter(r => r.deliveredAt || r.seenAt).length;
+    if (deliveredCount >= expected) return "DELIVERED";
+    
+    return "SENT";
+  };
+  const status = getMessageStatus();
 
   if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
     try {
@@ -484,7 +511,14 @@ export function GroupMessageBubble({
           <div className={cn("flex flex-col mt-1.5", isMe ? "items-end mr-1" : "ml-1")}>
             <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
               {msg.isEdited && <span className="italic font-normal">(edited)</span>}
-              {isMe ? "Sent" : formatTime(msg.createdAt).toUpperCase()}
+              {formatTime(msg.createdAt).toUpperCase()}
+              {isMe && (
+                <span className="ml-0.5 inline-flex items-center">
+                  {status === "SENT" && <Check className="w-3.5 h-3.5" />}
+                  {status === "DELIVERED" && <CheckCheck className="w-3.5 h-3.5" />}
+                  {status === "SEEN" && <CheckCheck className="w-3.5 h-3.5 text-[#3B58F5]" />}
+                </span>
+              )}
             </span>
           </div>
         )}

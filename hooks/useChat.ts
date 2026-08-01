@@ -4,6 +4,13 @@ import { chatService } from "@/services/chat.service";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
 import { toast } from "sonner";
 
+export interface MessageReceipt {
+  id: string;
+  userId: string;
+  deliveredAt: string | null;
+  seenAt: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -16,6 +23,7 @@ export interface ChatMessage {
   isDeleted?: boolean;
   /** Per-message disappear timer in seconds, stamped at send time. */
   disappearAfterSeconds?: number | null;
+  receipts?: MessageReceipt[];
 }
 
 export interface PinnedMessage {
@@ -459,6 +467,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
+                receipts: payload.receipts || [],
               };
               return updated;
             }
@@ -476,6 +485,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
+                receipts: payload.receipts || [],
               },
             ];
           });
@@ -499,6 +509,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
+                receipts: payload.receipts || [],
               },
             ];
           });
@@ -521,6 +532,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               mediaUrl: payload.mediaUrl,
               mediaType: payload.mediaType,
               disappearAfterSeconds: payload.disappearAfterSeconds,
+              receipts: payload.receipts || [],
             },
           ];
         });
@@ -539,8 +551,17 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               mediaUrl: payload.mediaUrl,
               mediaType: payload.mediaType,
               disappearAfterSeconds: payload.disappearAfterSeconds,
+              receipts: payload.receipts || [],
             },
           ];
+        });
+      }
+
+      // Automatically mark as delivered if the message is from someone else
+      if (senderId !== currentUser) {
+        socket.emit("chat:mark_delivered", {
+          conversationId: payload.conversationId,
+          messageId: payload.id,
         });
       }
     };
@@ -594,10 +615,37 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       );
     };
 
+    const handleStatusUpdate = (payload: any) => {
+      if (payload.conversationId !== conversationId) return;
+      
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.id === payload.messageId) {
+          const receipts = [...(msg.receipts || [])];
+          const existing = receipts.find((r) => r.userId === payload.userId);
+          
+          if (existing) {
+            if (payload.status === 'DELIVERED') existing.deliveredAt = payload.timestamp;
+            if (payload.status === 'SEEN') existing.seenAt = payload.timestamp;
+          } else {
+            receipts.push({
+              id: Math.random().toString(), // local fallback ID
+              userId: payload.userId,
+              deliveredAt: payload.status === 'DELIVERED' ? payload.timestamp : null,
+              seenAt: payload.status === 'SEEN' ? payload.timestamp : null,
+            });
+          }
+          
+          return { ...msg, receipts };
+        }
+        return msg;
+      }));
+    };
+
     socket.on("chat:receive_message", handleReceiveMessage);
     socket.on("NEW_MESSAGE", handleReceiveMessage);
     socket.on("chat:message_edited", handleMessageEdited);
     socket.on("chat:message_unsent", handleMessageUnsent);
+    socket.on("chat:message_status_update", handleStatusUpdate);
     socket.on("chat:error", handleChatError);
 
     return () => {
@@ -605,9 +653,33 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       socket.off("NEW_MESSAGE", handleReceiveMessage);
       socket.off("chat:message_edited", handleMessageEdited);
       socket.off("chat:message_unsent", handleMessageUnsent);
+      socket.off("chat:message_status_update", handleStatusUpdate);
       socket.off("chat:error", handleChatError);
     };
   }, [socket, isConnected, conversationId]);
+
+  // ── Mark Messages as Seen ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket || !isConnected || !conversationId || !messages.length) return;
+
+    const currentUser = currentUserIdRef.current;
+    
+    // Find messages not sent by us, where our receipt doesn't have a seenAt
+    const unreadMessages = messages.filter(m => {
+      if (m.senderId === currentUser) return false;
+      const myReceipt = m.receipts?.find(r => r.userId === currentUser);
+      return !myReceipt?.seenAt;
+    });
+
+    if (unreadMessages.length > 0) {
+      unreadMessages.forEach(m => {
+        socket.emit("chat:mark_seen", {
+          conversationId,
+          messageId: m.id,
+        });
+      });
+    }
+  }, [messages, socket, isConnected, conversationId]);
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(

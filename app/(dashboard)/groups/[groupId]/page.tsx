@@ -659,6 +659,7 @@ export default function GroupChatPage() {
                   isNextSameSender={isNextSameSender}
                   isFirstFromSender={isFirstFromSender}
                   groupId={groupId}
+                  groupMembersCount={groupMembers.length}
                   isPinned={isPinned}
                   onPin={(dur, previewText, previewMedia) =>
                     pinMessage(

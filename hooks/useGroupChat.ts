@@ -20,6 +20,12 @@ export interface GroupMessage {
   };
   isEdited?: boolean;
   isDeleted?: boolean;
+  receipts?: {
+    id: string;
+    userId: string;
+    deliveredAt: string | null;
+    seenAt: string | null;
+  }[];
 }
 
 const parseEditedText = (rawText: string) => {
@@ -371,6 +377,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         mediaUrl: payload.mediaUrl ?? undefined,
         mediaType: payload.mediaType ?? undefined,
         sender: payload.sender,
+        receipts: payload.receipts || [],
       };
 
       // Case 1: Pure media message — no ciphertext, skip decryption entirely
@@ -378,34 +385,40 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (payload.mediaUrl || payload.mediaType) {
           appendMessage(baseMsg);
         }
-        return;
-      }
-
-      // Case 2: Has ciphertext — need group key to decrypt
-      const gKey = groupKeyRef.current;
-      if (!gKey) {
-        console.warn("⚠️ [Socket] Missing group key — cannot decrypt incoming message. Rendering media only.");
-        // Still render the media if present rather than silently dropping
-        if (payload.mediaUrl) {
-          appendMessage(baseMsg);
+      } else {
+        // Case 2: Has ciphertext — need group key to decrypt
+        const gKey = groupKeyRef.current;
+        if (!gKey) {
+          console.warn("⚠️ [Socket] Missing group key — cannot decrypt incoming message. Rendering media only.");
+          // Still render the media if present rather than silently dropping
+          if (payload.mediaUrl) {
+            appendMessage(baseMsg);
+          }
+        } else {
+          try {
+            const decrypted = await decryptGroupMessage(
+              payload.ciphertext,
+              payload.nonce,
+              gKey
+            );
+            const parsed = parseEditedText(decrypted);
+            appendMessage({ ...baseMsg, text: parsed.text, isEdited: parsed.isEdited });
+          } catch (err) {
+            console.error("❌ [Socket] Failed to decrypt group message:", err);
+            appendMessage({
+              ...baseMsg,
+              text: payload.mediaUrl ? "" : "🔒 Encrypted group message (Decryption Failed)",
+              isEdited: false,
+            });
+          }
         }
-        return;
       }
 
-      try {
-        const decrypted = await decryptGroupMessage(
-          payload.ciphertext,
-          payload.nonce,
-          gKey
-        );
-        const parsed = parseEditedText(decrypted);
-        appendMessage({ ...baseMsg, text: parsed.text, isEdited: parsed.isEdited });
-      } catch (err) {
-        console.error("❌ [Socket] Failed to decrypt group message:", err);
-        appendMessage({
-          ...baseMsg,
-          text: payload.mediaUrl ? "" : "🔒 Encrypted group message (Decryption Failed)",
-          isEdited: false,
+      // Automatically mark as delivered if the message is from someone else
+      if (senderId !== currentUserIdRef.current) {
+        socket.emit("group:mark_delivered", {
+          groupId: payload.groupId,
+          messageId: payload.id,
         });
       }
     };
@@ -440,18 +453,69 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
     };
 
+    const handleStatusUpdate = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.id === payload.messageId) {
+          const receipts = [...(msg.receipts || [])];
+          const existing = receipts.find((r) => r.userId === payload.userId);
+          
+          if (existing) {
+            if (payload.status === 'DELIVERED') existing.deliveredAt = payload.timestamp;
+            if (payload.status === 'SEEN') existing.seenAt = payload.timestamp;
+          } else {
+            receipts.push({
+              id: Math.random().toString(),
+              userId: payload.userId,
+              deliveredAt: payload.status === 'DELIVERED' ? payload.timestamp : null,
+              seenAt: payload.status === 'SEEN' ? payload.timestamp : null,
+            });
+          }
+          
+          return { ...msg, receipts };
+        }
+        return msg;
+      }));
+    };
+
     socket.on("group:receive_message", handleReceiveMessage);
     socket.on("group:message_edited", handleMessageEdited);
     socket.on("group:message_unsent", handleMessageUnsent);
+    socket.on("group:message_status_update", handleStatusUpdate);
     socket.on("group:error", handleGroupError);
 
     return () => {
       socket.off("group:receive_message", handleReceiveMessage);
       socket.off("group:message_edited", handleMessageEdited);
       socket.off("group:message_unsent", handleMessageUnsent);
+      socket.off("group:message_status_update", handleStatusUpdate);
       socket.off("group:error", handleGroupError);
     };
   }, [socket, isConnected, groupId]);
+
+  // ── Mark Messages as Seen ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket || !isConnected || !groupId || !messages.length) return;
+
+    const currentUser = currentUserIdRef.current;
+    
+    // Find messages not sent by us, where our receipt doesn't have a seenAt
+    const unreadMessages = messages.filter(m => {
+      if (m.senderId === currentUser) return false;
+      const myReceipt = m.receipts?.find(r => r.userId === currentUser);
+      return !myReceipt?.seenAt;
+    });
+
+    if (unreadMessages.length > 0) {
+      unreadMessages.forEach(m => {
+        socket.emit("group:mark_seen", {
+          groupId,
+          messageId: m.id,
+        });
+      });
+    }
+  }, [messages, socket, isConnected, groupId]);
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
