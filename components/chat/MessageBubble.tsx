@@ -543,9 +543,9 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
             {formatTime(msg.createdAt)}
             {isMe && (
               <span className="ml-0.5 inline-flex items-center">
-                {status === "SENT" && <Check className="w-3.5 h-3.5" />}
-                {status === "DELIVERED" && <CheckCheck className="w-3.5 h-3.5" />}
-                {status === "SEEN" && <CheckCheck className="w-3.5 h-3.5 text-[#3B58F5]" />}
+                {status === "SENT" && <Check className="w-4 h-4 text-gray-400" strokeWidth={2.5} />}
+                {status === "DELIVERED" && <CheckCheck className="w-4 h-4 text-gray-400" strokeWidth={2.5} />}
+                {status === "SEEN" && <CheckCheck className="w-4 h-4 text-[#34B7F1]" strokeWidth={2.5} />}
               </span>
             )}
           </span>

@@ -54,6 +54,12 @@ export const useGlobalNotifications = (
       const targetRoute = `/chats/${conversationId}`;
       const isInThisChat = pathRef.current === targetRoute;
 
+      // Immediately mark as delivered since it reached our client
+      socket.emit("chat:mark_delivered", {
+        conversationId,
+        messageId: payload.id,
+      });
+
       if (isInThisChat) {
         // Soft in-chat pop — user is already reading this conversation
         playNotificationSound("message");
@@ -112,6 +118,12 @@ export const useGlobalNotifications = (
       const groupId = payload.groupId;
       const targetRoute = `/groups/${groupId}`;
       const isInThisGroup = pathRef.current === targetRoute;
+
+      // Immediately mark as delivered since it reached our client
+      socket.emit("group:mark_delivered", {
+        groupId,
+        messageId: payload.id,
+      });
 
       if (isInThisGroup) {
         playNotificationSound("message");
