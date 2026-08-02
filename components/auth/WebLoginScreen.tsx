@@ -53,9 +53,9 @@ export default function WebLoginScreen() {
         style={{ height: 64, paddingLeft: 'clamp(1rem, 5vw, 43px)', paddingRight: 'clamp(1rem, 5vw, 43px)', borderBottom: "0.667px solid #F3F4F6", background: "#fff", boxShadow: "0px 1px 2px -1px rgba(0,0,0,.1),0px 1px 3px 0px rgba(0,0,0,.1)" }}
       >
         {/* Logo */}
-        <div className="flex items-center" style={{ gap: -8 }}>
+        <div className="flex items-center">
           <Image src="/call_chats_logo.png" alt="CallsChat" width={79} height={57} className="object-contain" />
-          <span className="hidden sm:inline-block" style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 23.75, lineHeight: 1 }}>
+          <span className="hidden sm:inline-block" style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 23.75, lineHeight: 1, marginLeft: -12 }}>
             <span style={{ color: "#02235F" }}>Calls</span>
             <span style={{ color: "#037CFD" }}>Chat</span>
           </span>
@@ -200,7 +200,7 @@ export default function WebLoginScreen() {
 
             {/* ── PHONE MOCKUPS ── */}
             {/* Positioned absolutely relative to the App Download Card container for Desktop, hidden on smaller screens */}
-            <div className="absolute hidden xl:block" style={{ left: -42, top: 168, width: 295, height: 326, zIndex: -1 }}>
+            <div className="absolute hidden lg:block" style={{ left: -42, top: 140, width: 295, height: 326, zIndex: -1 }}>
               {/* Back phone */}
               <Image
                 src="/figma/phone_back.png"
@@ -298,7 +298,7 @@ export default function WebLoginScreen() {
           </div>
 
           {/* ── PHONE LOGIN BUTTON ── */}
-          <div className="w-full flex justify-center mt-[10px] xl:mt-32">
+          <div className="w-full flex justify-center mt-[10px] lg:mt-8">
             <button
               onClick={() => router.push("/choose-mode")}
               style={{
