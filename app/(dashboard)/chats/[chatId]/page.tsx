@@ -232,6 +232,8 @@ function ChatRoomPageContent() {
   // Ticker: forces a re-render every second so expired messages vanish in real-time.
   const [tick, setTick] = useState(0);
 
+  const [isMuted, setIsMuted] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -269,6 +271,7 @@ function ChatRoomPageContent() {
             
             // Load the disappear setting unconditionally if the conversation is found
             if (conv) {
+              setIsMuted(conv.isMuted || false);
               let timer = conv.disappearAfterSeconds !== undefined ? conv.disappearAfterSeconds : null;
               if (!conv.workspaceId && conv.context !== "BUSINESS" && !conv.groupId && typeof window !== "undefined") {
                 const stored = localStorage.getItem("callschat_default_disappear_seconds");
@@ -618,6 +621,8 @@ function ChatRoomPageContent() {
                 disappearAfterSeconds={disappearAfterSeconds}
                 onDisappearUpdated={setDisappearAfterSeconds}
                 onViewContact={() => setIsContactProfileOpen(true)}
+                isMuted={isMuted}
+                onMuteToggle={setIsMuted}
               />
             )}
           </div>

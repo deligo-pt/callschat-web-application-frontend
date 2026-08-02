@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ContactService } from "@/services/contact.service";
+import { chatService } from "@/services/chat.service";
 import { useContacts } from "@/hooks/useContacts";
 import { ChatActionModals } from "./ChatActionModals";
 import { DisappearingMessagesModal } from "./DisappearingMessagesModal";
@@ -50,6 +51,8 @@ export interface ChatOptionsMenuProps {
   /** Called after successful update so the parent can re-sync state. */
   onDisappearUpdated?: (newValue: number | null) => void;
   onViewContact?: () => void;
+  isMuted?: boolean;
+  onMuteToggle?: (newMuteState: boolean) => void;
 }
 
 export function ChatOptionsMenu({
@@ -62,6 +65,8 @@ export function ChatOptionsMenu({
   disappearAfterSeconds: initialDisappear = null,
   onDisappearUpdated,
   onViewContact,
+  isMuted = false,
+  onMuteToggle,
 }: ChatOptionsMenuProps) {
   const t = useTranslations("options");
   const tNotif = useTranslations("notifications");
@@ -85,6 +90,24 @@ export function ChatOptionsMenu({
   const isFavourite = contact?.isFavourite || false;
 
   const [isFavouriting, setIsFavouriting] = useState(false);
+  const [isMuting, setIsMuting] = useState(false);
+
+  const handleToggleMute = async () => {
+    if (isMuting) return;
+    setIsMuting(true);
+    try {
+      await chatService.muteConversation(conversationId, !isMuted);
+      if (onMuteToggle) {
+        onMuteToggle(!isMuted);
+      }
+      toast.success(!isMuted ? "Notifications muted" : "Notifications unmuted");
+    } catch (error: any) {
+      console.error("Failed to toggle mute:", error);
+      toast.error(error?.response?.data?.message || "Failed to update mute status");
+    } finally {
+      setIsMuting(false);
+    }
+  };
 
   const handleToggleFavourites = async () => {
     if (isFavouriting) return;
@@ -127,17 +150,27 @@ export function ChatOptionsMenu({
             />
             <span className="text-[14.5px]">{t("view_contact")}</span>
           </DropdownMenuItem>
-          <DropdownMenuItem className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-[#F4F6FC] rounded-xl focus:bg-[#F4F6FC]">
-            <Bell
-              className="h-[18px] w-[18px] text-[#3B58F5]"
-              strokeWidth={2.5}
-            />
-            <span className="text-[14.5px]">{t("unmute_notifications")}</span>
-          </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />
 
           {/* Toggle Items */}
+          <div
+            data-testid="mute-toggle-btn"
+            className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors"
+            onClick={(e) => {
+              e.preventDefault();
+              handleToggleMute();
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <Bell
+                className="h-[18px] w-[18px] text-[#3B58F5]"
+                strokeWidth={2.5}
+              />
+              <span className="text-[14.5px]">{t("mute_notifications") || "Mute notifications"}</span>
+            </div>
+            <Switch className="pointer-events-none" checked={isMuted} disabled={isMuting} />
+          </div>
           <div
             className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors"
             onClick={(e) => {
@@ -152,7 +185,7 @@ export function ChatOptionsMenu({
               />
               <span className="text-[14.5px]">{t("ai_protection")}</span>
             </div>
-            <Switch checked={aiProtection} onCheckedChange={setAiProtection} />
+            <Switch className="pointer-events-none" checked={aiProtection} />
           </div>
           <div
             className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors"
@@ -168,10 +201,7 @@ export function ChatOptionsMenu({
               />
               <span className="text-[14.5px]">{t("live_translation")}</span>
             </div>
-            <Switch
-              checked={liveTranslation}
-              onCheckedChange={setLiveTranslation}
-            />
+            <Switch className="pointer-events-none" checked={liveTranslation} />
           </div>
           <div
             className="flex items-center justify-between px-3 py-3 hover:bg-[#F4F6FC] rounded-xl cursor-pointer transition-colors"
@@ -187,7 +217,7 @@ export function ChatOptionsMenu({
               />
               <span className="text-[14.5px]">{t("privacy_mode")}</span>
             </div>
-            <Switch checked={privacyMode} onCheckedChange={setPrivacyMode} />
+            <Switch className="pointer-events-none" checked={privacyMode} />
           </div>
 
           <DropdownMenuSeparator className="my-1.5 bg-[#F4F6FC]" />

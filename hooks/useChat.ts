@@ -785,7 +785,12 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           }
         }
 
-        const payload = { conversationId, ciphertext, nonce, mediaUrl, mediaType };
+        let previewText = null;
+        if (text) {
+          previewText = text.substring(0, 100); // Send first 100 chars as preview
+        }
+
+        const payload = { conversationId, ciphertext, nonce, mediaUrl, mediaType, previewText };
         socket.emit("chat:send_message", payload);
         
         // Remove optimistic message if no text, as server will echo it back

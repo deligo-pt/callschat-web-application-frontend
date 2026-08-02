@@ -99,6 +99,14 @@ export const chatService = {
     return response.data;
   },
 
+  muteConversation: async (conversationId: string, isMuted: boolean, mutedUntil?: Date | null) => {
+    const response = await apiClient.patch(`/conversations/${conversationId}/mute`, {
+      isMuted,
+      mutedUntil: mutedUntil ? mutedUntil.toISOString() : null,
+    });
+    return response.data;
+  },
+
   /**
    * Triggers server-side auto-deletion of an ephemeral conversation once all
    * messages have expired. The server independently re-validates before deleting.

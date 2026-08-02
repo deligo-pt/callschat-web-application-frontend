@@ -584,7 +584,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           nonce = encrypted.nonce;
         }
 
-        const payload = { groupId, ciphertext, nonce, mediaUrl, mediaType };
+        let previewText = null;
+        if (text) {
+          previewText = text.substring(0, 100);
+        }
+
+        const payload = { groupId, ciphertext, nonce, mediaUrl, mediaType, previewText };
         socket.emit("group:send_message", payload);
         
         if (!text) {
