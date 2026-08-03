@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -60,7 +60,7 @@ export default function Navbar() {
     ];
 
     // Animation variants for the dropdown panel container
-    const menuVariants = {
+    const menuVariants: Variants = {
         hidden: {
             opacity: 0,
             y: -10,
@@ -80,7 +80,7 @@ export default function Navbar() {
         }
     };
     
-    const itemVariants = {
+    const itemVariants: Variants = {
         hidden: { opacity: 0, x: -20 },
         visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } }
     };
