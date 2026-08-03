@@ -199,6 +199,48 @@ In the project directory, you can run:
 
 ---
 
+## 🚀 Production Deployment
+
+There are two primary ways to deploy this application for production: using **Docker** (recommended) or deploying directly via **Node.js**.
+
+### Option A: Deploy using Docker & Docker Compose (Recommended)
+
+This repository includes a multi-stage `Dockerfile` and a `docker-compose.yml` optimized for Next.js standalone builds. This is the easiest way to deploy to any VPS (AWS EC2, DigitalOcean, etc.).
+
+1. **Prepare your environment**:
+   Create your `.env` file in the root directory (refer to the Environment Variables section).
+   
+2. **Build and start the container**:
+   ```bash
+   docker-compose up -d --build
+   ```
+3. **Access the application**:
+   The frontend will be running on `http://localhost:3000`. You can map this port to a reverse proxy (like Nginx or Traefik) to serve it over HTTPS.
+
+### Option B: Deploy using Node.js / PM2
+
+If you prefer deploying directly to a Node.js server without Docker:
+
+1. **Install dependencies and build**:
+   ```bash
+   npm install
+   npm run build
+   ```
+2. **Start the server**:
+   You can start it natively using:
+   ```bash
+   npm start
+   ```
+   *Note: For production, we highly recommend using a process manager like [PM2](https://pm2.keymetrics.io/) to keep the application alive:*
+   ```bash
+   npm install -g pm2
+   pm2 start npm --name "callschat-frontend" -- start
+   ```
+
+*(Note: If you plan to deploy to Vercel, simply import the repository into Vercel and paste your environment variables. Vercel will automatically detect the Next.js framework.)*
+
+---
+
 ## ❓ Troubleshooting & Common Issues
 
 ### 1. Socket.IO Connection Failed or CORS Error

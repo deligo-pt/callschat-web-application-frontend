@@ -144,6 +144,11 @@ export default function PersonalSignUpScreen() {
         });
         const data = await res.json();
         if (data.success) {
+          if (data.data?.devOtp) {
+            console.log("\\n==================================");
+            console.log(`🔑 DEV OTP: ${data.data.devOtp}`);
+            console.log("==================================\\n");
+          }
           setSentPhone(phone);
           setStep("OTP");
           setTimer(60);

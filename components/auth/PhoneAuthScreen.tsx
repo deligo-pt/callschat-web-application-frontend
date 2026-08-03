@@ -100,6 +100,11 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
         
         const data = await res.json();
         if (data.success) {
+          if (data.data?.devOtp) {
+            console.log("\\n==================================");
+            console.log(`🔑 DEV OTP: ${data.data.devOtp}`);
+            console.log("==================================\\n");
+          }
           setSentPhoneNumber(sanitizedPhone);
           toast.success("OTP sent successfully!");
           setStep("OTP");

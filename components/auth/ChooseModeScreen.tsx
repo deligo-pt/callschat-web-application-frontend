@@ -50,7 +50,7 @@ export default function ChooseModeScreen({ authType = "signup" }: ChooseModeScre
         >
           <ChevronLeft className="h-4 w-4" /> Back
         </button>
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-1.5">
           <Image src="/call_chats_logo.png" height={36} width={36} alt="CallsChat Logo" className="drop-shadow-sm" />
           <span className="font-extrabold text-lg sm:text-xl text-[#0A2540]">
             Calls<span className="text-[#2563EB]">Chat</span>

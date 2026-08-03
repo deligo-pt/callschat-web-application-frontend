@@ -1,17 +1,17 @@
 "use client";
 
-import React, { useEffect } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, PhoneCall, Users, Contact, UserCircle2, Briefcase, LayoutDashboard, BarChart3, Inbox, Settings, CheckCircle2, Folder, Share2, UsersRound } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { SocketProvider } from "@/components/providers/SocketProvider";
+import { PendingInvitesModal } from "@/components/business/PendingInvitesModal";
+import { WorkspaceSwitcher } from "@/components/navigation/WorkspaceSwitcher";
 import { CallProvider } from "@/components/providers/CallProvider";
+import { SocketProvider } from "@/components/providers/SocketProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
 import { UserProvider, useUser } from "@/context/UserContext";
-import { WorkspaceSwitcher } from "@/components/navigation/WorkspaceSwitcher";
-import { PendingInvitesModal } from "@/components/business/PendingInvitesModal";
+import { cn } from "@/lib/utils";
+import { Briefcase, CheckCircle2, Contact, Folder, MessageSquare, PhoneCall, Share2, UserCircle2, Users, UsersRound } from "lucide-react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import React, { useEffect } from "react";
 
 function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
