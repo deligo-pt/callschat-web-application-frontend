@@ -10,7 +10,7 @@ import { NotificationDropdown } from "@/components/notifications/NotificationDro
 import {
   Star, Search, UserCircle2, Check, ShieldCheck, Building2,
   ChevronRight, AtSign, CreditCard, Globe, Send, Bell, Briefcase, Clock, LogOut
-, Heart} from "lucide-react";
+, Heart, MonitorSmartphone} from "lucide-react";
 import { Locale } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<Locale, string> = {
@@ -316,7 +316,32 @@ function ProfileSidebarNavigation() {
         {/* SECURITY */}
         <div className="flex flex-col">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("security")}</span>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => router.push("/profile/sessions")}
+              className={cn(
+                "flex items-center justify-between rounded-xl border p-3 transition-colors",
+                isRouteActive("/profile/sessions")
+                  ? "border-blue-200 bg-[#EEF2FF]"
+                  : "border-slate-100 bg-white hover:bg-slate-50"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] text-[#2563EB]"
+                )}>
+                  <MonitorSmartphone className="h-4.5 w-4.5" />
+                </div>
+                <div className="flex flex-col items-start leading-tight">
+                  <span className={cn(
+                    "text-[13px] font-bold",
+                    isRouteActive("/profile/sessions") ? "text-[#2563EB]" : "text-[#0F172A]"
+                  )}>Active Sessions</span>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </button>
+
             <button
               onClick={() => router.push("/profile/disappearing")}
               className={cn(

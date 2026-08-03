@@ -1,11 +1,11 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { Moon, Globe, RefreshCw, Phone, MessageSquare, HelpCircle, Mail, MessageCircle } from "lucide-react";
-import QRCode from "react-qr-code";
 import { cn } from "@/lib/utils";
+import { Globe, HelpCircle, Mail, MessageCircle, MessageSquare, Moon, Phone, RefreshCw } from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import QRCode from "react-qr-code";
 
 export default function WebLoginScreen() {
   const router = useRouter();
@@ -179,7 +179,12 @@ export default function WebLoginScreen() {
                 <button
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", maxWidth: 188, height: 55, padding: "10px 16px", border: "2px solid #E5E7EB", borderRadius: 18, background: "transparent" }}
                 >
-                  <svg width={20} height={20} viewBox="0 0 24 24" fill="#6A7282"><path d="M4 2v20l17-10z" /></svg>
+                  <svg width={20} height={20} viewBox="0 0 512 512">
+                    <path fill="#3BCCFF" d="M22 0C10.7 7.5 3 22 3 41.5v429c0 19.5 7.7 34 19 41.5l257.5-256L22 0z"/>
+                    <path fill="#FF3333" d="M346.5 268l-68-68L22 429c13.2 12.3 33.7 13.8 54 2.1L346.5 268z"/>
+                    <path fill="#FFD400" d="M346.5 244l102.5-59c23.5-13.5 23.5-35.5 0-49L346.5 77l-68 68 68 99z"/>
+                    <path fill="#48FF48" d="M22 83l256.5 256 68-68L76 2.1C55.7-9.6 35.2-8.1 22 4.2L22 83z"/>
+                  </svg>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
                     <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 9, lineHeight: "13.5px", color: "#6A7282" }}>GET IT ON</span>
                     <span style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, lineHeight: "17.5px", color: "#101828" }}>Google Play</span>
@@ -189,7 +194,9 @@ export default function WebLoginScreen() {
                 <button
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", maxWidth: 188, height: 55, padding: "10px 16px", border: "2px solid #E5E7EB", borderRadius: 18, background: "transparent" }}
                 >
-                  <svg width={20} height={20} viewBox="0 0 24 24" fill="#6A7282"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.04 2.26-.74 3.55-.83 2.12-.13 3.7.83 4.73 2.3-3.89 2.28-3.11 7.16.8 8.61-1.02 2.59-2.24 4.89-4.16 6.74zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.02 4.41-3.74 4.25z" /></svg>
+                  <svg width={20} height={20} viewBox="0 0 384 512" fill="#101828">
+                    <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+                  </svg>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
                     <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 9, lineHeight: "13.5px", color: "#6A7282" }}>Download on the</span>
                     <span style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, lineHeight: "17.5px", color: "#101828" }}>App Store</span>
@@ -199,15 +206,14 @@ export default function WebLoginScreen() {
             </div>
 
             {/* ── PHONE MOCKUPS ── */}
-            {/* Positioned absolutely relative to the App Download Card container for Desktop, hidden on smaller screens */}
-            <div className="absolute hidden lg:block" style={{ left: -42, top: 140, width: 295, height: 326, zIndex: -1 }}>
+            <div className="relative mt-8 mb-12 lg:mt-0 lg:mb-0 lg:absolute lg:-left-[42px] lg:top-[168px] w-[295px] h-[326px] mx-auto lg:mx-0 lg:z-[-1]">
               {/* Back phone */}
               <Image
                 src="/figma/phone_back.png"
                 alt="Phone back"
                 width={187}
                 height={309}
-                style={{ position: "absolute", left: 108, top: 8, objectFit: "cover", borderRadius: 24 }}
+                className="absolute left-[108.43px] top-[7.95px] object-cover rounded-[24px]"
               />
               {/* Front phone */}
               <Image
@@ -215,7 +221,8 @@ export default function WebLoginScreen() {
                 alt="Phone front"
                 width={165}
                 height={326}
-                style={{ position: "absolute", left: 0, top: 0, objectFit: "cover", borderRadius: 24, boxShadow: "6.15px 3.08px 19.76px 7.69px rgba(0,0,0,0.11)" }}
+                className="absolute left-0 top-0 object-cover rounded-[24px]"
+                style={{ boxShadow: "6.15px 3.08px 19.76px 7.69px rgba(0,0,0,0.11)" }}
               />
             </div>
           </div>
