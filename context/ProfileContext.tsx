@@ -68,7 +68,15 @@ const ProfileContext = createContext<ProfileContextType | null>(null);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { currentMode, updateCurrentMode, businessProfile, refetchBusinessProfile, refetchUser } = useUser();
+  const { 
+    user: globalUser, 
+    isLoading: isGlobalLoading, 
+    currentMode, 
+    updateCurrentMode, 
+    businessProfile, 
+    refetchBusinessProfile, 
+    refetchUser 
+  } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
@@ -96,55 +104,37 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   useEffect(() => {
-    async function fetchProfile() {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-          router.push("/login");
-          return;
-        }
+    if (isGlobalLoading) return; // Wait for UserContext to finish its initial fetch
 
-        const [data, bRes] = await Promise.all([
-          UserService.getProfile().catch(() => null),
-          BusinessService.getProfile().catch(() => null)
-        ]);
-
-        const bData = bRes?.success ? bRes.data : businessProfile;
-
-        if (data && data.success && data.data) {
-          setUserData(data.data);
-          if (data.data.currentMode) {
-            updateCurrentMode(data.data.currentMode);
-          }
-          setFormData({
-            displayName: data.data.profile?.displayName || bData?.companyName || "",
-            username: data.data.profile?.username || "",
-            email: data.data.email || "",
-            phone: data.data.phone || "",
-            bio: data.data.profile?.bio || "",
-            country: data.data.profile?.country || "",
-            timezone: data.data.profile?.timezone || "UTC",
-            language: data.data.profile?.language || "en",
-            companyName: bData?.companyName || data.data.profile?.displayName || "",
-            category: bData?.category || "Technology",
-            description: bData?.description || "",
-            website: bData?.website || "",
-          });
-          if (data.data.profile?.avatarUrl) {
-            setAvatarPreview(getOptimizedImageUrl(data.data.profile.avatarUrl, 200, 200));
-          }
-        } else {
-          toast.error("Failed to load profile data");
-        }
-      } catch (error) {
-        toast.error("Network error while fetching profile");
-      } finally {
-        setIsLoading(false);
-      }
+    if (!globalUser) {
+      router.push("/login");
+      return;
     }
 
-    fetchProfile();
-  }, [router]);
+    setUserData(globalUser);
+
+    setFormData(prev => ({
+      ...prev,
+      displayName: globalUser.profile?.displayName || businessProfile?.companyName || "",
+      username: globalUser.profile?.username || "",
+      email: globalUser.email || "",
+      phone: globalUser.phone || "",
+      bio: globalUser.profile?.bio || "",
+      country: globalUser.profile?.country || "",
+      timezone: globalUser.profile?.timezone || "UTC",
+      language: globalUser.profile?.language || "en",
+      companyName: businessProfile?.companyName || globalUser.profile?.displayName || "",
+      category: businessProfile?.category || "Technology",
+      description: businessProfile?.description || "",
+      website: businessProfile?.website || "",
+    }));
+
+    if (globalUser.profile?.avatarUrl && !avatarFile) {
+      setAvatarPreview(getOptimizedImageUrl(globalUser.profile.avatarUrl, 200, 200));
+    }
+
+    setIsLoading(false);
+  }, [globalUser, businessProfile, isGlobalLoading, router]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
