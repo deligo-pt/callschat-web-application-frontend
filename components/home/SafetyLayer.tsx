@@ -61,7 +61,7 @@ export default function SafetyLayer() {
     };
 
     return (
-        <section id="ai-service" className="w-full bg-[#EDF7FD] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16">
+        <section id="ai-service" className="w-full bg-[#EDF7FD] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
             <div className="container mx-auto max-w-7xl w-full">
 
                 {/* Top Header Badge Pill */}

@@ -58,7 +58,7 @@ export default function DualMood() {
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-[#DCE7FF] bg-[#EDF3FF] px-4 py-1.5 text-sm font-semibold text-primary shadow-sm">
             <Briefcase className="h-4 w-4" />
-            Dual Mode
+            Two Account Types
           </div>
         </motion.div>
 
@@ -71,11 +71,11 @@ export default function DualMood() {
           variants={headerVariants}
         >
           <h2 className="text-4xl font-extrabold tracking-tight text-[#102A63] sm:text-5xl">
-            Personal to Business.<br />
-            <span className="text-primary">One seamless switch.</span>
+            Personal & Business.<br />
+            <span className="text-primary">Dedicated experiences.</span>
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-base font-normal leading-relaxed text-gray-500">
-            Toggle between personal conversations and professional communications instantly with dedicated modes for every aspect of your life.
+            Enjoy specialized interfaces for personal conversations and professional team communications, with dedicated account types tailored for your needs.
           </p>
         </motion.div>
 

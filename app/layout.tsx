@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/shared/Navbar";
-import Footer from "@/components/shared/Footer";
+import { Toaster } from "sonner";
+import { ClientIntlProvider } from "@/components/i18n/ClientIntlProvider";
 
 const geistSans = Geist({
-  variable: "--font-sans", // Standardized variable name
+  variable: "--font-sans",
   subsets: ["latin"],
-  display: 'swap',
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  display: 'swap',
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -28,15 +28,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen flex flex-col bg-zinc-100 overflow-x-hidden`}
+        suppressHydrationWarning
       >
-        <Navbar />
-        <main className="flex-1">
-          {children}
-        </main>
-        <Footer />
+        <ClientIntlProvider>
+          <main className="flex-1">{children}</main>
+          <Toaster position="top-center" richColors />
+        </ClientIntlProvider>
       </body>
     </html>
   );

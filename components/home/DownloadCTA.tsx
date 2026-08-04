@@ -40,13 +40,13 @@ export default function DownloadCTA() {
                 </p>
 
                 {/* App Stores CTA Trigger Buttons */}
-                <div className="mt-10 flex flex-wrap justify-center gap-4">
+                <div className="mt-10 flex flex-col sm:flex-row flex-wrap justify-center gap-4 w-full sm:w-auto">
 
                     {/* iOS Download Trigger */}
                     <motion.button
                         whileHover={{ scale: 1.04, y: -2 }}
                         whileTap={{ scale: 0.98 }}
-                        className="flex items-center gap-3 rounded-xl bg-white px-5 py-2.5 text-left text-[#1A62E8] shadow-md focus:outline-none"
+                        className="flex items-center justify-center sm:justify-start gap-3 rounded-xl bg-white px-5 py-2.5 text-left text-[#1A62E8] shadow-md focus:outline-none w-full sm:w-auto"
                     >
                         {/* Outlined Apple Logo Icon */}
                         <svg fill="#1A62E8" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -62,7 +62,7 @@ export default function DownloadCTA() {
                     <motion.button
                         whileHover={{ scale: 1.04, y: -2, backgroundColor: "rgba(255, 255, 255, 0.08)" }}
                         whileTap={{ scale: 0.98 }}
-                        className="flex items-center gap-3 rounded-xl border border-white/40 bg-transparent px-5 py-2.5 text-left text-white focus:outline-none"
+                        className="flex items-center justify-center sm:justify-start gap-3 rounded-xl border border-white/40 bg-transparent px-5 py-2.5 text-left text-white focus:outline-none w-full sm:w-auto"
                     >
                         <Play className="h-5 w-5 shrink-0 text-white" fill="transparent" stroke="currentColor" strokeWidth={2.5} />
                         <div className="flex flex-col leading-none">
@@ -112,7 +112,7 @@ export default function DownloadCTA() {
                     whileInView="visible"
                     viewport={{ once: true, margin: "-40px" }}
                     variants={triggerVariants}
-                    className="mt-16 flex flex-wrap justify-center items-center gap-x-12 gap-y-4 text-sm font-medium text-white/90"
+                    className="mt-16 flex flex-wrap justify-center items-center gap-x-6 sm:gap-x-12 gap-y-4 text-sm font-medium text-white/90 text-center"
                 >
                     <motion.div variants={featureItemVariants} custom={featureOffsets[0]} className="flex items-center gap-2.5">
                         <span className="h-2 w-2 rounded-full bg-white shadow-sm" />

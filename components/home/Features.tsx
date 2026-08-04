@@ -46,8 +46,8 @@ export default function Features() {
             iconBgColor: "#7C3AED",
         },
         {
-            title: "Business Mode",
-            description: "Switch to professional profile with analytics and team management.",
+            title: "Business Account",
+            description: "Create a dedicated professional account with analytics and team management.",
             icon: Briefcase,
             iconBgColor: "#64748B",
         },
@@ -77,7 +77,7 @@ export default function Features() {
     };
 
     return (
-        <section id="features" className="w-full bg-background px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16">
+        <section id="features" className="w-full bg-background px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
             <div className="container mx-auto max-w-6xl">
 
                 {/* Section Header */}
