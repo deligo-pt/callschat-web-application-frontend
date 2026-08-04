@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
+import { compressImage } from "@/utils/image";
 import { toast } from "sonner";
 
 export interface MessageReceipt {
@@ -737,7 +738,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         
         if (file) {
           setIsUploading(true);
-          const uploadRes = await chatService.uploadMedia(conversationId, file);
+          let finalFile = file;
+          if (file.type.startsWith('image/') && !file.type.includes('svg')) {
+            finalFile = await compressImage(file, 1920, 0.8);
+          }
+          const uploadRes = await chatService.uploadMedia(conversationId, finalFile);
           if (uploadRes.success) {
             mediaUrl = uploadRes.data.mediaUrl;
             mediaType = uploadRes.data.mediaType;

@@ -76,30 +76,35 @@ export const useGlobalNotifications = (
 
         toast.custom((t) => (
           <div
-            className="flex items-center gap-3 p-4 bg-background border border-border shadow-xl rounded-2xl cursor-pointer hover:bg-muted/50 transition-colors w-[360px]"
+            className="group relative flex w-[360px] cursor-pointer items-start gap-4 overflow-hidden rounded-[20px] bg-white/95 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl border border-white/20 transition-all hover:scale-[1.02] hover:bg-white active:scale-[0.98] dark:bg-[#1E1E1E]/95 dark:border-white/10 dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]"
             onClick={() => {
               toast.dismiss(t);
               routerRef.current.push(targetRoute);
             }}
           >
+            {/* Blue unread indicator bar */}
+            <div className="absolute left-0 top-0 h-full w-[3px] bg-[#3B58F5]" />
+
             {senderAvatar ? (
               <img
                 src={senderAvatar}
                 alt={senderName}
-                className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-primary/20"
+                className="mt-0.5 h-12 w-12 shrink-0 rounded-full object-cover shadow-sm ring-1 ring-black/5"
               />
             ) : (
-              <div className="w-11 h-11 rounded-full bg-primary/10 shrink-0 flex items-center justify-center ring-2 ring-primary/20">
-                <span className="text-primary font-bold text-lg">
-                  {senderName.charAt(0).toUpperCase()}
-                </span>
+              <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#EEF2FF] to-[#E0E7FF] text-[17px] font-bold text-[#3B58F5] shadow-sm ring-1 ring-black/5 dark:from-[#3B58F5]/20 dark:to-[#3B58F5]/10 dark:text-[#818CF8]">
+                {senderName.charAt(0).toUpperCase()}
               </div>
             )}
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <span className="font-semibold text-foreground text-sm truncate">
-                {senderName}
-              </span>
-              <span className="text-muted-foreground text-sm truncate">
+            
+            <div className="flex flex-1 flex-col overflow-hidden pt-0.5">
+              <div className="flex items-center justify-between">
+                <span className="truncate text-[15px] font-semibold tracking-tight text-[#0F172A] dark:text-white">
+                  {senderName}
+                </span>
+                <span className="text-[11px] font-medium text-slate-400">Now</span>
+              </div>
+              <span className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-slate-500 dark:text-slate-400">
                 {payload.text || "Sent an attachment"}
               </span>
             </div>
@@ -140,33 +145,36 @@ export const useGlobalNotifications = (
 
         toast.custom((t) => (
           <div
-            className="flex items-center gap-3 p-4 bg-background border border-border shadow-xl rounded-2xl cursor-pointer hover:bg-muted/50 transition-colors w-[360px]"
+            className="group relative flex w-[360px] cursor-pointer items-start gap-4 overflow-hidden rounded-[20px] bg-white/95 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl border border-white/20 transition-all hover:scale-[1.02] hover:bg-white active:scale-[0.98] dark:bg-[#1E1E1E]/95 dark:border-white/10 dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]"
             onClick={() => {
               toast.dismiss(t);
               routerRef.current.push(targetRoute);
             }}
           >
+            {/* Blue unread indicator bar */}
+            <div className="absolute left-0 top-0 h-full w-[3px] bg-[#3B58F5]" />
+
             {senderAvatar ? (
               <img
                 src={senderAvatar}
                 alt={senderName}
-                className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-primary/20"
+                className="mt-0.5 h-12 w-12 shrink-0 rounded-full object-cover shadow-sm ring-1 ring-black/5"
               />
             ) : (
-              <div className="w-11 h-11 rounded-full bg-primary/10 shrink-0 flex items-center justify-center ring-2 ring-primary/20">
-                <span className="text-primary font-bold text-lg">
-                  {senderName.charAt(0).toUpperCase()}
-                </span>
+              <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#EEF2FF] to-[#E0E7FF] text-[17px] font-bold text-[#3B58F5] shadow-sm ring-1 ring-black/5 dark:from-[#3B58F5]/20 dark:to-[#3B58F5]/10 dark:text-[#818CF8]">
+                {senderName.charAt(0).toUpperCase()}
               </div>
             )}
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <span className="font-semibold text-foreground text-sm truncate">
-                {senderName}
-                <span className="font-normal text-muted-foreground">
-                  {" "}· {groupName}
+            
+            <div className="flex flex-1 flex-col overflow-hidden pt-0.5">
+              <div className="flex items-center justify-between">
+                <span className="truncate text-[15px] font-semibold tracking-tight text-[#0F172A] dark:text-white">
+                  {groupName}
                 </span>
-              </span>
-              <span className="text-muted-foreground text-sm truncate">
+                <span className="text-[11px] font-medium text-slate-400">Now</span>
+              </div>
+              <span className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-[#0F172A] dark:text-slate-300">{senderName}: </span>
                 {payload.text || "Sent an attachment"}
               </span>
             </div>

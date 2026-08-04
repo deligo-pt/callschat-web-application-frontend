@@ -3,29 +3,10 @@
 import React, { createContext, useContext, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useUser } from "@/context/UserContext";
+import { useUser, UserProfileData } from "@/context/UserContext";
 import { BusinessService } from "@/services/business.service";
 import { UserService } from "@/services/user.service";
 import { getOptimizedImageUrl, compressImage } from "@/utils/image";
-
-// Define the shape of the user profile from the API
-export interface UserProfileData {
-  id: string;
-  phone: string;
-  email: string | null;
-  accountType?: string;
-  currentMode?: string;
-  profile: {
-    displayName: string;
-    username: string;
-    bio: string | null;
-    avatarUrl: string | null;
-    country: string | null;
-    timezone: string;
-    language: string;
-  };
-}
-
 export interface ProfileFormData {
   displayName: string;
   username: string;
