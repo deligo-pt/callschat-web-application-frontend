@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { compressImage } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
 // Helper: national flag emoji from country code
@@ -52,14 +53,27 @@ export default function PersonalSignUpScreen() {
   const [lastName, setLastName] = React.useState("");
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = React.useState(false);
   const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setPhotoPreview(url);
-      setIsPhotoPickerOpen(false);
+      let toastId;
+      if (file.size > 2 * 1024 * 1024) toastId = toast.loading("Optimizing image...");
+      
+      try {
+        const compressedFile = await compressImage(file, 800, 0.7);
+        if (toastId) toast.dismiss(toastId);
+        
+        setAvatarFile(compressedFile);
+        const url = URL.createObjectURL(compressedFile);
+        setPhotoPreview(url);
+        setIsPhotoPickerOpen(false);
+      } catch (err) {
+        if (toastId) toast.dismiss(toastId);
+        toast.error("Failed to process image");
+      }
     }
   };
 
@@ -246,13 +260,13 @@ export default function PersonalSignUpScreen() {
             window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: 'PERSONAL' } }));
           }
 
-          if (!isSkip && (fileInputRef.current?.files?.[0] || firstName || lastName)) {
+          if (!isSkip && (avatarFile || firstName || lastName)) {
             try {
               const formData = new FormData();
               formData.append("firstName", firstName.trim() || "User");
               formData.append("lastName", lastName.trim() || "");
-              if (fileInputRef.current?.files?.[0]) {
-                formData.append("profileImage", fileInputRef.current.files[0]);
+              if (avatarFile) {
+                formData.append("profileImage", avatarFile);
               }
               const setupRes = await fetch(`${BASE_URL}/user/profile/setup`, {
                 method: "PATCH",

@@ -79,7 +79,10 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     }
   }, [activeCall?.isGroup, activeCall?.groupId]);
 
-  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind: 'videoinput' });
+  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ 
+    kind: 'videoinput',
+    requestPermissions: activeCall?.callType === "VIDEO" || isCameraEnabled
+  });
 
   const handleSwitchCamera = () => {
     if (devices && devices.length > 1) {

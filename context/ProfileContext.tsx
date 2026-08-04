@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { BusinessService } from "@/services/business.service";
 import { UserService } from "@/services/user.service";
-import { getOptimizedImageUrl } from "@/utils/image";
+import { getOptimizedImageUrl, compressImage } from "@/utils/image";
 
 // Define the shape of the user profile from the API
 export interface UserProfileData {
@@ -146,16 +146,29 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     fetchProfile();
   }, [router]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Image size should be less than 5MB");
-        return;
+      // Show loading toast if it's a huge file that might take a second to compress
+      let toastId;
+      if (file.size > 2 * 1024 * 1024) {
+        toastId = toast.loading("Optimizing image...");
       }
-      setAvatarFile(file);
-      const url = URL.createObjectURL(file);
-      setAvatarPreview(url);
+
+      try {
+        // Compress the image down to a max dimension of 800px and 70% JPEG quality
+        // This takes a 10MB photo and turns it into a ~150KB fast-loading avatar!
+        const compressedFile = await compressImage(file, 800, 0.7);
+        
+        if (toastId) toast.dismiss(toastId);
+        
+        setAvatarFile(compressedFile);
+        const url = URL.createObjectURL(compressedFile);
+        setAvatarPreview(url);
+      } catch (err) {
+        if (toastId) toast.dismiss(toastId);
+        toast.error("Failed to process image");
+      }
     }
   };
 
