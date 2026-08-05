@@ -26,8 +26,6 @@ import {
   VolumeX,
   ChevronDown,
   Maximize2,
-  PictureInPicture,
-  SwitchCamera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
@@ -83,14 +81,6 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     kind: 'videoinput',
     requestPermissions: activeCall?.callType === "VIDEO" || isCameraEnabled
   });
-
-  const handleSwitchCamera = () => {
-    if (devices && devices.length > 1) {
-      const currentIndex = devices.findIndex((d) => d.deviceId === activeDeviceId);
-      const nextIndex = (currentIndex + 1) % devices.length;
-      setActiveMediaDevice(devices[nextIndex].deviceId);
-    }
-  };
 
   // -------------------------------------------------------------------------
   // Phase 5: Dynamic Grid Engine
@@ -155,115 +145,75 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     (t) => t.source === Track.Source.Camera && t.participant.isCameraEnabled,
   );
 
-  const toggleNativePiP = async () => {
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else {
-        const videos = document.getElementsByTagName('video');
-        if (videos.length > 0) {
-          // Find the active remote speaker video, or fallback to the first video
-          const activeVideo = Array.from(videos).find(v => v.srcObject) || videos[0];
-          await activeVideo.requestPictureInPicture();
-        }
-      }
-    } catch (err) {
-      console.error("Failed to toggle Native PiP", err);
-    }
-  };
-
   // ─────────────────────────────────────────────────────────────────────────
   // Shared control dock
   // ─────────────────────────────────────────────────────────────────────────
   const ControlDock = ({ compact = false }: { compact?: boolean }) => (
     <div className={cn(
-      "flex items-center justify-center gap-6",
+      "flex items-center justify-between",
       compact
-        ? "absolute -bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-[2rem] bg-[#223263]/90 px-10 py-5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl border border-white/5"
-        : "absolute bottom-10 left-1/2 z-50 flex -translate-x-1/2 rounded-[2rem] bg-[#223263]/90 px-10 py-5 shadow-2xl backdrop-blur-xl border border-white/10",
+        ? "absolute -bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-[44px] bg-white/5 px-8 py-5 shadow-[0_12px_50px_0_rgba(0,0,0,0.4),inset_0_1.5px_0_0_rgba(255,255,255,0.1)] backdrop-blur-xl border border-white/10 w-[95vw] max-w-[545px]"
+        : "absolute bottom-10 left-1/2 z-50 flex -translate-x-1/2 rounded-[44px] bg-white/5 p-8 shadow-[0_12px_50px_0_rgba(0,0,0,0.4),inset_0_1.5px_0_0_rgba(255,255,255,0.1)] backdrop-blur-xl border border-white/10 w-full max-w-[545px]",
     )}>
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-[12px]">
         <button
           onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
           className={cn(
-            "flex h-[56px] w-[56px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-[84px] w-[84px] items-center justify-center rounded-full transition-all duration-300",
             isCameraEnabled
-              ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30"
-              : "bg-white/10 text-white/80 hover:bg-white/20",
+              ? "bg-white/20 border-[1.7px] border-white/30 text-white shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
+              : "bg-white/10 border-[1.7px] border-white/20 text-white/80 hover:bg-white/20 shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]",
           )}
           aria-label={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
         >
-          {isCameraEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+          {isCameraEnabled ? <Video className="h-8 w-8" /> : <VideoOff className="h-8 w-8" />}
         </button>
-        <span className="text-[13px] font-medium text-white/50">Video</span>
+        <span className="text-[15.5px] font-normal text-white/50">Video</span>
       </div>
 
-      <div className="flex flex-col items-center gap-2">
-        <button
-          onClick={handleSwitchCamera}
-          className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 transition-all duration-300"
-          aria-label="Switch camera"
-        >
-          <SwitchCamera className="h-6 w-6" />
-        </button>
-        <span className="text-[13px] font-medium text-white/50">Switch</span>
-      </div>
-
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-[12px]">
         <button
           onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
           className={cn(
-            "flex h-[56px] w-[56px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-[84px] w-[84px] items-center justify-center rounded-full transition-all duration-300",
             isMicrophoneEnabled
-              ? "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30"
-              : "bg-white/10 text-white/80 hover:bg-white/20",
+              ? "bg-[#2563EB] text-white shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
+              : "bg-white/10 border-[1.7px] border-white/20 text-white/80 hover:bg-white/20 shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]",
           )}
           aria-label={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
         >
-          {isMicrophoneEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+          {isMicrophoneEnabled ? <Mic className="h-8 w-8" /> : <MicOff className="h-8 w-8" />}
         </button>
-        <span className="text-[13px] font-medium text-white/50">Mic</span>
+        <span className="text-[15.5px] font-normal text-white/50">Mic</span>
       </div>
 
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-[12px]">
         <button
           onClick={() => setIsSpeakerMuted(!isSpeakerMuted)}
           className={cn(
-            "flex h-[56px] w-[56px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-[84px] w-[84px] items-center justify-center rounded-full transition-all duration-300",
             !isSpeakerMuted
-              ? "bg-white/10 text-white hover:bg-white/20"
-              : "bg-[#3B58F5] text-white shadow-lg shadow-[#3B58F5]/30"
+              ? "bg-white/10 border-[1.7px] border-white/20 text-white hover:bg-white/20 shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
+              : "bg-[#2563EB] text-white shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
           )}
           aria-label={!isSpeakerMuted ? "Mute Speaker" : "Unmute Speaker"}
         >
-          {!isSpeakerMuted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+          {!isSpeakerMuted ? <VolumeX className="h-8 w-8" /> : <Volume2 className="h-8 w-8" />}
         </button>
-        <span className="text-[13px] font-medium text-white/50">Mute</span>
+        <span className="text-[15.5px] font-normal text-white/50">Mute</span>
       </div>
 
-      <div className="flex flex-col items-center gap-2 ml-2">
+      <div className="flex flex-col items-center gap-[12px]">
         <button
           onClick={handleEndCall}
-          className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-[#EF4444] text-white transition-all duration-300 hover:scale-105 hover:bg-red-600 active:scale-95 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
+          className="flex h-[84px] w-[84px] items-center justify-center rounded-full bg-gradient-to-br from-[#F43F5E] to-[#DC2626] text-white transition-all duration-300 hover:scale-105 active:scale-95 shadow-[0_6px_31px_0_rgba(244,63,94,0.5)]"
           aria-label="End call"
         >
-          <PhoneOff className="h-6 w-6" fill="currentColor" />
+          <PhoneOff className="h-8 w-8" fill="currentColor" />
         </button>
-        <span className="text-[13px] font-medium text-[#EF4444]">End</span>
+        <span className="text-[15.5px] font-normal text-[#F43F5E]">End</span>
       </div>
 
-      {!compact && (
-        <div className="flex flex-col items-center gap-2 hidden md:flex">
-          <button
-            onClick={toggleNativePiP}
-            className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 transition-all duration-300"
-            title="Pop out video (Native PiP)"
-          >
-            <PictureInPicture className="h-6 w-6" />
-          </button>
-          <span className="text-[13px] font-medium text-white/50">Pop Out</span>
-        </div>
-      )}
     </div>
   );
 
@@ -368,7 +318,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
 
     // ── Default: avatar layout ───────────────────────────────────────────────
     return (
-      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#1D2A54]">
+      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#102A63]">
 
         
         {/* ─── Add Friends Sidebar (Slide in from left) ─── */}
@@ -391,7 +341,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
           <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-6">
             <button
               onClick={handleEndCall}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white transition-all hover:bg-white/30 backdrop-blur-md"
+              className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-[#E9EFFD] border border-[#9BB7F6] text-[#2563EB] transition-all hover:bg-blue-100 backdrop-blur-md shadow-sm"
               aria-label="Back / End call"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -401,29 +351,27 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
                <h2 className="text-[20px] font-bold tracking-wide text-white">
                  {activeCall?.isGroup ? "Call" : ""}
                </h2>
-               <p className="text-[13px] font-medium text-white/70">
-                 {formatDuration(duration)}
-               </p>
+               {/* Timer moved down for 1-on-1 */}
             </div>
 
             <div className="flex gap-4">
               <button
                 onClick={() => setIsCallMinimized(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+                className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
                 title="Minimize Call"
               >
                 <ChevronDown className="h-5 w-5" />
               </button>
               <button
                 onClick={onOpenInvite}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+                className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
                 title="Add participant"
                 aria-label="Invite someone to this call"
               >
                 <UserPlus className="h-5 w-5" />
               </button>
               <button
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+                className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
                 aria-label="More options"
               >
                 <MoreVertical className="h-5 w-5" />
@@ -435,27 +383,22 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
           <div className="flex flex-1 flex-col items-center justify-center pt-10 px-8 pb-32">
             {!activeCall.isGroup && remoteParticipants.length <= 1 ? (
               // 1-on-1 Layout
-              <div className="flex flex-col items-center justify-center">
-                <div className="relative mb-6">
-                  <div className="absolute -inset-2 rounded-full bg-[#3B58F5] opacity-60 blur-lg animate-pulse"></div>
+              <div className="flex flex-col items-center justify-center gap-4">
+                <div className="relative mb-2">
                   <img 
                     src={getOptimizedImageUrl(finalSingleAvatarUrl)} 
                     alt="Avatar" 
-                    className="relative h-44 w-44 rounded-full object-cover border-[3px] border-[#3B58F5] shadow-2xl"
+                    className="relative h-56 w-56 rounded-full object-cover border-[4px] border-[#2563EB] shadow-2xl"
                   />
                 </div>
-                <h1 className="text-[32px] font-bold text-white tracking-wide mb-2 mt-4 text-center px-4">
-                  {singlePeerName}
-                </h1>
-                <p className="text-[13px] font-medium text-white/50 mt-1">{formatDuration(duration)}</p>
-                {/* Messenger-style: tap to turn on camera */}
-                <button
-                  onClick={() => localParticipant.setCameraEnabled(true)}
-                  className="mt-5 flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-[13px] font-semibold text-white/70 hover:bg-[#3B58F5]/40 hover:text-white transition-all"
-                >
-                  <Video className="h-4 w-4" />
-                  Turn on camera
-                </button>
+                <div className="flex flex-col items-center gap-[14px]">
+                  <h1 className="text-[40px] font-semibold text-white leading-[1.2em] text-center px-4">
+                    {singlePeerName}
+                  </h1>
+                  <p className="text-[20px] font-normal text-white leading-[29px] text-center">
+                    {formatDuration(duration)}
+                  </p>
+                </div>
               </div>
             ) : (
               // Group Layout (Grid of Avatars)
@@ -524,13 +467,13 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
   const remoteTrack = tracks.find(t => !t.participant.isLocal);
 
   return (
-    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#1D2A54]">
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#102A63]">
       
       {/* ─── Top Header ─── */}
       <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-6">
         <button
           onClick={handleEndCall}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#1D2A54] transition-all hover:bg-white/90 shadow-md"
+          className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-[#E9EFFD] border border-[#9BB7F6] text-[#2563EB] transition-all hover:bg-blue-100 shadow-md"
           aria-label="Back / End call"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -548,7 +491,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
         <div className="flex gap-4">
           <button
             onClick={() => setIsCallMinimized(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+            className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
             title="Minimize Call"
           >
             <ChevronDown className="h-5 w-5" />
@@ -556,7 +499,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
           {!activeCall?.isGroup && (
             <button
               onClick={onOpenInvite}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+              className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
               title="Add participant"
               aria-label="Invite someone to this call"
             >
@@ -564,7 +507,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
             </button>
           )}
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+            className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
             aria-label="More options"
           >
             <MoreVertical className="h-5 w-5" />
