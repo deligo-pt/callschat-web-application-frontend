@@ -87,36 +87,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
   // ── Key Setup ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const setupKeys = async () => {
-      if (typeof window === "undefined" || !currentUserId) return;
-
-      const privKeyName = `privateKey_${currentUserId}`;
-      const pubKeyName = `publicKey_${currentUserId}`;
-
-      let privKey = localStorage.getItem(privKeyName);
-      let pubKey = localStorage.getItem(pubKeyName);
-
-      if (!privKey || !pubKey) {
-        pubKey = await generateAndStoreKeyPair(currentUserId);
-        privKey = localStorage.getItem(privKeyName);
-      }
-
-      // Use a per-user deviceId so different users never overwrite each other's
-      // key entry, and so the same user's key is stable across sessions on this
-      // browser (keyed by userId, not a global "web-client" constant).
-      const deviceId = `web-${currentUserId}`;
-      localStorage.setItem("deviceId", deviceId);
-      try {
-        await chatService.uploadPublicKey(deviceId, pubKey!);
-      } catch (e) {
-        console.error("Failed to upload public key", e);
-      }
-
-      setMyPrivateKey(privKey);
-      setMyPublicKey(pubKey);
-    };
-
-    setupKeys();
+    if (typeof window === "undefined" || !currentUserId) return;
+    const privKeyName = `privateKey_${currentUserId}`;
+    const pubKeyName = `publicKey_${currentUserId}`;
+    setMyPrivateKey(localStorage.getItem(privKeyName));
+    setMyPublicKey(localStorage.getItem(pubKeyName));
   }, [currentUserId]);
 
   // ── Fetch Recipient Public Key ─────────────────────────────────────────────
@@ -694,9 +669,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       // of what the caller requested — never encrypt without a real peer identity.
       const effectiveSkipEncryption = skipEncryption || !activePeerId || isBizChatRef.current;
 
-      // If we are encrypting but missing keys, abort
-      if (!effectiveSkipEncryption && (!myPrivateKey || !recipientPublicKey)) {
-        console.error("Cannot encrypt send: missing keys");
+      // If we are encrypting but missing our own keys, abort
+      if (!effectiveSkipEncryption && !myPrivateKey) {
+        console.error("Cannot encrypt send: missing myPrivateKey");
+        toast.error("Security setup incomplete. Please refresh the page.");
         return;
       }
 
@@ -779,6 +755,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
             if (!pubKeyToUse) {
               console.error("Cannot encrypt: no recipient public key available. Aborting send.");
+              toast.error("Recipient has not set up secure messaging yet.");
               setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
               return;
             }
@@ -934,6 +911,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     pinMessage,
     unsendMessage,
     isUploading,
-    isReady: !!(myPrivateKey && (recipientPublicKey || isBizChat) && isConnected && conversationId),
+    // UI considers the chat ready as long as we have our own keys and a valid connection
+    isReady: !!(myPrivateKey && isConnected && conversationId),
   };
 };

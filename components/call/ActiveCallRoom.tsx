@@ -269,13 +269,12 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     if (anyoneHasCamera) {
       return (
         <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#0A0F24]">
-          {/* Sidebar */}
-          <div className={cn(
-            "transition-all duration-300 ease-in-out z-50",
-            inviteOpen ? "w-[360px] opacity-100" : "w-0 opacity-0 overflow-hidden",
-          )}>
-            <InviteParticipantSidebar open={inviteOpen} onClose={onCloseInvite} roomId={activeCall.roomName} callType={activeCall.callType} />
-          </div>
+          {/* Add Friends Modal (Overlay) */}
+          {inviteOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+              <InviteParticipantSidebar open={inviteOpen} onClose={onCloseInvite} roomId={activeCall.roomName} callType={activeCall.callType} />
+            </div>
+          )}
 
           <div className="flex-1 relative h-full">
             {/* Header */}
@@ -321,18 +320,17 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
       <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#102A63]">
 
         
-        {/* ─── Add Friends Sidebar (Slide in from left) ─── */}
-        <div className={cn(
-          "transition-all duration-300 ease-in-out z-50",
-          inviteOpen ? "w-[360px] opacity-100 translate-x-0" : "w-0 opacity-0 -translate-x-full overflow-hidden"
-        )}>
-          <InviteParticipantSidebar 
-            open={inviteOpen} 
-            onClose={onCloseInvite} 
-            roomId={activeCall.roomName} 
-            callType={activeCall.callType} 
-          />
-        </div>
+        {/* ─── Add Friends Modal (Overlay) ─── */}
+        {inviteOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <InviteParticipantSidebar 
+              open={inviteOpen} 
+              onClose={onCloseInvite} 
+              roomId={activeCall.roomName} 
+              callType={activeCall.callType} 
+            />
+          </div>
+        )}
 
         {/* ─── Main Content Area ─── */}
         <div className="flex-1 relative flex flex-col h-full transition-all duration-300">
