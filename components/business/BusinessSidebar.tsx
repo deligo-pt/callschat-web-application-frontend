@@ -87,13 +87,7 @@ export function BusinessSidebar() {
   }, [fetchChannels, fetchDms]);
 
   const handleChannelClick = (channel: ChannelData) => {
-    router.push(
-      `/business/chats?channelId=${channel.id}&channelName=${encodeURIComponent(
-        channel.name
-      )}&channelDesc=${encodeURIComponent(channel.description || "")}&isPrivate=${
-        channel.isPrivate
-      }`
-    );
+    router.push(`/business/channels/${channel.id}`);
   };
 
   return (

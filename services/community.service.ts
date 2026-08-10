@@ -46,6 +46,26 @@ export const communityService = {
     }
   },
 
+  async updateCommunity(communityId: string, data: {
+    name?: string;
+    description?: string;
+    category?: string;
+    avatarUrl?: string | null;
+  }): Promise<{ success: boolean; data?: CommunityItem; error?: string }> {
+    try {
+      const response = await apiClient.patch(`/communities/${communityId}`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to update community:', error.response?.data || error);
+      return {
+        success: false,
+        error: error.response?.data?.message
+          ? JSON.stringify(error.response.data.message)
+          : 'Failed to update community',
+      };
+    }
+  },
+
   async fetchCommunityDetails(communityId: string): Promise<{ success: boolean; data?: CommunityDetailData; error?: string }> {
     try {
       const response = await apiClient.get(`/communities/${communityId}`);

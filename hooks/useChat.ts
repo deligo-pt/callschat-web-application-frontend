@@ -51,6 +51,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const [myPrivateKey, setMyPrivateKey] = useState<string | null>(null);
   const [myPublicKey, setMyPublicKey] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Typing indicator state
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const isTypingLocallyRef = useRef(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use refs so the receive handler always has the latest key values
   // without needing to re-register every time they change
@@ -617,11 +622,34 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }));
     };
 
+    const handleTypingStart = (payload: { conversationId: string; userId: string }) => {
+      if (payload.conversationId !== conversationId) return;
+      if (payload.userId === currentUserIdRef.current) return;
+      
+      setTypingUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(payload.userId);
+        return newSet;
+      });
+    };
+
+    const handleTypingStop = (payload: { conversationId: string; userId: string }) => {
+      if (payload.conversationId !== conversationId) return;
+      
+      setTypingUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(payload.userId);
+        return newSet;
+      });
+    };
+
     socket.on("chat:receive_message", handleReceiveMessage);
     socket.on("NEW_MESSAGE", handleReceiveMessage);
     socket.on("chat:message_edited", handleMessageEdited);
     socket.on("chat:message_unsent", handleMessageUnsent);
     socket.on("chat:message_status_update", handleStatusUpdate);
+    socket.on("chat:typing_start", handleTypingStart);
+    socket.on("chat:typing_stop", handleTypingStop);
     socket.on("chat:error", handleChatError);
 
     return () => {
@@ -630,6 +658,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       socket.off("chat:message_edited", handleMessageEdited);
       socket.off("chat:message_unsent", handleMessageUnsent);
       socket.off("chat:message_status_update", handleStatusUpdate);
+      socket.off("chat:typing_start", handleTypingStart);
+      socket.off("chat:typing_stop", handleTypingStop);
       socket.off("chat:error", handleChatError);
     };
   }, [socket, isConnected, conversationId]);
@@ -772,6 +802,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           previewText = text.substring(0, 100); // Send first 100 chars as preview
         }
 
+        if (!nonce) {
+          nonce = crypto.randomUUID();
+        }
+
         const payload = { conversationId, ciphertext, nonce, mediaUrl, mediaType, previewText };
         socket.emit("chat:send_message", payload);
         
@@ -901,6 +935,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [conversationId]
   );
 
+  const handleTyping = useCallback(() => {
+    if (!socket || !isConnected || !conversationId) return;
+
+    if (!isTypingLocallyRef.current) {
+      isTypingLocallyRef.current = true;
+      socket.emit("chat:typing_start", { conversationId });
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingLocallyRef.current = false;
+      socket.emit("chat:typing_stop", { conversationId });
+    }, 3000);
+  }, [socket, isConnected, conversationId]);
+
   return {
     messages,
     setMessages,
@@ -911,6 +963,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     pinMessage,
     unsendMessage,
     isUploading,
+    typingUsers,
+    handleTyping,
     // UI considers the chat ready as long as we have our own keys and a valid connection
     isReady: !!(myPrivateKey && isConnected && conversationId),
   };

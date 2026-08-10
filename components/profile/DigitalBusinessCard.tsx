@@ -26,7 +26,7 @@ import { useProfile } from "@/context/ProfileContext";
 import { toast } from "sonner";
 import { CardService, type DigitalCardData } from "@/services/card.service";
 import { toBlob, toPng } from "html-to-image";
-import { getOptimizedImageUrl } from "@/utils/image";
+import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 
 interface DigitalBusinessCardProps {
   onBack?: () => void;
@@ -131,6 +131,14 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
   // Circle badge initial letter
   const circleBadgeText = personName ? personName.charAt(0).toUpperCase() : "M";
 
+  // Use raw media URL for external images to prevent Canvas CORS/Taint errors during download
+  const safeAvatarUrl = React.useMemo(() => {
+    if (!avatarPreview) return null;
+    if (avatarPreview.startsWith("blob:") || avatarPreview.startsWith("data:")) return avatarPreview;
+    if (userData?.profile?.avatarUrl) return getRawMediaUrl(userData.profile.avatarUrl);
+    return avatarPreview;
+  }, [avatarPreview, userData?.profile?.avatarUrl]);
+
   // Handlers
   const handleEditClick = () => {
     if (onEdit) {
@@ -185,7 +193,12 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
           if (node.tagName === 'IMG' && (node as HTMLImageElement).src?.startsWith('chrome-extension://')) return false;
           return true;
         };
-        const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true, filter });
+        const dataUrl = await toPng(cardRef.current, { 
+          pixelRatio: 3, 
+          filter,
+          skipAutoScale: true,
+          fetchRequestInit: { cache: 'no-cache' }
+        });
         const link = document.createElement("a");
         link.download = `${companyName.replace(/\s+/g, "_")}_Business_Card.png`;
         link.href = dataUrl;
@@ -245,6 +258,8 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
       const blob = await toBlob(cardRef.current, {
         pixelRatio: 3,
         backgroundColor: "transparent",
+        skipAutoScale: true,
+        fetchRequestInit: { cache: 'no-cache' }
       });
 
       if (!blob) {
@@ -371,8 +386,8 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
             {/* Top Row: Circle Badge & QR Code */}
             <div className="flex items-start justify-between mb-6">
               <div className="h-12 w-12 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center font-bold text-lg text-white shadow-inner border border-white/30 overflow-hidden shrink-0">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+                {safeAvatarUrl ? (
+                  <img src={safeAvatarUrl} alt="Avatar" className="h-full w-full object-cover" />
                 ) : (
                   <span>{circleBadgeText}</span>
                 )}

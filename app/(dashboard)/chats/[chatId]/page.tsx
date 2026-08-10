@@ -276,7 +276,7 @@ function ChatRoomPageContent() {
             if (conv) {
               setIsMuted(conv.isMuted || false);
               let timer = conv.disappearAfterSeconds !== undefined ? conv.disappearAfterSeconds : null;
-              if (!conv.workspaceId && conv.context !== "BUSINESS" && !conv.groupId && typeof window !== "undefined") {
+              if (!conv.workspaceId && !conv.groupId && typeof window !== "undefined") {
                 const stored = localStorage.getItem("callschat_default_disappear_seconds");
                 if (stored && stored !== "null" && stored !== "0") {
                   const parsed = parseInt(stored, 10);
@@ -290,7 +290,6 @@ function ChatRoomPageContent() {
             }
 
             if (
-              conv?.context === "BUSINESS" ||
               conv?.workspaceId ||
               conv?.lastMessage?.ticketId ||
               (conv && !conv.otherUserId) // B2C where I am the business
@@ -404,7 +403,7 @@ function ChatRoomPageContent() {
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
 
-  const { messages, sendMessage, editMessage, pinnedMessages, pinMessage, clearMessages, isReady, isUploading, unsendMessage } =
+  const { messages, sendMessage, editMessage, pinnedMessages, pinMessage, clearMessages, isReady, isUploading, unsendMessage, typingUsers, handleTyping } =
     useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -873,6 +872,21 @@ function ChatRoomPageContent() {
               );
             })
         )}
+        
+        {typingUsers.size > 0 && (
+          <div className="flex items-center gap-2 text-[#8F95B2] text-[13px] font-medium ml-2 animate-pulse">
+            <div className="flex gap-1">
+              <span className="w-1.5 h-1.5 bg-[#8F95B2] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 bg-[#8F95B2] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 bg-[#8F95B2] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            {isBizChat 
+              ? `${bizName || bizHandle || "Support"} is typing...`
+              : typingUsers.has(recipientId) 
+                ? `${recipient?.name || "User"} is typing...` 
+                : "typing..."}
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -888,6 +902,7 @@ function ChatRoomPageContent() {
           onSend={handleSend}
           isReady={isBizChat ? true : isReady}
           isUploading={isUploading || isSendingFirstBizMessage}
+          onTyping={handleTyping}
         />
       )}
 

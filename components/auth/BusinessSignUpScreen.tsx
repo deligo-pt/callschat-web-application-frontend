@@ -175,7 +175,7 @@ export default function BusinessSignUpScreen() {
           }
           toast.success("Business account created! Welcome.");
           await new Promise((r) => setTimeout(r, 50));
-          router.push("/business/dashboard");
+          router.push("/profile/verification");
         } else {
           const msg = data.error?.message ?? data.message ?? "Registration failed.";
           if (msg.toLowerCase().includes("handle")) setHandleError(msg);
@@ -205,7 +205,7 @@ export default function BusinessSignUpScreen() {
           window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: accountType } }));
         }
         await new Promise((r) => setTimeout(r, 50));
-        router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
+        router.push(accountType === "BUSINESS" ? "/profile/verification" : "/chats");
       } else {
         toast.error(data.error?.message ?? data.message ?? "Login failed.");
       }
