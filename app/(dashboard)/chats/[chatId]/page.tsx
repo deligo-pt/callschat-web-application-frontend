@@ -276,7 +276,7 @@ function ChatRoomPageContent() {
             if (conv) {
               setIsMuted(conv.isMuted || false);
               let timer = conv.disappearAfterSeconds !== undefined ? conv.disappearAfterSeconds : null;
-              if (!conv.workspaceId && conv.context !== "BUSINESS" && !conv.groupId && typeof window !== "undefined") {
+              if (!conv.workspaceId && !conv.groupId && typeof window !== "undefined") {
                 const stored = localStorage.getItem("callschat_default_disappear_seconds");
                 if (stored && stored !== "null" && stored !== "0") {
                   const parsed = parseInt(stored, 10);
@@ -290,7 +290,6 @@ function ChatRoomPageContent() {
             }
 
             if (
-              conv?.context === "BUSINESS" ||
               conv?.workspaceId ||
               conv?.lastMessage?.ticketId ||
               (conv && !conv.otherUserId) // B2C where I am the business

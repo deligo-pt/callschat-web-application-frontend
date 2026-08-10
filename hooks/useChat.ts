@@ -772,6 +772,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           previewText = text.substring(0, 100); // Send first 100 chars as preview
         }
 
+        if (!nonce) {
+          nonce = crypto.randomUUID();
+        }
+
         const payload = { conversationId, ciphertext, nonce, mediaUrl, mediaType, previewText };
         socket.emit("chat:send_message", payload);
         

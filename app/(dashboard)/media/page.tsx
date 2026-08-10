@@ -11,6 +11,7 @@ import { useContacts, type Contact } from "@/hooks/useContacts";
 import { useAllMedia, type MediaItem } from "@/hooks/useAllMedia";
 import { useTranslations } from "next-intl";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
+import { useCallContext } from "@/components/providers/CallContext";
 
 export default function MediaPage() {
   const t = useTranslations("media");
@@ -19,6 +20,7 @@ export default function MediaPage() {
   const router = useRouter();
   const { contacts, isLoading: contactsLoading, searchQuery, setSearchQuery } = useContacts();
   const { media, isLoading: mediaLoading, loadMore, hasMore } = useAllMedia();
+  const { initiateCall } = useCallContext();
   
   const [activeTab, setActiveTab] = useState<'Media' | 'Docs' | 'Links'>('Media');
 
@@ -172,10 +174,16 @@ export default function MediaPage() {
                           <button onClick={(e) => { e.preventDefault(); handleStartChat(contact.userId); }} className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#3B58F5] transition-colors hover:bg-blue-100">
                             <MessageSquare className="h-4 w-4" strokeWidth={2.5} />
                           </button>
-                          <button className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100">
+                          <button 
+                            onClick={(e) => { e.preventDefault(); initiateCall(contact.userId, "AUDIO", contact.name, contact.avatarUrl || undefined); }}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100"
+                          >
                             <Phone className="h-4 w-4" strokeWidth={2.5} />
                           </button>
-                          <button className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100">
+                          <button 
+                            onClick={(e) => { e.preventDefault(); initiateCall(contact.userId, "VIDEO", contact.name, contact.avatarUrl || undefined); }}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100"
+                          >
                             <Video className="h-4 w-4" strokeWidth={2.5} />
                           </button>
                         </div>

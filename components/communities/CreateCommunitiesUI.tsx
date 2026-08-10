@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { communityService } from "@/services/community.service";
+import { uploadMedia } from "@/services/business.service";
 
 export interface CommunityItem {
   id: string;
@@ -61,6 +62,9 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
   const [communityName, setCommunityName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Technology");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   
   // Step 2 State
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
@@ -100,6 +104,14 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
 
     setIsSubmitting(true);
     try {
+      let finalAvatarUrl: string | undefined = undefined;
+      
+      if (avatarFile) {
+        toast.info("Uploading community avatar...");
+        const mediaRes = await uploadMedia(avatarFile);
+        finalAvatarUrl = mediaRes.url;
+      }
+
       const selectedGroupNames = selectedGroupIds.map(
         (id) => SUGGESTED_GROUPS_LIST.find((g) => g.id === id)?.name || id
       );
@@ -108,6 +120,7 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
         name: communityName.trim(),
         description: description.trim() || undefined,
         category,
+        avatarUrl: finalAvatarUrl,
         groupNames: selectedGroupNames,
       });
 
@@ -162,13 +175,33 @@ export function CreateCommunitiesUI({ onBack, onCommunityCreated }: CreateCommun
           /* Step 1: Basic Community Info (Image 1) */
           <div className="flex flex-col items-center w-full max-w-[480px] animate-in fade-in-50 duration-300">
             {/* Circular Avatar Upload Placeholder */}
-            <div className="relative mb-8 mt-2 cursor-pointer group">
-              <div className="h-[116px] w-[116px] rounded-full bg-[#EFF4FF] border border-[#E0E7FF] flex items-center justify-center shadow-md shadow-blue-500/5 group-hover:bg-blue-100/60 transition-colors">
-                <ImageIcon className="h-10 w-10 text-[#94A3B8] group-hover:text-[#64748B] transition-colors" />
+            <div 
+              className="relative mb-8 mt-2 cursor-pointer group"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="h-[116px] w-[116px] rounded-full bg-[#EFF4FF] border border-[#E0E7FF] flex items-center justify-center shadow-md shadow-blue-500/5 group-hover:bg-blue-100/60 transition-colors overflow-hidden">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Preview" className="h-full w-full object-cover" />
+                ) : (
+                  <ImageIcon className="h-10 w-10 text-[#94A3B8] group-hover:text-[#64748B] transition-colors" />
+                )}
               </div>
               <div className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center shadow-md border-2 border-white group-hover:bg-blue-700 transition-colors">
                 <Camera className="h-4 w-4" />
               </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setAvatarFile(file);
+                    setAvatarPreview(URL.createObjectURL(file));
+                  }
+                }}
+              />
             </div>
 
             {/* Form Fields */}

@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { communityService, CommunityDetailGroup } from "@/services/community.service";
 import { toast } from "sonner";
 import { CommunityGroupChatView } from "./CommunityGroupChatView";
+import { uploadMedia } from "@/services/business.service";
+import { Camera } from "lucide-react";
 
 interface CommunityDetailViewProps {
   community: CommunityItem;
@@ -90,6 +92,9 @@ export function CommunityDetailView({ community, onCreateNewClick, onCommunityDe
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDesc, setNewGroupDesc] = useState("");
   const [joinedGroupIds, setJoinedGroupIds] = useState<Record<string, boolean>>({});
+  const [localAvatarUrl, setLocalAvatarUrl] = useState(community.avatarUrl);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   
   // Selected group state for exact chat interface rendering matching input_file_0.png and input_file_1.png
   const [selectedGroup, setSelectedGroup] = useState<CommunityDetailGroup | null>(null);
@@ -131,6 +136,34 @@ export function CommunityDetailView({ community, onCreateNewClick, onCommunityDe
       toast.error("Failed to delete community");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      toast.info("Uploading new community avatar...");
+      const mediaRes = await uploadMedia(file);
+      
+      const updateRes = await communityService.updateCommunity(community.id, {
+        avatarUrl: mediaRes.url,
+      });
+
+      if (updateRes.success && updateRes.data) {
+        toast.success("Community avatar updated successfully");
+        setLocalAvatarUrl(updateRes.data.avatarUrl);
+      } else {
+        toast.error(updateRes.error || "Failed to update community avatar");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to upload avatar");
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -235,8 +268,40 @@ export function CommunityDetailView({ community, onCreateNewClick, onCommunityDe
         </div>
 
         {/* Overlapping Community Avatar Square */}
-        <div className="absolute -bottom-7 left-6 h-[56px] w-[56px] sm:h-[60px] sm:w-[60px] rounded-[16px] bg-[#2563EB] text-white flex items-center justify-center text-2xl font-bold shadow-md border-[3.5px] border-white z-10">
-          <span>{initialChar}</span>
+        <div 
+          className={cn(
+            "absolute -bottom-7 left-6 h-[56px] w-[56px] sm:h-[60px] sm:w-[60px] rounded-[16px] bg-[#2563EB] text-white flex items-center justify-center text-2xl font-bold shadow-md border-[3.5px] border-white z-10 overflow-hidden",
+            (!community.myRole || community.myRole === "OWNER" || community.myRole === "ADMIN") && "cursor-pointer group"
+          )}
+          onClick={() => {
+            if (!community.myRole || community.myRole === "OWNER" || community.myRole === "ADMIN") {
+              fileInputRef.current?.click();
+            }
+          }}
+        >
+          {localAvatarUrl ? (
+            <img src={localAvatarUrl} alt={community.name} className="h-full w-full object-cover" />
+          ) : (
+            <span>{initialChar}</span>
+          )}
+          
+          {(!community.myRole || community.myRole === "OWNER" || community.myRole === "ADMIN") && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploadingAvatar ? (
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              ) : (
+                <Camera className="h-5 w-5 text-white" />
+              )}
+            </div>
+          )}
+          
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleAvatarUpload}
+          />
         </div>
       </div>
 

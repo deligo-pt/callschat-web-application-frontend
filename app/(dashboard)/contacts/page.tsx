@@ -253,7 +253,7 @@ export default function ContactsPage() {
                               <button 
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  initiateCall(contact.userId, 'AUDIO', contact.name, contact.avatarUrl);
+                                  initiateCall(contact.userId, 'AUDIO', contact.name, contact.avatarUrl || undefined);
                                 }}
                                 className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100"
                               >
@@ -262,7 +262,7 @@ export default function ContactsPage() {
                               <button 
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  initiateCall(contact.userId, 'VIDEO', contact.name, contact.avatarUrl);
+                                  initiateCall(contact.userId, 'VIDEO', contact.name, contact.avatarUrl || undefined);
                                 }}
                                 className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100"
                               >

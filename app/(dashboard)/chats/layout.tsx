@@ -1,24 +1,23 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
-import { cn } from "@/lib/utils";
-import { Bell, MessageSquare, Search, Star, Lock, MoreVertical, Trash2, PenSquare, UserPlus , Heart} from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chatService } from "@/services/chat.service";
-import { motion } from "framer-motion";
-import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
-import { decryptMessage } from "@/utils/crypto";
-import { getOptimizedImageUrl } from "@/utils/image";
-import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
-import { usePresence } from "@/context/PresenceContext";
-import { useUser } from "@/context/UserContext";
-import { useSocket } from "@/components/providers/SocketProvider";
+import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
 import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
+import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
 import { NewMessageModal } from "@/components/chat/NewMessageModal";
-import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
-import { Building2 } from "lucide-react";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { useSocket } from "@/components/providers/SocketProvider";
+import { usePresence } from "@/context/PresenceContext";
+import { useUser } from "@/context/UserContext";
+import { cn } from "@/lib/utils";
+import { chatService } from "@/services/chat.service";
+import { decryptMessage } from "@/utils/crypto";
+import { getOptimizedImageUrl } from "@/utils/image";
+import { motion } from "framer-motion";
+import { Building2, Heart, Lock, MessageSquare, MoreVertical, Search, Trash2, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 
 interface Conversation {
   id: string;
@@ -249,7 +248,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           !msg.nonce ||
           msg.ticketId ||
           conv.workspaceId ||
-          conv.context === 'BUSINESS' ||
           !conv.otherUserId;
 
         if (isBizConv) {
