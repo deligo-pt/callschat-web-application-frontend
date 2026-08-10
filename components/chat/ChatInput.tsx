@@ -11,9 +11,10 @@ interface ChatInputProps {
   onSend: (text: string, file: File | null) => void;
   isReady: boolean;
   isUploading: boolean;
+  onTyping?: () => void;
 }
 
-export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
+export function ChatInput({ onSend, isReady, isUploading, onTyping }: ChatInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -244,6 +245,7 @@ export function ChatInput({ onSend, isReady, isUploading }: ChatInputProps) {
               value={inputText}
               onChange={(e) => {
                 setInputText(e.target.value);
+                onTyping?.();
                 e.target.style.height = "auto";
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
               }}

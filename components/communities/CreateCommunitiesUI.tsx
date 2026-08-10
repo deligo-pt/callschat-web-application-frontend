@@ -21,6 +21,7 @@ export interface CommunityItem {
   name: string;
   description?: string | null;
   category: string;
+  avatarUrl?: string | null;
   memberCount: number;
   groupCount?: number;
   iconBg?: string;
