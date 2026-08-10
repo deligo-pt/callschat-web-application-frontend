@@ -124,17 +124,24 @@ export const InviteParticipantSidebar = ({
   const sortedLetters = Object.keys(groupedContacts).sort();
 
   return (
-    <div className="w-[360px] h-full bg-white flex flex-col border-r border-[#E6EAFA] shrink-0 z-50">
-      <div className="p-6 border-b border-transparent shrink-0">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-[24px] font-bold text-[#3B58F5]">Add Friends</h1>
-          <div className="flex items-center gap-4 text-[#8F95B2]">
-            <Star className="h-5 w-5 text-[#F59E0B] fill-[#F59E0B]" />
-            <Bell className="h-5 w-5 text-[#3B58F5]" />
+    <div className="relative w-[412px] max-h-[85vh] h-[750px] bg-white flex flex-col rounded-[24px] shadow-2xl overflow-hidden shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="p-6 pb-4 shrink-0">
+        <button 
+          onClick={onClose} 
+          className="absolute top-6 right-6 p-1 text-[#8F95B2] hover:text-[#1D2A54] transition-colors rounded-full hover:bg-gray-100"
+          title="Close"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <div className="flex items-center mb-6 pr-8">
+          <h1 className="text-[24px] font-bold text-[#1D2A54]">Add friends</h1>
+          <div className="flex items-center gap-4 ml-auto">
+            <Star className="h-6 w-6 text-[#8F95B2]" />
+            <Bell className="h-6 w-6 text-[#8F95B2]" />
           </div>
         </div>
 
-        <div className="relative mb-4">
+        <div className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-[#B0B8D4]" />
           <input
             type="text"

@@ -183,35 +183,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
           {textContent}
         </p>
 
-        {notification.type === "CONTACT_ADDED" && !isResolved && (
-          <div className="flex gap-2 mt-2 mb-1">
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="h-7 text-xs" 
-              disabled={isProcessing}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (notification.issuerId) {
-                  onAcceptContact(notification.id, notification.issuerId);
-                }
-              }}
-            >
-              {isProcessing ? t("adding") : t("add_back")}
-            </Button>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              className="h-7 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkAsRead(notification.id);
-              }}
-            >
-              {t("dismiss")}
-            </Button>
-          </div>
-        )}
+        {/* Action buttons for CONTACT_ADDED were removed to mimic WhatsApp behavior */}
 
         <span className="text-xs font-medium text-muted-foreground mt-1">
           {getRelativeTimeShort(notification.createdAt, t)}

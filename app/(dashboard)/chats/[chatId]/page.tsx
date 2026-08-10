@@ -21,6 +21,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { CustomerService } from "@/services/customer-support.service";
+import { ContactService } from "@/services/contact.service";
 import { useCallContext } from "@/components/providers/CallContext";
 import { ChatOptionsMenu } from "@/components/chat/ChatOptionsMenu";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -206,6 +207,8 @@ function ChatRoomPageContent() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [isContactProfileOpen, setIsContactProfileOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isRecipientInContacts, setIsRecipientInContacts] = useState(true);
+  const [isAddingContact, setIsAddingContact] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -343,6 +346,8 @@ function ChatRoomPageContent() {
               (u.addressee?.id || u.contact?.id || u.id) === finalRecipientId,
           );
 
+          setIsRecipientInContacts(!!match);
+
           if (match) {
             const userProfile =
               match.addressee?.profile ||
@@ -448,6 +453,25 @@ function ChatRoomPageContent() {
     }
     void chatService.markConversationAsRead(conversationId);
   }, [conversationId]);
+
+  const handleAddContact = async () => {
+    if (!recipientId) return;
+    try {
+      setIsAddingContact(true);
+      await ContactService.addMutualContact(recipientId);
+      setIsRecipientInContacts(true);
+      toast.success("Added to contacts");
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        setIsRecipientInContacts(true);
+        toast.info("User is already in your contacts");
+      } else {
+        toast.error("Failed to add contact");
+      }
+    } finally {
+      setIsAddingContact(false);
+    }
+  };
 
   // ── Send Handler ──────────────────────────────────────────────────────────
   /**
@@ -675,6 +699,33 @@ function ChatRoomPageContent() {
           <span className="text-[10px] font-medium text-purple-400">
             New messages auto-delete
           </span>
+        </div>
+      )}
+
+      {/* ── Add to Contact Banner ──────────────────────────────────────────── */}
+      {!isBizChat && !isRecipientInContacts && !isInitializing && !blockStatus?.isBlocked && (
+        <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-5 py-3 flex items-center justify-between gap-3 shadow-sm z-10">
+          <div className="flex flex-col">
+            <span className="text-[13px] font-semibold text-blue-900">
+              Know {recipient?.name || "this user"}? Add to your contacts.
+            </span>
+            <span className="text-[11px] text-blue-700/80">
+              This helps you find them easily later.
+            </span>
+          </div>
+          <button
+            onClick={handleAddContact}
+            disabled={isAddingContact}
+            className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isAddingContact ? (
+              <span className="flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Adding...
+              </span>
+            ) : (
+              "Add Contact"
+            )}
+          </button>
         </div>
       )}
 

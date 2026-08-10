@@ -17,12 +17,14 @@ import { useTranslations } from "next-intl";
 import { ContactService } from "@/services/contact.service";
 import { toast } from "sonner";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { useCallContext } from "@/components/providers/CallContext";
 
 export default function ContactsPage() {
   const t = useTranslations("contacts");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
   const router = useRouter();
+  const { initiateCall } = useCallContext();
   const { contacts, isLoading, searchQuery, setSearchQuery, fetchContacts, handleToggleFavourite } = useContacts();
 
   // Add Contact Panel State
@@ -248,10 +250,22 @@ export default function ContactsPage() {
                               >
                                 <MessageSquare className="h-4 w-4" strokeWidth={2.5} />
                               </button>
-                              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100">
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  initiateCall(contact.userId, 'AUDIO', contact.name, contact.avatarUrl);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100"
+                              >
                                 <Phone className="h-4 w-4" strokeWidth={2.5} />
                               </button>
-                              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100">
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  initiateCall(contact.userId, 'VIDEO', contact.name, contact.avatarUrl);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100"
+                              >
                                 <Video className="h-4 w-4" strokeWidth={2.5} />
                               </button>
                             </>

@@ -4,6 +4,7 @@ import { PendingInvitesModal } from "@/components/business/PendingInvitesModal";
 import { WorkspaceSwitcher } from "@/components/navigation/WorkspaceSwitcher";
 import { CallProvider } from "@/components/providers/CallProvider";
 import { SocketProvider } from "@/components/providers/SocketProvider";
+import { E2EEProvider } from "@/components/providers/E2EEProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
 import { UserProvider, useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
@@ -217,9 +218,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <SocketProvider>
         <CallProvider>
           <PresenceProvider>
-            <DashboardNavContent>
-              {children}
-            </DashboardNavContent>
+            <E2EEProvider>
+              <DashboardNavContent>
+                {children}
+              </DashboardNavContent>
+            </E2EEProvider>
           </PresenceProvider>
         </CallProvider>
       </SocketProvider>

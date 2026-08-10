@@ -212,7 +212,6 @@ export const useCallSignaling = () => {
       startedBy: string;
     }) => {
       console.log('[Call] Group call active in:', payload.groupId);
-      stopRingtone();
       setActiveGroupCalls(prev =>
         prev.includes(payload.groupId) ? prev : [...prev, payload.groupId],
       );
@@ -220,6 +219,7 @@ export const useCallSignaling = () => {
       // If we are currently ringing OUTGOING for this exact group, it means someone answered!
       setOutgoingGroupCall(prev => {
         if (prev && prev.groupId === payload.groupId) {
+          stopRingtone(); // Stop any outgoing ringtone if applicable
           // Transition to active call
           setActiveCall({
             callId: prev.callId || payload.callId,
@@ -420,6 +420,7 @@ export const useCallSignaling = () => {
     (callId: string) => {
       if (!socket) return;
       console.log('[Call] Hanging up call', callId);
+      stopRingtone();
       userInitiatedHangupRef.current = true;
       socket.emit('call:hangup', { callId });
       setActiveCall(null);
@@ -490,6 +491,7 @@ export const useCallSignaling = () => {
     (groupId: string) => {
       if (!socket) return;
       console.log('[Call] Accepting group call for', groupId);
+      stopRingtone();
       socket.emit('group:call_join', { groupId }, (response: any) => {
         if (response?.success && response?.token) {
           setIncomingGroupCall(null);
@@ -512,6 +514,7 @@ export const useCallSignaling = () => {
     (groupId: string) => {
       if (!socket) return;
       console.log('[Call] Rejecting group call for', groupId);
+      stopRingtone();
       socket.emit('group:call_reject', { groupId });
       setIncomingGroupCall(null);
     },
@@ -522,6 +525,7 @@ export const useCallSignaling = () => {
     (groupId: string) => {
       if (!socket) return;
       console.log('[Call] Joining group call for', groupId);
+      stopRingtone();
       socket.emit('group:call_join', { groupId }, (response: any) => {
         if (response?.success && response?.token) {
           setActiveCall({
@@ -543,6 +547,7 @@ export const useCallSignaling = () => {
     (callId: string) => {
       if (!socket) return;
       console.log('[Call] Leaving group call', callId);
+      stopRingtone();
       userInitiatedHangupRef.current = true;
       socket.emit('group:call_leave', { callId });
       setActiveCall(null);

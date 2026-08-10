@@ -192,6 +192,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
             setUserData(prev => prev ? { ...prev, email: data.data.email !== undefined ? data.data.email : prev.email } : prev);
           }
           toast.success("Profile updated successfully!");
+          setAvatarFile(null);
           await refetchUser?.();
         } else {
           toast.error(data?.error?.message || data?.message || "Failed to update profile");
