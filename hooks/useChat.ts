@@ -537,14 +537,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           ];
         });
       }
-
-      // Automatically mark as delivered if the message is from someone else
-      if (senderId !== currentUser) {
-        socket.emit("chat:mark_delivered", {
-          conversationId: payload.conversationId,
-          messageId: payload.id,
-        });
-      }
+      
+      // Note: chat:mark_delivered is now handled globally in SocketProvider
     };
 
     const handleChatError = (err: any) => {
@@ -622,6 +616,34 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }));
     };
 
+    const handleConversationStatusUpdate = (payload: any) => {
+      if (payload.conversationId !== conversationId) return;
+      if (payload.status !== 'SEEN') return;
+
+      const updatedReceiptsMap = new Map(payload.receipts.map((r: any) => [r.messageId, r.timestamp]));
+
+      setMessages((prev) => prev.map((msg) => {
+        const seenAtStr = updatedReceiptsMap.get(msg.id) as string;
+        if (seenAtStr) {
+          const receipts = [...(msg.receipts || [])];
+          const existing = receipts.find((r) => r.userId === payload.userId);
+          
+          if (existing) {
+            existing.seenAt = seenAtStr;
+          } else {
+            receipts.push({
+              id: Math.random().toString(),
+              userId: payload.userId,
+              deliveredAt: null,
+              seenAt: seenAtStr,
+            });
+          }
+          return { ...msg, receipts };
+        }
+        return msg;
+      }));
+    };
+
     const handleTypingStart = (payload: { conversationId: string; userId: string }) => {
       if (payload.conversationId !== conversationId) return;
       if (payload.userId === currentUserIdRef.current) return;
@@ -648,6 +670,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     socket.on("chat:message_edited", handleMessageEdited);
     socket.on("chat:message_unsent", handleMessageUnsent);
     socket.on("chat:message_status_update", handleStatusUpdate);
+    socket.on("chat:conversation_status_update", handleConversationStatusUpdate);
     socket.on("chat:typing_start", handleTypingStart);
     socket.on("chat:typing_stop", handleTypingStop);
     socket.on("chat:error", handleChatError);
@@ -658,6 +681,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       socket.off("chat:message_edited", handleMessageEdited);
       socket.off("chat:message_unsent", handleMessageUnsent);
       socket.off("chat:message_status_update", handleStatusUpdate);
+      socket.off("chat:conversation_status_update", handleConversationStatusUpdate);
       socket.off("chat:typing_start", handleTypingStart);
       socket.off("chat:typing_stop", handleTypingStop);
       socket.off("chat:error", handleChatError);
@@ -669,22 +693,40 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     if (!socket || !isConnected || !conversationId || !messages.length) return;
 
     const currentUser = currentUserIdRef.current;
+    let visibilityTimeout: NodeJS.Timeout;
     
-    // Find messages not sent by us, where our receipt doesn't have a seenAt
-    const unreadMessages = messages.filter(m => {
-      if (m.senderId === currentUser) return false;
-      const myReceipt = m.receipts?.find(r => r.userId === currentUser);
-      return !myReceipt?.seenAt;
-    });
+    const checkAndMarkSeen = () => {
+      // Only mark as seen if the document is focused and visible
+      if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+        return;
+      }
 
-    if (unreadMessages.length > 0) {
-      unreadMessages.forEach(m => {
-        socket.emit("chat:mark_seen", {
-          conversationId,
-          messageId: m.id,
-        });
+      // Find if we have any messages not sent by us that don't have a seenAt receipt
+      const hasUnread = messages.some(m => {
+        if (m.senderId === currentUser) return false;
+        const myReceipt = m.receipts?.find(r => r.userId === currentUser);
+        return !myReceipt?.seenAt;
       });
-    }
+
+      if (hasUnread) {
+        socket.emit("chat:mark_conversation_seen", {
+          conversationId,
+        });
+      }
+    };
+
+    // Check initially (with slight delay to allow rendering/focus changes)
+    visibilityTimeout = setTimeout(checkAndMarkSeen, 500);
+
+    // Also check when window regains focus or visibility changes
+    window.addEventListener("focus", checkAndMarkSeen);
+    document.addEventListener("visibilitychange", checkAndMarkSeen);
+
+    return () => {
+      clearTimeout(visibilityTimeout);
+      window.removeEventListener("focus", checkAndMarkSeen);
+      document.removeEventListener("visibilitychange", checkAndMarkSeen);
+    };
   }, [messages, socket, isConnected, conversationId]);
 
   // ── Send Message ───────────────────────────────────────────────────────────

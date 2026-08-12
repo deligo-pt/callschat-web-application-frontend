@@ -82,9 +82,36 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("[Socket] Auth confirmed by server:", data);
     });
 
+    // Global listener to mark incoming messages as delivered
+    const handleGlobalMessage = (payload: any) => {
+      // Decode userId locally inside the handler since currentUserId might be stale in closure,
+      // or we can use the one calculated above since it's from localStorage.
+      const userId = typeof window !== "undefined" ? (() => {
+        const t = localStorage.getItem("accessToken");
+        if (!t) return null;
+        try {
+          const p = JSON.parse(window.atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+          return p.sub || p.id || null;
+        } catch { return null; }
+      })() : null;
+
+      const senderId = payload.senderId || payload.sender?.id;
+      if (senderId && userId && senderId !== userId) {
+        socketInstance.emit("chat:mark_delivered", {
+          conversationId: payload.conversationId,
+          messageId: payload.id,
+        });
+      }
+    };
+
+    socketInstance.on("chat:receive_message", handleGlobalMessage);
+    socketInstance.on("NEW_MESSAGE", handleGlobalMessage);
+
     setSocket(socketInstance);
 
     return () => {
+      socketInstance.off("chat:receive_message", handleGlobalMessage);
+      socketInstance.off("NEW_MESSAGE", handleGlobalMessage);
       socketInstance.disconnect();
     };
   }, []);

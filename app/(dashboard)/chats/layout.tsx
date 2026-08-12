@@ -14,7 +14,7 @@ import { chatService } from "@/services/chat.service";
 import { decryptMessage } from "@/utils/crypto";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { motion } from "framer-motion";
-import { Building2, Heart, Lock, MessageSquare, MoreVertical, Search, Trash2, UserPlus } from "lucide-react";
+import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { Suspense, useCallback, useEffect, useState } from "react";
@@ -38,6 +38,7 @@ interface Conversation {
     ticketId?: string | null;
     mediaType: string | null;
     mediaUrl?: string | null;
+    isDeleted?: boolean;
     createdAt: string;
   } | null;
 }
@@ -53,6 +54,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
+  // Per-conversation typing state: set of conversationIds where someone is typing
+  const [typingConvIds, setTypingConvIds] = useState<Set<string>>(new Set());
   // Tracks the last time the user read each conversation (persisted to localStorage)
   const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
   const pathname = usePathname();
@@ -149,9 +152,38 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       fetchData();
     };
 
+    // Also re-fetch when a message is unsent so the sidebar falls back
+    // to the previous visible message (WhatsApp behaviour).
+    const handleUnsent = () => {
+      fetchData();
+    };
+
+    const handleTypingStart = (payload: { conversationId: string; userId: string }) => {
+      setTypingConvIds((prev) => {
+        const next = new Set(prev);
+        next.add(payload.conversationId);
+        return next;
+      });
+    };
+
+    const handleTypingStop = (payload: { conversationId: string; userId: string }) => {
+      setTypingConvIds((prev) => {
+        const next = new Set(prev);
+        next.delete(payload.conversationId);
+        return next;
+      });
+    };
+
     socket.on("chat:receive_message", handleMessageUpdate);
+    socket.on("chat:message_unsent", handleUnsent);
+    socket.on("chat:typing_start", handleTypingStart);
+    socket.on("chat:typing_stop", handleTypingStop);
+
     return () => {
       socket.off("chat:receive_message", handleMessageUpdate);
+      socket.off("chat:message_unsent", handleUnsent);
+      socket.off("chat:typing_start", handleTypingStart);
+      socket.off("chat:typing_stop", handleTypingStop);
     };
   }, [socket, fetchData]);
 
@@ -314,25 +346,36 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   const getLastMessagePreview = (conv: Conversation) => {
+    // ── Typing indicator takes highest priority (WhatsApp behaviour) ──
+    if (typingConvIds.has(conv.id)) {
+      return "typing…";
+    }
+
     const msg = conv.lastMessage;
     if (!msg) return "No messages yet";
-    if (msg.mediaType === "image") return "📷 Photo";
-    if (msg.mediaType === "video") return "🎥 Video";
-    if (msg.mediaType === "audio") return "🎤 Voice message";
-    if (msg.mediaType === "document") return "📄 Document";
-    
+
+    const isMe = msg.senderId === currentUserId;
+    const youPrefix = isMe ? "You: " : "";
+
+    // ── Media-type previews ──────────────────────────────────────────
+    if (msg.mediaType === "image") return `${youPrefix}📷 Photo`;
+    if (msg.mediaType === "video") return `${youPrefix}🎥 Video`;
+    if (msg.mediaType === "audio") return `${youPrefix}🎤 Voice message`;
+    if (msg.mediaType === "document") return `${youPrefix}📄 Document`;
+
     if (msg.mediaType === "call") {
       if (msg.mediaUrl) {
         try {
           const payload = JSON.parse(msg.mediaUrl);
-          return payload.type === "VIDEO" ? "📹 Video call" : "📞 Audio call";
+          return payload.type === "VIDEO" ? `${youPrefix}📹 Video call` : `${youPrefix}📞 Audio call`;
         } catch (e) {
           // Fallback if parsing fails
         }
       }
-      return "📞 Call";
+      return `${youPrefix}📞 Call`;
     }
-    
+
+    // ── Text previews ────────────────────────────────────────────────
     let textToPreview = "";
     if (decryptedPreviews[conv.id]) {
       textToPreview = decryptedPreviews[conv.id];
@@ -345,7 +388,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     if (textToPreview.startsWith("__PIN_EVENT__:")) {
       try {
         const payload = JSON.parse(textToPreview.substring("__PIN_EVENT__:".length));
-        const isMe = msg.senderId === currentUserId;
         const name = isMe ? "You" : (conv.otherUserName || payload.pinnerName || "Someone");
         const action = payload.action === "pin" ? "pinned" : "unpinned";
         return `📌 ${name} ${action} a message`;
@@ -358,7 +400,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       textToPreview = textToPreview.substring("__EDITED__:".length);
     }
 
-    return textToPreview.length > 50 ? textToPreview.substring(0, 50) + "..." : textToPreview;
+    const truncated = textToPreview.length > 50 ? textToPreview.substring(0, 50) + "..." : textToPreview;
+    return `${youPrefix}${truncated}`;
   };
 
   const filteredConversations = conversations.filter((c) =>
@@ -510,11 +553,13 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                               <p className="mt-0.5 w-full truncate text-left text-[13px] font-medium text-[#8F95B2] flex items-center gap-1">
                                 {(() => {
                                   const preview = getLastMessagePreview(conv);
+                                  const isTyping = typingConvIds.has(conv.id);
                                   return (
-                                    <>
-                                      {!preview.startsWith("📌") && <Lock className="h-3 w-3 shrink-0 text-[#8F95B2]" />}
-                                      <span>{preview}</span>
-                                    </>
+                                    <span
+                                      className={isTyping ? "text-[#3B58F5] font-semibold italic" : ""}
+                                    >
+                                      {preview}
+                                    </span>
                                   );
                                 })()}
                               </p>
