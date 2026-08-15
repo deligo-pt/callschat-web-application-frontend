@@ -106,13 +106,13 @@ export default function Translation() {
                 </motion.div>
 
                 {/* Main Two-Column Content Matrix */}
-                <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-12 mx-auto w-full px-2 sm:px-6 lg:px-8">
+                <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-12 foldable:grid-cols-2 foldable:gap-8 mx-auto w-full px-2 sm:px-6 lg:px-8">
 
                     {/* Left Column: Interactive Chat App UI Preview. The trigger
                         lives on this in-place wrapper; the inner panel slides in
                         from the left as one unit. */}
                     <motion.div
-                        className="lg:col-span-5 flex justify-center w-full"
+                        className="lg:col-span-5 foldable:col-span-1 flex justify-center w-full"
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: true, margin: "-40px" }}
@@ -193,7 +193,7 @@ export default function Translation() {
 
                     {/* Right Column: Custom Non-Card Info Grid Elements */}
                     <motion.div
-                        className="flex flex-col gap-5 lg:col-span-7 w-full"
+                        className="flex flex-col gap-5 lg:col-span-7 foldable:col-span-1 w-full"
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: true, margin: "-50px" }}

@@ -68,10 +68,23 @@ export const useCallSignaling = () => {
   const [outgoingGroupCall, setOutgoingGroupCall] = useState<OutgoingGroupCall | null>(null);
   const [activeGroupCalls, setActiveGroupCalls] = useState<string[]>([]);
   const [isCallMinimized, setIsCallMinimized] = useState<boolean>(false);
-  
-  const pendingPeerRef = useRef<{ name?: string; avatar?: string }>({});
+  /**
+   * WhatsApp-style reconnection state.
+   * When non-null, one of the call participants lost their network and is in
+   * the 45-second reconnect window. The UI should show a "Waiting for X..."
+   * badge on the remote participant's tile.
+   */
+  const [reconnectingUserId, setReconnectingUserId] = useState<string | null>(null);
+
+  /**
+   * Tracks if the LOCAL user disconnected unexpectedly from LiveKit and is waiting
+   * for Socket.io to recover and provide a fresh token.
+   */
+  const [isAwaitingLocalReconnect, setIsAwaitingLocalReconnect] = useState<boolean>(false);
+
   const pendingCancelRef = useRef<boolean>(false);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+  const pendingPeerRef = useRef<{ name?: string; avatar?: string }>({});
   /**
    * Set to true immediately before emitting call:hangup so that the LiveKit
    * `onDisconnected` callback knows the disconnect was user-initiated and
@@ -195,8 +208,71 @@ export const useCallSignaling = () => {
       }
     };
 
+    // -----------------------------------------------------------------------
+    // call:reconnecting
+    //
+    // Received by the SURVIVING participant when the other user's network drops.
+    // We store the disconnectedUserId so the <ActiveCallRoom> can render the
+    // "Waiting for X..." badge on their tile.
+    //
+    // The call session is still alive in LiveKit — we do NOT dismount the room.
+    // -----------------------------------------------------------------------
+    const handleCallReconnecting = (payload: {
+      callId: string;
+      disconnectedUserId: string;
+      reconnectWindowExpiresAt: string;
+    }) => {
+      console.log('[Call] Remote participant is reconnecting:', payload);
+      setReconnectingUserId(payload.disconnectedUserId);
+    };
+
+    // -----------------------------------------------------------------------
+    // call:reconnected
+    //
+    // Received by BOTH parties when the dropped user rejoins:
+    //   A. The reconnecting user (our socket just reconnected + the server
+    //      detected our RECONNECTING call): receives { callId, roomName,
+    //      token, livekitUrl } — we re-mount the LiveKit room.
+    //   B. The surviving participant: receives { callId, reconnectedUserId }
+    //      — we clear the reconnecting overlay.
+    // -----------------------------------------------------------------------
+    const handleCallReconnected = (payload: {
+      callId: string;
+      roomName?: string;
+      token?: string;
+      livekitUrl?: string;
+      reconnectedUserId?: string;
+    }) => {
+      console.log('[Call] Call reconnected:', payload);
+      // Always clear the reconnecting overlay
+      setReconnectingUserId(null);
+      setIsAwaitingLocalReconnect(false); // Clear local reconnect state
+
+      // Case A: we are the returning user and received a fresh token
+      if (payload.token && payload.roomName && payload.livekitUrl) {
+        setActiveCall(current => {
+          if (!current) {
+            // We were fully dismounted — restore the active call
+            return {
+              callId: payload.callId,
+              token: payload.token!,
+              serverUrl: payload.livekitUrl!,
+              roomName: payload.roomName!,
+              // Preserve call type and group from the pending peer ref if available
+              callType: 'AUDIO',
+            };
+          }
+          // Already mounted (LiveKit auto-reconnected) — just refresh the token
+          return { ...current, token: payload.token!, callId: payload.callId };
+        });
+      }
+      // Case B: nothing to do beyond clearing the overlay (already done above)
+    };
 
     socket.on('call:incoming', handleIncomingCall);
+    socket.on('call:reconnecting', handleCallReconnecting);
+    socket.on('call:reconnected', handleCallReconnected);
+
     socket.on('call:connected', handleCallConnected);
     socket.on('call:ended', handleCallEnded);
     socket.on('call:missed', handleCallEnded);
@@ -293,6 +369,8 @@ export const useCallSignaling = () => {
       socket.off('call:rejected', handleCallEnded);
       socket.off('call:unavailable', handleCallUnavailable);
       socket.off('call:error', handleCallError);
+      socket.off('call:reconnecting', handleCallReconnecting);
+      socket.off('call:reconnected', handleCallReconnected);
       socket.off('group:call_active', handleGroupCallActive);
       socket.off('group:call_incoming', handleGroupCallIncoming);
       socket.off('group:call_missed', handleGroupCallTerminated);
@@ -556,20 +634,27 @@ export const useCallSignaling = () => {
   );
 
   // -------------------------------------------------------------------------
-  // onLiveKitDisconnected
+  // onLiveKitDisconnected (UPDATED — WhatsApp-style reconnect)
   //
   // Pass this as the `onDisconnected` prop of <LiveKitRoom>.
   //
-  // LiveKit fires onDisconnected in many situations that are NOT user hang-ups:
-  //   - DataChannel errors during WebRTC negotiation
-  //   - Brief network drops that trigger reconnection
-  //   - The component unmounting because hangupCall() already set activeCall=null
+  // PREVIOUS BEHAVIOR: any unexpected disconnect → emit call:hangup → call ended.
+  // This caused calls to terminate on every brief network hiccup.
   //
-  // Without this guard, ANY disconnect → hangupCall() → call:hangup emitted →
-  // call:ended sent to the other party, killing the call unexpectedly.
+  // NEW BEHAVIOR (WhatsApp-style):
+  //   - User-initiated hangup:   unchanged. userInitiatedHangupRef prevents a
+  //     duplicate call:hangup from being emitted by this handler.
+  //   - Unexpected disconnect:   we do NOT emit call:hangup. The server's
+  //     `socket.on('disconnect')` handler already transitions the call to
+  //     RECONNECTING and emits call:reconnecting to the other party.
+  //     LiveKit itself will attempt to reconnect automatically for up to
+  //     the room's departureTimeout (45 seconds). If it succeeds, the
+  //     server's reconnect probe fires call:reconnected to both parties.
+  //     If it times out, the background sweeper ends the call and both
+  //     parties receive call:ended.
   //
-  // Fix: only emit call:hangup from onDisconnected when the disconnect was
-  // NOT already handled by a user-initiated hangup/leave action.
+  //   The local user sees the useConnectionState() RECONNECTING overlay
+  //   in <ActiveCallRoom> for the duration of the LiveKit auto-reconnect.
   // -------------------------------------------------------------------------
   const onLiveKitDisconnected = useCallback(() => {
     if (userInitiatedHangupRef.current) {
@@ -580,19 +665,18 @@ export const useCallSignaling = () => {
       return;
     }
 
-    // Unexpected disconnect (network drop, DataChannel error, server closed).
-    // Read the current call state from a functional update so we have the
-    // latest callId without a stale closure.
-    console.warn('[Call] LiveKit disconnected unexpectedly — cleaning up local state');
-    setActiveCall(currentCall => {
-      if (currentCall && socket) {
-        // Notify the backend so the other party sees call:ended in real-time.
-        // Without this, the other party’s UI stays connected until they hang up.
-        socket.emit('call:hangup', { callId: currentCall.callId });
-      }
-      return null;
-    });
-  }, [socket]);
+    // Unexpected disconnect (network drop, DataChannel error, etc.).
+    // We intentionally do NOT emit call:hangup here.
+    console.warn(
+      '[Call] LiveKit disconnected unexpectedly — reconnect window open, awaiting server recovery',
+    );
+    setIsAwaitingLocalReconnect(true); // Trigger local overlay
+    
+    // Clear the active call state ONLY if the user's socket also dropped
+    // and the server confirmed the call ended (via call:ended listener above).
+    // Do NOT clear it here — it would dismount the LiveKitRoom before LiveKit
+    // has a chance to auto-reconnect.
+  }, []);
 
   return {
     incomingCall,
@@ -601,6 +685,8 @@ export const useCallSignaling = () => {
     incomingGroupCall,
     outgoingGroupCall,
     activeGroupCalls,
+    reconnectingUserId,
+    isAwaitingLocalReconnect,
     initiateCall,
     acceptCall,
     acceptEscalatedCall,
@@ -618,3 +704,4 @@ export const useCallSignaling = () => {
     setIsCallMinimized,
   };
 };
+

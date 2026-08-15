@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant foldable (@media (horizontal-viewport-segments: 2));
 
 @theme inline {
   /* Brand Colors available as utility classes (e.g., text-primary, bg-dark-navy) */

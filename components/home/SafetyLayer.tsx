@@ -99,13 +99,13 @@ export default function SafetyLayer() {
                 </motion.div>
 
                 {/* Main Columns Content Matrix */}
-                <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-12 px-2 sm:px-6 lg:px-8">
+                <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-12 foldable:grid-cols-2 foldable:gap-8 px-2 sm:px-6 lg:px-8">
 
                     {/* Left Column: Interactive Safety Monitor Display Box. The
                         trigger lives on this in-place wrapper; the inner panel
                         zooms up from ~1/3 size. */}
                     <motion.div
-                        className="lg:col-span-5 flex justify-center w-full"
+                        className="lg:col-span-5 foldable:col-span-1 flex justify-center w-full"
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: true, margin: "-40px" }}
@@ -174,7 +174,7 @@ export default function SafetyLayer() {
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: true, margin: "-50px" }}
-                        className="flex flex-col gap-5 lg:col-span-7 w-full"
+                        className="flex flex-col gap-5 lg:col-span-7 foldable:col-span-1 w-full"
                     >
                         {safetyFeatures.map((item, idx) => {
                             const ItemIcon = item.icon;

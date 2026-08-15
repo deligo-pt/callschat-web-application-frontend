@@ -14,9 +14,10 @@ interface ParticipantTileProps {
   hideName?: boolean;
   className?: string;
   groupMembers?: any[];
+  isReconnecting?: boolean;
 }
 
-export function ParticipantTile({ trackRef, disableOverlay, hideName, className, groupMembers = [] }: ParticipantTileProps) {
+export function ParticipantTile({ trackRef, disableOverlay, hideName, className, groupMembers = [], isReconnecting }: ParticipantTileProps) {
   const { participant } = trackRef;
   const isSpeaking = useIsSpeaking(participant);
   const { contacts } = useContacts();
@@ -93,6 +94,16 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
               className="relative h-24 w-24 md:h-32 md:w-32 rounded-full object-cover border-4 border-[#3B58F5] shadow-lg"
             />
           </div>
+        </div>
+      )}
+
+      {/* Reconnecting Overlay (WhatsApp-style) */}
+      {isReconnecting && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px]">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-[#3B58F5] mb-3" />
+          <span className="text-sm font-semibold text-white tracking-wide">
+            Reconnecting...
+          </span>
         </div>
       )}
 
