@@ -6,27 +6,22 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import QRCode from "react-qr-code";
+import { useQrLogin } from "@/hooks/useQrLogin";
 
 export default function WebLoginScreen() {
   const router = useRouter();
-  const [countdown, setCountdown] = React.useState(25);
-  const [qrValue, setQrValue] = React.useState("callschat-login-token-1");
   const [isHelpOpen, setIsHelpOpen] = React.useState(false);
 
-  React.useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          setQrValue(`callschat-login-token-${Date.now()}`);
-          return 25;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // Real QR login state — connected to the /qr-auth Socket.IO namespace
+  const { status, qrValue, countdown, errorMessage, refreshQrCode } = useQrLogin();
 
   const formatTime = (s: number) => `00:${s.toString().padStart(2, "0")}`;
+
+  // Whether the QR code box should show a loading/error overlay
+  const isQrReady = status === "ready" || status === "expired";
+  const isLoading = status === "connecting" || status === "generating";
+  const isSuccess = status === "success";
+  const isError = status === "error";
 
   return (
     <div className="relative min-h-screen w-full bg-white font-sans overflow-x-hidden flex flex-col">
@@ -269,17 +264,72 @@ export default function WebLoginScreen() {
                   background: "#fff", borderRadius: 9,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   padding: "7px",
+                  position: "relative",
                 }}
               >
-                <div style={{ position: "relative", width: 263, height: 263, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <QRCode value={qrValue} size={263} fgColor="#2563EB" level="Q" style={{ width: "100%", height: "100%", maxWidth: 263, maxHeight: 263 }} />
-                  {/* Logo overlay: white circle 65x62 */}
-                  <div style={{ position: "absolute", width: 65, height: 62, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 62, height: 62, borderRadius: 9999, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Image src="/call_chats_logo.png" alt="Logo" width={58} height={42} style={{ objectFit: "contain" }} />
+                {/* Real QR code when token is ready */}
+                {isQrReady && qrValue && (
+                  <div style={{ position: "relative", width: 263, height: 263, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <QRCode value={qrValue} size={263} fgColor="#2563EB" level="Q" style={{ width: "100%", height: "100%", maxWidth: 263, maxHeight: 263 }} />
+                    {/* Logo overlay */}
+                    <div style={{ position: "absolute", width: 65, height: 62, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: 62, height: 62, borderRadius: 9999, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Image src="/call_chats_logo.png" alt="Logo" width={58} height={42} style={{ objectFit: "contain" }} />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Loading overlay (connecting / generating) */}
+                {isLoading && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                    <div
+                      style={{
+                        width: 40, height: 40, borderRadius: 9999,
+                        border: "3px solid #E5E7EB",
+                        borderTopColor: "#2563EB",
+                        animation: "spin 0.9s linear infinite",
+                      }}
+                    />
+                    <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 13, color: "#6A7282" }}>
+                      {status === "connecting" ? "Connecting…" : "Generating QR…"}
+                    </span>
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                  </div>
+                )}
+
+                {/* Success overlay */}
+                {isSuccess && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 9999, background: "#22C55E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5}>
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    </div>
+                    <span style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, color: "#16A34A" }}>Logged in!</span>
+                    <span style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 12, color: "#6A7282" }}>Redirecting…</span>
+                  </div>
+                )}
+
+                {/* Error overlay */}
+                {isError && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "0 12px", textAlign: "center" }}>
+                    <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 13, color: "#EF4444" }}>
+                      {errorMessage || "Something went wrong."}
+                    </span>
+                    <button
+                      onClick={refreshQrCode}
+                      style={{
+                        marginTop: 4, padding: "8px 18px",
+                        background: "#2563EB", color: "#fff",
+                        border: "none", borderRadius: 8, cursor: "pointer",
+                        fontFamily: "Inter", fontWeight: 600, fontSize: 13,
+                      }}
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -293,11 +343,22 @@ export default function WebLoginScreen() {
                   display: "flex", alignItems: "center", gap: 12,
                 }}
               >
-                <RefreshCw size={20} className={cn("text-white/80 shrink-0", countdown <= 5 ? "animate-spin" : "")} />
+                <RefreshCw
+                  size={20}
+                  className={cn("text-white/80 shrink-0", isLoading || countdown <= 5 ? "animate-spin" : "")}
+                  onClick={isError ? refreshQrCode : undefined}
+                  style={isError ? { cursor: "pointer" } : undefined}
+                />
                 <div className="flex-1 min-w-0">
                   <p className="truncate" style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 'clamp(11px, 2vw, 14px)', lineHeight: "20px", color: "#fff", margin: 0 }}>QR code refreshes automatically</p>
                   <p className="truncate" style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 'clamp(11px, 2vw, 14px)', lineHeight: "20px", color: "#BEDBFF", margin: 0 }}>
-                    Expires in <strong style={{ fontWeight: 700, color: "#fff" }}>{formatTime(countdown)}</strong>
+                    {isLoading
+                      ? "Loading…"
+                      : isError
+                      ? <span style={{ color: "#FCA5A5" }}>Connection error — click refresh</span>
+                      : isSuccess
+                      ? <span style={{ color: "#86EFAC" }}>Logged in! Redirecting…</span>
+                      : <>Expires in <strong style={{ fontWeight: 700, color: "#fff" }}>{formatTime(countdown)}</strong></>}
                   </p>
                 </div>
               </div>

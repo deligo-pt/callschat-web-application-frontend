@@ -107,3 +107,70 @@ export const decryptGroupMessage = async (ciphertextBase64: string, nonceBase64:
   
   return sodium.to_string(decryptedBytes);
 };
+
+// ── QR Login: Ephemeral Diffie-Hellman Key Exchange ───────────────────────────
+//
+// Used during QR code login to securely transfer the user's private key
+// from the mobile app to the web browser without the server ever seeing it.
+//
+// Protocol:
+//   1. Web generates an ephemeral keypair (webEphPub / webEphPriv).
+//   2. webEphPub is embedded in the QR code JSON alongside the qrToken.
+//   3. Android encrypts the user's private key with webEphPub (crypto_box_easy).
+//   4. Server relays the ciphertext blindly via Socket.IO — cannot decrypt it.
+//   5. Web decrypts using webEphPriv + mobileEphPub.
+//   6. Web derives the matching public key and stores both in localStorage.
+
+/**
+ * Generates a one-time (ephemeral) keypair for a single QR login session.
+ * The private half stays in a React ref — never stored or sent anywhere.
+ * The public half is embedded in the QR code value so the Android app can
+ * encrypt the user's real private key specifically for this browser session.
+ */
+export const generateEphemeralKeyPair = async (): Promise<{
+  publicKey: string;
+  privateKey: string;
+}> => {
+  await sodium.ready;
+  const kp = sodium.crypto_box_keypair();
+  return {
+    publicKey: sodium.to_base64(kp.publicKey, sodium.base64_variants.ORIGINAL),
+    privateKey: sodium.to_base64(kp.privateKey, sodium.base64_variants.ORIGINAL),
+  };
+};
+
+/**
+ * Decrypts the user's private key that was encrypted by the Android app.
+ * Uses the DH secret derived from webEphPriv + mobileEphPub.
+ *
+ * @returns The plaintext private key in base64 — store immediately in localStorage.
+ */
+export const decryptKeyFromMobile = async (
+  encryptedPrivKey: string,
+  mobileEphPub: string,
+  nonce: string,
+  webEphPriv: string,
+): Promise<string> => {
+  await sodium.ready;
+  const decrypted = sodium.crypto_box_open_easy(
+    sodium.from_base64(encryptedPrivKey, sodium.base64_variants.ORIGINAL),
+    sodium.from_base64(nonce, sodium.base64_variants.ORIGINAL),
+    sodium.from_base64(mobileEphPub, sodium.base64_variants.ORIGINAL),
+    sodium.from_base64(webEphPriv, sodium.base64_variants.ORIGINAL),
+  );
+  return sodium.to_base64(decrypted, sodium.base64_variants.ORIGINAL);
+};
+
+/**
+ * Derives the matching public key from a private key using the same scalar
+ * multiplication that crypto_box_keypair uses internally.
+ * This means we only need to sync the private key — the public key is always
+ * recoverable without any extra data transfer.
+ */
+export const derivePublicKeyFromPrivate = async (privateKeyBase64: string): Promise<string> => {
+  await sodium.ready;
+  const privBytes = sodium.from_base64(privateKeyBase64, sodium.base64_variants.ORIGINAL);
+  const pubBytes = sodium.crypto_scalarmult_base(privBytes);
+  return sodium.to_base64(pubBytes, sodium.base64_variants.ORIGINAL);
+};
+
