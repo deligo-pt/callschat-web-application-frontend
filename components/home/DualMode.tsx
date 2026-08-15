@@ -81,7 +81,7 @@ export default function DualMood() {
 
         {/* Two-Column Mode Layout */}
         <motion.div
-          className="grid grid-cols-1 gap-8 md:grid-cols-2"
+          className="grid grid-cols-1 gap-8 md:grid-cols-2 foldable:gap-x-[calc(env(viewport-segment-left_1_0)-env(viewport-segment-width_0_0)+2rem)]"
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-60px" }}

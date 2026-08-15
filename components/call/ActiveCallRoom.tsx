@@ -8,8 +8,9 @@ import {
   useRemoteParticipants,
   useTracks,
   useMediaDeviceSelect,
+  useConnectionState,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { Track, ConnectionState } from "livekit-client";
 import "@livekit/components-styles";
 import { useCallContext } from "@/components/providers/CallContext";
 import { useContacts } from "@/hooks/useContacts";
@@ -45,7 +46,7 @@ interface CustomCallLayoutProps {
   setIsSpeakerMuted: (muted: boolean) => void;
 }
 const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMuted, setIsSpeakerMuted }: CustomCallLayoutProps) => {
-  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected, isCallMinimized, setIsCallMinimized } = useCallContext();
+  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected, isCallMinimized, setIsCallMinimized, reconnectingUserId } = useCallContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const { contacts } = useContacts();
 
@@ -100,6 +101,30 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     ],
     { onlySubscribed: false },
   );
+
+  const connectionState = useConnectionState();
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
+
+  useEffect(() => {
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
+  const { isAwaitingLocalReconnect } = useCallContext();
+
+  const isLocalReconnecting = 
+    connectionState === ConnectionState.Reconnecting || 
+    connectionState === ConnectionState.Connecting ||
+    isOffline ||
+    isAwaitingLocalReconnect;
 
   // Auto-scaling grid algorithm
   let gridClass =
@@ -305,7 +330,12 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
             {/* Video grid */}
             <div className={cn("absolute inset-0 z-0", gridClass)}>
               {tracks.map((trackRef, idx) => (
-                <ParticipantTile key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} trackRef={trackRef} groupMembers={groupMembers} />
+                <ParticipantTile 
+                  key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} 
+                  trackRef={trackRef} 
+                  groupMembers={groupMembers} 
+                  isReconnecting={trackRef.participant.identity === reconnectingUserId}
+                />
               ))}
             </div>
 
@@ -519,7 +549,13 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
           // 1-on-1 Picture-in-Picture Layout
           <div className="relative w-full h-full max-w-5xl mx-auto rounded-[32px] overflow-visible shadow-2xl bg-[#0F172A]">
              <div className="absolute inset-0 rounded-[32px] overflow-hidden bg-black">
-                <ParticipantTile key={`${remoteTrack.participant.identity}-remote`} trackRef={remoteTrack} disableOverlay className="rounded-none ring-0 shadow-none border-0" />
+                <ParticipantTile 
+                  key={`${remoteTrack.participant.identity}-remote`} 
+                  trackRef={remoteTrack} 
+                  disableOverlay 
+                  className="rounded-none ring-0 shadow-none border-0" 
+                  isReconnecting={remoteTrack.participant.identity === reconnectingUserId}
+                />
              </div>
              
              {/* PiP Local Video */}
@@ -540,6 +576,7 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
                 <ParticipantTile
                   key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
                   trackRef={trackRef}
+                  isReconnecting={trackRef.participant.identity === reconnectingUserId}
                 />
               ))}
             </div>
@@ -549,6 +586,17 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
           </div>
         )}
       </div>
+
+      {/* Local Reconnecting Overlay (when OUR network drops) */}
+      {isLocalReconnecting && (
+        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[#3B58F5] mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">Reconnecting...</h3>
+          <p className="text-white/70 text-center max-w-[300px]">
+            Please wait while we try to restore your connection.
+          </p>
+        </div>
+      )}
 
     </div>
   );

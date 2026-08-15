@@ -34,9 +34,18 @@ export interface CallContextType {
    * Guards against the DataChannel error → onDisconnected → double-hangup cascade.
    */
   onLiveKitDisconnected: () => void;
+  /**
+   * WhatsApp-style reconnection state (null when call is stable).
+   * When non-null, contains the userId of the participant whose network dropped.
+   * The <ActiveCallRoom> uses this to show a "Waiting for X..." overlay.
+   */
+  reconnectingUserId: string | null;
+  /** Tracks if WE disconnected abruptly from LiveKit and are awaiting socket recovery */
+  isAwaitingLocalReconnect: boolean;
   isCallMinimized: boolean;
   setIsCallMinimized: (val: boolean) => void;
 }
+
 
 export const CallContext = createContext<CallContextType | null>(null);
 

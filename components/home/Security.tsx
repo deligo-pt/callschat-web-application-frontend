@@ -110,7 +110,7 @@ export default function Security() {
                 </motion.div>
 
                 {/* Two Column Section Layout */}
-                <div className="flex flex-col md:flex-row justify-between items-center w-full gap-10">
+                <div className="flex flex-col md:flex-row justify-between items-center w-full gap-10 foldable:gap-x-[calc(env(viewport-segment-left_1_0)-env(viewport-segment-width_0_0)+2rem)]">
 
                     {/* Left Column: Feature Items List Block */}
                     <motion.div

@@ -98,7 +98,7 @@ export default function Features() {
 
                 {/* Features Matrix Grid */}
                 <motion.div
-                    className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+                    className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 foldable:grid-cols-2 foldable:gap-x-[calc(env(viewport-segment-left_1_0)-env(viewport-segment-width_0_0)+2rem)]"
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-50px" }}

@@ -77,7 +77,7 @@ export default function Hero({ onDownloadClick }: HeroProps) {
                     <motion.div
                         initial={false}
                         animate={contentControls}
-                        className="relative z-10 flex h-full max-w-xl flex-col justify-center"
+                        className="relative z-10 flex h-full max-w-xl foldable:max-w-[calc(env(viewport-segment-width_0_0)-4rem)] flex-col justify-center"
                     >
 
                         {/* Tagline Badge */}
