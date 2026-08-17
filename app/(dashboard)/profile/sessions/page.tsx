@@ -172,10 +172,16 @@ export default function SessionsManagementPage() {
                           </div>
                           
                           <div className="mt-1 flex flex-col gap-0.5">
-                            {session.ipAddress && (
+                            {session.browser && (
+                              <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                                <Laptop className="h-3.5 w-3.5 shrink-0" />
+                                <span>{session.browser}</span>
+                              </div>
+                            )}
+                            {(session.location || session.ipAddress) && (
                               <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
                                 <Globe className="h-3.5 w-3.5 shrink-0" />
-                                <span>{session.ipAddress}</span>
+                                <span>{session.location || session.ipAddress}</span>
                               </div>
                             )}
                             <div className="flex items-center gap-1.5 text-[12px] text-slate-500">

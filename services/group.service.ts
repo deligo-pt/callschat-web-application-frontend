@@ -130,8 +130,8 @@ export const groupService = {
     try {
       const response = await apiClient.get(`/groups/${groupId}/messages`);
       return response.data;
-    } catch (error) {
-      console.error(`Failed to fetch group messages for ${groupId}`, error);
+    } catch (error: any) {
+      console.error(`Failed to fetch group messages for ${groupId}`, JSON.stringify(error.response?.data || error.message));
       return { success: false };
     }
   },

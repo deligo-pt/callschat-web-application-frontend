@@ -115,10 +115,8 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
     setIsSaving(true);
     try {
       const clean = usernameInput.trim().toLowerCase();
-      // 1. Update backend directly via FormData multipart patch to ensure profile updates cleanly
-      const updateForm = new FormData();
-      updateForm.append("username", clean);
-      await apiClient.patch("/user/profile", updateForm);
+      // 1. Update username directly via dedicated JSON endpoint
+      await apiClient.patch("/user/username", { username: clean });
 
       // 2. Update context state
       setFormData({ ...formData, username: clean });

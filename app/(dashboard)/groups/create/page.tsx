@@ -9,6 +9,7 @@ import { groupService } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
 import { useContacts } from "@/hooks/useContacts";
 import { generateGroupKey, encryptMessage } from "@/utils/crypto";
+import { getUserPrivateKey } from "@/utils/keyStore";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useGroupStore } from "@/hooks/useGroupStore";
 import { getOptimizedImageUrl } from "@/utils/image";
@@ -111,8 +112,7 @@ export default function CreateGroupPage() {
 
       if (!myUserId) throw new Error("Could not identify current user");
 
-      const myPrivKeyName = `privateKey_${myUserId}`;
-      let myPrivKey = localStorage.getItem(myPrivKeyName) || localStorage.getItem("privateKey");
+      let myPrivKey = await getUserPrivateKey(myUserId);
       
       if (!myPrivKey) throw new Error("Local private key missing");
 
@@ -127,7 +127,7 @@ export default function CreateGroupPage() {
         const res = await chatService.fetchRecipientKey(userId);
         let pubKey = "";
         if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          pubKey = res.data[res.data.length - 1].publicKey;
+          pubKey = res.data[0].publicKey;
         } else if (res?.success && res?.data?.publicKey) {
           pubKey = res.data.publicKey;
         }
