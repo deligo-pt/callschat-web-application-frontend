@@ -12,6 +12,7 @@ import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { decryptMessage } from "@/utils/crypto";
+import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { motion } from "framer-motion";
 import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus } from "lucide-react";
@@ -252,12 +253,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     const decryptPreviews = async () => {
       if (!currentUserId || conversations.length === 0) return;
       
-      const privKeyName = `privateKey_${currentUserId}`;
-      let myPrivateKey = localStorage.getItem(privKeyName);
-      if (!myPrivateKey) {
-        myPrivateKey = localStorage.getItem("privateKey"); // fallback
-      }
+      let myPrivateKey = await getUserPrivateKey(currentUserId);
       if (!myPrivateKey) return;
+      let myPublicKey = await getUserPublicKey(currentUserId);
 
       const newPreviews = { ...decryptedPreviews };
       let hasChanges = false;
@@ -306,7 +304,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           if (!pubKeyToUse) {
             const res = await chatService.fetchRecipientKey(targetUserId);
             if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-              pubKeyToUse = res.data[res.data.length - 1].publicKey;
+              pubKeyToUse = res.data[0].publicKey;
             } else if (res?.success && res?.data?.publicKey) {
               pubKeyToUse = res.data.publicKey;
             }

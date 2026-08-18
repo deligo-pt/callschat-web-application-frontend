@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
+import { getUserPrivateKey, getUserPublicKey, migrateKeysFromLocalStorage } from "@/utils/keyStore";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
 import { compressImage } from "@/utils/image";
 import { toast } from "sonner";
@@ -93,10 +94,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   // ── Key Setup ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === "undefined" || !currentUserId) return;
-    const privKeyName = `privateKey_${currentUserId}`;
-    const pubKeyName = `publicKey_${currentUserId}`;
-    setMyPrivateKey(localStorage.getItem(privKeyName));
-    setMyPublicKey(localStorage.getItem(pubKeyName));
+    const loadKeys = async () => {
+      await migrateKeysFromLocalStorage(currentUserId);
+      const privKey = await getUserPrivateKey(currentUserId);
+      const pubKey = await getUserPublicKey(currentUserId);
+      setMyPrivateKey(privKey);
+      setMyPublicKey(pubKey);
+    };
+    loadKeys();
   }, [currentUserId]);
 
   // ── Fetch Recipient Public Key ─────────────────────────────────────────────

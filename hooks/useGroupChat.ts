@@ -3,6 +3,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { groupService } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
 import { generateGroupKey, encryptMessage, encryptGroupMessage, decryptGroupMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
+import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
 
 export interface GroupMessage {
   id: string;
@@ -72,13 +73,13 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         // 0. Ensure local keypair exists before checking or creating group keys
         const privKeyName = `privateKey_${currentUserId}`;
         const pubKeyName = `publicKey_${currentUserId}`;
-        let localPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey");
-        let localPubKey = localStorage.getItem(pubKeyName) || localStorage.getItem("publicKey");
+        let localPrivKey = await getUserPrivateKey(currentUserId);
+        let localPubKey = await getUserPublicKey(currentUserId);
 
         if (!localPrivKey || !localPubKey) {
           console.log("[useGroupChat] Local keypair missing, generating new keypair for user:", currentUserId);
           localPubKey = await generateAndStoreKeyPair(currentUserId);
-          localPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey");
+          localPrivKey = await getUserPrivateKey(currentUserId);
           const deviceId = `web-${currentUserId}`;
           localStorage.setItem("deviceId", deviceId);
           try {
@@ -109,7 +110,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           const isCreatorOrAdmin = currentUserId === creatorId || myRoleRes.data?.myRole === 'ADMIN' || myRoleRes.data?.myRole === 'OWNER';
           if (isCreatorOrAdmin && currentUserId) {
             console.log("[useGroupChat] Auto-initializing E2EE group key for group:", groupId);
-            const myPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey") || localPrivKey;
+            const myPrivKey = (await getUserPrivateKey(currentUserId)) || localPrivKey;
             if (!myPrivKey) {
               throw new Error("Local private key missing for group key initialization");
             }
@@ -206,7 +207,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         // Also include the current user's own public key as a fallback
         // (in case the current user IS the creator and the key is self-encrypted
         // with an older keypair stored locally)
-        const myPubKeyLocal = localStorage.getItem(`publicKey_${currentUserId}`) || localStorage.getItem("publicKey");
+        const myPubKeyLocal = await getUserPublicKey(currentUserId);
         if (myPubKeyLocal && !creatorPubKeys.includes(myPubKeyLocal)) {
           creatorPubKeys.push(myPubKeyLocal);
         }
@@ -216,7 +217,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
 
         // 4. Fetch my private key
-        const myPrivKey = localStorage.getItem(privKeyName) || localStorage.getItem("privateKey") || localPrivKey;
+        const myPrivKey = (await getUserPrivateKey(currentUserId)) || localPrivKey;
         if (!myPrivKey) {
           throw new Error("Missing local private key");
         }

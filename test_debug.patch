@@ -1,0 +1,27 @@
+--- utils/crypto.ts
++++ utils/crypto.ts
+@@ -81,6 +81,9 @@
+ };
+ 
+ export const decryptMessage = async (ciphertext: string, nonce: string, senderPublicKey: string, myPrivateKey: string) => {
++  console.log("DECRYPT_DEBUG_START");
++  console.log("ciphertext:", ciphertext);
++  console.log("nonce:", nonce);
++  console.log("senderPublicKey:", senderPublicKey);
++  console.log("myPrivateKey:", myPrivateKey);
+   const sharedSecret = getSharedSecret(myPrivateKey, senderPublicKey);
++  console.log("sharedSecret hex:", Buffer.from(sharedSecret).toString('hex'));
+   const cipherBytes = base64ToBytes(ciphertext);
+   const nonceBytes = base64ToBytes(nonce);
+   
+   const cipher = xchacha20poly1305(sharedSecret, nonceBytes);
+   
++  try {
+     const decryptedBytes = cipher.decrypt(cipherBytes);
++    console.log("DECRYPT_DEBUG_END_SUCCESS");
+     return bytesToUtf8(decryptedBytes);
++  } catch (e) {
++    console.log("DECRYPT_DEBUG_END_FAIL:", e.message);
++    throw e;
++  }
+ };

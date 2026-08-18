@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { useUser } from "@/context/UserContext";
 import { generateAndStoreKeyPair } from "@/utils/crypto";
+import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
 import { chatService } from "@/services/chat.service";
 
 export function E2EEProvider({ children }: { children: React.ReactNode }) {
@@ -13,15 +14,11 @@ export function E2EEProvider({ children }: { children: React.ReactNode }) {
       if (typeof window === "undefined" || !user?.id || isLoading) return;
 
       const currentUserId = user.id;
-      const privKeyName = `privateKey_${currentUserId}`;
-      const pubKeyName = `publicKey_${currentUserId}`;
-
-      let privKey = localStorage.getItem(privKeyName);
-      let pubKey = localStorage.getItem(pubKeyName);
+      let privKey = await getUserPrivateKey(currentUserId);
+      let pubKey = await getUserPublicKey(currentUserId);
 
       if (!privKey || !pubKey) {
         pubKey = await generateAndStoreKeyPair(currentUserId);
-        privKey = localStorage.getItem(privKeyName);
       }
 
       const deviceId = `web-${currentUserId}`;

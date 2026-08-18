@@ -9,6 +9,8 @@ import {
   decryptKeyFromMobile,
   derivePublicKeyFromPrivate,
 } from "@/utils/crypto";
+import { chatService } from "@/services/chat.service";
+import { storeUserKeys } from "@/utils/keyStore";
 
 // ---------------------------------------------------------------------------
 // QR Login State Machine
@@ -191,15 +193,37 @@ export function useQrLogin() {
               } catch { return null; }
             })();
 
-            // Store with user-specific keys (used by useGroupChat + useChat)
             if (userId) {
-              localStorage.setItem(`privateKey_${userId}`, privKey);
-              localStorage.setItem(`publicKey_${userId}`, pubKey);
+              try {
+                const res = await chatService.fetchRecipientKey(userId);
+                let serverPubKey = null;
+                if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+                  serverPubKey = res.data[0].publicKey;
+                } else if (res?.success && res?.data?.publicKey) {
+                  serverPubKey = res.data.publicKey;
+                }
+                
+                if (serverPubKey && serverPubKey !== pubKey) {
+                  throw new Error("Key signature mismatch: derived public key does not match the server's registered key.");
+                }
+              } catch (validationErr) {
+                console.error("[QR Login] Key validation failed:", validationErr);
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("refreshToken");
+                setState((prev) => ({
+                  ...prev,
+                  status: "error",
+                  errorMessage: "Security mismatch: the synchronized key does not match your account. Login aborted."
+                }));
+                webEphPrivRef.current = null;
+                webEphPubRef.current = null;
+                socketRef.current?.disconnect();
+                return;
+              }
+              
+              await storeUserKeys(userId, privKey, pubKey);
             }
-            // Also store under fallback keys used in older code paths
-            localStorage.setItem("privateKey", privKey);
-            localStorage.setItem("publicKey", pubKey);
-
+            // Only store user-specific keys
             console.log("[QR Login] ✅ Encryption keypair synced from mobile device.");
           } catch (err) {
             // Key decryption failed — not fatal. User can still use the app
