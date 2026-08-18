@@ -14,11 +14,19 @@ export default function SetupProfileScreen() {
   const router = useRouter();
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
+  const [gender, setGender] = React.useState<"MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY" | "">("");
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = React.useState(false);
   const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
   
   const [isPending, startTransition] = React.useTransition();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const displayAvatarSrc = React.useMemo(() => {
+    if (photoPreview) return photoPreview;
+    if (gender === "MALE") return "/default-avatar-male.png";
+    if (gender === "FEMALE") return "/default-avatar-female.png";
+    return "/default-avatar.png";
+  }, [photoPreview, gender]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,6 +62,9 @@ export default function SetupProfileScreen() {
         const formData = new FormData();
         formData.append("firstName", firstName.trim());
         formData.append("lastName", lastName.trim());
+        if (gender) {
+          formData.append("gender", gender);
+        }
 
         if (fileInputRef.current?.files?.[0]) {
           const mediaForm = new FormData();
@@ -85,6 +96,15 @@ export default function SetupProfileScreen() {
     });
   };
 
+  const handleSkip = async () => {
+    try {
+      await apiClient.post("/user/profile/skip");
+    } catch {
+      // Ignore network failure on skip
+    }
+    router.push("/chats");
+  };
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] font-sans">
       {/* Hidden File Input */}
@@ -97,7 +117,7 @@ export default function SetupProfileScreen() {
       />
 
       {/* Top Header Section */}
-      <div className="flex flex-col items-center justify-center pt-16 pb-12 text-white px-4">
+      <div className="flex flex-col items-center justify-center pt-16 pb-10 text-white px-4">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 text-center">
           Set up your profile
         </h1>
@@ -107,28 +127,29 @@ export default function SetupProfileScreen() {
       </div>
 
       {/* Bottom White Section */}
-      <div className="flex-1 rounded-t-[2.5rem] sm:rounded-t-[3.5rem] bg-white px-6 py-10 sm:px-12 flex flex-col items-center shadow-2xl relative">
-        <div className="w-full max-w-[400px] flex-1 flex flex-col pt-4 sm:pt-6">
+      <div className="flex-1 rounded-t-[2.5rem] sm:rounded-t-[3.5rem] bg-white px-6 py-8 sm:px-12 flex flex-col items-center shadow-2xl relative">
+        <div className="w-full max-w-[420px] flex-1 flex flex-col pt-2 sm:pt-4">
 
-          {/* Avatar Section */}
-          <div className="flex justify-center mb-10">
+          {/* Avatar Section with dynamic cartoon preview */}
+          <div className="flex justify-center mb-6">
             <div className="relative group">
               <button 
                 type="button"
                 onClick={() => setIsPhotoPickerOpen(true)}
-                className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-[6px] border-[#EEF2FF] bg-[#E2E8F0] transition-all hover:border-blue-100 shadow-sm"
+                className="flex h-28 w-28 sm:h-32 sm:w-32 items-center justify-center overflow-hidden rounded-full border-[5px] border-[#EEF2FF] bg-[#E2E8F0] transition-all hover:border-blue-100 shadow-md group-hover:scale-[1.02]"
               >
-                {photoPreview ? (
-                  <img src={photoPreview} alt="Profile preview" className="h-full w-full object-cover" />
-                ) : (
-                  <User className="h-16 w-16 text-slate-500" strokeWidth={1.5} />
-                )}
+                <img 
+                  src={displayAvatarSrc} 
+                  alt="Profile preview" 
+                  className="h-full w-full object-cover" 
+                />
               </button>
               
               <button 
                 type="button"
                 onClick={() => setIsPhotoPickerOpen(true)}
                 className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-[#2563EB] shadow-md text-white transition-transform hover:scale-110 active:scale-95"
+                title="Change Photo"
               >
                 <Camera className="h-4 w-4" />
               </button>
@@ -136,8 +157,8 @@ export default function SetupProfileScreen() {
           </div>
 
           {/* Form Fields */}
-          <div className="space-y-6">
-            <div className="space-y-2">
+          <div className="space-y-4">
+            <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 pl-1">
                 First Name
               </label>
@@ -147,11 +168,11 @@ export default function SetupProfileScreen() {
                 value={firstName}
                 disabled={isPending}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="flex h-12 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
+                className="flex h-11 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 pl-1">
                 Last Name
               </label>
@@ -161,27 +182,80 @@ export default function SetupProfileScreen() {
                 value={lastName}
                 disabled={isPending}
                 onChange={(e) => setLastName(e.target.value)}
-                className="flex h-12 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
+                className="flex h-11 w-full rounded-xl border border-indigo-50 bg-[#EEF2FF] px-4 text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:border-indigo-100"
               />
+            </div>
+
+            {/* Optional Gender Selection */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between pl-1">
+                <label className="text-xs font-bold text-slate-700">
+                  Gender
+                </label>
+                <span className="text-[11px] font-medium text-slate-400">Optional</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGender(gender === "MALE" ? "" : "MALE")}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 h-10 rounded-xl border text-xs font-semibold transition-all",
+                    gender === "MALE"
+                      ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                  <span>👨</span>
+                  <span>Male</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGender(gender === "FEMALE" ? "" : "FEMALE")}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 h-10 rounded-xl border text-xs font-semibold transition-all",
+                    gender === "FEMALE"
+                      ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                  <span>👩</span>
+                  <span>Female</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGender(gender === "PREFER_NOT_TO_SAY" ? "" : "PREFER_NOT_TO_SAY")}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 h-10 rounded-xl border text-xs font-semibold transition-all",
+                    gender === "PREFER_NOT_TO_SAY" || gender === "OTHER"
+                      ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                  <span>✨</span>
+                  <span>Other</span>
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Info Box */}
-          <div className="mt-8 flex items-start gap-3 rounded-xl border border-blue-50 bg-[#EEF2FF] p-4">
+          <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-blue-50 bg-[#EEF2FF] p-3">
             <Info className="h-4 w-4 text-[#2563EB] shrink-0 mt-0.5" />
             <p className="text-xs font-medium leading-relaxed text-[#2563EB]">
-              Your name will be visible to your contacts. You can change it anytime in settings.
+              Your name will be visible to your contacts. You can change your information or avatar anytime.
             </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="mt-auto space-y-4 pt-12 pb-6">
+          <div className="mt-auto space-y-3 pt-6 pb-4">
             <button
               type="button"
               onClick={handleRegister}
               disabled={!firstName || !lastName || isPending}
               className={cn(
-                "w-full flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-bold transition-all duration-200 shadow-sm",
+                "w-full flex items-center justify-center gap-2 rounded-xl h-11 text-sm font-bold transition-all duration-200 shadow-sm",
                 firstName && lastName && !isPending
                   ? "bg-[#2563EB] text-white hover:bg-blue-700 active:scale-[0.99]"
                   : "cursor-not-allowed bg-slate-100 text-slate-400"
@@ -200,8 +274,8 @@ export default function SetupProfileScreen() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => router.push("/chats")}
-                className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                onClick={handleSkip}
+                className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors py-1"
               >
                 Skip for now
               </button>
