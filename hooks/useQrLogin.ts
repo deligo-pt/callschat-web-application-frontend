@@ -196,15 +196,24 @@ export function useQrLogin() {
             if (userId) {
               try {
                 const res = await chatService.fetchRecipientKey(userId);
-                let serverPubKey = null;
+                
+                let isKeyMatch = false;
+
+                // Server returns list of public keys for all devices registered to the user
                 if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                  serverPubKey = res.data[0].publicKey;
-                } else if (res?.success && res?.data?.publicKey) {
-                  serverPubKey = res.data.publicKey;
+                  // Check if the synced key matches any registered device public key
+                  isKeyMatch = res.data.some((device: { publicKey: string }) => device.publicKey === pubKey);
+                } else if (res?.data?.publicKey) {
+                  isKeyMatch = res.data.publicKey === pubKey;
+                } else if (typeof res?.data === "string") {
+                  isKeyMatch = res.data === pubKey;
+                } else {
+                  // If no key was previously stored on the backend, this key is valid
+                  isKeyMatch = true;
                 }
                 
-                if (serverPubKey && serverPubKey !== pubKey) {
-                  throw new Error("Key signature mismatch: derived public key does not match the server's registered key.");
+                if (!isKeyMatch) {
+                  throw new Error("Key signature mismatch: derived public key does not match any registered keys.");
                 }
               } catch (validationErr) {
                 console.error("[QR Login] Key validation failed:", validationErr);
