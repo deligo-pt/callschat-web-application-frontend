@@ -304,6 +304,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           if (!pubKeyToUse) {
             const res = await chatService.fetchRecipientKey(targetUserId);
             if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+              // Backend returns keys newest-first (desc by createdAt) — res.data[0] is active
               pubKeyToUse = res.data[0].publicKey;
             } else if (res?.success && res?.data?.publicKey) {
               pubKeyToUse = res.data.publicKey;
