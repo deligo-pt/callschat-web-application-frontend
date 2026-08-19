@@ -4,9 +4,13 @@ import { useQrLogin } from "@/hooks/useQrLogin";
 import { Locale, routing } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import {
+  ArrowUpRight,
   Check,
+  ChevronRight,
   Globe,
   HelpCircle,
+  Info,
+  Lock,
   Mail,
   MessageCircle,
   MessageSquare,
@@ -39,6 +43,7 @@ const LANGUAGE_LABELS: Record<Locale, { label: string; flag: string }> = {
 
 export default function WebLoginScreen() {
   const router = useRouter();
+  const [stayLoggedIn, setStayLoggedIn] = React.useState(true);
   const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false);
   const [isDarkMode, setIsDarkMode] = React.useState(false);
@@ -55,6 +60,7 @@ export default function WebLoginScreen() {
   const isLoading = status === "connecting" || status === "generating";
   const isSuccess = status === "success";
   const isError = status === "error";
+  const isExpired = status === "expired";
 
   // Initialize theme & locale from localStorage on mount
   React.useEffect(() => {
@@ -140,7 +146,7 @@ export default function WebLoginScreen() {
         style={{ right: 0, top: 0, width: 251, height: 259, color: "#C7DFFE" }}
       />
 
-      {/* ── NAVBAR (Figma BusinessLanding: 64px height, exact borders & logo) ── */}
+      {/* ── NAVBAR (64px height, exact brand logo & controls) ── */}
       <header
         className="relative z-30 flex items-center justify-between w-full bg-white dark:bg-[#0E1528] border-b border-[#F3F4F6] dark:border-slate-800 transition-colors duration-300"
         style={{
@@ -216,7 +222,7 @@ export default function WebLoginScreen() {
               style={{
                 width: 40,
                 height: 22,
-                background: isDarkMode ? "#155DFC" : "#155DFC",
+                background: "#155DFC",
                 borderRadius: 9999,
               }}
             >
@@ -306,7 +312,7 @@ export default function WebLoginScreen() {
         </div>
       </header>
 
-      {/* ── MAIN CONTENT (Figma 2-Column: 1440px layout max-width) ── */}
+      {/* ── MAIN CONTENT (2-Column Layout) ── */}
       <main className="relative w-full flex-grow flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12 lg:gap-8 px-4 sm:px-8 md:px-12 lg:px-[68px] pt-10 pb-20 max-w-[1440px] mx-auto z-10">
 
         {/* ── LEFT: Marketing copy & App Downloads ── */}
@@ -315,13 +321,13 @@ export default function WebLoginScreen() {
           {/* Headings */}
           <div className="flex flex-col mb-5 lg:mb-0 lg:gap-[-10px] text-center lg:text-left">
             <h1
-              className="text-4xl sm:text-5xl lg:text-[56px] leading-[1.2em] text-[#101828] dark:text-white m-0"
+              className="text-4xl sm:text-5xl lg:text-[56px] leading-[1.2em] text-[#101828] dark:text-white m-0 tracking-tight"
               style={{ fontFamily: "Roboto", fontWeight: 700 }}
             >
               The future of
             </h1>
             <h1
-              className="text-4xl sm:text-5xl lg:text-[56px] leading-[1.2em] text-[#155DFC] m-0 lg:pt-2"
+              className="text-4xl sm:text-5xl lg:text-[56px] leading-[1.2em] text-[#155DFC] m-0 lg:pt-2 tracking-tight"
               style={{ fontFamily: "Roboto", fontWeight: 700 }}
             >
               secure messaging
@@ -331,19 +337,19 @@ export default function WebLoginScreen() {
           {/* Subtitle */}
           <div className="pt-4 lg:pt-5 mb-10 text-center lg:text-left">
             <p
-              className="text-lg sm:text-[20px] leading-[1.2em] text-[#6A7282] dark:text-slate-300 max-w-[448px] m-0 mx-auto lg:mx-0"
+              className="text-lg sm:text-[20px] leading-[1.3em] text-[#6A7282] dark:text-slate-300 max-w-[448px] m-0 mx-auto lg:mx-0"
               style={{ fontFamily: "Roboto", fontWeight: 400 }}
             >
               AI-powered conversations with end-to-end encryption. Connect across devices seamlessly — your privacy, your control, your conversations.
             </p>
           </div>
 
-          {/* ── FEATURE CARDS (Figma Exact 3 Cards Layout) ── */}
+          {/* ── FEATURE CARDS (3 Cards) ── */}
           <div className="flex flex-wrap justify-center lg:justify-start gap-[16px] xl:gap-[22.18px] mb-[40px] lg:mb-[90px]">
             
             {/* E2E Encrypted */}
             <div
-              className="relative shrink-0 flex flex-col transition-transform duration-200 hover:-translate-y-1"
+              className="relative shrink-0 flex flex-col transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md group cursor-default"
               style={{
                 width: "clamp(140px, 15vw, 157.89px)",
                 height: 117.44,
@@ -358,7 +364,7 @@ export default function WebLoginScreen() {
                 alt="E2E"
                 width={18}
                 height={22}
-                className="object-cover mb-auto"
+                className="object-cover mb-auto group-hover:scale-110 transition-transform duration-300"
               />
               <div className="flex flex-col">
                 <span style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 14.35, color: "#2563EB" }}>
@@ -370,9 +376,9 @@ export default function WebLoginScreen() {
               </div>
             </div>
 
-            {/* AI-Powered (Figma selected/elevated with dark background offset) */}
+            {/* AI-Powered (selected/elevated card) */}
             <div
-              className="relative shrink-0 transition-transform duration-200 hover:-translate-y-1"
+              className="relative shrink-0 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md group cursor-default"
               style={{
                 width: "clamp(150px, 16vw, 165.72px)",
                 height: 122.66,
@@ -393,7 +399,7 @@ export default function WebLoginScreen() {
                   alt="AI"
                   width={22}
                   height={22}
-                  className="object-cover mb-auto"
+                  className="object-cover mb-auto group-hover:scale-110 transition-transform duration-300"
                 />
                 <div className="flex flex-col">
                   <span style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 14.35, color: "#2563EB" }}>
@@ -408,7 +414,7 @@ export default function WebLoginScreen() {
 
             {/* Instant Sync */}
             <div
-              className="relative shrink-0 flex flex-col transition-transform duration-200 hover:-translate-y-1"
+              className="relative shrink-0 flex flex-col transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md group cursor-default"
               style={{
                 width: "clamp(140px, 15vw, 157.89px)",
                 height: 117.44,
@@ -423,7 +429,7 @@ export default function WebLoginScreen() {
                 alt="Sync"
                 width={14}
                 height={21}
-                className="object-cover mb-auto"
+                className="object-cover mb-auto group-hover:scale-110 transition-transform duration-300"
               />
               <div className="flex flex-col">
                 <span style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 13.05, color: "#2563EB" }}>
@@ -560,351 +566,232 @@ export default function WebLoginScreen() {
           </div>
         </div>
 
-        {/* ── RIGHT: Blue QR Login Panel ── */}
-        <div className="flex flex-col w-full lg:w-1/2 max-w-[519px] items-center lg:items-end z-20">
-          <div
-            className="w-full flex flex-col justify-between shadow-2xl shadow-blue-900/30"
-            style={{
-              height: "auto",
-              minHeight: 642,
-              background: "linear-gradient(224deg, rgba(8,46,121,1) 0%, rgba(11,63,165,1) 65%, rgba(15,85,223,1) 100%)",
-              borderRadius: 16,
-              padding: "70px 0 45px 0",
-            }}
-          >
-            {/* Instructions block */}
-            <div className="px-6 sm:px-[57px] flex flex-col gap-[18px]">
-              <div className="flex flex-col gap-[2px]">
-                <span style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 19, color: "#fff", lineHeight: "25px" }}>
-                  Scan to log in
-                </span>
-                <span style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 11, color: "#fff", lineHeight: "17px" }}>
-                  Use your CallsChat mobile app to scan
-                </span>
-              </div>
-              <div className="flex flex-col gap-[7px]">
-                {[
-                  { num: "1", text: "Open CallsChat on your phone", numColor: "#CAE3FB" },
-                  { num: "2", text: "Tap Menu → Linked Devices", numColor: "#CDE4FB" },
-                  { num: "3", text: "Point your camera at this screen", numColor: "#CBE3FB" },
-                ].map(({ num, text, numColor }) => (
-                  <div key={num} className="flex items-center gap-[9px]">
-                    <div
-                      style={{
-                        width: 28,
-                        height: 27,
-                        borderRadius: 6,
-                        background: "rgba(255,255,255,0.15)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 10, color: numColor }}>
-                        {num}
-                      </span>
+        {/* ── RIGHT: WhatsApp Web-Inspired "Scan to Log In" Section ── */}
+        <div className="flex flex-col w-full lg:w-1/2 max-w-[530px] items-center lg:items-end z-20">
+          
+          {/* Main Scan Card (WhatsApp Web Refined Design & Rich Typography) */}
+          <div className="w-full bg-white dark:bg-[#111B21] rounded-[28px] border border-[#E9ECEF] dark:border-slate-800 p-6 sm:p-8 md:p-9 shadow-[0_4px_30px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300 flex flex-col gap-6">
+            
+            {/* Header: Title */}
+            <div>
+              <h2 className="text-[26px] sm:text-[28px] font-bold tracking-tight text-[#111B21] dark:text-[#E9EDEF] mb-4">
+                Scan to log in
+              </h2>
+
+              {/* 3 Step Stepper with connecting timeline track (WhatsApp Web Design) */}
+              <div className="flex flex-col gap-0 my-3">
+                {/* Step 1 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="flex flex-col items-center">
+                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-slate-600 bg-white dark:bg-slate-800 text-[#111B21] dark:text-white text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
+                      1
                     </div>
-                    <span style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 11, color: "#fff" }}>
-                      {text}
-                    </span>
+                    <div className="w-[1.5px] h-7 bg-[#E2E8F0] dark:bg-slate-700/80 my-1" />
                   </div>
-                ))}
+                  <p className="text-[14px] text-[#3B4A54] dark:text-[#8696A0] pt-0.5 leading-snug">
+                    Open CallsChat on your phone
+                  </p>
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="flex flex-col items-center">
+                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-slate-600 bg-white dark:bg-slate-800 text-[#111B21] dark:text-white text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
+                      2
+                    </div>
+                    <div className="w-[1.5px] h-7 bg-[#E2E8F0] dark:bg-slate-700/80 my-1" />
+                  </div>
+                  <p className="text-[14px] text-[#3B4A54] dark:text-[#8696A0] pt-0.5 leading-snug">
+                    Tap <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">Menu</strong> or <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">Settings</strong> and select <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">Linked Devices</strong>
+                  </p>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="flex flex-col items-center">
+                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-slate-600 bg-white dark:bg-slate-800 text-[#111B21] dark:text-white text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
+                      3
+                    </div>
+                  </div>
+                  <p className="text-[14px] text-[#3B4A54] dark:text-[#8696A0] pt-0.5 leading-snug">
+                    Point your camera at this screen to capture the QR code
+                  </p>
+                </div>
+              </div>
+
+              {/* Need Help link with micro-animation */}
+              <div className="mt-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsHelpOpen(true)}
+                  className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-[#037CFD] hover:underline cursor-pointer group focus:outline-none"
+                >
+                  <span>Need help?</span>
+                  <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </button>
               </div>
             </div>
 
-            {/* QR Code box (Figma 311 x 275px) */}
-            <div className="w-full flex justify-center mt-10 mb-[14px] px-4">
-              <div
-                style={{
-                  width: "100%",
-                  maxWidth: 311,
-                  height: 275,
-                  background: "#fff",
-                  borderRadius: 9,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "7px",
-                  position: "relative",
-                  boxShadow: "0px 4px 20px rgba(0,0,0,0.15)",
-                }}
-              >
-                {/* Real QR code when token is ready */}
+            {/* ── QR CODE FRAME (With Centered CallsChat Logo & Subtle Animations) ── */}
+            <div className="w-full flex flex-col items-center justify-center py-1">
+              <div className="relative w-full max-w-[260px] aspect-square bg-white rounded-2xl p-4 border border-slate-200/90 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden transition-all duration-300">
+                
+                {/* Live QR code */}
                 {isQrReady && qrValue && (
-                  <div
-                    style={{
-                      position: "relative",
-                      width: 263,
-                      height: 263,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                  <div className="relative w-full h-full flex items-center justify-center animate-in fade-in zoom-in-95 duration-300">
                     <QRCode
                       value={qrValue}
-                      size={263}
-                      fgColor="#2563EB"
+                      size={240}
+                      fgColor="#111B21"
                       level="Q"
-                      style={{ width: "100%", height: "100%", maxWidth: 263, maxHeight: 263 }}
+                      className="w-full h-full object-contain"
                     />
-                    {/* Centered Logo overlay */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        width: 65,
-                        height: 62,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 62,
-                          height: 62,
-                          borderRadius: 9999,
-                          background: "#fff",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-                        }}
-                      >
-                        <Image
-                          src="/call_chats_logo.png"
-                          alt="Logo"
-                          width={58}
-                          height={42}
-                          style={{ objectFit: "contain" }}
-                        />
-                      </div>
+                    {/* Centered CallsChat Logo Badge with subtle shadow */}
+                    <div className="absolute w-11 h-11 rounded-full bg-white shadow-md p-1 flex items-center justify-center border border-slate-100/90 ring-2 ring-blue-50/80">
+                      <Image
+                        src="/call_chats_logo.png"
+                        alt="CallsChat"
+                        width={30}
+                        height={30}
+                        className="object-contain"
+                      />
                     </div>
                   </div>
                 )}
 
-                {/* Loading overlay (connecting / generating) */}
+                {/* Loading overlay */}
                 {isLoading && (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                    <div
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 9999,
-                        border: "3px solid #E5E7EB",
-                        borderTopColor: "#2563EB",
-                        animation: "spin 0.9s linear infinite",
-                      }}
-                    />
-                    <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 13, color: "#6A7282" }}>
-                      {status === "connecting" ? "Connecting…" : "Generating QR…"}
+                  <div className="flex flex-col items-center justify-center gap-2.5 text-center p-4">
+                    <div className="w-9 h-9 rounded-full border-3 border-slate-200 border-t-[#037CFD] animate-spin" />
+                    <span className="text-xs font-medium text-slate-600">
+                      {status === "connecting" ? "Connecting to server…" : "Generating QR code…"}
                     </span>
-                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   </div>
                 )}
 
-                {/* Success overlay */}
+                {/* Success overlay with celebration animation */}
                 {isSuccess && (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                    <div
-                      style={{
-                        width: 52,
-                        height: 52,
-                        borderRadius: 9999,
-                        background: "#22C55E",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5}>
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
+                  <div className="flex flex-col items-center justify-center gap-2 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md animate-bounce">
+                      <Check className="w-7 h-7 stroke-[3]" />
                     </div>
-                    <span style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, color: "#16A34A" }}>
-                      Logged in!
-                    </span>
-                    <span style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 12, color: "#6A7282" }}>
-                      Redirecting…
-                    </span>
+                    <span className="text-sm font-bold text-emerald-600">Logged in!</span>
+                    <span className="text-xs text-slate-500 font-medium">Redirecting to chats…</span>
                   </div>
                 )}
 
-                {/* Error overlay */}
-                {isError && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "0 12px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 13, color: "#EF4444" }}>
-                      {errorMessage || "Something went wrong."}
-                    </span>
+                {/* Expired / Error overlay with frosted backdrop blur */}
+                {(isExpired || isError) && (
+                  <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center gap-2.5 animate-in fade-in duration-200">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shadow-xs">
+                      <RefreshCw size={20} className="text-slate-600" />
+                    </div>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {isError ? errorMessage || "Connection failed" : "QR code expired"}
+                    </p>
                     <button
                       type="button"
                       onClick={refreshQrCode}
-                      style={{
-                        marginTop: 4,
-                        padding: "8px 18px",
-                        background: "#2563EB",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 8,
-                        cursor: "pointer",
-                        fontFamily: "Inter",
-                        fontWeight: 600,
-                        fontSize: 13,
-                      }}
+                      className="px-4 py-2 rounded-xl bg-[#037CFD] hover:bg-blue-600 text-white text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
                     >
-                      Try again
+                      Click to reload QR
                     </button>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* QR refresh info bar (Figma 317px width) */}
-            <div className="w-full flex justify-center mt-auto px-4">
-              <div
-                style={{
-                  width: "100%",
-                  maxWidth: 317,
-                  background: "rgba(255,255,255,0.1)",
-                  borderRadius: 18,
-                  padding: "12px 16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
+              {/* Subtext below QR: Live pulsing timer & manual refresh */}
+              <div className="w-full max-w-[260px] mt-3 flex items-center justify-between text-xs text-[#54656F] dark:text-[#8696A0]">
+                <div className="flex items-center gap-2">
+                  {/* Pulsing status dot */}
+                  <span className="relative flex h-2 w-2">
+                    <span className={cn(
+                      "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                      isError || isExpired ? "bg-rose-400" : "bg-emerald-400"
+                    )} />
+                    <span className={cn(
+                      "relative inline-flex rounded-full h-2 w-2",
+                      isError || isExpired ? "bg-rose-500" : "bg-emerald-500"
+                    )} />
+                  </span>
+                  
+                  <span>
+                    Expires in <strong className="font-semibold text-[#111B21] dark:text-slate-200">{formatTime(countdown)}</strong>
+                  </span>
+                </div>
+
                 <button
                   type="button"
                   onClick={refreshQrCode}
-                  aria-label="Refresh QR Code"
-                  className="bg-transparent border-0 p-0 cursor-pointer text-white/80 hover:text-white transition-colors shrink-0"
+                  disabled={isLoading || isSuccess}
+                  className="text-xs font-semibold text-[#037CFD] hover:underline disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer group"
                 >
                   <RefreshCw
-                    size={20}
+                    size={12}
                     className={cn(
                       "transition-transform",
-                      isLoading || countdown <= 5 ? "animate-spin" : "hover:rotate-180 duration-500"
+                      isLoading || countdown <= 5 ? "animate-spin" : "group-hover:rotate-180 duration-500"
                     )}
                   />
+                  <span>Refresh</span>
                 </button>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="truncate m-0"
-                    style={{
-                      fontFamily: "Inter",
-                      fontWeight: 500,
-                      fontSize: "clamp(11px, 2vw, 14px)",
-                      lineHeight: "20px",
-                      color: "#fff",
-                    }}
-                  >
-                    QR code refreshes automatically
-                  </p>
-                  <p
-                    className="truncate m-0"
-                    style={{
-                      fontFamily: "Inter",
-                      fontWeight: 400,
-                      fontSize: "clamp(11px, 2vw, 14px)",
-                      lineHeight: "20px",
-                      color: "#BEDBFF",
-                    }}
-                  >
-                    {isLoading ? (
-                      "Loading…"
-                    ) : isError ? (
-                      <span style={{ color: "#FCA5A5" }}>Connection error — click refresh</span>
-                    ) : isSuccess ? (
-                      <span style={{ color: "#86EFAC" }}>Logged in! Redirecting…</span>
-                    ) : (
-                      <>
-                        Expires in{" "}
-                        <strong style={{ fontWeight: 700, color: "#fff" }}>
-                          {formatTime(countdown)}
-                        </strong>
-                      </>
-                    )}
-                  </p>
-                </div>
               </div>
             </div>
-          </div>
 
-          {/* ── PHONE LOGIN BUTTON (Figma 458 x 56px #155DFC, navigates to /login) ── */}
-          <div className="w-full flex flex-col items-center justify-center mt-[10px] lg:mt-8 gap-2">
-            <button
-              type="button"
-              onClick={() => router.push("/login")}
-              className="hover:scale-[1.01] active:scale-[0.98] transition-transform cursor-pointer"
-              style={{
-                width: "100%",
-                maxWidth: 458,
-                height: 56,
-                background: "#155DFC",
-                borderRadius: 16,
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                boxShadow: "0px 2px 4px -2px rgba(0,0,0,.1),0px 4px 6px -1px rgba(0,0,0,.1)",
-              }}
-            >
-              <Phone size={20} fill="#fff" color="#fff" />
-              <span
-                style={{
-                  fontFamily: "Inter",
-                  fontWeight: 600,
-                  fontSize: 16,
-                  lineHeight: "24px",
-                  color: "#fff",
-                }}
-              >
-                Log in with phone number
-              </span>
-            </button>
+            {/* Bottom Row inside card: Stay logged in checkbox & Phone login link */}
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-[#3B4A54] dark:text-[#8696A0]">
+                <input
+                  type="checkbox"
+                  checked={stayLoggedIn}
+                  onChange={(e) => setStayLoggedIn(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#037CFD] focus:ring-[#037CFD] border-slate-300 dark:border-slate-600 dark:bg-slate-800 accent-[#037CFD] cursor-pointer"
+                />
+                <span>Stay logged in on this browser</span>
+                <span title="Keeps you signed in on this device so you don't need to re-scan.">
+                  <Info
+                    size={13}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-help"
+                  />
+                </span>
+              </label>
 
-            {/* Subtle Sign Up Link for New Users */}
-            <div className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
-              New to CallsChat?{" "}
-              <Link
-                href="/signup"
-                className="font-bold text-[#155DFC] hover:underline transition-colors ml-0.5"
+              {/* Log in with phone number link with slide animation */}
+              <button
+                type="button"
+                onClick={() => router.push("/login")}
+                className="text-xs sm:text-sm font-semibold text-[#037CFD] hover:underline inline-flex items-center gap-0.5 cursor-pointer group focus:outline-none"
               >
-                Create an account
-              </Link>
+                <span>Log in with phone number</span>
+                <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+              </button>
             </div>
           </div>
 
-          {/* ── E2E ENCRYPTED TEXT (Figma 9px #102A63) ── */}
-          <div className="w-full flex justify-center xl:justify-center mt-3 lg:mt-[40px] mb-8 lg:mb-0">
-            <p
-              className="text-center"
-              style={{
-                fontFamily: "Inter",
-                fontWeight: 400,
-                fontSize: 9,
-                color: "#102A63",
-                margin: 0,
-              }}
-            >
-              End-to-end encrypted - Your data stays private
-            </p>
+          {/* ── BELOW THE SCAN CARD: Sign Up Link & Prominent High-Visibility E2EE Security Banner ── */}
+          <div className="w-full flex flex-col items-center gap-2.5 mt-5 text-center">
+            <div className="text-xs sm:text-[13px] font-medium text-[#3B4A54] dark:text-[#8696A0]">
+              Don&apos;t have a CallsChat account?{" "}
+              <Link
+                href="/signup"
+                className="font-semibold text-[#037CFD] hover:underline inline-flex items-center gap-0.5 ml-0.5 group"
+              >
+                <span>Get started</span>
+                <ArrowUpRight size={13} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </Link>
+            </div>
+
+            {/* Prominent High-Visibility E2EE Lock Banner */}
+            <div className="flex items-center justify-center gap-2 text-[13px] sm:text-[13.5px] font-medium text-[#54656F] dark:text-[#8696A0] pt-1">
+              <Lock size={14} className="text-[#54656F] dark:text-[#8696A0] shrink-0" />
+              <span>Your personal messages are end-to-end encrypted</span>
+            </div>
           </div>
+
         </div>
       </main>
 
-      {/* ── HELP WIDGET (Figma 146 x 234px #102A63 Support Card & Floating Button) ── */}
+      {/* ── HELP / SUPPORT POPUP WIDGET ── */}
       <div
         ref={helpRef}
         className="fixed z-50 bottom-6 right-6 flex flex-col items-end gap-2"
@@ -913,7 +800,7 @@ export default function WebLoginScreen() {
           <div
             className="animate-in fade-in slide-in-from-bottom-3 duration-200"
             style={{
-              width: 146,
+              width: 170,
               background: "#fff",
               border: "1px solid #E8E8E8",
               borderRadius: 16,
@@ -925,8 +812,8 @@ export default function WebLoginScreen() {
             }}
           >
             {/* Need help heading */}
-            <div style={{ padding: "12px 18px 8px" }} className="flex items-center justify-between">
-              <span style={{ fontFamily: "Roboto", fontWeight: 700, fontSize: 18, color: "#102A63" }}>
+            <div style={{ padding: "12px 16px 8px" }} className="flex items-center justify-between">
+              <span style={{ fontFamily: "Roboto", fontWeight: 700, fontSize: 16, color: "#102A63" }}>
                 Need help?
               </span>
               <button
@@ -957,9 +844,9 @@ export default function WebLoginScreen() {
               }}
               className="hover:bg-blue-50 transition-colors text-left"
             >
-              <MessageSquare size={20} color="#102A63" />
+              <MessageSquare size={18} color="#102A63" />
               <span style={{ fontFamily: "Roboto", fontWeight: 500, fontSize: 12, color: "#102A63" }}>
-                Live Chat
+                Live Support
               </span>
             </button>
 
@@ -1004,24 +891,6 @@ export default function WebLoginScreen() {
                 Email support
               </span>
             </a>
-
-            {/* SMS / chat FAB icon inside panel */}
-            <div style={{ display: "flex", justifyContent: "center", paddingTop: 8 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  background: "#155DFC",
-                  borderRadius: 9999,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0px 4px 6px -4px rgba(0,0,0,.1),0px 10px 15px -3px rgba(0,0,0,.1)",
-                }}
-              >
-                <MessageCircle size={22} fill="#fff" color="#fff" />
-              </div>
-            </div>
           </div>
         )}
 
