@@ -170,6 +170,10 @@ export function useQrLogin() {
         // Persist JWT tokens (same as normal login flow)
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
+        document.cookie = `accessToken=${data.accessToken}; path=/; max-age=2592000`;
+        if (data.refreshToken) {
+          document.cookie = `refreshToken=${data.refreshToken}; path=/; max-age=2592000`;
+        }
 
         // ── Key Sync (Option A) ──────────────────────────────────────────────
         // If the Android app sent the encrypted private key, decrypt it now

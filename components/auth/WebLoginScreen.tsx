@@ -65,15 +65,9 @@ export default function WebLoginScreen() {
   // Initialize theme & locale from localStorage on mount
   React.useEffect(() => {
     try {
-      const storedTheme = localStorage.getItem("callschat_theme");
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const isDark = storedTheme === "dark" || (!storedTheme && prefersDark);
-      setIsDarkMode(isDark);
-      if (isDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
+      // Force light mode initially per user request
+      setIsDarkMode(false);
+      document.documentElement.classList.remove("dark");
 
       const storedLocale = localStorage.getItem("callschat_locale") as Locale | null;
       if (storedLocale && routing.locales.includes(storedLocale)) {
