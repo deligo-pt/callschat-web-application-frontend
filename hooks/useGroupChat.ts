@@ -125,8 +125,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               const rKeyRes = await chatService.fetchRecipientKey(uId);
               let pubKey = "";
               if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
-                // Backend returns keys newest-first (desc by createdAt) \u2014 res.data[0] is active
-                pubKey = rKeyRes.data[0].publicKey;
+                // Keys are ordered asc by createdAt — last entry is the newest/active key
+                pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
               } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
                 pubKey = rKeyRes.data.publicKey;
               }
