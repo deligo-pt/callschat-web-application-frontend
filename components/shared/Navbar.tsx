@@ -35,7 +35,7 @@ export default function Navbar() {
         if (token) {
             router.push("/chats");
         } else {
-            router.push("/onboarding");
+            router.push("/connect");
         }
     };
 
@@ -46,7 +46,7 @@ export default function Navbar() {
         if (token) {
             router.push("/chats");
         } else {
-            router.push("/onboarding");
+            router.push("/connect");
         }
     };
 

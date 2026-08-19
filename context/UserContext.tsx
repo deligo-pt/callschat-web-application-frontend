@@ -134,7 +134,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem("currentMode");
           sessionStorage.removeItem("auth_account_mode");
           setUser(null);
-          window.location.href = "/login";
+          window.location.href = "/connect";
         }
       }
     } finally {

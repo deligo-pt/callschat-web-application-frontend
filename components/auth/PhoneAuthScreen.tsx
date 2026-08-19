@@ -562,7 +562,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                     const sessionMode = sessionStorage.getItem("auth_account_mode") || "PERSONAL";
                     router.push(sessionMode === "BUSINESS" ? "/auth/business/signup" : "/auth/personal/signup");
                   } else {
-                    router.push("/login");
+                    router.push("/connect");
                   }
                 }}
                 className="font-bold text-blue-600 hover:underline transition-colors ml-1 cursor-pointer"

@@ -247,6 +247,29 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
 
         if (!plaintextGroupKey) {
+          console.warn("[useGroupChat] Creator/Self keys failed. Trying other members (in case re-keyed by admin)...");
+          const membersRes = await groupService.fetchGroupMembers(groupId);
+          if (membersRes.success && membersRes.data?.members) {
+            for (const member of membersRes.data.members) {
+              if (!member.publicKey || member.userId === creatorId || member.userId === currentUserId) continue;
+
+              try {
+                plaintextGroupKey = await decryptMessage(
+                  encryptedGroupKey,
+                  keyNonce,
+                  member.publicKey,
+                  myPrivKey
+                );
+                console.log(`[useGroupChat] Group key decrypted successfully using member ${member.userId}'s public key.`);
+                break;
+              } catch (err) {
+                lastDecryptError = err;
+              }
+            }
+          }
+        }
+
+        if (!plaintextGroupKey) {
           console.error("[useGroupChat] All public key attempts exhausted.", lastDecryptError);
           throw new Error(
             "Failed to decrypt group key. The encryption keys may be out of sync. " +
