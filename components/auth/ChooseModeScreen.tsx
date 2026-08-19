@@ -191,7 +191,7 @@ export default function ChooseModeScreen({ authType = "signup" }: ChooseModeScre
         <div className="mt-6 text-center text-sm font-medium text-[#64748B]">
           {isLogin ? "Don't have an account yet? " : "Already have an account? "}
           <Link
-            href={isLogin ? "/signup" : "/login"}
+            href={isLogin ? "/signup" : "/connect"}
             className="font-bold text-[#2563EB] hover:underline transition-colors ml-1"
           >
             {isLogin ? "Sign up" : "Log in"}

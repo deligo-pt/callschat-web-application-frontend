@@ -64,7 +64,7 @@ export const groupService = {
     }
   },
 
-  async fetchGroupMembers(groupId: string): Promise<{ success: boolean; data?: { members: any[]; total: number; requesterRole: string } }> {
+  async fetchGroupMembers(groupId: string): Promise<{ success: boolean; data?: { members: Array<{ id: string; userId: string; publicKey?: string | null; [key: string]: any }>; total: number; requesterRole: string } }> {
     try {
       const response = await apiClient.get(`/groups/${groupId}/members`);
       return response.data;

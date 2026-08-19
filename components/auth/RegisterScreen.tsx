@@ -16,7 +16,10 @@ export default function RegisterScreen() {
     // Ensure the user has a registration token from the OTP step
     if (!sessionStorage.getItem("registrationToken")) {
       toast.error("Session expired. Please verify your phone number again.");
-      router.replace("/login");
+      const timer = setTimeout(() => {
+        router.replace("/connect");
+      }, 5000);
+      return () => clearTimeout(timer);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

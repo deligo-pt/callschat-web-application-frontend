@@ -88,7 +88,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     if (isGlobalLoading) return; // Wait for UserContext to finish its initial fetch
 
     if (!globalUser) {
-      router.push("/login");
+      router.push("/connect");
       return;
     }
 
@@ -228,7 +228,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const refreshToken = localStorage.getItem("refreshToken");
 
       if (!token) {
-        router.push("/login");
+        router.push("/connect");
         return;
       }
 
@@ -251,7 +251,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("refreshToken");
       document.cookie = "accessToken=; path=/; max-age=0";
       toast.success("Logged out successfully");
-      router.push("/login");
+      router.push("/connect");
     }
   };
 

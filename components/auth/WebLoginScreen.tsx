@@ -187,7 +187,8 @@ export default function WebLoginScreen() {
 
         {/* Nav Controls: Dark mode toggle & Language dropdown */}
         <div className="flex items-center gap-2 sm:gap-[12px]">
-          {/* Dark mode toggle */}
+          {/* Dark mode toggle (hidden temporarily) */}
+          {/* 
           <button
             type="button"
             onClick={toggleDarkMode}
@@ -216,7 +217,6 @@ export default function WebLoginScreen() {
             >
               {isDarkMode ? "Light mode" : "Dark mode"}
             </span>
-            {/* Toggle switch */}
             <div
               className="relative transition-colors duration-200"
               style={{
@@ -240,6 +240,7 @@ export default function WebLoginScreen() {
               />
             </div>
           </button>
+          */}
 
           {/* Language Dropdown */}
           <DropdownMenu>
@@ -759,7 +760,7 @@ export default function WebLoginScreen() {
               {/* Log in with phone number link with slide animation */}
               <button
                 type="button"
-                onClick={() => router.push("/login")}
+                onClick={() => router.push("/connect")}
                 className="text-xs sm:text-sm font-semibold text-[#037CFD] hover:underline inline-flex items-center gap-0.5 cursor-pointer group focus:outline-none"
               >
                 <span>Log in with phone number</span>
@@ -831,7 +832,7 @@ export default function WebLoginScreen() {
               type="button"
               onClick={() => {
                 setIsHelpOpen(false);
-                router.push("/login");
+                router.push("/connect");
               }}
               style={{
                 display: "flex",
