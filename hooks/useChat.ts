@@ -114,9 +114,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     const fetchRecipientKey = async () => {
       try {
         const res = await chatService.fetchRecipientKey(activePeerId);
-        // Guard: if backend returns empty array (no key registered), do not set any key
+        // Guard: if backend returns empty array (no key registered), do not set any key.
+        // Backend returns keys newest-first (ordered desc by createdAt).
         if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          // Grab the first key in the array (most recently inserted, ordered by desc)
           setRecipientPublicKey(res.data[0].publicKey);
         } else if (res?.success && res?.data?.publicKey) {
           setRecipientPublicKey(res.data.publicKey);
@@ -172,82 +172,49 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   if (!myPrivateKey) throw new Error("Missing private key");
 
                   // ── Key selection logic ────────────────────────────────────
-                  // NaCl crypto_box_open_easy(cipher, nonce, SENDER_pubKey, MY_privKey)
-                  // The shared secret is symmetric: DH(A.priv, B.pub) == DH(B.priv, A.pub)
-                  // BUT the ciphertext was created by the sender so we need
-                  // the SENDER's public key + OUR private key.
-                  //
-                  // For messages WE sent (senderId === currentUserId):
-                  //   - We encrypted as: crypto_box_easy(msg, nonce, peerPub, myPriv)
-                  //   - We decrypt as:   crypto_box_open_easy(cipher, nonce, peerPub, myPriv)
-                  //   → senderPublicKey = PEER's public key ✓
-                  //
-                  // For messages PEER sent (senderId !== currentUserId):
-                  //   - Peer encrypted as: crypto_box_easy(msg, nonce, myPub, peerPriv)
-                  //   - We decrypt as:     crypto_box_open_easy(cipher, nonce, peerPub, myPriv)
-                  //   → senderPublicKey = PEER's public key ✓
-                  //
-                  // In both cases senderPublicKey = peerPub + our privKey. This is correct.
-                  // If decryption fails it means the peer's key changed — try fetching
-                  // fresh key. As a last resort try our own public key (alternate DH direction).
-
                   const isSentByMe = msg.senderId === currentUserId;
-                  // targetUserId: the OTHER party in this specific message's crypto context
                   const targetUserId = isSentByMe ? activePeerId : msg.senderId;
 
-                  // Resolve the senderPublicKey to decrypt with
-                  const resolvePeerKey = async (uid: string): Promise<string | null> => {
-                    if (uid === activePeerId && recipientPublicKey) return recipientPublicKey;
+                  // Resolve ALL public keys for this peer (for key-rotation-aware decryption)
+                  const resolvePeerKeys = async (uid: string): Promise<string[]> => {
                     try {
                       const res = await chatService.fetchRecipientKey(uid);
                       if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                        return res.data[0].publicKey;
+                        // Backend returns keys newest-first (desc); keep that order
+                        return res.data.map((d: { publicKey: string }) => d.publicKey);
                       } else if (res?.success && res?.data?.publicKey) {
-                        return res.data.publicKey;
+                        return [res.data.publicKey];
                       }
                     } catch { /* ignore */ }
-                    return null;
+                    return [];
                   };
 
-                  const peerPubKey = await resolvePeerKey(targetUserId);
-                  if (!peerPubKey) throw new Error("No public key available for decryption");
+                  const peerKeys = await resolvePeerKeys(targetUserId);
+                  if (peerKeys.length === 0) throw new Error("No public key available for decryption");
 
-                  // ── Attempt 1: peer pub key + my priv key (standard path) ──
-                  let text: string;
-                  try {
-                    text = await decryptMessage(msg.ciphertext, msg.nonce, peerPubKey, myPrivateKey);
-                  } catch {
-                    // ── Attempt 2: fetch latest peer key (key rotation) ────────
-                    console.warn(`[History] Decryption failed for msg ${msg.id}, trying latest key...`);
-                    let decrypted = false;
+                  // ── Try every registered key for the peer (handles key rotation) ──
+                  let text: string | undefined;
+                  let decrypted = false;
 
+                  for (const candidateKey of peerKeys) {
                     try {
-                      const res = await chatService.fetchRecipientKey(targetUserId);
-                      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                        const latestKey = res.data[0].publicKey;
-                        if (latestKey && latestKey !== peerPubKey) {
-                          text = await decryptMessage(msg.ciphertext, msg.nonce, latestKey, myPrivateKey);
-                          console.log(`[History] Decrypted msg ${msg.id} with rotated peer key.`);
-                          decrypted = true;
-                        }
-                      }
-                    } catch { /* continue to next attempt */ }
+                      text = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKey);
+                      decrypted = true;
+                      break;
+                    } catch { /* try next key */ }
+                  }
 
-                    // ── Attempt 3: use MY OWN public key as senderPublicKey ────
-                    // This handles the case where the local keypair was regenerated
-                    // and the message was originally encrypted by the other party
-                    // using an older version of our public key that no longer matches.
-                    if (!decrypted && myPublicKey) {
-                      try {
-                        text = await decryptMessage(msg.ciphertext, msg.nonce, myPublicKey, myPrivateKey);
-                        console.log(`[History] Decrypted msg ${msg.id} using own public key (key rotation recovery).`);
-                        decrypted = true;
-                      } catch { /* all attempts exhausted */ }
-                    }
+                  // ── Final fallback: use MY OWN public key ─────────────────────
+                  if (!decrypted && myPublicKey) {
+                    try {
+                      text = await decryptMessage(msg.ciphertext, msg.nonce, myPublicKey, myPrivateKey);
+                      console.log(`[History] Decrypted msg ${msg.id} using own public key (key rotation recovery).`);
+                      decrypted = true;
+                    } catch { /* all attempts exhausted */ }
+                  }
 
-                    if (!decrypted) {
-                      throw new Error("All decryption attempts failed");
-                    }
+                  if (!decrypted || text === undefined) {
+                    throw new Error("All decryption attempts failed");
                   }
 
                   const parsed = parseEditedText(text!);
@@ -362,66 +329,62 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           // If the peer sent it, we decrypt with the peer's public key.
           const targetUserId = senderId === currentUser ? peerUser : senderId;
 
-          let pubKeyToUse = pubKey;
-          if (!pubKeyToUse || (targetUserId && targetUserId !== peerUser)) {
+          // Fetch ALL registered public keys for the target user (newest first)
+          let allPeerKeys: string[] = [];
+          try {
+            // Use cached key as the first candidate if it matches the target
+            if (pubKey && (!targetUserId || targetUserId === peerUser)) {
+              allPeerKeys.push(pubKey);
+            }
             if (targetUserId) {
-              console.log(`[Socket] Target user (${targetUserId}) key needed, fetching...`);
               const res = await chatService.fetchRecipientKey(targetUserId);
               if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                pubKeyToUse = res.data[0].publicKey;
+                // Keys ordered asc by createdAt — reverse so newest is tried first
+                const fetchedKeys = res.data.map((d: { publicKey: string }) => d.publicKey).reverse();
+                // Merge without duplicates
+                for (const k of fetchedKeys) {
+                  if (!allPeerKeys.includes(k)) allPeerKeys.push(k);
+                }
+                // Also update the cached key to the newest one
+                if (targetUserId === peerUser && fetchedKeys.length > 0) {
+                  setRecipientPublicKey(fetchedKeys[0]);
+                  recipientPublicKeyRef.current = fetchedKeys[0];
+                }
               } else if (res?.success && res?.data?.publicKey) {
-                pubKeyToUse = res.data.publicKey;
+                if (!allPeerKeys.includes(res.data.publicKey)) allPeerKeys.push(res.data.publicKey);
               }
             }
-          }
+          } catch { /* use whatever we have */ }
 
-          if (!pubKeyToUse) {
+          if (allPeerKeys.length === 0) {
             throw new Error("Missing public key for decryption");
           }
 
-          console.log(`[Socket] Attempting decryption. Sender: ${senderId}, Decrypting with Public Key of: ${targetUserId}`);
+          console.log(`[Socket] Attempting decryption. Sender: ${senderId}, trying ${allPeerKeys.length} key(s) for: ${targetUserId}`);
 
           let text = "";
-          try {
-            text = await decryptMessage(
-              payload.ciphertext,
-              payload.nonce,
-              pubKeyToUse,
-              privKey
-            );
-          } catch (initialErr) {
-            console.warn("⚠️ [Socket] Initial decryption failed, fetching latest key for peer...");
-            let decryptedRealtime = false;
+          let decryptedRealtime = false;
 
-            // Attempt 1: fetch the latest key for the peer (handles key rotation)
+          // Try all peer keys (handles key rotation between devices)
+          for (const candidateKey of allPeerKeys) {
             try {
-              const res = await chatService.fetchRecipientKey(targetUserId);
-              if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                const latestKey = res.data[0].publicKey;
-                if (latestKey && latestKey !== pubKeyToUse) {
-                  text = await decryptMessage(payload.ciphertext, payload.nonce, latestKey, privKey);
-                  console.log("✅ [Socket] Successfully decrypted with latest key!");
-                  if (targetUserId === peerUser) {
-                    setRecipientPublicKey(latestKey);
-                    recipientPublicKeyRef.current = latestKey;
-                  }
-                  decryptedRealtime = true;
-                }
-              }
-            } catch { /* continue to next attempt */ }
+              text = await decryptMessage(payload.ciphertext, payload.nonce, candidateKey, privKey);
+              decryptedRealtime = true;
+              break;
+            } catch { /* try next key */ }
+          }
 
-            // Attempt 2: try our own public key as the senderPublicKey
-            if (!decryptedRealtime && myPublicKeyRef.current) {
-              try {
-                text = await decryptMessage(payload.ciphertext, payload.nonce, myPublicKeyRef.current, privKey);
-                console.log("✅ [Socket] Decrypted with own public key (key rotation recovery).");
-                decryptedRealtime = true;
-              } catch { /* all attempts exhausted */ }
-            }
+          // Final fallback: try our own public key (in case peer used our old key)
+          if (!decryptedRealtime && myPublicKeyRef.current) {
+            try {
+              text = await decryptMessage(payload.ciphertext, payload.nonce, myPublicKeyRef.current, privKey);
+              console.log("✅ [Socket] Decrypted with own public key (key rotation recovery).");
+              decryptedRealtime = true;
+            } catch { /* all attempts exhausted */ }
+          }
 
-            if (!decryptedRealtime) {
-              throw initialErr;
-            }
+          if (!decryptedRealtime) {
+            throw new Error("All decryption attempts exhausted");
           }
 
           console.log("✅ [Socket] Decrypted message:", text);
@@ -822,6 +785,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             try {
               const res = await chatService.fetchRecipientKey(activePeerId);
               if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+                // Backend returns keys newest-first (desc); res.data[0] is the active key
                 pubKeyToUse = res.data[0].publicKey;
               } else if (res?.success && res?.data?.publicKey) {
                 pubKeyToUse = res.data.publicKey;
