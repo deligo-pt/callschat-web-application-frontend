@@ -55,6 +55,17 @@ export interface OutgoingGroupCall {
   roomName?: string;
 }
 
+export type OutgoingCallStatus = 'CALLING' | 'RINGING' | 'BUSY' | 'UNAVAILABLE' | 'DECLINED';
+
+export interface CallWaitingInfo {
+  callId: string;
+  callerId: string;
+  callerName?: string;
+  callerAvatar?: string | null;
+  callType: 'AUDIO' | 'VIDEO';
+  roomName: string;
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -64,6 +75,8 @@ export const useCallSignaling = () => {
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [outgoingCall, setOutgoingCall] = useState<OutgoingCall | null>(null);
+  const [outgoingCallStatus, setOutgoingCallStatus] = useState<OutgoingCallStatus>('CALLING');
+  const [callWaiting, setCallWaiting] = useState<CallWaitingInfo | null>(null);
   const [incomingGroupCall, setIncomingGroupCall] = useState<IncomingGroupCall | null>(null);
   const [outgoingGroupCall, setOutgoingGroupCall] = useState<OutgoingGroupCall | null>(null);
   const [activeGroupCalls, setActiveGroupCalls] = useState<string[]>([]);
@@ -133,9 +146,56 @@ export const useCallSignaling = () => {
     // -----------------------------------------------------------------------
     const handleIncomingCall = (payload: IncomingCall) => {
       console.log('[Call] Incoming call received:', payload);
-      playRingtone();
+      // Immediately acknowledge to server that our device is ringing
+      if (socket && payload.callId) {
+        socket.emit('call:ringing_ack', { callId: payload.callId });
+      }
+
       pendingPeerRef.current = { name: payload.callerName };
-      setIncomingCall(payload);
+
+      // If already in an active call, treat as Call Waiting (non-blocking banner)
+      if (activeCall) {
+        playNotificationSound('call_waiting');
+        setCallWaiting({
+          callId: payload.callId,
+          callerId: payload.callerId,
+          callerName: payload.callerName,
+          callType: payload.callType,
+          roomName: payload.roomName,
+        });
+      } else {
+        playRingtone();
+        setIncomingCall(payload);
+      }
+    };
+
+    const handleCallRinging = (payload: { callId: string }) => {
+      console.log('[Call] Remote device is actively ringing:', payload);
+      setOutgoingCallStatus('RINGING');
+    };
+
+    const handleCallBusy = (payload: { callId: string; reason?: string; message?: string }) => {
+      console.log('[Call] Remote user is busy:', payload);
+      stopRingtone();
+      playNotificationSound('busy');
+      setOutgoingCallStatus('BUSY');
+      setTimeout(() => {
+        setOutgoingCall(null);
+        setOutgoingCallStatus('CALLING');
+      }, 2500);
+    };
+
+    const handleCallWaiting = (payload: CallWaitingInfo) => {
+      console.log('[Call] Call waiting notification received:', payload);
+      playNotificationSound('call_waiting');
+      setCallWaiting(payload);
+    };
+
+    const handleCallCancelled = (payload: { callId: string }) => {
+      console.log('[Call] Call cancelled by caller:', payload);
+      stopRingtone();
+      setIncomingCall(prev => (prev?.callId === payload.callId ? null : prev));
+      setCallWaiting(prev => (prev?.callId === payload.callId ? null : prev));
     };
 
     const handleCallConnected = (payload: any) => {
@@ -143,6 +203,7 @@ export const useCallSignaling = () => {
       stopRingtone();
       setIncomingCall(null);
       setOutgoingCall(null);
+      setOutgoingCallStatus('CALLING');
       setActiveCall({
         callId: payload.callId,
         token: payload.token,
@@ -158,17 +219,34 @@ export const useCallSignaling = () => {
     const handleCallEnded = (payload?: unknown) => {
       console.log('[Call] Call ended/missed/rejected:', payload);
       stopRingtone();
+      playNotificationSound('call_ended');
       setIncomingCall(null);
       setOutgoingCall(null);
       setActiveCall(null);
+      setCallWaiting(null);
+      setOutgoingCallStatus('CALLING');
+    };
+
+    const handleCallRejected = (payload?: unknown) => {
+      console.log('[Call] Call declined/rejected:', payload);
+      stopRingtone();
+      playNotificationSound('call_ended');
+      setOutgoingCallStatus('DECLINED');
+      setTimeout(() => {
+        setOutgoingCall(null);
+        setOutgoingCallStatus('CALLING');
+      }, 1500);
     };
 
     const handleCallUnavailable = (payload?: unknown) => {
       console.warn('[Call] User unavailable:', payload);
       stopRingtone();
-      setIncomingCall(null);
-      setOutgoingCall(null);
-      setActiveCall(null);
+      playNotificationSound('call_ended');
+      setOutgoingCallStatus('UNAVAILABLE');
+      setTimeout(() => {
+        setOutgoingCall(null);
+        setOutgoingCallStatus('CALLING');
+      }, 1500);
     };
 
     const handleCallError = (payload: { code?: string; message?: string } | unknown) => {
@@ -223,6 +301,7 @@ export const useCallSignaling = () => {
       reconnectWindowExpiresAt: string;
     }) => {
       console.log('[Call] Remote participant is reconnecting:', payload);
+      playNotificationSound('reconnecting');
       setReconnectingUserId(payload.disconnectedUserId);
     };
 
@@ -270,13 +349,17 @@ export const useCallSignaling = () => {
     };
 
     socket.on('call:incoming', handleIncomingCall);
+    socket.on('call:ringing', handleCallRinging);
+    socket.on('call:busy', handleCallBusy);
+    socket.on('call:waiting', handleCallWaiting);
+    socket.on('call:cancelled', handleCallCancelled);
     socket.on('call:reconnecting', handleCallReconnecting);
     socket.on('call:reconnected', handleCallReconnected);
 
     socket.on('call:connected', handleCallConnected);
     socket.on('call:ended', handleCallEnded);
     socket.on('call:missed', handleCallEnded);
-    socket.on('call:rejected', handleCallEnded);
+    socket.on('call:rejected', handleCallRejected);
     socket.on('call:unavailable', handleCallUnavailable);
     socket.on('call:error', handleCallError);
 
@@ -363,10 +446,14 @@ export const useCallSignaling = () => {
 
     return () => {
       socket.off('call:incoming', handleIncomingCall);
+      socket.off('call:ringing', handleCallRinging);
+      socket.off('call:busy', handleCallBusy);
+      socket.off('call:waiting', handleCallWaiting);
+      socket.off('call:cancelled', handleCallCancelled);
       socket.off('call:connected', handleCallConnected);
       socket.off('call:ended', handleCallEnded);
       socket.off('call:missed', handleCallEnded);
-      socket.off('call:rejected', handleCallEnded);
+      socket.off('call:rejected', handleCallRejected);
       socket.off('call:unavailable', handleCallUnavailable);
       socket.off('call:error', handleCallError);
       socket.off('call:reconnecting', handleCallReconnecting);
@@ -395,7 +482,8 @@ export const useCallSignaling = () => {
       pendingCancelRef.current = false;
       playRingtone();
       pendingPeerRef.current = { name: receiverName, avatar: receiverAvatar };
-      // Set tentative outgoing state; callId will be populated when socket responds
+      // Set tentative outgoing state with CALLING status
+      setOutgoingCallStatus('CALLING');
       setOutgoingCall({ receiverId, callType, receiverName, receiverAvatar });
 
       socket.emit('call:initiate', { receiverId, callType }, (response: any) => {
@@ -414,7 +502,7 @@ export const useCallSignaling = () => {
         }
       });
     },
-    [socket],
+    [socket, playRingtone],
   );
 
   // -------------------------------------------------------------------------
@@ -486,6 +574,35 @@ export const useCallSignaling = () => {
     },
     [socket, stopRingtone],
   );
+
+  // -------------------------------------------------------------------------
+  // Call Waiting Actions (WhatsApp-style: End & Accept / Decline)
+  // -------------------------------------------------------------------------
+  const acceptCallWaiting = useCallback(() => {
+    if (!socket || !callWaiting) return;
+    console.log('[Call] Accepting call waiting:', callWaiting);
+
+    // End current active call
+    if (activeCall) {
+      userInitiatedHangupRef.current = true;
+      socket.emit('call:hangup', { callId: activeCall.callId });
+    }
+
+    // Accept waiting call
+    socket.emit('call:accept', { callId: callWaiting.callId, roomName: callWaiting.roomName });
+    pendingPeerRef.current = {
+      name: callWaiting.callerName,
+      avatar: callWaiting.callerAvatar ?? undefined,
+    };
+    setCallWaiting(null);
+  }, [socket, callWaiting, activeCall]);
+
+  const declineCallWaiting = useCallback(() => {
+    if (!socket || !callWaiting) return;
+    console.log('[Call] Declining call waiting:', callWaiting);
+    socket.emit('call:reject', { callId: callWaiting.callId, roomName: callWaiting.roomName });
+    setCallWaiting(null);
+  }, [socket, callWaiting]);
 
   // -------------------------------------------------------------------------
   // hangupCall
@@ -682,6 +799,8 @@ export const useCallSignaling = () => {
     incomingCall,
     activeCall,
     outgoingCall,
+    outgoingCallStatus,
+    callWaiting,
     incomingGroupCall,
     outgoingGroupCall,
     activeGroupCalls,
@@ -691,6 +810,8 @@ export const useCallSignaling = () => {
     acceptCall,
     acceptEscalatedCall,
     rejectCall,
+    acceptCallWaiting,
+    declineCallWaiting,
     hangupCall,
     cancelOutgoingCall,
     startGroupCall,

@@ -247,26 +247,46 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
   };
 
   if (msg.mediaType === "call" && msg.mediaUrl) {
-    let callData: { callId: string; type: "AUDIO" | "VIDEO"; status: string; durationSeconds: number } | null = null;
+    let callData: {
+      callId: string;
+      type: "AUDIO" | "VIDEO";
+      status: string;
+      durationSeconds: number;
+      failureReason?: string;
+    } | null = null;
     try {
       callData = JSON.parse(msg.mediaUrl);
     } catch {}
 
     const isVideo = callData?.type === "VIDEO";
-    const isMissed = callData?.status === "MISSED" || callData?.status === "DECLINED";
+    const isMissed =
+      callData?.status === "MISSED" ||
+      callData?.status === "DECLINED" ||
+      callData?.status === "FAILED";
     const dur = callData?.durationSeconds ?? 0;
 
     const formatDur = (s: number) => {
       if (!s) return "";
       const m = Math.floor(s / 60);
       const rem = s % 60;
-      if (m > 0) return `${m} mins`;
-      return `${rem} secs`;
+      if (m > 0) return `${m}m ${rem}s`;
+      return `${rem}s`;
     };
 
-    const subtitle = isMissed 
-      ? (callData?.status === "DECLINED" ? "Declined" : "No answer") 
-      : (dur > 0 ? formatDur(dur) : "Call ended");
+    let subtitle = "Call ended";
+    if (callData?.failureReason === "BUSY") {
+      subtitle = "User busy";
+    } else if (callData?.failureReason === "CANCELLED") {
+      subtitle = isMe ? "Canceled call" : "Missed call";
+    } else if (callData?.failureReason === "TIMEOUT") {
+      subtitle = isMe ? "No answer" : "Missed call";
+    } else if (callData?.status === "DECLINED") {
+      subtitle = isMe ? "Call declined" : "Declined";
+    } else if (callData?.status === "MISSED") {
+      subtitle = isMe ? "No answer" : "Missed call";
+    } else if (dur > 0) {
+      subtitle = formatDur(dur);
+    }
 
     return (
       <div className={cn("flex w-full z-10 flex-col my-1", isMe ? "items-end" : "items-start")}>
@@ -297,7 +317,7 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
             <span className={cn("font-bold text-[14px] truncate", isMissed ? "text-red-500" : "text-[#254BCC]")}>
               {isVideo ? "Video call" : "Audio call"}
             </span>
-            <span className="text-xs text-gray-500 font-medium">
+            <span className={cn("text-xs font-medium", isMissed ? "text-red-400" : "text-gray-500")}>
               {subtitle}
             </span>
           </div>

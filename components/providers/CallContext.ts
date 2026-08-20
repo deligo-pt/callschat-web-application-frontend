@@ -7,20 +7,25 @@ import {
   OutgoingCall,
   IncomingGroupCall,
   OutgoingGroupCall,
+  OutgoingCallStatus,
+  CallWaitingInfo,
 } from '@/hooks/useCallSignaling';
 
 export interface CallContextType {
   incomingCall: IncomingCall | null;
   activeCall: ActiveCall | null;
   outgoingCall: OutgoingCall | null;
+  outgoingCallStatus: OutgoingCallStatus;
+  callWaiting: CallWaitingInfo | null;
   incomingGroupCall: IncomingGroupCall | null;
   outgoingGroupCall: OutgoingGroupCall | null;
   activeGroupCalls: string[];
   initiateCall: (receiverId: string, callType: 'AUDIO' | 'VIDEO', receiverName?: string, receiverAvatar?: string) => void;
   acceptCall: (callId: string, roomName: string, peerName?: string, peerAvatar?: string) => void;
-  /** Phase 4: Accept an escalated (mid-call) invitation — fetches token via REST, bypasses DB. */
   acceptEscalatedCall: (roomName: string, callType: 'AUDIO' | 'VIDEO') => Promise<void>;
   rejectCall: (callId: string, roomName: string, isGroup?: boolean, isEscalated?: boolean) => void;
+  acceptCallWaiting: () => void;
+  declineCallWaiting: () => void;
   hangupCall: (callId: string) => void;
   cancelOutgoingCall: () => void;
   startGroupCall: (groupId: string, callType: 'AUDIO' | 'VIDEO') => void;
