@@ -147,7 +147,7 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
   }
 
   const renderOptionsMenu = () => {
-    if (msg.id.startsWith("optimistic-") || !msg.text || msg.text.startsWith("__PIN_EVENT__:")) return null;
+    if (msg.id.startsWith("optimistic-") || msg.isDeleted || (!msg.text && !msg.mediaUrl) || msg.text?.startsWith("__PIN_EVENT__:")) return null;
     return (
       <div
         className={cn(
@@ -171,16 +171,18 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
           >
             {isMe && (
               <>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setEditText(msg.text);
-                    setIsEditing(true);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-                >
-                  <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
-                  <span>Edit message</span>
-                </DropdownMenuItem>
+                {msg.text && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setEditText(msg.text);
+                      setIsEditing(true);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
+                    <span>Edit message</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => onUnsend?.(msg.id)}
                   className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"

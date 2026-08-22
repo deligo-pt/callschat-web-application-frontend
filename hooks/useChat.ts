@@ -549,9 +549,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
     const handleMessageUnsent = (payload: any) => {
       if (payload.conversationId !== conversationId) return;
+      const targetId = payload.messageId || payload.id;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === payload.messageId
+          m.id === targetId
             ? { ...m, isDeleted: true, text: "", mediaUrl: undefined, mediaType: undefined }
             : m
         )
