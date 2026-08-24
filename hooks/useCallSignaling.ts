@@ -630,6 +630,8 @@ export const useCallSignaling = () => {
       userInitiatedHangupRef.current = true;
       socket.emit('call:hangup', { callId });
       setActiveCall(null);
+      setReconnectingUserId(null);
+      setIsAwaitingLocalReconnect(false);
     },
     [socket],
   );
