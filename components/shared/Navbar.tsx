@@ -13,8 +13,7 @@ import {
     Languages,
     ShieldCheck,
     ChevronRight,
-    HelpCircle,
-    Lock
+    HelpCircle
 } from "lucide-react";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { useTranslations } from "next-intl";
@@ -24,10 +23,11 @@ export default function Navbar() {
     const t = useTranslations("landing_nav");
     const [isOpen, setIsOpen] = useState(false);
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const [hoveredLink, setHoveredLink] = useState<string | null>(null);
     const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
     const [isMobileFeaturesOpen, setIsMobileFeaturesOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const navContainerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
 
     const openModal = () => setIsDownloadModalOpen(true);
@@ -41,17 +41,6 @@ export default function Navbar() {
         handleScroll();
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
-    }, []);
-
-    // Close dropdown on outside click
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsFeaturesOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     // Prevent body scroll when mobile menu is open
@@ -86,6 +75,14 @@ export default function Navbar() {
             router.push("/connect");
         }
     };
+
+    const navLinks = [
+        { id: "features", label: t("features"), href: "/#features", hasDropdown: true },
+        { id: "privacy", label: t("privacy"), href: "/#security", hasDropdown: false },
+        { id: "dual_mode", label: t("dual_mode"), href: "/#dual-mood", hasDropdown: false },
+        { id: "ai_service", label: t("ai_service"), href: "/#ai-service", hasDropdown: false },
+        { id: "faq", label: t("faq"), href: "/#faq", hasDropdown: false },
+    ];
 
     const featureSubItems = [
         {
@@ -170,96 +167,133 @@ export default function Navbar() {
                     </span>
                 </Link>
 
-                {/* Navigation Links (Center - WhatsApp Style) */}
-                <nav className="hidden lg:flex items-center gap-8">
-                    
-                    {/* Features Dropdown Item */}
-                    <div
-                        ref={dropdownRef}
-                        className="relative"
-                        onMouseEnter={() => setIsFeaturesOpen(true)}
-                        onMouseLeave={() => setIsFeaturesOpen(false)}
-                    >
-                        <button
-                            onClick={() => setIsFeaturesOpen(!isFeaturesOpen)}
-                            className="group flex items-center gap-1 py-2 text-[15px] font-medium text-[#111b21] dark:text-[#E9EDEF] hover:text-[#25D366] transition-colors"
-                        >
-                            <span>{t("features")}</span>
-                            <ChevronDown
-                                className={`h-4 w-4 transition-transform duration-200 ${
-                                    isFeaturesOpen ? "rotate-180 text-[#25D366]" : "text-[#54656F] dark:text-slate-400 group-hover:text-[#25D366]"
-                                }`}
-                            />
-                        </button>
+                {/* Navigation Links (Center - WhatsApp Style with Gliding Blue Underline Effect) */}
+                <nav
+                    ref={navContainerRef}
+                    onMouseLeave={() => {
+                        setHoveredLink(null);
+                        setIsFeaturesOpen(false);
+                    }}
+                    className="hidden lg:flex items-center gap-8 relative"
+                >
+                    {navLinks.map((link) => {
+                        const isHovered = hoveredLink === link.id;
 
-                        {/* WhatsApp-style Floating Mega Menu Dropdown */}
-                        <AnimatePresence>
-                            {isFeaturesOpen && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                                    transition={{ duration: 0.2, ease: "easeOut" }}
-                                    className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-[360px] rounded-2xl bg-white dark:bg-[#1f2c34] p-3 shadow-2xl border border-[#E9EDEF] dark:border-slate-700/60 z-50"
-                                >
-                                    <div className="space-y-1">
-                                        {featureSubItems.map((item) => {
-                                            const IconComp = item.icon;
-                                            return (
-                                                <Link
-                                                    key={item.title}
-                                                    href={item.href}
-                                                    onClick={() => setIsFeaturesOpen(false)}
-                                                    className="flex items-start gap-3.5 rounded-xl p-3 hover:bg-[#F0F2F5] dark:hover:bg-[#111b21] transition-colors group/item"
-                                                >
-                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#E7F8EE] dark:bg-[#103629] text-[#25D366] transition-colors group-hover/item:bg-[#25D366] group-hover/item:text-white">
-                                                        <IconComp className="h-5 w-5" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-sm font-semibold text-[#111b21] dark:text-white group-hover/item:text-[#25D366]">
-                                                                {item.title}
-                                                            </span>
-                                                            <span className="text-[10px] font-semibold text-[#54656F] dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                                                                {item.badge}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-xs text-[#54656F] dark:text-slate-400 mt-0.5 line-clamp-1">
-                                                            {item.description}
-                                                        </p>
-                                                    </div>
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                        return (
+                            <div
+                                key={link.id}
+                                className="relative py-2"
+                                onMouseEnter={() => {
+                                    setHoveredLink(link.id);
+                                    if (link.hasDropdown) {
+                                        setIsFeaturesOpen(true);
+                                    } else {
+                                        setIsFeaturesOpen(false);
+                                    }
+                                }}
+                            >
+                                {link.hasDropdown ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFeaturesOpen(!isFeaturesOpen)}
+                                        className={`group flex items-center gap-1 text-[15px] font-medium transition-colors duration-200 cursor-pointer ${
+                                            isHovered || isFeaturesOpen
+                                                ? "text-blue-600 dark:text-blue-400 font-semibold"
+                                                : "text-[#111b21] dark:text-[#E9EDEF]"
+                                        }`}
+                                    >
+                                        <span>{link.label}</span>
+                                        <ChevronDown
+                                            className={`h-4 w-4 transition-transform duration-200 ${
+                                                isFeaturesOpen
+                                                    ? "rotate-180 text-blue-600 dark:text-blue-400"
+                                                    : isHovered
+                                                    ? "text-blue-600 dark:text-blue-400"
+                                                    : "text-[#54656F] dark:text-slate-400"
+                                            }`}
+                                        />
+                                    </button>
+                                ) : (
+                                    <Link
+                                        href={link.href}
+                                        onClick={() => {
+                                            setHoveredLink(null);
+                                            setIsFeaturesOpen(false);
+                                        }}
+                                        className={`flex items-center text-[15px] font-medium transition-colors duration-200 ${
+                                            isHovered
+                                                ? "text-blue-600 dark:text-blue-400 font-semibold"
+                                                : "text-[#111b21] dark:text-[#E9EDEF]"
+                                        }`}
+                                    >
+                                        <span>{link.label}</span>
+                                    </Link>
+                                )}
 
-                    {/* Privacy Link */}
-                    <Link
-                        href="/#security"
-                        className="text-[15px] font-medium text-[#111b21] dark:text-[#E9EDEF] hover:text-[#25D366] transition-colors py-2"
-                    >
-                        {t("privacy")}
-                    </Link>
+                                {/* WhatsApp Blue Underline Animation */}
+                                {isHovered && (
+                                    <motion.div
+                                        layoutId="whatsapp-blue-nav-underline"
+                                        className="absolute -bottom-0.5 left-0 right-0 h-[2.5px] bg-blue-600 dark:bg-blue-400 rounded-full shadow-[0_2px_8px_rgba(37,99,235,0.45)] pointer-events-none"
+                                        transition={{
+                                            type: "spring",
+                                            stiffness: 400,
+                                            damping: 28,
+                                        }}
+                                    />
+                                )}
 
-                    {/* Help Center / FAQ Link */}
-                    <Link
-                        href="/#faq"
-                        className="text-[15px] font-medium text-[#111b21] dark:text-[#E9EDEF] hover:text-[#25D366] transition-colors py-2"
-                    >
-                        {t("faq")}
-                    </Link>
-
-                    {/* AI Safety Link */}
-                    <Link
-                        href="/#ai-service"
-                        className="text-[15px] font-medium text-[#111b21] dark:text-[#E9EDEF] hover:text-[#25D366] transition-colors py-2"
-                    >
-                        {t("ai_service")}
-                    </Link>
+                                {/* Floating Mega Menu Dropdown for Features */}
+                                {link.hasDropdown && (
+                                    <AnimatePresence>
+                                        {isFeaturesOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                                                transition={{ duration: 0.18, ease: "easeOut" }}
+                                                className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-[360px] rounded-2xl bg-white dark:bg-[#1f2c34] p-3 shadow-2xl border border-[#E9EDEF] dark:border-slate-700/60 z-50"
+                                            >
+                                                <div className="space-y-1">
+                                                    {featureSubItems.map((item) => {
+                                                        const IconComp = item.icon;
+                                                        return (
+                                                            <Link
+                                                                key={item.title}
+                                                                href={item.href}
+                                                                onClick={() => {
+                                                                    setIsFeaturesOpen(false);
+                                                                    setHoveredLink(null);
+                                                                }}
+                                                                className="flex items-start gap-3.5 rounded-xl p-3 hover:bg-blue-50/80 dark:hover:bg-[#111b21] transition-colors group/item"
+                                                            >
+                                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 transition-colors group-hover/item:bg-blue-600 group-hover/item:text-white">
+                                                                    <IconComp className="h-5 w-5" />
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="text-sm font-semibold text-[#111b21] dark:text-white group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400">
+                                                                            {item.title}
+                                                                        </span>
+                                                                        <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-100/70 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">
+                                                                            {item.badge}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xs text-[#54656F] dark:text-slate-400 mt-0.5 line-clamp-1">
+                                                                        {item.description}
+                                                                    </p>
+                                                                </div>
+                                                            </Link>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                )}
+                            </div>
+                        );
+                    })}
                 </nav>
 
                 {/* Right Action Buttons (WhatsApp Style: Outline Log In + Green Download) */}
@@ -268,7 +302,7 @@ export default function Navbar() {
                     {/* Log In Outline Pill */}
                     <button
                         onClick={handleLogin}
-                        className="flex items-center gap-1.5 rounded-full border border-[#111b21] dark:border-white px-5 py-2.5 text-sm font-semibold text-[#111b21] dark:text-white transition-all hover:bg-black/5 dark:hover:bg-white/10"
+                        className="flex items-center gap-1.5 rounded-full border border-[#111b21] dark:border-white px-5 py-2.5 text-sm font-semibold text-[#111b21] dark:text-white transition-all hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
                     >
                         <span>{t("login")}</span>
                         <ChevronRight className="h-4 w-4 stroke-[2.5]" />
@@ -277,7 +311,7 @@ export default function Navbar() {
                     {/* Green Signature Download Button */}
                     <button
                         onClick={openModal}
-                        className="flex items-center gap-2 rounded-full bg-[#25D366] hover:bg-[#20BD5A] px-6 py-2.5 text-sm font-bold text-[#111b21] transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                        className="flex items-center gap-2 rounded-full bg-[#25D366] hover:bg-[#20BD5A] px-6 py-2.5 text-sm font-bold text-[#111b21] transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                         <span>{t("download")}</span>
                         <ArrowDown className="h-4 w-4 stroke-[2.5]" />
@@ -364,7 +398,7 @@ export default function Navbar() {
                                         <span>{t("features")}</span>
                                         <ChevronDown
                                             className={`h-5 w-5 text-[#54656F] transition-transform duration-200 ${
-                                                isMobileFeaturesOpen ? "rotate-180 text-[#25D366]" : ""
+                                                isMobileFeaturesOpen ? "rotate-180 text-blue-600" : ""
                                             }`}
                                         />
                                     </button>
@@ -384,9 +418,9 @@ export default function Navbar() {
                                                             key={sub.title}
                                                             href={sub.href}
                                                             onClick={() => setIsOpen(false)}
-                                                            className="flex items-center gap-3 py-2 text-sm font-medium text-[#54656F] dark:text-slate-300 hover:text-[#25D366]"
+                                                            className="flex items-center gap-3 py-2 text-sm font-medium text-[#54656F] dark:text-slate-300 hover:text-blue-600"
                                                         >
-                                                            <SubIcon className="h-4 w-4 text-[#25D366]" />
+                                                            <SubIcon className="h-4 w-4 text-blue-600" />
                                                             <span>{sub.title}</span>
                                                         </Link>
                                                     );
@@ -401,20 +435,20 @@ export default function Navbar() {
                                     <Link
                                         href="/#security"
                                         onClick={() => setIsOpen(false)}
-                                        className="block py-3 text-lg font-semibold text-[#111b21] dark:text-white border-b border-[#E9EDEF] dark:border-slate-800/80 hover:text-[#25D366]"
+                                        className="block py-3 text-lg font-semibold text-[#111b21] dark:text-white border-b border-[#E9EDEF] dark:border-slate-800/80 hover:text-blue-600"
                                     >
                                         {t("privacy")}
                                     </Link>
                                 </motion.div>
 
-                                {/* Help Center Link */}
+                                {/* Dual Mode Link */}
                                 <motion.div variants={mobileItemVariants}>
                                     <Link
-                                        href="/#faq"
+                                        href="/#dual-mood"
                                         onClick={() => setIsOpen(false)}
-                                        className="block py-3 text-lg font-semibold text-[#111b21] dark:text-white border-b border-[#E9EDEF] dark:border-slate-800/80 hover:text-[#25D366]"
+                                        className="block py-3 text-lg font-semibold text-[#111b21] dark:text-white border-b border-[#E9EDEF] dark:border-slate-800/80 hover:text-blue-600"
                                     >
-                                        {t("faq")}
+                                        {t("dual_mode")}
                                     </Link>
                                 </motion.div>
 
@@ -423,9 +457,20 @@ export default function Navbar() {
                                     <Link
                                         href="/#ai-service"
                                         onClick={() => setIsOpen(false)}
-                                        className="block py-3 text-lg font-semibold text-[#111b21] dark:text-white border-b border-[#E9EDEF] dark:border-slate-800/80 hover:text-[#25D366]"
+                                        className="block py-3 text-lg font-semibold text-[#111b21] dark:text-white border-b border-[#E9EDEF] dark:border-slate-800/80 hover:text-blue-600"
                                     >
                                         {t("ai_service")}
+                                    </Link>
+                                </motion.div>
+
+                                {/* Help Center Link */}
+                                <motion.div variants={mobileItemVariants}>
+                                    <Link
+                                        href="/#faq"
+                                        onClick={() => setIsOpen(false)}
+                                        className="block py-3 text-lg font-semibold text-[#111b21] dark:text-white border-b border-[#E9EDEF] dark:border-slate-800/80 hover:text-blue-600"
+                                    >
+                                        {t("faq")}
                                     </Link>
                                 </motion.div>
 
