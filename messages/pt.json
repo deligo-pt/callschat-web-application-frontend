@@ -24,6 +24,19 @@
     "communities": "Comunidades",
     "profile": "Perfil"
   },
+  "landing_nav": {
+    "features": "Recursos",
+    "privacy": "Privacidade",
+    "dual_mode": "Modo Duplo",
+    "security": "Segurança",
+    "live_translation": "Tradução ao Vivo",
+    "ai_service": "Segurança com IA",
+    "faq": "Central de Ajuda",
+    "login": "Entrar",
+    "download": "Baixar",
+    "download_app": "Baixar Aplicativo",
+    "getting_started": "Começar"
+  },
   "profile": {
     "title": "Perfil",
     "account": "Conta",
@@ -174,5 +187,23 @@
     "next": "Próxima",
     "default_invite_msg": "Hey! I'm using CallsChat for secure audio/video calls. Join me: https://callschat.com/download",
     "search_placeholder": "Pesquisar por nome ou telefone..."
+  },
+  "hero": {
+    "badge": "Privacidade com IA e Tradução em Tempo Real",
+    "title_start": "Comunique-se",
+    "title_highlight": "Sem Limites",
+    "subtitle": "Experimente a nova geração de comunicação fluida com privacidade de nível militar, tradução simultânea por IA e chamadas de áudio e vídeo em alta definição.",
+    "download_ios": "Baixar para iOS",
+    "download_android": "Baixar para Android",
+    "web_connect": "Abrir Web App",
+    "rating_score": "4.9/5",
+    "rating_text": "de mais de 100 mil usuários",
+    "encrypted_badge": "E2EE de 256 bits Ativo",
+    "translation_badge": "Tradução ao Vivo (100+ Idiomas)",
+    "ai_shield_badge": "Proteção Antigolpe com IA",
+    "hd_audio_badge": "Áudio e Vídeo Ultra HD 4K",
+    "slide_1_label": "Conexão Diária",
+    "slide_2_label": "Encontros Familiares",
+    "slide_3_label": "Família & Amigos Globais"
   }
 }

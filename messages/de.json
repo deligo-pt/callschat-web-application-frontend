@@ -24,6 +24,19 @@
     "communities": "Gemeinschaften",
     "profile": "Profil"
   },
+  "landing_nav": {
+    "features": "Funktionen",
+    "privacy": "Datenschutz",
+    "dual_mode": "Dual-Modus",
+    "security": "Sicherheit",
+    "live_translation": "Live-Übersetzung",
+    "ai_service": "KI-Sicherheit",
+    "faq": "Hilfebereich",
+    "login": "Anmelden",
+    "download": "Herunterladen",
+    "download_app": "App herunterladen",
+    "getting_started": "Starten"
+  },
   "profile": {
     "title": "Profil",
     "account": "Konto",
@@ -174,5 +187,23 @@
     "next": "Weiter",
     "default_invite_msg": "Hey! I'm using CallsChat for secure audio/video calls. Join me: https://callschat.com/download",
     "search_placeholder": "Nach Name oder Telefon suchen..."
+  },
+  "hero": {
+    "badge": "KI-Datenschutz & Echtzeit-Übersetzung",
+    "title_start": "Kommunizieren",
+    "title_highlight": "Ohne Grenzen",
+    "subtitle": "Erleben Sie die nächste Generation nahtloser Kommunikation mit militärischer Verschlüsselung, sofortiger KI-Sprachübersetzung und kristallklaren HD-Audio- und Videoanrufen.",
+    "download_ios": "Für iOS herunterladen",
+    "download_android": "Für Android herunterladen",
+    "web_connect": "Web-App öffnen",
+    "rating_score": "4.9/5",
+    "rating_text": "von über 100.000 Nutzern weltweit",
+    "encrypted_badge": "256-Bit E2EE Aktiv",
+    "translation_badge": "Live-Übersetzung (100+ Sprachen)",
+    "ai_shield_badge": "KI-Betrugsschutz",
+    "hd_audio_badge": "4K Ultra-HD Sprachqualität",
+    "slide_1_label": "Tägliche Verbindung",
+    "slide_2_label": "Generationen-Austausch",
+    "slide_3_label": "Weltweite Familie & Freunde"
   }
 }

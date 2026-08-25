@@ -24,6 +24,19 @@
     "communities": "Communities",
     "profile": "Profile"
   },
+  "landing_nav": {
+    "features": "Features",
+    "privacy": "Privacy",
+    "dual_mode": "Dual Mode",
+    "security": "Security",
+    "live_translation": "Live Translation",
+    "ai_service": "AI Safety",
+    "faq": "Help Center",
+    "login": "Log In",
+    "download": "Download",
+    "download_app": "Download App",
+    "getting_started": "Get Started"
+  },
   "profile": {
     "title": "Profile",
     "account": "Account",
@@ -174,5 +187,23 @@
     "next": "Next",
     "default_invite_msg": "Hey! I'm using CallsChat for secure audio/video calls. Join me: https://callschat.com/download",
     "search_placeholder": "Search by name or phone..."
+  },
+  "hero": {
+    "badge": "AI-Powered Privacy & Real-Time Translation",
+    "title_start": "Communicate",
+    "title_highlight": "Without Limits",
+    "subtitle": "Experience the next generation of seamless communication with military-grade privacy, instant AI speech translation, and crystal-clear HD audio/video calls.",
+    "download_ios": "Download for iOS",
+    "download_android": "Download for Android",
+    "web_connect": "Launch Web App",
+    "rating_score": "4.9/5",
+    "rating_text": "from 100k+ global users",
+    "encrypted_badge": "256-Bit E2EE Active",
+    "translation_badge": "Live Translation (100+ Langs)",
+    "ai_shield_badge": "AI Scam Protection",
+    "hd_audio_badge": "4K Ultra-HD Clarity",
+    "slide_1_label": "Everyday Connection",
+    "slide_2_label": "Cross-Generation Huddle",
+    "slide_3_label": "Global Family & Friends"
   }
 }

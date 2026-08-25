@@ -24,6 +24,19 @@
     "communities": "समुदाय",
     "profile": "प्रोफ़ाइल"
   },
+  "landing_nav": {
+    "features": "विशेषताएं",
+    "privacy": "गोपनीयता",
+    "dual_mode": "दोहरा मोड",
+    "security": "सुरक्षा",
+    "live_translation": "लाइव अनुवाद",
+    "ai_service": "एआई सुरक्षा",
+    "faq": "सहायता केंद्र",
+    "login": "लॉग इन",
+    "download": "डाउनलोड",
+    "download_app": "ऐप डाउनलोड करें",
+    "getting_started": "शुरू करें"
+  },
   "profile": {
     "title": "प्रोफ़ाइल",
     "account": "खाता",
@@ -174,5 +187,23 @@
     "next": "अगला",
     "default_invite_msg": "Hey! I'm using CallsChat for secure audio/video calls. Join me: https://callschat.com/download",
     "search_placeholder": "नाम या फ़ोन से खोजें..."
+  },
+  "hero": {
+    "badge": "एआई-संचालित गोपनीयता और रीयल-टाइम अनुवाद",
+    "title_start": "संवाद करें",
+    "title_highlight": "बिना किसी सीमा के",
+    "subtitle": "मिलिट्री-ग्रेड प्राइवेसी, तुरंत एआई वॉयस अनुवाद और क्रिस्टल-क्लियर एचडी ऑडियो/वीडियो कॉल के साथ अगली पीढ़ी के संचार का अनुभव करें।",
+    "download_ios": "iOS के लिए डाउनलोड करें",
+    "download_android": "Android के लिए डाउनलोड करें",
+    "web_connect": "वेब ऐप खोलें",
+    "rating_score": "4.9/5",
+    "rating_text": "100k+ वैश्विक उपयोगकर्ताओं से",
+    "encrypted_badge": "256-बिट E2EE सक्रिय",
+    "translation_badge": "लाइव अनुवाद (100+ भाषाएं)",
+    "ai_shield_badge": "एआई धोखाधड़ी सुरक्षा",
+    "hd_audio_badge": "4K अल्ट्रा-एचडी स्पष्टता",
+    "slide_1_label": "दैनिक संपर्क",
+    "slide_2_label": "पारिवारिक बातचीत",
+    "slide_3_label": "वैश्विक परिवार और मित्र"
   }
 }

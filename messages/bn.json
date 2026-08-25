@@ -24,6 +24,19 @@
     "communities": "কমিউনিটি",
     "profile": "প্রোফাইল"
   },
+  "landing_nav": {
+    "features": "বৈশিষ্ট্যসমূহ",
+    "privacy": "গোপনীয়তা",
+    "dual_mode": "দ্বৈত মোড",
+    "security": "নিরাপত্তা",
+    "live_translation": "লাইভ অনুবাদ",
+    "ai_service": "এআই সুরক্ষা",
+    "faq": "সহায়তা কেন্দ্র",
+    "login": "লগ ইন",
+    "download": "ডাউনলোড",
+    "download_app": "অ্যাপ ডাউনলোড করুন",
+    "getting_started": "শুরু করুন"
+  },
   "profile": {
     "title": "প্রোফাইল",
     "account": "অ্যাকাউন্ট",
@@ -174,5 +187,23 @@
     "next": "পরবর্তী",
     "default_invite_msg": "Hey! I'm using CallsChat for secure audio/video calls. Join me: https://callschat.com/download",
     "search_placeholder": "নাম বা ফোন দ্বারা খুঁজুন..."
+  },
+  "hero": {
+    "badge": "এআই-চালিত গোপনীয়তা এবং রিয়েল-টাইম অনুবাদ",
+    "title_start": "যোগাযোগ করুন",
+    "title_highlight": "সীমাহীনভাবে",
+    "subtitle": "সামরিক গ্রেডের গোপনীয়তা, তাৎক্ষণিক এআই ভয়েস অনুবাদ এবং ক্রিস্টাল-ক্লিয়ার এইচডি অডিও/ভিডিও কলের সাথে পরবর্তী প্রজন্মের নির্বিঘ্ন যোগাযোগের অভিজ্ঞতা নিন।",
+    "download_ios": "iOS এর জন্য ডাউনলোড করুন",
+    "download_android": "Android এর জন্য ডাউনলোড করুন",
+    "web_connect": "ওয়েব অ্যাপ খুলুন",
+    "rating_score": "৪.৯/৫",
+    "rating_text": "১০০কে+ বৈশ্বিক ব্যবহারকারী থেকে",
+    "encrypted_badge": "২৫৬-বিট E2EE সক্রিয়",
+    "translation_badge": "লাইভ অনুবাদ (১০০+ ভাষা)",
+    "ai_shield_badge": "এআই প্রতারণা সুরক্ষা",
+    "hd_audio_badge": "৪কে আল্ট্রা-এইচডি স্বচ্ছতা",
+    "slide_1_label": "দৈনন্দিন সংযোগ",
+    "slide_2_label": "আন্তঃপ্রজন্মের মিলন",
+    "slide_3_label": "বৈশ্বিক পরিবার ও বন্ধু"
   }
 }
