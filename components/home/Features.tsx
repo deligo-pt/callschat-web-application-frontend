@@ -19,7 +19,15 @@ import {
     EyeOff,
     Mic,
     Shield,
-    Radio
+    Radio,
+    Flame,
+    ScanFace,
+    Check,
+    Video,
+    ShieldAlert,
+    Send,
+    Bot,
+    ArrowRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslations } from "next-intl";
@@ -84,17 +92,40 @@ const waveformBarHeights = [
     [4, 12, 6, 18, 4],
 ];
 
+const callParticipants = [
+    { name: "Alex M.", role: "Host", avatarBg: "bg-blue-600", initial: "A" },
+    { name: "Elena R.", role: "Design Lead", avatarBg: "bg-purple-600", initial: "E" },
+    { name: "Marcus T.", role: "Dev Lead", avatarBg: "bg-emerald-600", initial: "M" },
+];
+
 export default function Features() {
     const t = useTranslations("features_section");
-    const [dualModeTab, setDualModeTab] = useState<"personal" | "business">("personal");
+    
+    // Card 1: Voice & Translation States
     const [demoIndex, setDemoIndex] = useState(0);
     const [typedText, setTypedText] = useState("");
     const [isTyping, setIsTyping] = useState(true);
     const [recordingTimer, setRecordingTimer] = useState(3);
 
+    // Card 2: Secret Mode Self-Destruct Countdown
+    const [secretCountdown, setSecretCountdown] = useState(5);
+    const [isSecretDestroyed, setIsSecretDestroyed] = useState(false);
+
+    // Card 3: Dual Mode Auto-Toggle
+    const [dualModeTab, setDualModeTab] = useState<"personal" | "business">("personal");
+
+    // Card 4: AI Threat Interceptor Radar
+    const [threatState, setThreatState] = useState<"scanning" | "blocked">("scanning");
+
+    // Card 5: HD Call Active Speaker Rotation
+    const [activeSpeakerIndex, setActiveSpeakerIndex] = useState(0);
+
+    // Card 6: Team Inbox Lifecycle Step
+    const [ticketStep, setTicketStep] = useState<0 | 1 | 2>(0);
+
     const currentDemo = translationDemos[demoIndex];
 
-    // LLM-style token typing animation with smooth cycling
+    // Card 1: LLM-style token typing animation with smooth cycling
     useEffect(() => {
         let isMounted = true;
         let charIndex = 0;
@@ -125,12 +156,61 @@ export default function Features() {
         };
     }, [demoIndex, currentDemo.translatedText]);
 
-    // Live recording timer ticking
+    // Card 1: Live recording timer ticking
     useEffect(() => {
         const timer = setInterval(() => {
             setRecordingTimer((prev) => (prev >= 9 ? 1 : prev + 1));
         }, 1000);
         return () => clearInterval(timer);
+    }, []);
+
+    // Card 2: Secret Mode Self-Destructing Message Cycle
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setSecretCountdown((prev) => {
+                if (prev <= 1) {
+                    setIsSecretDestroyed(true);
+                    setTimeout(() => {
+                        setIsSecretDestroyed(false);
+                    }, 2200);
+                    return 5;
+                }
+                return prev - 1;
+            });
+        }, 1200);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Card 3: Dual Mode Ambient Auto-Morph
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setDualModeTab((prev) => (prev === "personal" ? "business" : "personal"));
+        }, 5000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Card 4: AI Threat Interceptor Scanner Loop
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThreatState((prev) => (prev === "scanning" ? "blocked" : "scanning"));
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Card 5: HD Call Active Speaker Cycle
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setActiveSpeakerIndex((prev) => (prev + 1) % callParticipants.length);
+        }, 2600);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Card 6: Enterprise Ticket Resolution Flow Loop
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTicketStep((prev) => ((prev + 1) % 3) as 0 | 1 | 2);
+        }, 3500);
+        return () => clearInterval(interval);
     }, []);
 
     return (
@@ -325,7 +405,7 @@ export default function Features() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, margin: "-50px" }}
                         transition={{ duration: 0.4, delay: 0.1 }}
-                        className="md:col-span-1 lg:col-span-1 rounded-[2rem] border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/90 p-6 sm:p-8 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                        className="md:col-span-1 lg:col-span-1 rounded-[2rem] border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/90 p-6 sm:p-8 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group overflow-hidden relative"
                     >
                         <div>
                             <div className="flex items-center gap-2">
@@ -344,31 +424,67 @@ export default function Features() {
                             </p>
                         </div>
 
-                        {/* Biometric Shield Interactive Widget */}
-                        <div className="mt-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 p-4 space-y-2.5">
-                            <div className="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 p-3 shadow-xs border border-slate-200/60 dark:border-slate-800">
+                        {/* Animated Biometric & Disappearing Message Widget */}
+                        <div className="mt-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 p-4 space-y-3">
+                            
+                            {/* Face ID Laser Hologram Scan */}
+                            <div className="relative overflow-hidden flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 p-3 shadow-xs border border-slate-200/60 dark:border-slate-800">
+                                {/* Moving Laser Beam */}
+                                <motion.div
+                                    className="pointer-events-none absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_10px_#34d399]"
+                                    animate={{ top: ["0%", "100%", "0%"] }}
+                                    transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                                />
+                                
                                 <div className="flex items-center gap-2.5">
-                                    <EyeOff className="h-4 w-4 text-red-500" />
+                                    <ScanFace className="h-4 w-4 text-emerald-500 animate-pulse" />
                                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                                        Screenshot Shield
+                                        Biometric Face ID
                                     </span>
                                 </div>
-                                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
-                                    BLOCKED
+                                <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/40">
+                                    <Check className="h-3 w-3" /> VERIFIED
                                 </span>
                             </div>
 
-                            <div className="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 p-3 shadow-xs border border-slate-200/60 dark:border-slate-800">
-                                <div className="flex items-center gap-2.5">
-                                    <Clock className="h-4 w-4 text-amber-500" />
-                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                                        Self-Destruct Timer
+                            {/* Self-Destructing Message Live Countdown */}
+                            <div className="rounded-xl bg-white dark:bg-slate-900 p-3 shadow-xs border border-slate-200/60 dark:border-slate-800 space-y-1.5">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-semibold">
+                                        <Clock className="h-3.5 w-3.5 text-amber-500" />
+                                        Self-Destructing Message
+                                    </span>
+                                    <span className="text-[11px] font-mono font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-200/60 dark:border-amber-800/40">
+                                        ⏱ 0{secretCountdown}s
                                     </span>
                                 </div>
-                                <span className="text-[11px] font-mono font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-full">
-                                    ⏱ 30s
-                                </span>
+
+                                <AnimatePresence mode="wait">
+                                    {isSecretDestroyed ? (
+                                        <motion.p
+                                            key="destroyed"
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="text-xs font-semibold text-red-500 dark:text-red-400 flex items-center gap-1.5 pt-0.5"
+                                        >
+                                            <Flame className="h-3.5 w-3.5 animate-bounce" />
+                                            Message Vaporized & Cleared
+                                        </motion.p>
+                                    ) : (
+                                        <motion.p
+                                            key="active"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0, filter: "blur(4px)" }}
+                                            className="text-xs font-mono text-slate-700 dark:text-slate-300 pt-0.5 truncate"
+                                        >
+                                            🔒 Project Quantum Master Access Token
+                                        </motion.p>
+                                    )}
+                                </AnimatePresence>
                             </div>
+
                         </div>
                     </motion.div>
 
@@ -397,12 +513,12 @@ export default function Features() {
                             </p>
                         </div>
 
-                        {/* Dual Mode Switcher Widget */}
+                        {/* Dual Mode Morphing Switcher Widget */}
                         <div className="mt-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 p-3.5 space-y-3">
                             <div className="flex rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1">
                                 <button
                                     onClick={() => setDualModeTab("personal")}
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                                         dualModeTab === "personal"
                                             ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
                                             : "text-slate-600 dark:text-slate-400"
@@ -412,7 +528,7 @@ export default function Features() {
                                 </button>
                                 <button
                                     onClick={() => setDualModeTab("business")}
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                                         dualModeTab === "business"
                                             ? "bg-white dark:bg-slate-900 text-indigo-600 shadow-xs"
                                             : "text-slate-600 dark:text-slate-400"
@@ -422,27 +538,53 @@ export default function Features() {
                                 </button>
                             </div>
 
-                            <div className="rounded-xl bg-white dark:bg-slate-900 p-3 shadow-xs border border-slate-200/60 dark:border-slate-800 text-xs">
+                            <AnimatePresence mode="wait">
                                 {dualModeTab === "personal" ? (
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                                            <span className="font-bold text-slate-800 dark:text-white">Direct 1v1 Encrypted</span>
+                                    <motion.div
+                                        key="personal-view"
+                                        initial={{ opacity: 0, y: 6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -6 }}
+                                        transition={{ duration: 0.25 }}
+                                        className="rounded-xl bg-white dark:bg-slate-900 p-3 shadow-xs border border-slate-200/60 dark:border-slate-800 space-y-1.5"
+                                    >
+                                        <div className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-300" />
+                                                <span className="font-bold text-slate-800 dark:text-white">Emma Watson</span>
+                                            </div>
+                                            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded-full">
+                                                🔒 E2EE 1v1
+                                            </span>
                                         </div>
-                                        <span className="text-[10px] text-slate-400">Zero Analytics</span>
-                                    </div>
+                                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                                            &quot;Conference room is ready! See you soon 🚀&quot;
+                                        </p>
+                                    </motion.div>
                                 ) : (
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse" />
-                                            <span className="font-bold text-slate-800 dark:text-white">Shared Inbox & RBAC</span>
+                                    <motion.div
+                                        key="business-view"
+                                        initial={{ opacity: 0, y: 6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -6 }}
+                                        transition={{ duration: 0.25 }}
+                                        className="rounded-xl bg-white dark:bg-slate-900 p-3 shadow-xs border border-slate-200/60 dark:border-slate-800 space-y-1.5"
+                                    >
+                                        <div className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse" />
+                                                <span className="font-bold text-slate-800 dark:text-white">Ticket #402 (P1)</span>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-1.5 py-0.5 rounded">
+                                                ⚡ 12m SLA
+                                            </span>
                                         </div>
-                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-1.5 py-0.5 rounded">
-                                            Tickets Active
-                                        </span>
-                                    </div>
+                                        <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
+                                            &quot;Priority Customer: API Token provisioned&quot;
+                                        </p>
+                                    </motion.div>
                                 )}
-                            </div>
+                            </AnimatePresence>
                         </div>
                     </motion.div>
 
@@ -471,20 +613,38 @@ export default function Features() {
                             </p>
                         </div>
 
-                        {/* Threat Interceptor Alert Widget */}
-                        <div className="mt-6 rounded-2xl border border-amber-200/80 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-3.5 space-y-2">
-                            <div className="flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-300">
-                                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                                <span>Phishing URL Neutralized</span>
-                            </div>
-                            <p className="text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate bg-white/70 dark:bg-black/40 px-2 py-1 rounded">
-                                https://auth-fake-portal.co/verify
-                            </p>
-                            <div className="flex items-center justify-between text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold pt-1">
-                                <span className="flex items-center gap-1">
-                                    <CheckCircle2 className="h-3 w-3" /> Auto-Protected
+                        {/* Live AI Threat Interceptor Scanner Widget */}
+                        <div className="mt-6 rounded-2xl border border-amber-200/80 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-3.5 space-y-2 relative overflow-hidden">
+                            {/* Scanning Laser Beam */}
+                            {threatState === "scanning" && (
+                                <motion.div
+                                    className="pointer-events-none absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-amber-500 to-transparent shadow-[0_0_8px_#f59e0b]"
+                                    animate={{ top: ["0%", "100%", "0%"] }}
+                                    transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                                />
+                            )}
+
+                            <div className="flex items-center justify-between text-xs font-bold">
+                                <div className="flex items-center gap-1.5">
+                                    <ShieldAlert className={`h-4 w-4 ${threatState === "blocked" ? "text-red-600 animate-pulse" : "text-amber-600"}`} />
+                                    <span className={threatState === "blocked" ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-300"}>
+                                        {threatState === "blocked" ? "🛑 Threat Intercepted & Blocked" : "🔍 AI Threat Scanner Active"}
+                                    </span>
+                                </div>
+                                <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-100 dark:bg-amber-950 px-2 py-0.5 rounded-full">
+                                    3ms
                                 </span>
-                                <span>Zero Data Stored</span>
+                            </div>
+
+                            <p className="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate bg-white/80 dark:bg-black/50 p-2 rounded-lg border border-amber-200/60 dark:border-amber-800/40">
+                                <span className="text-red-500 line-through">http://secure-update-verify.co</span>
+                            </p>
+
+                            <div className="flex items-center justify-between text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold pt-1 border-t border-amber-200/60 dark:border-amber-900/40">
+                                <span className="flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" /> Client-Side Zero-Leak
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono">100% Protected</span>
                             </div>
                         </div>
                     </motion.div>
@@ -514,27 +674,55 @@ export default function Features() {
                             </p>
                         </div>
 
-                        {/* HD Call LiveKit Preview Widget */}
-                        <div className="mt-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 p-3.5 space-y-2.5">
-                            <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-                                <span className="flex items-center gap-1.5">
-                                    <Volume2 className="h-4 w-4 text-purple-600" />
-                                    AI Noise Suppression
-                                </span>
-                                <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full text-[10px]">
-                                    ACTIVE
+                        {/* Interactive Active Speaker Video Call & Noise Suppression Widget */}
+                        <div className="mt-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 p-3.5 space-y-3">
+                            
+                            {/* 3-Participant Call Tiles with Speaking Ring Glow */}
+                            <div className="grid grid-cols-3 gap-2">
+                                {callParticipants.map((participant, index) => {
+                                    const isSpeaking = activeSpeakerIndex === index;
+                                    return (
+                                        <div
+                                            key={participant.name}
+                                            className={`rounded-xl bg-white dark:bg-slate-900 p-2.5 flex flex-col items-center justify-center text-center transition-all border ${
+                                                isSpeaking
+                                                    ? "border-emerald-500 shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400/50"
+                                                    : "border-slate-200/60 dark:border-slate-800"
+                                            }`}
+                                        >
+                                            <div className="relative">
+                                                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-white text-xs font-bold ${participant.avatarBg}`}>
+                                                    {participant.initial}
+                                                </div>
+                                                {isSpeaking && (
+                                                    <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="mt-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-full">
+                                                {participant.name}
+                                            </span>
+                                            <span className="text-[9px] text-slate-400">
+                                                {isSpeaking ? "Speaking..." : participant.role}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Noise Suppression & WebRTC Latency Bar */}
+                            <div className="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 p-2.5 border border-slate-200/60 dark:border-slate-800 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <Volume2 className="h-3.5 w-3.5 text-purple-600 animate-pulse" />
+                                    <span className="font-semibold text-slate-700 dark:text-slate-300">AI Noise Cancel</span>
+                                </div>
+                                <span className="font-mono font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full text-[10px]">
+                                    🟢 18ms WebRTC
                                 </span>
                             </div>
 
-                            <div className="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 p-2.5 border border-slate-200/60 dark:border-slate-800 text-xs">
-                                <div className="flex items-center gap-2">
-                                    <Activity className="h-3.5 w-3.5 text-purple-600" />
-                                    <span className="font-medium text-slate-700 dark:text-slate-300">LiveKit WebRTC</span>
-                                </div>
-                                <span className="font-mono font-bold text-purple-600">
-                                    24ms Ping
-                                </span>
-                            </div>
                         </div>
                     </motion.div>
 
@@ -584,13 +772,13 @@ export default function Features() {
                                 </div>
                             </div>
 
-                            {/* Right Content: Interactive Support Queue Preview (5 Columns) */}
+                            {/* Right Content: Interactive Live Ticket Routing Simulation (5 Columns) */}
                             <div className="lg:col-span-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/80 p-5 shadow-xs space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
                                         <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                                            Active Shared Queue
+                                            Live Shared Ticket Queue
                                         </span>
                                     </div>
                                     <span className="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-full">
@@ -598,32 +786,75 @@ export default function Features() {
                                     </span>
                                 </div>
 
-                                {/* Customer Message */}
+                                {/* Customer Incoming Message */}
                                 <div className="rounded-xl bg-white dark:bg-slate-900 p-3.5 border border-slate-200/60 dark:border-slate-800 shadow-xs">
                                     <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
                                         <span className="font-semibold text-slate-700 dark:text-slate-300">Marcus (Enterprise Lead)</span>
-                                        <span>2m ago</span>
+                                        <span>Just now</span>
                                     </div>
                                     <p className="text-xs text-slate-800 dark:text-slate-200">
                                         &quot;Can we provision 100 enterprise accounts with SSO and audit logs?&quot;
                                     </p>
                                 </div>
 
-                                {/* Agent Response */}
-                                <div className="rounded-xl bg-emerald-600 text-white p-3.5 shadow-md shadow-emerald-600/15">
-                                    <div className="flex items-center justify-between text-[11px] text-emerald-100 mb-1">
-                                        <span className="font-bold flex items-center gap-1.5">
-                                            <UserCheck className="h-3.5 w-3.5" />
-                                            @Sarah (Support Lead)
-                                        </span>
-                                        <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                            ⚡ 42s SLA
-                                        </span>
-                                    </div>
-                                    <p className="text-xs font-medium">
-                                        &quot;Approved! SAML 2.0 & Okta integration enabled for your domain.&quot;
-                                    </p>
-                                </div>
+                                {/* Live Auto-Routing & Resolution Simulation */}
+                                <AnimatePresence mode="wait">
+                                    {ticketStep === 0 && (
+                                        <motion.div
+                                            key="routing"
+                                            initial={{ opacity: 0, y: 4 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0 }}
+                                            className="flex items-center justify-between rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/40 p-3 text-xs"
+                                        >
+                                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-bold">
+                                                <Bot className="h-4 w-4 animate-spin" />
+                                                <span>AI Routing Engine Analyzing...</span>
+                                            </div>
+                                            <span className="text-[10px] text-blue-600 font-mono">⚡ 12ms</span>
+                                        </motion.div>
+                                    )}
+
+                                    {ticketStep === 1 && (
+                                        <motion.div
+                                            key="assigned"
+                                            initial={{ opacity: 0, y: 4 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0 }}
+                                            className="flex items-center justify-between rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/40 p-3 text-xs"
+                                        >
+                                            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold">
+                                                <UserCheck className="h-4 w-4" />
+                                                <span>Assigned to @Sarah (Senior Lead)</span>
+                                            </div>
+                                            <span className="text-[10px] text-amber-600 font-semibold animate-pulse">Typing...</span>
+                                        </motion.div>
+                                    )}
+
+                                    {ticketStep === 2 && (
+                                        <motion.div
+                                            key="resolved"
+                                            initial={{ opacity: 0, y: 4 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0 }}
+                                            className="rounded-xl bg-emerald-600 text-white p-3.5 shadow-md shadow-emerald-600/15 space-y-1"
+                                        >
+                                            <div className="flex items-center justify-between text-[11px] text-emerald-100">
+                                                <span className="font-bold flex items-center gap-1.5">
+                                                    <UserCheck className="h-3.5 w-3.5" />
+                                                    @Sarah (Support Lead)
+                                                </span>
+                                                <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                                    ✓ RESOLVED (38s)
+                                                </span>
+                                            </div>
+                                            <p className="text-xs font-medium">
+                                                &quot;Approved! SAML 2.0 & Okta integration enabled for your domain.&quot;
+                                            </p>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
                             </div>
                         </div>
                     </motion.div>
