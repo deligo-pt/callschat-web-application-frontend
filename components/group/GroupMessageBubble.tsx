@@ -164,49 +164,53 @@ export function GroupMessageBubble({
     );
   }
 
-  const renderOptionsMenu = () => (
-    <div
-      className={cn(
-        "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1.5 shrink-0 z-20",
-        isMe ? "order-first" : "order-last"
-      )}
-    >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
-            title="Message options"
+  const renderOptionsMenu = () => {
+    if (msg.id.startsWith("optimistic-") || msg.isDeleted || (!msg.text && !msg.mediaUrl) || msg.text?.startsWith("__PIN_EVENT__:")) return null;
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1.5 shrink-0 z-20",
+          isMe ? "order-first" : "order-last"
+        )}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+              title="Message options"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align={isMe ? "end" : "start"}
+            className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
           >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align={isMe ? "end" : "start"}
-          className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
-        >
-          {isMe && !msg.id.startsWith("optimistic-") && msg.text && !msg.text.startsWith("__PIN_EVENT__:") && (
-            <>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditText(msg.text);
-                  setIsEditing(true);
-                }}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
-                <span>Edit message</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onUnsend?.(msg.id)}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                <span>Unsend for everyone</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-1 bg-slate-100" />
-            </>
-          )}
+            {isMe && (
+              <>
+                {msg.text && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setEditText(msg.text);
+                      setIsEditing(true);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
+                    <span>Edit message</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => onUnsend?.(msg.id)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Unsend for everyone</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1 bg-slate-100" />
+              </>
+            )}
           {!isPinned ? (
             <>
               <DropdownMenuLabel className="text-[11px] font-semibold text-slate-400 px-2 py-1">
@@ -254,7 +258,8 @@ export function GroupMessageBubble({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  );
+    );
+  };
 
   const renderPinnedBadge = () => {
     if (!isPinned) return null;

@@ -263,8 +263,20 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
       for (const conv of conversations) {
         const msg = conv.lastMessage;
-        if (!msg) continue;
-        if (newPreviews[conv.id]) continue; // Already resolved
+        if (!msg) {
+          if (newPreviews[conv.id]) {
+            delete newPreviews[conv.id];
+            hasChanges = true;
+          }
+          continue;
+        }
+        if (newPreviews[msg.id]) {
+          if (newPreviews[conv.id] !== newPreviews[msg.id]) {
+            newPreviews[conv.id] = newPreviews[msg.id];
+            hasChanges = true;
+          }
+          continue;
+        }
         if (msg.mediaType) continue; // Media handled differently
 
         // B2C support conversations: messages are stored as plaintext.
@@ -283,10 +295,12 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         if (isBizConv) {
           if (msg.ciphertext && !msg.nonce) {
             // True plaintext — store full string in newPreviews, let getLastMessagePreview handle formatting & truncation
+            newPreviews[msg.id] = msg.ciphertext;
             newPreviews[conv.id] = msg.ciphertext;
             hasChanges = true;
           } else if (msg.ciphertext && msg.nonce) {
             // Old encrypted B2C message — unrecoverable, show placeholder
+            newPreviews[msg.id] = "Message (legacy encrypted)";
             newPreviews[conv.id] = "Message (legacy encrypted)";
             hasChanges = true;
           }
@@ -316,6 +330,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
           if (pubKeyToUse) {
             const text = await decryptMessage(msg.ciphertext, msg.nonce!, pubKeyToUse, myPrivateKey);
+            newPreviews[msg.id] = text;
             newPreviews[conv.id] = text;
             hasChanges = true;
           }
@@ -323,6 +338,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           // Decryption failed — silently fall back to a placeholder.
           // This can happen when a key has been rotated. The error is
           // intentionally NOT logged to avoid flooding the console.
+          newPreviews[msg.id] = "🔒 Encrypted message";
           newPreviews[conv.id] = "🔒 Encrypted message";
           hasChanges = true;
         }

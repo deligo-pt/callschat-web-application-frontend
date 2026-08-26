@@ -30,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen flex flex-col bg-zinc-100 overflow-x-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen flex flex-col bg-zinc-100 overflow-x-clip`}
         suppressHydrationWarning
       >
         <ClientIntlProvider>

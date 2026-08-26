@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '@/components/providers/SocketProvider';
 import { playNotificationSound } from '@/utils/sounds';
 import { CallService } from '@/services/call.service';
+import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -216,7 +217,7 @@ export const useCallSignaling = () => {
       pendingPeerRef.current = {};
     };
 
-    const handleCallEnded = (payload?: unknown) => {
+    const handleCallEnded = (payload?: { callId?: string; reason?: string }) => {
       console.log('[Call] Call ended/missed/rejected:', payload);
       stopRingtone();
       playNotificationSound('call_ended');
@@ -224,7 +225,17 @@ export const useCallSignaling = () => {
       setOutgoingCall(null);
       setActiveCall(null);
       setCallWaiting(null);
+      setReconnectingUserId(null); // Always clear the reconnecting overlay
+      setIsAwaitingLocalReconnect(false);
       setOutgoingCallStatus('CALLING');
+
+      // Show a descriptive toast when the call ended due to reconnect timeout
+      if (payload?.reason === 'reconnect_timeout') {
+        toast.error('Call ended', {
+          description: 'The other person could not reconnect in time.',
+          duration: 4000,
+        });
+      }
     };
 
     const handleCallRejected = (payload?: unknown) => {
@@ -619,6 +630,8 @@ export const useCallSignaling = () => {
       userInitiatedHangupRef.current = true;
       socket.emit('call:hangup', { callId });
       setActiveCall(null);
+      setReconnectingUserId(null);
+      setIsAwaitingLocalReconnect(false);
     },
     [socket],
   );

@@ -45,12 +45,12 @@
   }
 
   body {
-    @apply bg-background text-foreground overflow-x-hidden;
+    @apply bg-background text-foreground overflow-x-clip;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
   html {
-    @apply font-sans overflow-x-hidden;
+    @apply font-sans overflow-x-clip;
   }
 }
 
