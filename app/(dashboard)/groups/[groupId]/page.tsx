@@ -710,6 +710,19 @@ export default function GroupChatPage() {
                       mediaType: m.mediaType,
                     })
                   }
+                  onReplyPrivately={async (senderId) => {
+                    if (!senderId || senderId === currentUserId) return;
+                    try {
+                      const res = await chatService.initiateConversation(senderId);
+                      if (res?.data?.id) {
+                        router.push(`/chats/${res.data.id}?recipientId=${senderId}`);
+                      } else {
+                        router.push(`/chats?recipientId=${senderId}`);
+                      }
+                    } catch {
+                      router.push(`/chats?recipientId=${senderId}`);
+                    }
+                  }}
                   onScrollToMessage={scrollToMessage}
                   currentUserId={currentUserId}
                 />

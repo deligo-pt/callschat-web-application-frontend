@@ -126,6 +126,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
   // Keep plaintext group key in a ref so listeners always have it
   const groupKeyRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
+  const pendingReceiptsRef = useRef<Map<string, any[]>>(new Map());
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
@@ -392,6 +393,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 isDeleted: msg.isDeleted,
                 replyToId: msg.replyToId ?? null,
                 replyTo,
+                receipts: msg.receipts || [],
               };
             })
           );
@@ -400,6 +402,24 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
           setMessages(decryptedHistory);
+
+          // Proactively acknowledge delivery for any undelivered messages
+          if (socket && isConnected) {
+            const undelivered = historyRes.data.filter(
+              (m: any) =>
+                m.senderId !== currentUserId &&
+                (!m.receipts ||
+                  !m.receipts.some(
+                    (r: any) => r.userId === currentUserId && r.deliveredAt
+                  ))
+            );
+            undelivered.forEach((m: any) => {
+              socket.emit("group:mark_delivered", {
+                groupId,
+                messageId: m.id,
+              });
+            });
+          }
         } else {
           setMessages([]);
         }
@@ -457,6 +477,38 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
 
       // Helper to append a message, deduplicating by ID
+      const pendingForThis = pendingReceiptsRef.current.get(payload.id) || [];
+      const mergeReceipts = (base: any[] = [], opt?: any[]) => {
+        const res = [...base];
+        if (opt) {
+          for (const r of opt) {
+            const idx = res.findIndex((x) => x.userId === r.userId);
+            if (idx !== -1) {
+              res[idx] = {
+                ...res[idx],
+                deliveredAt: r.deliveredAt ?? res[idx].deliveredAt,
+                seenAt: r.seenAt ?? res[idx].seenAt,
+              };
+            } else {
+              res.push(r);
+            }
+          }
+        }
+        for (const pr of pendingForThis) {
+          const idx = res.findIndex((x) => x.userId === pr.userId);
+          if (idx !== -1) {
+            res[idx] = {
+              ...res[idx],
+              deliveredAt: pr.deliveredAt ?? res[idx].deliveredAt,
+              seenAt: pr.seenAt ?? res[idx].seenAt,
+            };
+          } else {
+            res.push(pr);
+          }
+        }
+        return res;
+      };
+
       const appendMessage = (msg: GroupMessage) => {
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
@@ -480,12 +532,15 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               if (!msg.replyTo?.text && existingOpt?.replyTo?.text) {
                 msg.replyTo = existingOpt.replyTo;
               }
-              updated[optimisticIdx] = msg;
+              updated[optimisticIdx] = {
+                ...msg,
+                receipts: mergeReceipts(msg.receipts || [], existingOpt?.receipts),
+              };
               return updated;
             }
           }
 
-          return [...prev, msg];
+          return [...prev, { ...msg, receipts: mergeReceipts(msg.receipts || []) }];
         });
       };
 
@@ -579,27 +634,92 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     const handleStatusUpdate = (payload: any) => {
       if (payload.groupId !== groupId) return;
       
-      setMessages((prev) => prev.map((msg) => {
-        if (msg.id === payload.messageId) {
-          const receipts = [...(msg.receipts || [])];
-          const existing = receipts.find((r) => r.userId === payload.userId);
-          
-          if (existing) {
-            if (payload.status === 'DELIVERED') existing.deliveredAt = payload.timestamp;
-            if (payload.status === 'SEEN') existing.seenAt = payload.timestamp;
-          } else {
-            receipts.push({
-              id: Math.random().toString(),
-              userId: payload.userId,
-              deliveredAt: payload.status === 'DELIVERED' ? payload.timestamp : null,
-              seenAt: payload.status === 'SEEN' ? payload.timestamp : null,
-            });
+      const newDeliveredAt =
+        payload.status === 'DELIVERED'
+          ? payload.timestamp
+          : payload.status === 'SEEN' && payload.deliveredAt
+          ? payload.deliveredAt
+          : payload.status === 'SEEN'
+          ? payload.timestamp
+          : null;
+
+      const newSeenAt = payload.status === 'SEEN' ? payload.timestamp : null;
+
+      const currentPending = pendingReceiptsRef.current.get(payload.messageId) || [];
+      const pIdx = currentPending.findIndex((r) => r.userId === payload.userId);
+      if (pIdx !== -1) {
+        currentPending[pIdx] = {
+          ...currentPending[pIdx],
+          deliveredAt: newDeliveredAt ?? currentPending[pIdx].deliveredAt,
+          seenAt: newSeenAt ?? currentPending[pIdx].seenAt,
+        };
+      } else {
+        currentPending.push({
+          id: Math.random().toString(),
+          userId: payload.userId,
+          deliveredAt: newDeliveredAt,
+          seenAt: newSeenAt,
+        });
+      }
+      pendingReceiptsRef.current.set(payload.messageId, currentPending);
+
+      setMessages((prev) => {
+        let matched = false;
+        const next = prev.map((msg) => {
+          if (msg.id === payload.messageId) {
+            matched = true;
+            const receipts = [...(msg.receipts || [])];
+            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
+            
+            if (existingIdx !== -1) {
+              const existing = receipts[existingIdx];
+              receipts[existingIdx] = {
+                ...existing,
+                deliveredAt: newDeliveredAt ?? existing.deliveredAt,
+                seenAt: newSeenAt ?? existing.seenAt,
+              };
+            } else {
+              receipts.push({
+                id: Math.random().toString(),
+                userId: payload.userId,
+                deliveredAt: newDeliveredAt,
+                seenAt: newSeenAt,
+              });
+            }
+            
+            return { ...msg, receipts };
           }
-          
-          return { ...msg, receipts };
+          return msg;
+        });
+
+        if (!matched) {
+          const optIdx = next.map((m) => m.id).lastIndexOf(
+            next.slice().reverse().find((m) => m.id.startsWith("optimistic-") && m.senderId === currentUserIdRef.current)?.id ?? ""
+          );
+          if (optIdx !== -1) {
+            const optMsg = next[optIdx];
+            const receipts = [...(optMsg.receipts || [])];
+            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
+            if (existingIdx !== -1) {
+              receipts[existingIdx] = {
+                ...receipts[existingIdx],
+                deliveredAt: newDeliveredAt ?? receipts[existingIdx].deliveredAt,
+                seenAt: newSeenAt ?? receipts[existingIdx].seenAt,
+              };
+            } else {
+              receipts.push({
+                id: Math.random().toString(),
+                userId: payload.userId,
+                deliveredAt: newDeliveredAt,
+                seenAt: newSeenAt,
+              });
+            }
+            next[optIdx] = { ...optMsg, receipts };
+          }
         }
-        return msg;
-      }));
+
+        return next;
+      });
     };
 
     socket.on("group:receive_message", handleReceiveMessage);
@@ -623,21 +743,39 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
     const currentUser = currentUserIdRef.current;
     
-    // Find messages not sent by us, where our receipt doesn't have a seenAt
-    const unreadMessages = messages.filter(m => {
-      if (m.senderId === currentUser) return false;
-      const myReceipt = m.receipts?.find(r => r.userId === currentUser);
-      return !myReceipt?.seenAt;
-    });
+    const checkAndMarkSeen = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
 
-    if (unreadMessages.length > 0) {
-      unreadMessages.forEach(m => {
-        socket.emit("group:mark_seen", {
-          groupId,
-          messageId: m.id,
-        });
+      // Find messages not sent by us, where our receipt doesn't have a seenAt
+      const unreadMessages = messages.filter(m => {
+        if (m.senderId === currentUser) return false;
+        const myReceipt = m.receipts?.find(r => r.userId === currentUser);
+        return !myReceipt?.seenAt;
       });
-    }
+
+      if (unreadMessages.length > 0) {
+        unreadMessages.forEach(m => {
+          socket.emit("group:mark_seen", {
+            groupId,
+            messageId: m.id,
+          });
+        });
+      }
+    };
+
+    checkAndMarkSeen();
+    const visibilityTimeout = setTimeout(checkAndMarkSeen, 300);
+
+    window.addEventListener("focus", checkAndMarkSeen);
+    window.addEventListener("click", checkAndMarkSeen);
+    document.addEventListener("visibilitychange", checkAndMarkSeen);
+
+    return () => {
+      clearTimeout(visibilityTimeout);
+      window.removeEventListener("focus", checkAndMarkSeen);
+      window.removeEventListener("click", checkAndMarkSeen);
+      document.removeEventListener("visibilitychange", checkAndMarkSeen);
+    };
   }, [messages, socket, isConnected, groupId]);
 
   // ── Send Message ───────────────────────────────────────────────────────────

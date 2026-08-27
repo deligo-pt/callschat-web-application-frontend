@@ -164,6 +164,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const currentUserIdRef = useRef<string>(currentUserId);
   const activePeerIdRef = useRef<string>(activePeerId);
   const isBizChatRef = useRef<boolean>(isBizChat);
+  const pendingReceiptsRef = useRef<Map<string, MessageReceipt[]>>(new Map());
 
   useEffect(() => {
     isBizChatRef.current = isBizChat;
@@ -316,6 +317,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
                   replyToId: msg.replyToId ?? null,
                   replyTo,
+                  receipts: msg.receipts || [],
                 };
               })
             );
@@ -325,6 +327,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             );
             setMessages(decryptedHistory);
+
+            // Proactively acknowledge delivery for any messages not yet marked as delivered
+            if (socket && isConnected) {
+              const undelivered = rawMessages.filter(
+                (m) =>
+                  m.senderId !== currentUserId &&
+                  (!m.receipts ||
+                    !m.receipts.some(
+                      (r: any) => r.userId === currentUserId && r.deliveredAt
+                    ))
+              );
+              undelivered.forEach((m) => {
+                socket.emit("chat:mark_delivered", {
+                  conversationId,
+                  messageId: m.id,
+                });
+              });
+            }
           }
         }
       } catch (err) {
@@ -478,6 +498,39 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             knownMap
           );
 
+          // Helper to merge server receipts, optimistic receipts, and buffered pending receipts
+          const pendingForThis = pendingReceiptsRef.current.get(payload.id) || [];
+          const mergeReceipts = (base: MessageReceipt[] = [], opt?: MessageReceipt[]) => {
+            const res = [...base];
+            if (opt) {
+              for (const r of opt) {
+                const idx = res.findIndex((x) => x.userId === r.userId);
+                if (idx !== -1) {
+                  res[idx] = {
+                    ...res[idx],
+                    deliveredAt: r.deliveredAt ?? res[idx].deliveredAt,
+                    seenAt: r.seenAt ?? res[idx].seenAt,
+                  };
+                } else {
+                  res.push(r);
+                }
+              }
+            }
+            for (const pr of pendingForThis) {
+              const idx = res.findIndex((x) => x.userId === pr.userId);
+              if (idx !== -1) {
+                res[idx] = {
+                  ...res[idx],
+                  deliveredAt: pr.deliveredAt ?? res[idx].deliveredAt,
+                  seenAt: pr.seenAt ?? res[idx].seenAt,
+                };
+              } else {
+                res.push(pr);
+              }
+            }
+            return res;
+          };
+
           setMessages((prev) => {
             // Replace an existing optimistic placeholder if present,
             // otherwise deduplicate by real server ID
@@ -521,7 +574,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
-                receipts: payload.receipts || [],
+                receipts: mergeReceipts(payload.receipts || [], existingOpt?.receipts),
                 replyToId: payload.replyToId ?? null,
                 replyTo: finalReplyTo,
               };
@@ -541,7 +594,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
-                receipts: payload.receipts || [],
+                receipts: mergeReceipts(payload.receipts || []),
                 replyToId: payload.replyToId ?? null,
                 replyTo: resolvedReplyTo,
               },
@@ -645,7 +698,20 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         });
       }
       
-      // Note: chat:mark_delivered is now handled globally in SocketProvider
+      // Proactively mark message as delivered whenever received from another participant
+      if (senderId !== currentUserIdRef.current && payload.id) {
+        socket.emit("chat:mark_delivered", {
+          conversationId,
+          messageId: payload.id,
+        });
+      }
+
+      // If receiver is actively in the chat and tab is visible, mark conversation as seen immediately
+      if (senderId !== currentUserIdRef.current && typeof document !== 'undefined' && document.visibilityState !== 'hidden') {
+        socket.emit("chat:mark_conversation_seen", {
+          conversationId,
+        });
+      }
     };
 
     const handleChatError = (err: any) => {
@@ -701,48 +767,129 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     const handleStatusUpdate = (payload: any) => {
       if (payload.conversationId !== conversationId) return;
       
-      setMessages((prev) => prev.map((msg) => {
-        if (msg.id === payload.messageId) {
-          const receipts = [...(msg.receipts || [])];
-          const existing = receipts.find((r) => r.userId === payload.userId);
-          
-          if (existing) {
-            if (payload.status === 'DELIVERED') existing.deliveredAt = payload.timestamp;
-            if (payload.status === 'SEEN') existing.seenAt = payload.timestamp;
-          } else {
-            receipts.push({
-              id: Math.random().toString(), // local fallback ID
-              userId: payload.userId,
-              deliveredAt: payload.status === 'DELIVERED' ? payload.timestamp : null,
-              seenAt: payload.status === 'SEEN' ? payload.timestamp : null,
-            });
+      const newDeliveredAt =
+        payload.status === 'DELIVERED'
+          ? payload.timestamp
+          : payload.status === 'SEEN' && payload.deliveredAt
+          ? payload.deliveredAt
+          : payload.status === 'SEEN'
+          ? payload.timestamp
+          : null;
+
+      const newSeenAt = payload.status === 'SEEN' ? payload.timestamp : null;
+
+      // Buffer in pendingReceiptsRef in case this status update arrived before
+      // the message finished async decryption/optimistic replacement
+      const currentPending = pendingReceiptsRef.current.get(payload.messageId) || [];
+      const pIdx = currentPending.findIndex((r) => r.userId === payload.userId);
+      if (pIdx !== -1) {
+        currentPending[pIdx] = {
+          ...currentPending[pIdx],
+          deliveredAt: newDeliveredAt ?? currentPending[pIdx].deliveredAt,
+          seenAt: newSeenAt ?? currentPending[pIdx].seenAt,
+        };
+      } else {
+        currentPending.push({
+          id: Math.random().toString(),
+          userId: payload.userId,
+          deliveredAt: newDeliveredAt,
+          seenAt: newSeenAt,
+        });
+      }
+      pendingReceiptsRef.current.set(payload.messageId, currentPending);
+
+      setMessages((prev) => {
+        let matched = false;
+        const next = prev.map((msg) => {
+          if (msg.id === payload.messageId) {
+            matched = true;
+            const receipts = [...(msg.receipts || [])];
+            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
+            
+            if (existingIdx !== -1) {
+              const existing = receipts[existingIdx];
+              receipts[existingIdx] = {
+                ...existing,
+                deliveredAt: newDeliveredAt ?? existing.deliveredAt,
+                seenAt: newSeenAt ?? existing.seenAt,
+              };
+            } else {
+              receipts.push({
+                id: Math.random().toString(),
+                userId: payload.userId,
+                deliveredAt: newDeliveredAt,
+                seenAt: newSeenAt,
+              });
+            }
+            
+            return { ...msg, receipts };
           }
-          
-          return { ...msg, receipts };
+          return msg;
+        });
+
+        // If not matched by real server ID (message is still an optimistic placeholder),
+        // update the latest optimistic message immediately so checkmarks update with zero lag
+        if (!matched) {
+          const optIdx = next.map((m) => m.id).lastIndexOf(
+            next.slice().reverse().find((m) => m.id.startsWith("optimistic-") && m.senderId === currentUserIdRef.current)?.id ?? ""
+          );
+          if (optIdx !== -1) {
+            const optMsg = next[optIdx];
+            const receipts = [...(optMsg.receipts || [])];
+            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
+            if (existingIdx !== -1) {
+              receipts[existingIdx] = {
+                ...receipts[existingIdx],
+                deliveredAt: newDeliveredAt ?? receipts[existingIdx].deliveredAt,
+                seenAt: newSeenAt ?? receipts[existingIdx].seenAt,
+              };
+            } else {
+              receipts.push({
+                id: Math.random().toString(),
+                userId: payload.userId,
+                deliveredAt: newDeliveredAt,
+                seenAt: newSeenAt,
+              });
+            }
+            next[optIdx] = { ...optMsg, receipts };
+          }
         }
-        return msg;
-      }));
+
+        return next;
+      });
     };
 
     const handleConversationStatusUpdate = (payload: any) => {
       if (payload.conversationId !== conversationId) return;
       if (payload.status !== 'SEEN') return;
 
-      const updatedReceiptsMap = new Map(payload.receipts.map((r: any) => [r.messageId, r.timestamp]));
+      // Build a map of messageId -> { seenAt, deliveredAt } from the receipt list
+      const updatedReceiptsMap = new Map(
+        payload.receipts.map((r: any) => [r.messageId, r])
+      );
 
       setMessages((prev) => prev.map((msg) => {
-        const seenAtStr = updatedReceiptsMap.get(msg.id) as string;
-        if (seenAtStr) {
+        const receiptData = updatedReceiptsMap.get(msg.id) as any;
+        if (receiptData) {
+          const seenAtStr = receiptData.timestamp;
+          const deliveredAtStr = receiptData.deliveredAt ?? null;
           const receipts = [...(msg.receipts || [])];
-          const existing = receipts.find((r) => r.userId === payload.userId);
+          const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
           
-          if (existing) {
-            existing.seenAt = seenAtStr;
+          if (existingIdx !== -1) {
+            const existing = receipts[existingIdx];
+            receipts[existingIdx] = {
+              ...existing,
+              // Preserve existing deliveredAt if backend didn't send one (never overwrite with null)
+              deliveredAt: deliveredAtStr ?? existing.deliveredAt,
+              seenAt: seenAtStr,
+            };
           } else {
             receipts.push({
               id: Math.random().toString(),
               userId: payload.userId,
-              deliveredAt: null,
+              // seen implies delivered — use backend value or fall back to seenAt timestamp
+              deliveredAt: deliveredAtStr ?? seenAtStr,
               seenAt: seenAtStr,
             });
           }
@@ -801,11 +948,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     if (!socket || !isConnected || !conversationId || !messages.length) return;
 
     const currentUser = currentUserIdRef.current;
-    let visibilityTimeout: NodeJS.Timeout;
     
     const checkAndMarkSeen = () => {
-      // Only mark as seen if the document is focused and visible
-      if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+      // Mark as seen if page is not hidden
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return;
       }
 
@@ -823,16 +969,19 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
     };
 
-    // Check initially (with slight delay to allow rendering/focus changes)
-    visibilityTimeout = setTimeout(checkAndMarkSeen, 500);
+    // Check immediately and also with slight delay for render stability
+    checkAndMarkSeen();
+    const visibilityTimeout = setTimeout(checkAndMarkSeen, 300);
 
-    // Also check when window regains focus or visibility changes
+    // Also check when window regains focus, becomes visible, or receives user interaction
     window.addEventListener("focus", checkAndMarkSeen);
+    window.addEventListener("click", checkAndMarkSeen);
     document.addEventListener("visibilitychange", checkAndMarkSeen);
 
     return () => {
       clearTimeout(visibilityTimeout);
       window.removeEventListener("focus", checkAndMarkSeen);
+      window.removeEventListener("click", checkAndMarkSeen);
       document.removeEventListener("visibilitychange", checkAndMarkSeen);
     };
   }, [messages, socket, isConnected, conversationId]);
