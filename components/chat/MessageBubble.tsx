@@ -1,8 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2, Pin, PinOff, Clock, Trash2, Check, CheckCheck } from "lucide-react";
+import {
+  Phone,
+  Video,
+  PhoneMissed,
+  PhoneIncoming,
+  PhoneOutgoing,
+  Loader2,
+  FileText,
+  Download,
+  MoreHorizontal,
+  Edit2,
+  Pin,
+  PinOff,
+  Clock,
+  Trash2,
+  Check,
+  CheckCheck,
+  Reply,
+  Camera,
+  Mic,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -44,6 +64,15 @@ interface MessageBubbleProps {
     mediaType?: string | null;
     isEdited?: boolean;
     isDeleted?: boolean;
+    replyToId?: string | null;
+    replyTo?: {
+      id: string;
+      senderId: string;
+      senderName?: string;
+      text: string;
+      mediaUrl?: string | null;
+      mediaType?: string | null;
+    } | null;
     receipts?: {
       id: string;
       userId: string;
@@ -61,11 +90,30 @@ interface MessageBubbleProps {
   onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
   onUnpin?: () => void;
   onUnsend?: (messageId: string) => void;
+  onReply?: (msg: any) => void;
+  onScrollToMessage?: (messageId: string) => void;
   /** Per-message disappear timer in seconds, or null if not set. */
   disappearAfterSeconds?: number | null;
+  currentUserId?: string;
 }
 
-export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit, isPinned, onPin, onUnpin, onUnsend, disappearAfterSeconds }: MessageBubbleProps) {
+export function MessageBubble({
+  msg,
+  isMe,
+  showTail,
+  peerId,
+  peerName,
+  peerAvatar,
+  onEdit,
+  isPinned,
+  onPin,
+  onUnpin,
+  onUnsend,
+  onReply,
+  onScrollToMessage,
+  disappearAfterSeconds,
+  currentUserId,
+}: MessageBubbleProps) {
   const { initiateCall } = useCallContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -155,6 +203,14 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
           isMe ? "order-first" : "order-last"
         )}
       >
+        <button
+          type="button"
+          onClick={() => onReply?.(msg)}
+          className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+          title="Reply"
+        >
+          <Reply className="w-4 h-4" />
+        </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -169,6 +225,14 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
             align={isMe ? "end" : "start"}
             className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
           >
+            <DropdownMenuItem
+              onClick={() => onReply?.(msg)}
+              className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
+            >
+              <Reply className="w-3.5 h-3.5 text-[#3B58F5]" />
+              <span>Reply</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1 bg-slate-100" />
             {isMe && (
               <>
                 {msg.text && (
@@ -461,7 +525,10 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
   };
 
   return (
-    <div id={`msg-${msg.id}`} className={cn("flex w-full z-10 my-1 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+    <div
+      id={`msg-${msg.id}`}
+      className={cn("flex w-full z-10 my-1 group/bubble relative items-center transition-all", isMe ? "justify-end" : "justify-start")}
+    >
       {renderOptionsMenu()}
       <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
         {renderPinnedBadge()}
@@ -471,6 +538,80 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
             isMe ? "bg-[#254BCC] text-white rounded-[24px] rounded-br-[6px]" : "bg-white text-[#11142D] rounded-[24px] rounded-bl-[6px]"
           )}
         >
+          {/* WhatsApp-Style In-Bubble Quoted Card */}
+          {msg.replyTo && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (msg.replyTo?.id) onScrollToMessage?.(msg.replyTo.id);
+              }}
+              role="button"
+              tabIndex={0}
+              className={cn(
+                "relative mb-2 flex items-center justify-between gap-2 overflow-hidden rounded-[8px] p-2 pl-3 text-left cursor-pointer transition-all",
+                isMe
+                  ? "bg-black/15 hover:bg-black/25 text-white"
+                  : "bg-black/[0.05] hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-[#111B21] dark:text-[#E9EDEF]"
+              )}
+            >
+              {/* WhatsApp Left Vertical Colored Stripe Bar */}
+              <div
+                className={cn(
+                  "absolute left-0 top-0 bottom-0 w-[4px]",
+                  msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                    ? isMe ? "bg-white" : "bg-[#027eb5] dark:bg-[#53bdeb]"
+                    : isMe ? "bg-white/80" : "bg-[#027eb5] dark:bg-[#53bdeb]"
+                )}
+              />
+
+              <div className="flex flex-col min-w-0 flex-1 pl-1">
+                <span
+                  className={cn(
+                    "text-[12.5px] font-semibold tracking-tight truncate leading-tight",
+                    isMe
+                      ? "text-white/95"
+                      : msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                      ? "text-[#027eb5] dark:text-[#53bdeb]"
+                      : "text-[#027eb5] dark:text-[#53bdeb]"
+                  )}
+                >
+                  {msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                    ? "You"
+                    : msg.replyTo.senderName || peerName || "Contact"}
+                </span>
+                <div
+                  className={cn(
+                    "flex items-center gap-1 text-[12.5px] truncate mt-0.5 leading-snug",
+                    isMe ? "text-white/85" : "text-[#54656F] dark:text-[#8696A0]"
+                  )}
+                >
+                  {msg.replyTo.mediaType === "image" && <Camera className="h-3.5 w-3.5 shrink-0" />}
+                  {msg.replyTo.mediaType === "video" && <Video className="h-3.5 w-3.5 shrink-0" />}
+                  {msg.replyTo.mediaType === "audio" && <Mic className="h-3.5 w-3.5 shrink-0" />}
+                  {msg.replyTo.mediaType === "document" && <FileText className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="truncate">
+                    {msg.replyTo.text ||
+                      (msg.replyTo.mediaType
+                        ? msg.replyTo.mediaType === "image"
+                          ? "Photo"
+                          : msg.replyTo.mediaType === "video"
+                          ? "Video"
+                          : msg.replyTo.mediaType === "audio"
+                          ? "Voice message"
+                          : "Document"
+                        : "")}
+                  </span>
+                </div>
+              </div>
+              {msg.replyTo.mediaUrl && msg.replyTo.mediaType?.startsWith("image") && (
+                <img
+                  src={getOptimizedImageUrl(msg.replyTo.mediaUrl, 44, 44)}
+                  alt="Quoted attachment"
+                  className="h-10 w-10 rounded-[6px] object-cover ring-1 ring-black/5 shrink-0 ml-1.5"
+                />
+              )}
+            </div>
+          )}
 
           {renderMedia()}
 

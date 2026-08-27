@@ -6,16 +6,23 @@ import { usePathname, useRouter } from "next/navigation";
 import { playNotificationSound } from "@/utils/sounds";
 import { Socket } from "socket.io-client";
 import React from "react";
+import {
+  decrypt1v1Notification,
+  decryptGroupNotification,
+  formatWhatsAppMessagePreview,
+} from "@/utils/notificationPreview";
+import { WhatsAppNotificationCard } from "@/components/notifications/WhatsAppNotificationCard";
 
 /**
  * useGlobalNotifications
  *
  * Attaches to the shared Socket.io instance and listens for ALL incoming
- * chat and group messages globally — regardless of which page the user is on.
+ * 1v1 and group messages globally across the entire CallsChat app.
  *
- * Logic:
- *  - If the user is currently inside the exact conversation → play a soft pop, no toast.
- *  - If they are anywhere else in the app → play the pop + show a Messenger-style toast.
+ * WhatsApp Web Notification Logic:
+ *  - If the user is currently inside the target chat/group → play soft pop chime, no toast.
+ *  - If the user is anywhere else in the app (active tab) → play chime + show WhatsApp Web floating notification card.
+ *  - If the tab is backgrounded/minimized → fire native HTML5 Desktop Notification + play sound.
  */
 export const useGlobalNotifications = (
   socket: Socket | null,
@@ -24,7 +31,7 @@ export const useGlobalNotifications = (
   const pathname = usePathname();
   const router = useRouter();
 
-  // Keep fresh path + router in refs so the socket listener closure never goes stale
+  // Keep fresh references in refs so listeners never operate on stale state closures
   const pathRef = useRef(pathname);
   useEffect(() => {
     pathRef.current = pathname;
@@ -40,91 +47,146 @@ export const useGlobalNotifications = (
     currentUserIdRef.current = currentUserId;
   }, [currentUserId]);
 
+  // Request browser Notification permission on mount if supported
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (!socket) return;
 
     // ── 1v1 Chat Messages ──────────────────────────────────────────────────
-    const handleChatMessage = (payload: any) => {
+    const handleChatMessage = async (payload: any) => {
       const senderId = payload.senderId || payload.sender?.id;
 
-      // Only notify for messages from OTHER people
+      // Only notify for messages from OTHER participants
       if (!senderId || senderId === currentUserIdRef.current) return;
 
       const conversationId = payload.conversationId;
       const targetRoute = `/chats/${conversationId}`;
-      const isInThisChat = pathRef.current === targetRoute;
+      const currentPath = pathRef.current || "";
+      const isInThisChat = currentPath === targetRoute || currentPath.endsWith(conversationId);
 
-      // Immediately mark as delivered since it reached our client
+      // Immediately mark as delivered over socket
       socket.emit("chat:mark_delivered", {
         conversationId,
         messageId: payload.id,
       });
 
       if (isInThisChat) {
-        // Soft in-chat pop — user is already reading this conversation
+        // User is already reading this conversation
         playNotificationSound("message");
-      } else {
-        // User is somewhere else — full alert
-        playNotificationSound("message");
+        return;
+      }
 
-        const senderName =
-          payload.sender?.profile?.displayName ||
-          payload.senderName ||
-          "New Message";
-        const senderAvatar =
-          payload.sender?.profile?.avatarUrl || payload.senderAvatar || null;
+      // Check if conversation is locally muted
+      try {
+        const mutedRaw = localStorage.getItem(`muted_${conversationId}`);
+        if (mutedRaw) {
+          const mutedData = JSON.parse(mutedRaw);
+          if (mutedData.isMuted && (!mutedData.until || new Date(mutedData.until) > new Date())) {
+            return; // Silently ignore muted conversation
+          }
+        }
+      } catch {}
 
-        toast.custom((t) => (
-          <div
-            className="group relative flex w-[360px] cursor-pointer items-start gap-4 overflow-hidden rounded-[20px] bg-white/95 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl border border-white/20 transition-all hover:scale-[1.02] hover:bg-white active:scale-[0.98] dark:bg-[#1E1E1E]/95 dark:border-white/10 dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]"
+      // Play WhatsApp notification chime
+      playNotificationSound("message");
+
+      // 1. Resolve Sender Info
+      const senderName =
+        payload.sender?.profile?.displayName ||
+        payload.sender?.profile?.username ||
+        payload.senderName ||
+        "New Message";
+      const senderAvatar =
+        payload.sender?.profile?.avatarUrl || payload.senderAvatar || null;
+
+      // 2. Real-time Decryption
+      const decryptedText = await decrypt1v1Notification(
+        payload,
+        currentUserIdRef.current || ""
+      );
+
+      // 3. Format into WhatsApp media preview
+      const preview = formatWhatsAppMessagePreview(
+        decryptedText,
+        payload.mediaType,
+        payload.mediaUrl
+      );
+
+      // 4. Browser Background Native Notification (when tab is minimized / unfocused)
+      const isWindowHidden =
+        typeof document !== "undefined" &&
+        (document.visibilityState === "hidden" || !document.hasFocus());
+
+      if (
+        isWindowHidden &&
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          const nativeNotif = new Notification(senderName, {
+            body: preview.displayText,
+            icon: senderAvatar || "/call_chats_logo.png",
+            tag: `conv-${conversationId}`,
+          });
+
+          nativeNotif.onclick = () => {
+            window.focus();
+            routerRef.current.push(targetRoute);
+            nativeNotif.close();
+          };
+        } catch {
+          // Fallback to in-app toast below
+        }
+      }
+
+      // 5. In-App WhatsApp Notification Card Toast
+      toast.custom(
+        (t) => (
+          <WhatsAppNotificationCard
+            title={senderName}
+            isGroup={false}
+            displayText={preview.displayText}
+            attachmentType={preview.attachmentType}
+            avatarUrl={senderAvatar}
+            timestamp="Just now"
             onClick={() => {
               toast.dismiss(t);
               routerRef.current.push(targetRoute);
             }}
-          >
-            {/* Blue unread indicator bar */}
-            <div className="absolute left-0 top-0 h-full w-[3px] bg-[#3B58F5]" />
-
-            {senderAvatar ? (
-              <img
-                src={senderAvatar}
-                alt={senderName}
-                className="mt-0.5 h-12 w-12 shrink-0 rounded-full object-cover shadow-sm ring-1 ring-black/5"
-              />
-            ) : (
-              <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#EEF2FF] to-[#E0E7FF] text-[17px] font-bold text-[#3B58F5] shadow-sm ring-1 ring-black/5 dark:from-[#3B58F5]/20 dark:to-[#3B58F5]/10 dark:text-[#818CF8]">
-                {senderName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            
-            <div className="flex flex-1 flex-col overflow-hidden pt-0.5">
-              <div className="flex items-center justify-between">
-                <span className="truncate text-[15px] font-semibold tracking-tight text-[#0F172A] dark:text-white">
-                  {senderName}
-                </span>
-                <span className="text-[11px] font-medium text-slate-400">Now</span>
-              </div>
-              <span className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-slate-500 dark:text-slate-400">
-                {payload.text || "Sent an attachment"}
-              </span>
-            </div>
-          </div>
-        ));
-      }
+            onClose={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toast.dismiss(t);
+            }}
+          />
+        ),
+        {
+          duration: 5000,
+        }
+      );
     };
 
     // ── Group Messages ─────────────────────────────────────────────────────
-    const handleGroupMessage = (payload: any) => {
+    const handleGroupMessage = async (payload: any) => {
       const senderId = payload.senderId || payload.sender?.id;
 
-      // Only notify for messages from OTHER people
+      // Only notify for messages from OTHER participants
       if (!senderId || senderId === currentUserIdRef.current) return;
 
       const groupId = payload.groupId;
       const targetRoute = `/groups/${groupId}`;
-      const isInThisGroup = pathRef.current === targetRoute;
+      const currentPath = pathRef.current || "";
+      const isInThisGroup = currentPath === targetRoute || currentPath.endsWith(groupId);
 
-      // Immediately mark as delivered since it reached our client
+      // Immediately mark as delivered over socket
       socket.emit("group:mark_delivered", {
         groupId,
         messageId: payload.id,
@@ -132,55 +194,100 @@ export const useGlobalNotifications = (
 
       if (isInThisGroup) {
         playNotificationSound("message");
-      } else {
-        playNotificationSound("message");
+        return;
+      }
 
-        const senderName =
-          payload.sender?.profile?.displayName ||
-          payload.senderName ||
-          "Group Message";
-        const senderAvatar =
-          payload.sender?.profile?.avatarUrl || payload.senderAvatar || null;
-        const groupName = payload.groupName || "Group";
+      // Check if group is locally muted
+      try {
+        const mutedRaw = localStorage.getItem(`muted_group_${groupId}`);
+        if (mutedRaw) {
+          const mutedData = JSON.parse(mutedRaw);
+          if (mutedData.isMuted && (!mutedData.until || new Date(mutedData.until) > new Date())) {
+            return;
+          }
+        }
+      } catch {}
 
-        toast.custom((t) => (
-          <div
-            className="group relative flex w-[360px] cursor-pointer items-start gap-4 overflow-hidden rounded-[20px] bg-white/95 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl border border-white/20 transition-all hover:scale-[1.02] hover:bg-white active:scale-[0.98] dark:bg-[#1E1E1E]/95 dark:border-white/10 dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]"
+      // Play WhatsApp notification chime
+      playNotificationSound("message");
+
+      // 1. Resolve Group & Sender Info
+      const groupName = payload.groupName || payload.group?.name || "Group";
+      const groupAvatar = payload.groupAvatar || payload.group?.avatarUrl || null;
+      const senderName =
+        payload.sender?.profile?.displayName ||
+        payload.sender?.profile?.username ||
+        payload.senderName ||
+        "Member";
+      const senderAvatar =
+        payload.sender?.profile?.avatarUrl || payload.senderAvatar || null;
+
+      // 2. Real-time Decryption
+      const decryptedText = await decryptGroupNotification(
+        payload,
+        currentUserIdRef.current || ""
+      );
+
+      // 3. Format into WhatsApp media preview
+      const preview = formatWhatsAppMessagePreview(
+        decryptedText,
+        payload.mediaType,
+        payload.mediaUrl
+      );
+
+      // 4. Browser Background Native Notification
+      const isWindowHidden =
+        typeof document !== "undefined" &&
+        (document.visibilityState === "hidden" || !document.hasFocus());
+
+      if (
+        isWindowHidden &&
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          const nativeNotif = new Notification(`${groupName} (${senderName})`, {
+            body: preview.displayText,
+            icon: groupAvatar || senderAvatar || "/call_chats_logo.png",
+            tag: `group-${groupId}`,
+          });
+
+          nativeNotif.onclick = () => {
+            window.focus();
+            routerRef.current.push(targetRoute);
+            nativeNotif.close();
+          };
+        } catch {}
+      }
+
+      // 5. In-App WhatsApp Notification Card Toast
+      toast.custom(
+        (t) => (
+          <WhatsAppNotificationCard
+            title={groupName}
+            senderName={senderName}
+            isGroup={true}
+            displayText={preview.displayText}
+            attachmentType={preview.attachmentType}
+            avatarUrl={senderAvatar}
+            groupAvatarUrl={groupAvatar}
+            timestamp="Just now"
             onClick={() => {
               toast.dismiss(t);
               routerRef.current.push(targetRoute);
             }}
-          >
-            {/* Blue unread indicator bar */}
-            <div className="absolute left-0 top-0 h-full w-[3px] bg-[#3B58F5]" />
-
-            {senderAvatar ? (
-              <img
-                src={senderAvatar}
-                alt={senderName}
-                className="mt-0.5 h-12 w-12 shrink-0 rounded-full object-cover shadow-sm ring-1 ring-black/5"
-              />
-            ) : (
-              <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#EEF2FF] to-[#E0E7FF] text-[17px] font-bold text-[#3B58F5] shadow-sm ring-1 ring-black/5 dark:from-[#3B58F5]/20 dark:to-[#3B58F5]/10 dark:text-[#818CF8]">
-                {senderName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            
-            <div className="flex flex-1 flex-col overflow-hidden pt-0.5">
-              <div className="flex items-center justify-between">
-                <span className="truncate text-[15px] font-semibold tracking-tight text-[#0F172A] dark:text-white">
-                  {groupName}
-                </span>
-                <span className="text-[11px] font-medium text-slate-400">Now</span>
-              </div>
-              <span className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-slate-500 dark:text-slate-400">
-                <span className="font-semibold text-[#0F172A] dark:text-slate-300">{senderName}: </span>
-                {payload.text || "Sent an attachment"}
-              </span>
-            </div>
-          </div>
-        ));
-      }
+            onClose={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toast.dismiss(t);
+            }}
+          />
+        ),
+        {
+          duration: 5000,
+        }
+      );
     };
 
     socket.on("chat:receive_message", handleChatMessage);
@@ -190,5 +297,5 @@ export const useGlobalNotifications = (
       socket.off("chat:receive_message", handleChatMessage);
       socket.off("group:receive_message", handleGroupMessage);
     };
-  }, [socket]); // Only re-run if socket reference changes
+  }, [socket]);
 };

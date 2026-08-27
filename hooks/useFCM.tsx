@@ -5,6 +5,7 @@ import NotificationService from '@/services/notification.service';
 import { toast } from 'sonner';
 import { usePathname, useRouter } from 'next/navigation';
 import { playNotificationSound } from '@/utils/sounds';
+import { WhatsAppNotificationCard } from '@/components/notifications/WhatsAppNotificationCard';
 import React from 'react';
 
 export const useFCM = () => {
@@ -105,32 +106,37 @@ export const useFCM = () => {
           // Play the alert sound
           playNotificationSound('message');
           
-          const title = payload.notification?.title || 'New Message';
-          const body = payload.notification?.body || '';
-          const senderAvatar = data.senderAvatar;
+          const isGroup = type === 'GROUP';
+          const title = payload.notification?.title || data.senderName || (isGroup ? 'Group Message' : 'New Message');
+          const body = payload.notification?.body || data.message || data.body || '';
+          const senderAvatar = data.senderAvatar || null;
+          const senderName = data.senderName;
 
-          // Trigger a custom sonner toast
-          toast.custom((t) => (
-            <div 
-              className="flex items-center gap-3 p-4 bg-background border border-border shadow-lg rounded-xl cursor-pointer hover:bg-muted/50 transition-colors w-[356px]"
-              onClick={() => {
-                toast.dismiss(t);
-                routerRef.current.push(messageRoute);
-              }}
-            >
-              {senderAvatar ? (
-                <img src={senderAvatar} alt="avatar" className="w-10 h-10 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-primary/10 shrink-0 flex items-center justify-center">
-                  <span className="text-primary font-semibold">{title.charAt(0)}</span>
-                </div>
-              )}
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <span className="font-semibold text-foreground text-sm truncate">{title}</span>
-                <span className="text-muted-foreground text-sm line-clamp-2">{body}</span>
-              </div>
-            </div>
-          ));
+          // Trigger WhatsApp style sonner toast
+          toast.custom(
+            (t) => (
+              <WhatsAppNotificationCard
+                title={title}
+                senderName={isGroup ? senderName : undefined}
+                isGroup={isGroup}
+                displayText={body || 'New message'}
+                avatarUrl={senderAvatar}
+                timestamp="Just now"
+                onClick={() => {
+                  toast.dismiss(t);
+                  routerRef.current.push(messageRoute);
+                }}
+                onClose={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  toast.dismiss(t);
+                }}
+              />
+            ),
+            {
+              duration: 5000,
+            }
+          );
         }
       });
 

@@ -5,6 +5,15 @@ import { chatService } from "@/services/chat.service";
 import { generateGroupKey, encryptMessage, encryptGroupMessage, decryptGroupMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
 import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
 
+export interface QuotedMessage {
+  id: string;
+  senderId: string;
+  senderName?: string;
+  text: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+}
+
 export interface GroupMessage {
   id: string;
   groupId: string;
@@ -12,7 +21,7 @@ export interface GroupMessage {
   text: string;
   createdAt: string;
   mediaUrl?: string;
-  mediaType?: "image" | "video" | "audio" | "document" | null;
+  mediaType?: "image" | "video" | "audio" | "document" | string | null;
   sender?: {
     profile?: {
       displayName: string;
@@ -21,6 +30,8 @@ export interface GroupMessage {
   };
   isEdited?: boolean;
   isDeleted?: boolean;
+  replyToId?: string | null;
+  replyTo?: QuotedMessage | null;
   receipts?: {
     id: string;
     userId: string;
@@ -34,6 +45,65 @@ const parseEditedText = (rawText: string) => {
     return { text: rawText.substring("__EDITED__:".length), isEdited: true };
   }
   return { text: rawText, isEdited: false };
+};
+
+const resolveGroupQuotedMessage = async (
+  replyToRaw: any,
+  currentUid: string,
+  gKey: string | null,
+  knownDecryptedMap?: Map<string, string>
+): Promise<QuotedMessage | null> => {
+  if (!replyToRaw || !replyToRaw.id) return null;
+  const senderName =
+    replyToRaw.sender?.profile?.displayName ||
+    replyToRaw.sender?.profile?.username ||
+    replyToRaw.senderName ||
+    (replyToRaw.senderId === currentUid ? "You" : "Member");
+
+  if (replyToRaw.isDeleted) {
+    return {
+      id: replyToRaw.id,
+      senderId: replyToRaw.senderId,
+      senderName,
+      text: "🚫 This message was deleted",
+      mediaUrl: null,
+      mediaType: null,
+    };
+  }
+
+  let text = replyToRaw.text || "";
+
+  // 1. Check known decrypted map first
+  if (!text && knownDecryptedMap && knownDecryptedMap.has(replyToRaw.id)) {
+    text = knownDecryptedMap.get(replyToRaw.id)!;
+  }
+
+  // 2. Decrypt with group symmetric key if cipher is present
+  if (!text && replyToRaw.ciphertext && replyToRaw.nonce && gKey) {
+    try {
+      const dec = await decryptGroupMessage(replyToRaw.ciphertext, replyToRaw.nonce, gKey);
+      text = parseEditedText(dec).text;
+    } catch {}
+  } else if (!text && replyToRaw.ciphertext && !replyToRaw.nonce) {
+    text = parseEditedText(replyToRaw.ciphertext).text;
+  }
+
+  // 3. Fallback to media type label
+  if (!text && replyToRaw.mediaType) {
+    if (replyToRaw.mediaType === "image") text = "Photo";
+    else if (replyToRaw.mediaType === "video") text = "Video";
+    else if (replyToRaw.mediaType === "audio") text = "Voice message";
+    else if (replyToRaw.mediaType === "document") text = "Document";
+  }
+
+  return {
+    id: replyToRaw.id,
+    senderId: replyToRaw.senderId,
+    senderName,
+    text,
+    mediaUrl: replyToRaw.mediaUrl || null,
+    mediaType: replyToRaw.mediaType || null,
+  };
 };
 
 export interface PinnedMessage {
@@ -282,48 +352,47 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         // 6. Load History
         const historyRes = await groupService.fetchGroupMessages(groupId);
         if (historyRes.success && Array.isArray(historyRes.data)) {
+          // Step 1: Pre-decrypt all message texts and build a map
+          const decryptedTextsMap = new Map<string, string>();
+          for (const msg of historyRes.data) {
+            if (msg.ciphertext && msg.nonce && plaintextGroupKey) {
+              try {
+                const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, plaintextGroupKey);
+                decryptedTextsMap.set(msg.id, parseEditedText(dec).text);
+              } catch {}
+            } else if (msg.ciphertext && !msg.nonce) {
+              decryptedTextsMap.set(msg.id, parseEditedText(msg.ciphertext).text);
+            }
+          }
+
+          // Step 2: Build final decrypted messages with fully resolved quoted replies
           const decryptedHistory = await Promise.all(
             historyRes.data.map(async (msg: any) => {
-              try {
-                if (!msg.ciphertext || !msg.nonce) {
-                  return {
-                    ...msg,
-                    text: msg.mediaUrl ? "" : "🔒 Missing cipher data",
-                    groupId: msg.groupId || msg.conversationId,
-                  };
-                }
-                const decrypted = await decryptGroupMessage(
-                  msg.ciphertext,
-                  msg.nonce,
-                  plaintextGroupKey
-                );
-                const parsed = parseEditedText(decrypted);
-                return {
-                  id: msg.id,
-                  groupId: msg.groupId || msg.conversationId,
-                  senderId: msg.senderId,
-                  text: parsed.text,
-                  isEdited: parsed.isEdited,
-                  createdAt: msg.createdAt,
-                  mediaUrl: msg.mediaUrl,
-                  mediaType: msg.mediaType,
-                  sender: msg.sender,
-                  isDeleted: msg.isDeleted,
-                };
-              } catch (err) {
-                return {
-                  id: msg.id,
-                  groupId: msg.groupId || msg.conversationId,
-                  senderId: msg.senderId,
-                  text: "🔒 Encrypted Message (Decryption Failed)",
-                  isEdited: false,
-                  createdAt: msg.createdAt,
-                  mediaUrl: msg.mediaUrl,
-                  mediaType: msg.mediaType,
-                  sender: msg.sender,
-                  isDeleted: msg.isDeleted,
-                };
-              }
+              const replyTo = await resolveGroupQuotedMessage(
+                msg.replyTo,
+                currentUserId,
+                plaintextGroupKey,
+                decryptedTextsMap
+              );
+
+              const text =
+                decryptedTextsMap.get(msg.id) ??
+                (msg.ciphertext ? "🔒 Encrypted Message (Decryption Failed)" : "");
+
+              return {
+                id: msg.id,
+                groupId: msg.groupId || msg.conversationId,
+                senderId: msg.senderId,
+                text: text,
+                isEdited: msg.isEdited ?? false,
+                createdAt: msg.createdAt,
+                mediaUrl: msg.mediaUrl,
+                mediaType: msg.mediaType,
+                sender: msg.sender,
+                isDeleted: msg.isDeleted,
+                replyToId: msg.replyToId ?? null,
+                replyTo,
+              };
             })
           );
           
@@ -331,6 +400,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
           setMessages(decryptedHistory);
+        } else {
+          setMessages([]);
         }
 
         setIsReady(true);
@@ -372,10 +443,31 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
       const senderId = payload.senderId || payload.sender?.id || "unknown";
 
+      // Build map of known message texts
+      const knownMap = new Map<string, string>();
+      messages.forEach((m) => {
+        if (m.text) knownMap.set(m.id, m.text);
+      });
+
+      const resolvedReplyTo = await resolveGroupQuotedMessage(
+        payload.replyTo,
+        currentUserIdRef.current,
+        groupKeyRef.current,
+        knownMap
+      );
+
       // Helper to append a message, deduplicating by ID
       const appendMessage = (msg: GroupMessage) => {
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
+
+          // If quote text missing, check prev state
+          if (msg.replyTo && !msg.replyTo.text && msg.replyToId) {
+            const matched = prev.find((m) => m.id === msg.replyToId);
+            if (matched?.text) {
+              msg.replyTo.text = matched.text;
+            }
+          }
 
           // Replace an optimistic placeholder from this user if present
           if (msg.senderId === currentUserIdRef.current) {
@@ -384,6 +476,10 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             );
             if (optimisticIdx !== -1) {
               const updated = [...prev];
+              const existingOpt = prev[optimisticIdx];
+              if (!msg.replyTo?.text && existingOpt?.replyTo?.text) {
+                msg.replyTo = existingOpt.replyTo;
+              }
               updated[optimisticIdx] = msg;
               return updated;
             }
@@ -403,6 +499,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         mediaType: payload.mediaType ?? undefined,
         sender: payload.sender,
         receipts: payload.receipts || [],
+        replyToId: payload.replyToId ?? null,
+        replyTo: resolvedReplyTo,
       };
 
       // Case 1: Pure media message — no ciphertext, skip decryption entirely
@@ -415,7 +513,6 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         const gKey = groupKeyRef.current;
         if (!gKey) {
           console.warn("⚠️ [Socket] Missing group key — cannot decrypt incoming message. Rendering media only.");
-          // Still render the media if present rather than silently dropping
           if (payload.mediaUrl) {
             appendMessage(baseMsg);
           }
@@ -545,7 +642,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (text: string, file: File | null = null) => {
+    async (text: string, file: File | null = null, replyToMessage: QuotedMessage | null = null) => {
       const gKey = groupKeyRef.current;
       if (!socket || !isConnected || !gKey || !groupId) {
         console.error("Cannot send: missing group key, socket, or groupId");
@@ -553,6 +650,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
 
       const optimisticId = `optimistic-${Date.now()}`;
+      const replyToId = replyToMessage?.id || null;
       let optimisticMediaType: string | undefined = undefined;
       let optimisticMediaUrl: string | undefined = undefined;
       if (file) {
@@ -579,7 +677,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           createdAt: new Date().toISOString(),
           mediaUrl: optimisticMediaUrl,
           mediaType: optimisticMediaType as any,
-          // Don't populate sender so it looks like "You"
+          replyToId,
+          replyTo: replyToMessage,
         },
       ]);
 
@@ -615,7 +714,15 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           previewText = text.substring(0, 100);
         }
 
-        const payload = { groupId, ciphertext, nonce, mediaUrl, mediaType, previewText };
+        const payload = {
+          groupId,
+          ciphertext,
+          nonce,
+          mediaUrl,
+          mediaType,
+          previewText,
+          replyToId,
+        };
         socket.emit("group:send_message", payload);
         
         if (!text) {
