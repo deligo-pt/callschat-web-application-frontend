@@ -112,22 +112,44 @@ export function VoiceMessagePlayer({ src, messageId, isMe }: VoiceMessagePlayerP
     setProgress(ratio * 100);
   }, []);
 
-  // ── Colour tokens ──────────────────────────────────────────────────────────
-  const bgColor = isMe ? "bg-[#3B58F5]" : "bg-white";
-  const playBtnBg = isMe ? "bg-white/20 hover:bg-white/30" : "bg-[#3B58F5]/10 hover:bg-[#3B58F5]/20";
-  const playBtnIcon = isMe ? "text-white" : "text-[#3B58F5]";
-  const waveActive = isMe ? "bg-white" : "bg-[#3B58F5]";
-  const waveInactive = isMe ? "bg-white/35" : "bg-[#3B58F5]/25";
-  const timeColor = isMe ? "text-white/75" : "text-[#8F95B2]";
-  const scrubTrack = isMe ? "bg-white/25" : "bg-[#3B58F5]/15";
-  const scrubFill = isMe ? "bg-white" : "bg-[#3B58F5]";
-  const scrubThumb = isMe ? "bg-white" : "bg-[#3B58F5]";
+  // ── WhatsApp Style Colour tokens ──────────────────────────────────────────
+  const bgColor = isMe
+    ? "bg-[#D9FDD3] dark:bg-[#005C4B] border border-emerald-200/50 dark:border-emerald-700/30"
+    : "bg-white dark:bg-[#202C33] border border-gray-100 dark:border-[#2A3942]";
+
+  const playBtnBg = isMe
+    ? "bg-[#00A884] hover:bg-[#008069] text-white"
+    : "bg-[#00A884] hover:bg-[#008069] text-white";
+
+  const waveActive = isMe
+    ? "bg-[#008069] dark:bg-[#25D366]"
+    : "bg-[#00A884] dark:bg-[#25D366]";
+
+  const waveInactive = isMe
+    ? "bg-[#008069]/30 dark:bg-white/30"
+    : "bg-[#8696A0]/35 dark:bg-white/20";
+
+  const timeColor = isMe
+    ? "text-[#111B21]/70 dark:text-[#E9EDEF]/70"
+    : "text-[#667781] dark:text-[#8696A0]";
+
+  const scrubTrack = isMe
+    ? "bg-[#008069]/20 dark:bg-white/20"
+    : "bg-[#8696A0]/20 dark:bg-white/20";
+
+  const scrubFill = isMe
+    ? "bg-[#008069] dark:bg-[#25D366]"
+    : "bg-[#00A884] dark:bg-[#25D366]";
+
+  const scrubThumb = isMe
+    ? "bg-[#008069] dark:bg-[#25D366]"
+    : "bg-[#00A884] dark:bg-[#25D366]";
 
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-[18px] shadow-sm",
-        "w-[260px] select-none",
+        "flex items-center gap-3 px-3.5 py-2.5 rounded-2xl shadow-xs",
+        "w-[270px] select-none transition-all",
         bgColor
       )}
     >
@@ -136,16 +158,16 @@ export function VoiceMessagePlayer({ src, messageId, isMe }: VoiceMessagePlayerP
         onClick={togglePlay}
         disabled={!isLoaded || error}
         className={cn(
-          "flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full transition-all",
+          "shrink-0 flex items-center justify-center w-9 h-9 rounded-full transition-all shadow-xs",
           playBtnBg,
           (!isLoaded || error) && "opacity-50 cursor-not-allowed"
         )}
         aria-label={isPlaying ? "Pause" : "Play"}
       >
         {isPlaying ? (
-          <Pause className={cn("w-4 h-4 fill-current", playBtnIcon)} strokeWidth={0} />
+          <Pause className="w-4 h-4 fill-current" strokeWidth={0} />
         ) : (
-          <Play className={cn("w-4 h-4 fill-current ml-0.5", playBtnIcon)} strokeWidth={0} />
+          <Play className="w-4 h-4 fill-current ml-0.5" strokeWidth={0} />
         )}
       </button>
 
@@ -155,7 +177,7 @@ export function VoiceMessagePlayer({ src, messageId, isMe }: VoiceMessagePlayerP
         <div
           ref={progressBarRef}
           onClick={handleScrub}
-          className="flex items-end gap-[2px] h-7 cursor-pointer"
+          className="flex items-end gap-[2px] h-6.5 cursor-pointer"
           role="slider"
           aria-valuemin={0}
           aria-valuemax={100}
@@ -189,7 +211,7 @@ export function VoiceMessagePlayer({ src, messageId, isMe }: VoiceMessagePlayerP
             <div
               className={cn(
                 "absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2",
-                "w-2.5 h-2.5 rounded-full shadow-sm",
+                "w-2.5 h-2.5 rounded-full shadow-xs",
                 scrubThumb
               )}
             />
@@ -198,7 +220,7 @@ export function VoiceMessagePlayer({ src, messageId, isMe }: VoiceMessagePlayerP
       </div>
 
       {/* ── Duration / Current Time ─────────────────────────────────────────── */}
-      <span className={cn("flex-shrink-0 text-[11px] font-semibold tabular-nums min-w-[32px] text-right", timeColor)}>
+      <span className={cn("shrink-0 text-[11px] font-semibold tabular-nums min-w-[32px] text-right", timeColor)}>
         {isPlaying ? formatTime(currentTime) : formatTime(duration)}
       </span>
     </div>

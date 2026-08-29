@@ -195,27 +195,31 @@ function ChatsContent() {
     return false;
   };
 
-  // Remove business-specific channel UI override; channels should use /business/channels
-  // Universal initial UI matching Figma node 1247-2566 ("Sign up home page")
+  // Universal initial standby UI matching WhatsApp Web / Modern Desktop Messenger standard
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center p-6 sm:p-12 text-center bg-[#F8FAFC] relative overflow-y-auto">
-      <div className="mb-6 flex justify-center w-full max-w-[340px] sm:max-w-[380px]">
-        <img 
-          src="/welcome-illustration.png" 
-          alt="Welcome Illustration" 
-          className="w-full h-auto object-contain transition-transform duration-500 hover:scale-[1.02] drop-shadow-xs"
-        />
+    <div className="flex h-full w-full flex-col items-center justify-center p-6 sm:p-12 text-center bg-[#F0F2F5] dark:bg-[#111B21] relative overflow-y-auto border-l border-[#E2E8F0] dark:border-[#222D34]">
+      {/* Central Hero Container */}
+      <div className="flex flex-col items-center max-w-[460px] mx-auto animate-in fade-in zoom-in-95 duration-300">
+        <div className="relative mb-6">
+          <div className="h-24 w-24 rounded-3xl bg-gradient-to-tr from-[#00A884]/20 via-[#25D366]/15 to-emerald-100 dark:from-[#00A884]/30 dark:to-[#111B21] flex items-center justify-center shadow-inner border border-[#00A884]/20">
+            <MessageSquare className="h-12 w-12 text-[#00A884]" strokeWidth={1.75} />
+          </div>
+        </div>
+
+        <h1 className="text-[28px] sm:text-[32px] font-light text-[#41525D] dark:text-[#E9EDEF] mb-2 tracking-tight">
+          CallsChat Web
+        </h1>
+        
+        <p className="text-[14px] leading-relaxed text-[#667781] dark:text-[#8696A0] mb-8 font-normal max-w-[380px]">
+          Send and receive messages, make voice & video calls, and connect with your contacts with end-to-end encryption.
+        </p>
+
+        {/* E2EE Lock Banner at the bottom */}
+        <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/70 dark:bg-[#202C33]/70 backdrop-blur-xs border border-[#E2E8F0] dark:border-[#2A3942] shadow-2xs text-[#667781] dark:text-[#8696A0] text-[12px] font-medium">
+          <span className="text-[11px]">🔒</span>
+          <span>End-to-end encrypted</span>
+        </div>
       </div>
-      
-      <h1 className="text-3xl sm:text-[34px] font-extrabold text-[#0F172A] mb-2 tracking-tight leading-tight">
-        Welcome to CallsChat.
-      </h1>
-      <h2 className="text-xl sm:text-[22px] font-bold text-[#2563EB] mb-3 tracking-tight">
-        You&apos;re all set.
-      </h2>
-      <p className="text-sm sm:text-[15px] font-medium text-[#64748B] max-w-[440px] mx-auto leading-relaxed">
-        Start a conversation, make a call, or create a group to connect with your friends and team.
-      </p>
 
       <ExploreBusinessesModal isOpen={isExploreOpen} onClose={() => setIsExploreOpen(false)} />
     </div>

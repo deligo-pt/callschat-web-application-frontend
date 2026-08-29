@@ -15,7 +15,7 @@ import { decryptMessage } from "@/utils/crypto";
 import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { motion } from "framer-motion";
-import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus } from "lucide-react";
+import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { Suspense, useCallback, useEffect, useState } from "react";
@@ -519,16 +519,28 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     return `${youPrefix}${truncated}`;
   };
 
-  const filteredConversations = conversations.filter((c) =>
-    c.otherUserName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [chatFilter, setChatFilter] = useState<"all" | "unread" | "business">("all");
+
+  const filteredConversations = conversations.filter((c) => {
+    const matchesSearch = c.otherUserName.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (chatFilter === "unread") return hasUnread(c);
+    if (chatFilter === "business") return c.workspaceId || c.context === "BUSINESS" || !c.otherUserId;
+    return true;
+  });
+
+  const getPreviewStatusIcon = (conv: Conversation) => {
+    if (!conv.lastMessage || conv.lastMessage.senderId !== currentUserId) return null;
+    // Real checkmarks icon for outgoing message preview
+    return <CheckCheck className="h-3.5 w-3.5 shrink-0 text-[#8696A0] inline-block mr-1" />;
+  };
 
   return (
-    <div className="flex h-full w-full bg-[#F8FAFC]">
+    <div className="flex h-full w-full bg-[#F8FAFC] dark:bg-[#0C1317]">
       {/* Sidebar */}
       <div
         className={cn(
-          "flex h-full w-full flex-col border-r border-[#E6EAFA] bg-white md:w-[400px] shrink-0",
+          "flex h-full w-full flex-col border-r border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] md:w-[380px] lg:w-[420px] shrink-0 transition-all z-10",
           !isRootChatsPage && "hidden md:flex"
         )}
       >
@@ -537,14 +549,30 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         ) : (
           <>
             {/* Header Area */}
-            <div className="flex flex-col px-6 pt-8 pb-4">
+            <div className="flex flex-col px-4 pt-5 pb-3 border-b border-[#F0F2F5] dark:border-[#202C33]">
               <div className="flex items-center justify-between">
-                <h1 className="text-[26px] font-bold tracking-tight text-[#3B58F5]">
-                  CallsChat
-                </h1>
                 <div className="flex items-center gap-2">
-                  <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
-                    <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+                  <h1 className="text-[20px] font-extrabold tracking-tight text-[#111B21] dark:text-[#E9EDEF]">
+                    Chats
+                  </h1>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsNewMessageOpen(true)}
+                    title="New conversation"
+                    className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                    aria-label="New chat"
+                  >
+                    <MessageSquarePlus className="h-5 w-5" />
+                  </button>
+
+                  <Link 
+                    href="/chats/favorites" 
+                    title="Favorites" 
+                    className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:text-red-500 transition-colors focus:outline-none"
+                    aria-label="Favorites"
+                  >
+                    <Heart className="h-4.5 w-4.5" />
                   </Link>
 
                   <NotificationDropdown />
@@ -555,173 +583,233 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
               </div>
 
               {/* Search Bar */}
-              <div className="mt-4 relative">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <div className="mt-3 relative flex items-center">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8696A0]" />
                 <input
                   type="text"
-                  placeholder="Search conversations..."
+                  placeholder="Search or start new chat"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-10 w-full rounded-full bg-[#EEF2FF] pl-10 pr-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-transparent focus:border-blue-200 transition-all"
+                  className="h-9 w-full rounded-lg bg-[#F0F2F5] dark:bg-[#202C33] pl-9 pr-8 text-[13.5px] font-normal text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:outline-none focus:ring-1 focus:ring-[#00A884] border border-transparent transition-all"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#8696A0] hover:text-[#111B21] dark:hover:text-white rounded-full transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Filter Chips */}
+              <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto scrollbar-none pb-0.5">
+                <button
+                  type="button"
+                  onClick={() => setChatFilter("all")}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[12px] font-semibold transition-all shrink-0",
+                    chatFilter === "all"
+                      ? "bg-[#00A884]/15 text-[#008069] dark:text-[#00A884]"
+                      : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E2E8F0] dark:hover:bg-[#2A3942]"
+                  )}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatFilter("unread")}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[12px] font-semibold transition-all shrink-0 flex items-center gap-1",
+                    chatFilter === "unread"
+                      ? "bg-[#00A884]/15 text-[#008069] dark:text-[#00A884]"
+                      : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E2E8F0] dark:hover:bg-[#2A3942]"
+                  )}
+                >
+                  Unread
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatFilter("business")}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[12px] font-semibold transition-all shrink-0 flex items-center gap-1",
+                    chatFilter === "business"
+                      ? "bg-[#00A884]/15 text-[#008069] dark:text-[#00A884]"
+                      : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E2E8F0] dark:hover:bg-[#2A3942]"
+                  )}
+                >
+                  Businesses
+                </button>
+                {currentMode !== "BUSINESS" && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExploreOpen(true)}
+                    className="rounded-full px-2.5 py-1 text-[12px] font-semibold text-[#00A884] hover:bg-[#00A884]/10 transition-all shrink-0 flex items-center gap-1 ml-auto"
+                    title="Explore Official Businesses"
+                  >
+                    <Building2 className="h-3 w-3" />
+                    <span>Explore</span>
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Scrollable List Area */}
-            <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide md:pb-6">
-
-              {/* Active Now Section — rendered by the PresenceProvider-backed tray.
-                   It self-hides when no contacts are online, so no conditional
-                   wrapper is needed here. */}
+            <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar md:pb-4">
+              {/* Active Now Section */}
               <ActiveNowTray />
 
               {/* Conversations List */}
-              <div className="mt-6">
-                <div className="px-6 mb-2 flex items-center justify-between">
-                  <h2 className="text-[14px] font-bold text-[#3B58F5]">Messages</h2>
-                  {currentMode !== "BUSINESS" && (
-                    <button
-                      onClick={() => setIsExploreOpen(true)}
-                      className="text-xs font-extrabold text-[#3B58F5] hover:underline flex items-center gap-1.5 focus:outline-none"
-                      title="Explore Official Businesses"
-                    >
-                      <Building2 className="h-3.5 w-3.5" />
-                      <span>Businesses</span>
-                    </button>
-                  )}
-                </div>
-
+              <div className="mt-2">
                 {isLoading ? (
-                  <div className="flex items-center justify-center py-10">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#3B58F5] border-t-transparent" />
+                  <div className="flex items-center justify-center py-12">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#00A884] border-t-transparent" />
                   </div>
                 ) : filteredConversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 px-6 text-center mt-4">
-                    <h3 className="text-[18px] font-bold text-[#0F172A] mb-2">No conversations yet</h3>
-                    <p className="text-[12px] font-medium text-slate-500 max-w-[200px] leading-relaxed mb-8">
-                      You haven't started any conversations. Message your friends or create a group to start chatting.
+                  <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                    <div className="h-12 w-12 rounded-full bg-[#F0F2F5] dark:bg-[#202C33] flex items-center justify-center mb-3 text-[#8696A0]">
+                      <MessageSquare className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-[15px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-1">
+                      {searchQuery ? "No conversations found" : chatFilter === "unread" ? "No unread messages" : "No conversations yet"}
+                    </h3>
+                    <p className="text-[12.5px] font-normal text-[#54656F] dark:text-[#8696A0] max-w-[220px] leading-relaxed mb-5">
+                      {searchQuery
+                        ? "Try searching for another name or keyword"
+                        : "Connect and start encrypted chatting with your friends or team."}
                     </p>
-                    <div className="flex flex-col gap-3 w-full max-w-[180px]">
+                    {!searchQuery && (
                       <button
                         onClick={() => setIsNewMessageOpen(true)}
-                        className="flex items-center justify-center gap-2 rounded-full bg-[#2563EB] py-2.5 text-[12px] font-bold text-white transition-all hover:bg-blue-700 shadow-sm"
+                        className="flex items-center justify-center gap-2 rounded-full bg-[#00A884] hover:bg-[#008069] px-5 py-2 text-[12.5px] font-bold text-white transition-all shadow-xs"
                       >
-                        <MessageSquare className="h-4 w-4" />
-                        New Message
+                        <MessageSquarePlus className="h-4 w-4" />
+                        Start a Chat
                       </button>
-                      <button
-                        onClick={() => router.push("/contacts")}
-                        className="flex items-center justify-center gap-2 rounded-full border border-blue-200 bg-white py-2.5 text-[12px] font-bold text-[#2563EB] transition-all hover:bg-blue-50"
-                      >
-                        <UserPlus className="h-4 w-4" />
-                        Invite Friends
-                      </button>
-                    </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="flex flex-col">
+                  <div className="flex flex-col divide-y divide-[#F0F2F5] dark:divide-[#202C33]">
                     {filteredConversations.map((conv, index) => {
                       const isActive = pathname === `${basePath}/${conv.id}`;
                       const avatarUrl =
-                        getOptimizedImageUrl(conv.otherUserAvatar, 52, 52) ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=F4F6FC&color=3B58F5`;
+                        getOptimizedImageUrl(conv.otherUserAvatar, 48, 48) ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=E0F2FE&color=0284C7&bold=true`;
+
+                      const isOnline = isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline;
+                      const isTyping = typingConvIds.has(conv.id);
 
                       return (
                         <motion.div
                           key={conv.id}
-                          initial={{ opacity: 0, y: 8 }}
+                          initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.04 }}
+                          transition={{ delay: index * 0.02 }}
                           className="relative group"
                           onMouseLeave={() => setMenuOpenForId(null)}
                         >
                           <Link
                             href={`${basePath}/${conv.id}?recipientId=${conv.otherUserId}`}
                             className={cn(
-                              "flex w-full items-center gap-4 px-6 py-3.5 transition-colors",
-                              isActive ? "bg-[#EEF2FF]" : "hover:bg-[#F4F7FE]"
+                              "flex w-full items-center gap-3.5 px-4 py-3 transition-colors relative",
+                              isActive
+                                ? "bg-[#F0F2F5] dark:bg-[#202C33] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-[#00A884]"
+                                : "hover:bg-[#F8FAFC] dark:hover:bg-[#182229]/60"
                             )}
                           >
-                            {/* Avatar — green ring = online, plain = offline */}
+                            {/* Avatar with subtle online dot pip */}
                             <div className="relative shrink-0">
-                              <div
-                                className={cn(
-                                  "rounded-full",
-                                  (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline)
-                                    ? "border-[3px] border-emerald-500 p-[2px] bg-white"
-                                    : ""
-                                )}
-                              >
+                              <div className="h-12 w-12 rounded-full overflow-hidden bg-[#F0F2F5] dark:bg-[#202C33] shadow-xs">
                                 <img
                                   src={getOptimizedImageUrl(avatarUrl)}
                                   alt={conv.otherUserName}
-                                  className="h-[52px] w-[52px] rounded-full object-cover bg-[#F4F6FC]"
+                                  className="h-full w-full object-cover"
                                 />
                               </div>
+                              {isOnline && (
+                                <span
+                                  aria-hidden="true"
+                                  className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21] shadow-xs"
+                                />
+                              )}
                             </div>
 
                             {/* Content */}
-                            <div className="flex flex-1 flex-col items-start overflow-hidden">
-                              <h3 className={cn(
-                                "text-[15px]",
-                                hasUnread(conv) && !isActive ? "font-bold text-[#1D2A54]" : "font-semibold text-[#1D2A54]"
-                              )}>
-                                {conv.otherUserName}
-                              </h3>
-                              <p className={cn(
-                                "mt-0.5 w-full truncate text-left text-[13px]",
-                                hasUnread(conv) && !isActive ? "font-semibold text-[#1D2A54]" : "font-medium text-[#8F95B2]"
-                              )}>
-                                {(() => {
-                                  const preview = getLastMessagePreview(conv);
-                                  const isTyping = typingConvIds.has(conv.id);
-                                  return (
-                                    <span
-                                      className={isTyping ? "text-[#3B58F5] font-semibold italic" : ""}
-                                    >
-                                      {preview}
-                                    </span>
-                                  );
-                                })()}
-                              </p>
-                            </div>
+                            <div className="flex flex-1 flex-col items-start overflow-hidden min-w-0">
+                              <div className="flex w-full items-center justify-between gap-1">
+                                <h3 className={cn(
+                                  "text-[15px] truncate leading-snug",
+                                  hasUnread(conv) && !isActive
+                                    ? "font-bold text-[#111B21] dark:text-[#E9EDEF]"
+                                    : "font-semibold text-[#111B21] dark:text-[#E9EDEF]"
+                                )}>
+                                  {conv.otherUserName}
+                                </h3>
+                                <span className={cn(
+                                  "text-[11.5px] font-normal shrink-0",
+                                  hasUnread(conv) && !isActive
+                                    ? "font-bold text-[#25D366]"
+                                    : "text-[#667781] dark:text-[#8696A0]"
+                                )}>
+                                  {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : formatTime(conv.updatedAt)}
+                                </span>
+                              </div>
 
-                            {/* Time & Unread Count */}
-                            <div className="flex flex-col items-end justify-center gap-1.5 shrink-0">
-                              <span className={cn(
-                                "text-[11px] font-semibold",
-                                hasUnread(conv) && !isActive ? "text-[#00a884]" : "text-[#8F95B2]"
-                              )}>
-                                {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : formatTime(conv.updatedAt)}
-                              </span>
-                              {/* Show badge with actual unread count when not currently viewing */}
-                              {!isActive && hasUnread(conv) ? (
-                                <div className="flex h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#00a884] px-1.5 text-[11px] font-bold text-white shadow-sm">
+                              <div className="flex w-full items-center justify-between gap-2 mt-0.5">
+                                <p className={cn(
+                                  "truncate text-left text-[13px] leading-tight flex-1 min-w-0 flex items-center",
+                                  hasUnread(conv) && !isActive
+                                    ? "font-semibold text-[#111B21] dark:text-[#E9EDEF]"
+                                    : "font-normal text-[#54656F] dark:text-[#8696A0]"
+                                )}>
                                   {(() => {
-                                    const count = getUnreadCount(conv);
-                                    return count > 99 ? '99+' : count > 0 ? count : '●';
+                                    if (isTyping) {
+                                      return (
+                                        <span className="text-[#00A884] font-semibold italic flex items-center gap-1">
+                                          <span>typing...</span>
+                                        </span>
+                                      );
+                                    }
+                                    const preview = getLastMessagePreview(conv);
+                                    return (
+                                      <span className="truncate flex items-center">
+                                        {getPreviewStatusIcon(conv)}
+                                        <span className="truncate">{preview}</span>
+                                      </span>
+                                    );
                                   })()}
-                                </div>
-                              ) : null}
+                                </p>
+
+                                {/* Unread count badge */}
+                                {!isActive && hasUnread(conv) ? (
+                                  <div className="flex h-[19px] min-w-[19px] shrink-0 items-center justify-center rounded-full bg-[#25D366] px-1.5 text-[11px] font-bold text-white shadow-xs">
+                                    {(() => {
+                                      const count = getUnreadCount(conv);
+                                      return count > 99 ? "99+" : count > 0 ? count : "●";
+                                    })()}
+                                  </div>
+                                ) : null}
+                              </div>
                             </div>
                           </Link>
 
-                          {/* Context Menu Button */}
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          {/* Context Menu Trigger */}
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                             <button 
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 setMenuOpenForId(menuOpenForId === conv.id ? null : conv.id);
                               }}
-                              className="p-1.5 rounded-full hover:bg-black/5 text-[#8F95B2] hover:text-[#1D2A54]"
+                              className="p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-[#667781] hover:text-[#111B21] dark:hover:text-white transition-colors"
+                              title="More options"
                             >
-                              <MoreVertical className="h-5 w-5" />
+                              <MoreVertical className="h-4 w-4" />
                             </button>
 
                             {/* Dropdown Menu */}
                             {menuOpenForId === conv.id && (
-                              <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-[#E6EAFA] py-1 z-50">
+                              <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#202C33] rounded-xl shadow-xl border border-[#E2E8F0] dark:border-[#2A3942] py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
                                 <button
                                   onClick={(e) => {
                                     e.preventDefault();
@@ -729,10 +817,10 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                     setConversationToDelete(conv.id);
                                     setMenuOpenForId(null);
                                   }}
-                                  className="w-full px-4 py-2 text-left text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                                  className="w-full px-3.5 py-2 text-left text-[13px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 transition-colors"
                                 >
                                   <Trash2 className="h-4 w-4" />
-                                  Delete
+                                  Delete chat
                                 </button>
                               </div>
                             )}

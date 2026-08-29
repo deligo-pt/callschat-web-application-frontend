@@ -399,15 +399,15 @@ export function MessageBubble({
         <div
           onClick={() => peerId && initiateCall(peerId, isVideo ? 'VIDEO' : 'AUDIO', peerName, peerAvatar)}
           className={cn(
-            "flex items-center gap-3.5 px-4 py-3 rounded-2xl border shadow-sm max-w-[280px] w-full transition-colors cursor-pointer",
+            "flex items-center gap-3.5 px-4 py-3 rounded-2xl border shadow-xs max-w-[280px] w-full transition-colors cursor-pointer",
             isMe 
-              ? "bg-[#EEF2FF] border-[#D8E2FF] hover:bg-[#E0E9FF]" 
-              : "bg-white border-gray-200 hover:bg-gray-50"
+              ? "bg-[#D9FDD3] dark:bg-[#005C4B] border-emerald-200/60 dark:border-emerald-700/40 hover:bg-[#D0F8CA]" 
+              : "bg-white dark:bg-[#202C33] border-gray-200/70 dark:border-[#2A3942] hover:bg-gray-50 dark:hover:bg-[#233138]"
           )}
         >
           <div className={cn(
-            "w-10 h-10 rounded-full shrink-0 flex items-center justify-center shadow-sm",
-            isMissed ? "bg-red-50 text-red-500" : "bg-[#E0E9FF] text-[#254BCC]"
+            "w-10 h-10 rounded-full shrink-0 flex items-center justify-center shadow-xs",
+            isMissed ? "bg-red-50 dark:bg-red-950/40 text-red-500" : isMe ? "bg-[#00A884]/20 text-[#008069] dark:text-[#25D366]" : "bg-emerald-50 dark:bg-emerald-950/40 text-[#00A884]"
           )}>
             {isVideo ? (
               <Video className="w-5 h-5" />
@@ -420,14 +420,14 @@ export function MessageBubble({
             )}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
-            <span className={cn("font-bold text-[14px] truncate", isMissed ? "text-red-500" : "text-[#254BCC]")}>
+            <span className={cn("font-semibold text-[14px] truncate", isMissed ? "text-red-500" : "text-[#111B21] dark:text-[#E9EDEF]")}>
               {isVideo ? "Video call" : "Audio call"}
             </span>
-            <span className={cn("text-xs font-medium", isMissed ? "text-red-400" : "text-gray-500")}>
+            <span className={cn("text-xs font-medium", isMissed ? "text-red-400" : "text-[#667781] dark:text-[#8696A0]")}>
               {subtitle}
             </span>
           </div>
-          <span className="text-[10px] text-gray-400 font-medium self-end ml-1">
+          <span className="text-[10px] text-[#8696A0] font-medium self-end ml-1">
             {formatTime(msg.createdAt)}
           </span>
         </div>
@@ -517,16 +517,16 @@ export function MessageBubble({
         target={isOptimistic ? undefined : "_blank"}
         rel="noopener noreferrer"
         className={cn(
-          "flex items-center gap-3 p-3 rounded-xl mb-1 min-w-[200px] border shadow-sm transition-colors",
+          "flex items-center gap-3 p-2.5 rounded-xl mb-1 min-w-[220px] border shadow-xs transition-colors",
           isMe 
-            ? "bg-white/10 border-white/20 hover:bg-white/20 text-white" 
-            : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-800",
+            ? "bg-black/[0.04] dark:bg-white/[0.08] border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] text-[#111B21] dark:text-[#E9EDEF]" 
+            : "bg-[#F0F2F5] dark:bg-[#182229] border-gray-200 dark:border-[#2A3942] hover:bg-[#E5E9EC] text-[#111B21] dark:text-[#E9EDEF]",
           isOptimistic && "pointer-events-none opacity-80"
         )}
       >
         <div className={cn(
           "flex items-center justify-center w-10 h-10 rounded-lg shrink-0",
-          isMe ? "bg-white/20" : "bg-blue-100 text-blue-600"
+          isMe ? "bg-[#00A884]/15 text-[#008069] dark:text-[#25D366]" : "bg-emerald-50 dark:bg-emerald-950/40 text-[#00A884]"
         )}>
           {isOptimistic ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -536,13 +536,13 @@ export function MessageBubble({
         </div>
         <div className="flex flex-col flex-1 truncate">
           <span className="text-sm font-semibold truncate leading-tight" title={fileName}>{fileName}</span>
-          <span className={cn("text-xs font-medium", isMe ? "text-blue-100" : "text-slate-500")}>
+          <span className={cn("text-xs font-medium", isMe ? "text-[#54656F] dark:text-[#8696A0]" : "text-[#667781] dark:text-[#8696A0]")}>
             {isOptimistic ? "Uploading..." : isEmailFile ? "Email File · Click to open" : "Document · Click to open"}
           </span>
         </div>
         {!isOptimistic && (
-          <div className={cn("w-8 h-8 rounded-full flex items-center justify-center transition-colors", isMe ? "hover:bg-white/20" : "hover:bg-slate-200")}>
-            <Download className="w-4 h-4" />
+          <div className={cn("w-8 h-8 rounded-full flex items-center justify-center transition-colors", isMe ? "hover:bg-black/10 dark:hover:bg-white/10" : "hover:bg-slate-200")}>
+            <Download className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
           </div>
         )}
       </a>
@@ -554,11 +554,11 @@ export function MessageBubble({
     return (
       <div
         className={cn(
-          "flex items-center gap-1 text-[11px] font-medium text-[#3B58F5] mb-1 px-1",
+          "flex items-center gap-1 text-[11px] font-semibold text-[#00A884] mb-1 px-1",
           isMe ? "justify-end" : "justify-start"
         )}
       >
-        <Pin className="w-3 h-3 fill-[#3B58F5] rotate-45" />
+        <Pin className="w-3 h-3 fill-[#00A884] rotate-45" />
         <span>Pinned</span>
       </div>
     );
@@ -570,14 +570,16 @@ export function MessageBubble({
       className={cn("flex w-full z-10 my-1 group/bubble relative items-center transition-all", isMe ? "justify-end" : "justify-start")}
     >
       {renderOptionsMenu()}
-      <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
+      <div className={cn("flex flex-col max-w-[80%] sm:max-w-[70%]", isMe ? "items-end" : "items-start")}>
         {renderPinnedBadge()}
         <ContextMenu>
           <ContextMenuTrigger asChild>
             <div
               className={cn(
-                "relative px-5 py-3 text-[15px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex flex-col group cursor-default select-text",
-                isMe ? "bg-[#254BCC] text-white rounded-[24px] rounded-br-[6px]" : "bg-white text-[#11142D] rounded-[24px] rounded-bl-[6px]"
+                "relative px-4 py-2.5 text-[14.5px] leading-relaxed shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] flex flex-col group cursor-default select-text transition-all",
+                isMe 
+                  ? "bg-[#D9FDD3] dark:bg-[#005C4B] text-[#111B21] dark:text-[#E9EDEF] rounded-2xl rounded-tr-[4px] border border-emerald-300/30 dark:border-emerald-700/20" 
+                  : "bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] rounded-2xl rounded-tl-[4px] border border-gray-200/60 dark:border-[#2A3942]"
               )}
             >
               {/* WhatsApp-Style In-Bubble Quoted Card */}
@@ -592,8 +594,8 @@ export function MessageBubble({
                   className={cn(
                     "relative mb-2 flex items-center justify-between gap-2 overflow-hidden rounded-[8px] p-2 pl-3 text-left cursor-pointer transition-all",
                     isMe
-                      ? "bg-black/15 hover:bg-black/25 text-white"
-                      : "bg-black/[0.05] hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-[#111B21] dark:text-[#E9EDEF]"
+                      ? "bg-black/[0.06] hover:bg-black/[0.09] dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-[#111B21] dark:text-[#E9EDEF]"
+                      : "bg-black/[0.04] hover:bg-black/[0.07] dark:bg-white/[0.06] dark:hover:bg-white/[0.10] text-[#111B21] dark:text-[#E9EDEF]"
                   )}
                 >
                   {/* WhatsApp Left Vertical Colored Stripe Bar */}
@@ -601,32 +603,25 @@ export function MessageBubble({
                     className={cn(
                       "absolute left-0 top-0 bottom-0 w-[4px]",
                       msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
-                        ? isMe ? "bg-white" : "bg-[#027eb5] dark:bg-[#53bdeb]"
-                        : isMe ? "bg-white/80" : "bg-[#027eb5] dark:bg-[#53bdeb]"
+                        ? "bg-[#2563EB]"
+                        : "bg-[#00A884]"
                     )}
                   />
 
                   <div className="flex flex-col min-w-0 flex-1 pl-1">
                     <span
                       className={cn(
-                        "text-[12.5px] font-semibold tracking-tight truncate leading-tight",
-                        isMe
-                          ? "text-white/95"
-                          : msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
-                          ? "text-[#027eb5] dark:text-[#53bdeb]"
-                          : "text-[#027eb5] dark:text-[#53bdeb]"
+                        "text-[12.5px] font-bold tracking-tight truncate leading-tight",
+                        msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                          ? "text-[#2563EB]"
+                          : "text-[#008069] dark:text-[#25D366]"
                       )}
                     >
                       {msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
                         ? "You"
                         : msg.replyTo.senderName || peerName || "Contact"}
                     </span>
-                    <div
-                      className={cn(
-                        "flex items-center gap-1 text-[12.5px] truncate mt-0.5 leading-snug",
-                        isMe ? "text-white/85" : "text-[#54656F] dark:text-[#8696A0]"
-                      )}
-                    >
+                    <div className="flex items-center gap-1 text-[12px] truncate mt-0.5 leading-snug text-[#54656F] dark:text-[#8696A0]">
                       {msg.replyTo.mediaType === "image" && <Camera className="h-3.5 w-3.5 shrink-0" />}
                       {msg.replyTo.mediaType === "video" && <Video className="h-3.5 w-3.5 shrink-0" />}
                       {msg.replyTo.mediaType === "audio" && <Mic className="h-3.5 w-3.5 shrink-0" />}
@@ -675,7 +670,7 @@ export function MessageBubble({
                           setEditText(msg.text);
                         }
                       }}
-                      className="w-full text-sm bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
+                      className="w-full text-sm bg-white/70 dark:bg-black/30 text-[#111B21] dark:text-[#E9EDEF] border border-[#00A884] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#00A884] resize-none"
                       rows={2}
                       autoFocus
                     />
@@ -686,7 +681,7 @@ export function MessageBubble({
                           setIsEditing(false);
                           setEditText(msg.text);
                         }}
-                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                        className="px-2.5 py-1 rounded-md bg-black/10 dark:bg-white/10 hover:bg-black/20 text-[#111B21] dark:text-[#E9EDEF] transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -698,7 +693,7 @@ export function MessageBubble({
                           }
                           setIsEditing(false);
                         }}
-                        className="px-2.5 py-1 rounded bg-white font-medium text-[#254BCC] hover:bg-blue-50 transition-colors cursor-pointer"
+                        className="px-3 py-1 rounded-md bg-[#00A884] font-semibold text-white hover:bg-[#008069] transition-colors cursor-pointer shadow-xs"
                       >
                         Save
                       </button>

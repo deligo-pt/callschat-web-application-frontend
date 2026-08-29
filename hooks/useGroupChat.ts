@@ -1,9 +1,21 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
-import { groupService } from "@/services/group.service";
+import { groupService, GroupItem } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
-import { generateGroupKey, encryptMessage, encryptGroupMessage, decryptGroupMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
-import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
+import {
+  generateGroupKey,
+  encryptMessage,
+  encryptGroupMessage,
+  decryptGroupMessage,
+  decryptMessage,
+  generateAndStoreKeyPair,
+} from "@/utils/crypto";
+import {
+  getUserPrivateKey,
+  getUserPublicKey,
+  storeGroupKey,
+  getStoredGroupKey,
+} from "@/utils/keyStore";
 
 export interface QuotedMessage {
   id: string;
@@ -14,6 +26,44 @@ export interface QuotedMessage {
   mediaType?: string | null;
 }
 
+export interface GroupPollOptionData {
+  id: string;
+  pollId: string;
+  text: string;
+  order: number;
+  votes: Array<{
+    userId: string;
+    votedAt: string;
+    user?: {
+      profile?: {
+        displayName: string;
+        avatarUrl: string | null;
+      } | null;
+    } | null;
+  }>;
+}
+
+export interface GroupPollData {
+  id: string;
+  groupMessageId: string;
+  question: string;
+  allowMultiple: boolean;
+  options: GroupPollOptionData[];
+}
+
+export interface GroupMessageReactionItem {
+  id: string;
+  emoji: string;
+  userId: string;
+  createdAt: string;
+  user?: {
+    profile?: {
+      displayName: string;
+      avatarUrl: string | null;
+    } | null;
+  } | null;
+}
+
 export interface GroupMessage {
   id: string;
   groupId: string;
@@ -21,7 +71,7 @@ export interface GroupMessage {
   text: string;
   createdAt: string;
   mediaUrl?: string;
-  mediaType?: "image" | "video" | "audio" | "document" | string | null;
+  mediaType?: "image" | "video" | "audio" | "document" | "poll" | "call" | string | null;
   sender?: {
     profile?: {
       displayName: string;
@@ -30,6 +80,10 @@ export interface GroupMessage {
   };
   isEdited?: boolean;
   isDeleted?: boolean;
+  deletedByAdmin?: boolean;
+  isSystem?: boolean;
+  systemEventType?: string | null;
+  systemMetadata?: any;
   replyToId?: string | null;
   replyTo?: QuotedMessage | null;
   receipts?: {
@@ -38,6 +92,18 @@ export interface GroupMessage {
     deliveredAt: string | null;
     seenAt: string | null;
   }[];
+  reactions?: GroupMessageReactionItem[];
+  poll?: GroupPollData | null;
+}
+
+export interface PinnedMessage {
+  id: string;
+  groupId: string;
+  groupMessageId: string;
+  pinnedBy: string;
+  pinnedAt: string;
+  expiresAt: string | null;
+  groupMessage?: GroupMessage;
 }
 
 const parseEditedText = (rawText: string) => {
@@ -65,7 +131,7 @@ const resolveGroupQuotedMessage = async (
       id: replyToRaw.id,
       senderId: replyToRaw.senderId,
       senderName,
-      text: "🚫 This message was deleted",
+      text: replyToRaw.deletedByAdmin ? "🚫 This message was deleted by an admin" : "🚫 This message was deleted",
       mediaUrl: null,
       mediaType: null,
     };
@@ -73,12 +139,10 @@ const resolveGroupQuotedMessage = async (
 
   let text = replyToRaw.text || "";
 
-  // 1. Check known decrypted map first
   if (!text && knownDecryptedMap && knownDecryptedMap.has(replyToRaw.id)) {
     text = knownDecryptedMap.get(replyToRaw.id)!;
   }
 
-  // 2. Decrypt with group symmetric key if cipher is present
   if (!text && replyToRaw.ciphertext && replyToRaw.nonce && gKey) {
     try {
       const dec = await decryptGroupMessage(replyToRaw.ciphertext, replyToRaw.nonce, gKey);
@@ -88,12 +152,12 @@ const resolveGroupQuotedMessage = async (
     text = parseEditedText(replyToRaw.ciphertext).text;
   }
 
-  // 3. Fallback to media type label
   if (!text && replyToRaw.mediaType) {
     if (replyToRaw.mediaType === "image") text = "Photo";
     else if (replyToRaw.mediaType === "video") text = "Video";
     else if (replyToRaw.mediaType === "audio") text = "Voice message";
     else if (replyToRaw.mediaType === "document") text = "Document";
+    else if (replyToRaw.mediaType === "poll") text = "📊 Poll";
   }
 
   return {
@@ -106,33 +170,26 @@ const resolveGroupQuotedMessage = async (
   };
 };
 
-export interface PinnedMessage {
-  messageId: string;
-  pinnedAt: number;
-  pinnedUntil: number | null;
-  pinnerName: string;
-  previewText?: string;
-  previewMedia?: string;
-  originalMessage?: GroupMessage;
-}
-
 export const useGroupChat = (groupId: string, currentUserId: string) => {
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [pinnedMessages, setPinnedMessages] = useState<PinnedMessage[]>([]);
+  const [groupDetails, setGroupDetails] = useState<any>(null);
+  const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Keep plaintext group key in a ref so listeners always have it
   const groupKeyRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
   const pendingReceiptsRef = useRef<Map<string, any[]>>(new Map());
+  const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
   }, [currentUserId]);
 
-  // ── Setup: Fetch & Decrypt Symmetric Group Key ─────────────────────────────
+  // ── Setup: Fetch & Decrypt Symmetric Group Key (Zero Sync Issue Protocol) ───
   useEffect(() => {
     if (!groupId || !currentUserId) return;
 
@@ -141,18 +198,20 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         setIsReady(false);
         setError(null);
 
-        // 0. Ensure local keypair exists before checking or creating group keys
-        const privKeyName = `privateKey_${currentUserId}`;
-        const pubKeyName = `publicKey_${currentUserId}`;
+        // Check IndexedDB key store first (Instant unlock)
+        const cachedKey = await getStoredGroupKey(groupId, currentUserId);
+        if (cachedKey) {
+          groupKeyRef.current = cachedKey;
+        }
+
+        // 1. Ensure local keypair exists
         let localPrivKey = await getUserPrivateKey(currentUserId);
         let localPubKey = await getUserPublicKey(currentUserId);
 
         if (!localPrivKey || !localPubKey) {
-          console.log("[useGroupChat] Local keypair missing, generating new keypair for user:", currentUserId);
           localPubKey = await generateAndStoreKeyPair(currentUserId);
           localPrivKey = await getUserPrivateKey(currentUserId);
           const deviceId = `web-${currentUserId}`;
-          localStorage.setItem("deviceId", deviceId);
           try {
             if (localPubKey) {
               await chatService.uploadPublicKey(deviceId, localPubKey);
@@ -162,203 +221,138 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           }
         }
 
-        // 1. Fetch group details to find the creator
+        // 2. Fetch group details & permissions
         const groupRes = await groupService.fetchGroupDetails(groupId);
-        if (!groupRes.success || !groupRes.data) {
-          throw new Error("Failed to load group details");
+        if (groupRes.success && groupRes.data) {
+          setGroupDetails(groupRes.data);
         }
-        const creatorId = groupRes.data.createdBy;
+        const creatorId = groupRes.data?.createdBy;
 
-        // 2. Fetch the user's encrypted group key
-        const keyRes = await groupService.fetchGroupKey(groupId);
-        let encryptedGroupKey = keyRes.data?.encryptedGroupKey;
-        let keyNonce = keyRes.data?.keyNonce;
+        // 3. If symmetric key is not in cache, fetch envelope and decrypt
+        let plaintextGroupKey: string | null = groupKeyRef.current;
 
-        if (!encryptedGroupKey || !keyNonce) {
-          // If encryptedGroupKey is missing (e.g. for auto-created community groups or newly added groups),
-          // check if we can auto-initialize
-          const myRoleRes = await groupService.fetchGroupDetails(groupId);
-          const isCreatorOrAdmin = currentUserId === creatorId || myRoleRes.data?.myRole === 'ADMIN' || myRoleRes.data?.myRole === 'OWNER';
-          if (isCreatorOrAdmin && currentUserId) {
-            console.log("[useGroupChat] Auto-initializing E2EE group key for group:", groupId);
-            const myPrivKey = (await getUserPrivateKey(currentUserId)) || localPrivKey;
-            if (!myPrivKey) {
-              throw new Error("Local private key missing for group key initialization");
-            }
-            const freshGroupKey = await generateGroupKey();
-            const membersRes = await groupService.fetchGroupMembers(groupId);
-            const memberList = membersRes.success && membersRes.data?.members ? membersRes.data.members : [{ userId: currentUserId }];
-
-            const rekeyPayload = [];
-            for (const m of memberList) {
-              const uId = (m as any).userId || (m as any).id;
-              if (!uId) continue;
-              const rKeyRes = await chatService.fetchRecipientKey(uId);
-              let pubKey = "";
-              if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
-                // Keys are ordered asc by createdAt — last entry is the newest/active key
-                pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
-              } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
-                pubKey = rKeyRes.data.publicKey;
-              }
-              if (!pubKey && uId === currentUserId) {
-                pubKey = localStorage.getItem(`publicKey_${currentUserId}`) || localStorage.getItem("publicKey") || "";
-              }
-              if (pubKey) {
-                try {
-                  const enc = await encryptMessage(freshGroupKey, pubKey, myPrivKey);
-                  rekeyPayload.push({
-                    userId: uId,
-                    encryptedGroupKey: enc.ciphertext,
-                    keyNonce: enc.nonce,
-                  });
-                  if (uId === currentUserId) {
-                    encryptedGroupKey = enc.ciphertext;
-                    keyNonce = enc.nonce;
-                  }
-                } catch (encErr) {
-                  console.warn(`[useGroupChat] Could not encrypt key for member ${uId}:`, encErr);
-                }
-              }
-            }
-
-            if (rekeyPayload.length > 0) {
-              await groupService.rekeyGroup(groupId, rekeyPayload);
-              console.log("[useGroupChat] Group successfully re-keyed automatically.");
-              groupKeyRef.current = freshGroupKey;
-              setIsReady(true);
-              // Directly fetch history now that key is set
-              const msgsRes = await groupService.fetchGroupMessages(groupId);
-              if (msgsRes.success && msgsRes.data) {
-                const decrypted = [];
-                for (const msg of msgsRes.data) {
-                  if (!msg.ciphertext || !msg.nonce) continue;
-                  try {
-                    const text = await decryptGroupMessage(msg.ciphertext, msg.nonce, freshGroupKey);
-                    decrypted.push({
-                      id: msg.id,
-                      groupId: msg.groupId,
-                      senderId: msg.senderId,
-                      text,
-                      createdAt: msg.createdAt,
-                      mediaUrl: msg.mediaUrl,
-                      mediaType: msg.mediaType,
-                      sender: msg.sender,
-                    });
-                  } catch (e) {
-                    console.warn("Could not decrypt history item:", msg.id);
-                  }
-                }
-                setMessages(decrypted);
-              } else {
-                setMessages([]);
-              }
-              return;
-            }
-          }
+        if (!plaintextGroupKey) {
+          const keyRes = await groupService.fetchGroupKey(groupId);
+          let encryptedGroupKey = keyRes.data?.encryptedGroupKey;
+          let keyNonce = keyRes.data?.keyNonce;
+          const senderId = keyRes.data?.senderId || creatorId;
 
           if (!encryptedGroupKey || !keyNonce) {
-            throw new Error("You do not have a cryptographic key for this group. An admin needs to initialize encryption.");
+            // Auto-initialize if creator/admin
+            const isCreatorOrAdmin =
+              currentUserId === creatorId ||
+              groupRes.data?.myRole === "ADMIN" ||
+              groupRes.data?.myRole === "OWNER";
+
+            if (isCreatorOrAdmin && currentUserId) {
+              const myPrivKey = (await getUserPrivateKey(currentUserId)) || localPrivKey;
+              if (myPrivKey) {
+                const freshGroupKey = await generateGroupKey();
+                const membersRes = await groupService.fetchGroupMembers(groupId);
+                const memberList =
+                  membersRes.success && membersRes.data?.members
+                    ? membersRes.data.members
+                    : [{ userId: currentUserId }];
+
+                const rekeyPayload = [];
+                for (const m of memberList) {
+                  const uId = (m as any).userId || (m as any).id;
+                  if (!uId) continue;
+                  const rKeyRes = await chatService.fetchRecipientKey(uId);
+                  let pubKey = "";
+                  if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
+                    pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+                  } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
+                    pubKey = rKeyRes.data.publicKey;
+                  }
+                  if (!pubKey && uId === currentUserId) {
+                    pubKey = localPubKey || "";
+                  }
+                  if (pubKey) {
+                    try {
+                      const enc = await encryptMessage(freshGroupKey, pubKey, myPrivKey);
+                      rekeyPayload.push({
+                        userId: uId,
+                        encryptedGroupKey: enc.ciphertext,
+                        keyNonce: enc.nonce,
+                      });
+                      if (uId === currentUserId) {
+                        encryptedGroupKey = enc.ciphertext;
+                        keyNonce = enc.nonce;
+                      }
+                    } catch (encErr) {
+                      console.warn(`[useGroupChat] Could not encrypt key for member ${uId}:`, encErr);
+                    }
+                  }
+                }
+
+                if (rekeyPayload.length > 0) {
+                  await groupService.rekeyGroup(groupId, rekeyPayload);
+                  plaintextGroupKey = freshGroupKey;
+                  await storeGroupKey(groupId, currentUserId, freshGroupKey);
+                  groupKeyRef.current = freshGroupKey;
+                }
+              }
+            }
           }
-        }
 
-        // 3. Fetch creator's ALL public keys (key history) — newest last
-        const creatorKeyRes = await chatService.fetchRecipientKey(creatorId);
-        let creatorPubKeys: string[] = [];
+          // If still not unlocked, decrypt using sender public keys
+          if (!plaintextGroupKey && encryptedGroupKey && keyNonce) {
+            const senderCandidates = [senderId, creatorId, currentUserId].filter(Boolean);
+            const candidatePubKeys: string[] = [];
 
-        if (creatorKeyRes?.data && Array.isArray(creatorKeyRes.data) && creatorKeyRes.data.length > 0) {
-          // Collect all known public keys; try newest first (most likely match)
-          creatorPubKeys = [...creatorKeyRes.data]
-            .reverse()
-            .map((k: any) => k.publicKey)
-            .filter(Boolean);
-        } else if (creatorKeyRes?.success && creatorKeyRes?.data?.publicKey) {
-          creatorPubKeys = [creatorKeyRes.data.publicKey];
-        }
+            for (const sId of senderCandidates) {
+              if (!sId) continue;
+              const rKeyRes = await chatService.fetchRecipientKey(sId);
+              if (rKeyRes?.data && Array.isArray(rKeyRes.data)) {
+                for (const k of [...rKeyRes.data].reverse()) {
+                  if (k.publicKey && !candidatePubKeys.includes(k.publicKey)) {
+                    candidatePubKeys.push(k.publicKey);
+                  }
+                }
+              } else if (rKeyRes?.data?.publicKey && !candidatePubKeys.includes(rKeyRes.data.publicKey)) {
+                candidatePubKeys.push(rKeyRes.data.publicKey);
+              }
+            }
 
-        // Also include the current user's own public key as a fallback
-        // (in case the current user IS the creator and the key is self-encrypted
-        // with an older keypair stored locally)
-        const myPubKeyLocal = await getUserPublicKey(currentUserId);
-        if (myPubKeyLocal && !creatorPubKeys.includes(myPubKeyLocal)) {
-          creatorPubKeys.push(myPubKeyLocal);
-        }
+            if (localPubKey && !candidatePubKeys.includes(localPubKey)) {
+              candidatePubKeys.push(localPubKey);
+            }
 
-        if (creatorPubKeys.length === 0) {
-          throw new Error("Could not find creator's public key to decrypt group key");
-        }
-
-        // 4. Fetch my private key
-        const myPrivKey = (await getUserPrivateKey(currentUserId)) || localPrivKey;
-        if (!myPrivKey) {
-          throw new Error("Missing local private key");
-        }
-
-        // 5. Try decrypting with each creator public key (newest → oldest)
-        //    This handles the case where the creator regenerated their keypair
-        //    after the group was created (key rotation).
-        let plaintextGroupKey: string | null = null;
-        let lastDecryptError: any = null;
-
-        for (const pubKey of creatorPubKeys) {
-          try {
-            plaintextGroupKey = await decryptMessage(
-              encryptedGroupKey,
-              keyNonce,
-              pubKey,
-              myPrivKey
-            );
-            // If we reach here, decryption succeeded
-            console.log("[useGroupChat] Group key decrypted successfully.");
-            break;
-          } catch (err) {
-            lastDecryptError = err;
-            console.warn("[useGroupChat] Decryption attempt failed with a public key, trying next...");
-          }
-        }
-
-        if (!plaintextGroupKey) {
-          console.warn("[useGroupChat] Creator/Self keys failed. Trying other members (in case re-keyed by admin)...");
-          const membersRes = await groupService.fetchGroupMembers(groupId);
-          if (membersRes.success && membersRes.data?.members) {
-            for (const member of membersRes.data.members) {
-              if (!member.publicKey || member.userId === creatorId || member.userId === currentUserId) continue;
-
-              try {
-                plaintextGroupKey = await decryptMessage(
-                  encryptedGroupKey,
-                  keyNonce,
-                  member.publicKey,
-                  myPrivKey
-                );
-                console.log(`[useGroupChat] Group key decrypted successfully using member ${member.userId}'s public key.`);
-                break;
-              } catch (err) {
-                lastDecryptError = err;
+            const myPrivKey = (await getUserPrivateKey(currentUserId)) || localPrivKey;
+            if (myPrivKey) {
+              for (const pubKey of candidatePubKeys) {
+                try {
+                  plaintextGroupKey = await decryptMessage(encryptedGroupKey, keyNonce, pubKey, myPrivKey);
+                  if (plaintextGroupKey) {
+                    await storeGroupKey(groupId, currentUserId, plaintextGroupKey);
+                    groupKeyRef.current = plaintextGroupKey;
+                    break;
+                  }
+                } catch {}
               }
             }
           }
         }
 
-        if (!plaintextGroupKey) {
-          console.error("[useGroupChat] All public key attempts exhausted.", lastDecryptError);
-          throw new Error(
-            "Failed to decrypt group key. The encryption keys may be out of sync. " +
-            "Try re-logging in to regenerate your keypair."
-          );
+        // 4. Fetch Message History and Pinned Messages
+        const [historyRes, pinsRes] = await Promise.all([
+          groupService.fetchGroupMessages(groupId),
+          groupService.fetchPinnedMessages(groupId),
+        ]);
+
+        if (pinsRes.success && pinsRes.data) {
+          setPinnedMessages(pinsRes.data);
         }
 
-        groupKeyRef.current = plaintextGroupKey;
-
-        // 6. Load History
-        const historyRes = await groupService.fetchGroupMessages(groupId);
         if (historyRes.success && Array.isArray(historyRes.data)) {
-          // Step 1: Pre-decrypt all message texts and build a map
           const decryptedTextsMap = new Map<string, string>();
+          const currentKey = groupKeyRef.current;
+
           for (const msg of historyRes.data) {
-            if (msg.ciphertext && msg.nonce && plaintextGroupKey) {
+            if (msg.ciphertext && msg.nonce && currentKey) {
               try {
-                const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, plaintextGroupKey);
+                const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, currentKey);
                 decryptedTextsMap.set(msg.id, parseEditedText(dec).text);
               } catch {}
             } else if (msg.ciphertext && !msg.nonce) {
@@ -366,58 +360,59 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             }
           }
 
-          // Step 2: Build final decrypted messages with fully resolved quoted replies
           const decryptedHistory = await Promise.all(
             historyRes.data.map(async (msg: any) => {
               const replyTo = await resolveGroupQuotedMessage(
                 msg.replyTo,
                 currentUserId,
-                plaintextGroupKey,
+                currentKey,
                 decryptedTextsMap
               );
 
-              const text =
-                decryptedTextsMap.get(msg.id) ??
-                (msg.ciphertext ? "🔒 Encrypted Message (Decryption Failed)" : "");
+              let text = decryptedTextsMap.get(msg.id) ?? "";
+              if (!text && msg.ciphertext && !msg.mediaUrl) {
+                text = "🔒 Encrypted message";
+              }
 
               return {
                 id: msg.id,
-                groupId: msg.groupId || msg.conversationId,
+                groupId: msg.groupId,
                 senderId: msg.senderId,
-                text: text,
+                text,
                 isEdited: msg.isEdited ?? false,
                 createdAt: msg.createdAt,
                 mediaUrl: msg.mediaUrl,
                 mediaType: msg.mediaType,
                 sender: msg.sender,
                 isDeleted: msg.isDeleted,
+                deletedByAdmin: msg.deletedByAdmin,
+                isSystem: msg.isSystem,
+                systemEventType: msg.systemEventType,
+                systemMetadata: msg.systemMetadata,
                 replyToId: msg.replyToId ?? null,
                 replyTo,
                 receipts: msg.receipts || [],
+                reactions: msg.reactions || [],
+                poll: msg.poll || null,
               };
             })
           );
-          
+
           decryptedHistory.sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
           setMessages(decryptedHistory);
 
-          // Proactively acknowledge delivery for any undelivered messages
+          // Proactively mark delivered
           if (socket && isConnected) {
             const undelivered = historyRes.data.filter(
               (m: any) =>
                 m.senderId !== currentUserId &&
                 (!m.receipts ||
-                  !m.receipts.some(
-                    (r: any) => r.userId === currentUserId && r.deliveredAt
-                  ))
+                  !m.receipts.some((r: any) => r.userId === currentUserId && r.deliveredAt))
             );
             undelivered.forEach((m: any) => {
-              socket.emit("group:mark_delivered", {
-                groupId,
-                messageId: m.id,
-              });
+              socket.emit("group:mark_delivered", { groupId, messageId: m.id });
             });
           }
         } else {
@@ -428,42 +423,32 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       } catch (err: any) {
         console.error("Failed to setup group chat:", err);
         setError(err.message || "Failed to unlock group keys");
+        setIsReady(true);
       }
     };
 
     setupGroupKey();
   }, [groupId, currentUserId]);
 
-  // ── Socket: Join Room ──────────────────────────────────────────────────────
+  // ── Socket: Room Subscription ──────────────────────────────────────────────
   useEffect(() => {
     if (!socket || !isConnected || !groupId) return;
 
-    console.log("🔌 [Socket] Joining group room:", groupId);
     socket.emit("group:join_room", { groupId });
 
-    const handleJoinedRoom = (payload: any) => {
-      console.log("✅ [Socket] Successfully joined group room:", payload);
-    };
-
-    socket.on("group:joined_room", handleJoinedRoom);
-
     return () => {
-      socket.off("group:joined_room", handleJoinedRoom);
+      socket.emit("group:leave_room", { groupId });
     };
   }, [socket, isConnected, groupId]);
 
-  // ── Socket: Receive Messages ───────────────────────────────────────────────
+  // ── Socket: Real-Time Event Handlers ───────────────────────────────────────
   useEffect(() => {
     if (!socket || !isConnected || !groupId) return;
 
     const handleReceiveMessage = async (payload: any) => {
-      console.log("📥 [Socket] Received group:receive_message:", payload);
-
       if (payload.groupId !== groupId) return;
-
       const senderId = payload.senderId || payload.sender?.id || "unknown";
 
-      // Build map of known message texts
       const knownMap = new Map<string, string>();
       messages.forEach((m) => {
         if (m.text) knownMap.set(m.id, m.text);
@@ -476,122 +461,42 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         knownMap
       );
 
-      // Helper to append a message, deduplicating by ID
-      const pendingForThis = pendingReceiptsRef.current.get(payload.id) || [];
-      const mergeReceipts = (base: any[] = [], opt?: any[]) => {
-        const res = [...base];
-        if (opt) {
-          for (const r of opt) {
-            const idx = res.findIndex((x) => x.userId === r.userId);
-            if (idx !== -1) {
-              res[idx] = {
-                ...res[idx],
-                deliveredAt: r.deliveredAt ?? res[idx].deliveredAt,
-                seenAt: r.seenAt ?? res[idx].seenAt,
-              };
-            } else {
-              res.push(r);
-            }
-          }
+      let text = "";
+      if (payload.ciphertext && payload.nonce && groupKeyRef.current) {
+        try {
+          const dec = await decryptGroupMessage(payload.ciphertext, payload.nonce, groupKeyRef.current);
+          text = parseEditedText(dec).text;
+        } catch {
+          text = "🔒 Encrypted group message";
         }
-        for (const pr of pendingForThis) {
-          const idx = res.findIndex((x) => x.userId === pr.userId);
-          if (idx !== -1) {
-            res[idx] = {
-              ...res[idx],
-              deliveredAt: pr.deliveredAt ?? res[idx].deliveredAt,
-              seenAt: pr.seenAt ?? res[idx].seenAt,
-            };
-          } else {
-            res.push(pr);
-          }
-        }
-        return res;
-      };
+      } else if (payload.ciphertext && !payload.nonce) {
+        text = parseEditedText(payload.ciphertext).text;
+      }
 
-      const appendMessage = (msg: GroupMessage) => {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-
-          // If quote text missing, check prev state
-          if (msg.replyTo && !msg.replyTo.text && msg.replyToId) {
-            const matched = prev.find((m) => m.id === msg.replyToId);
-            if (matched?.text) {
-              msg.replyTo.text = matched.text;
-            }
-          }
-
-          // Replace an optimistic placeholder from this user if present
-          if (msg.senderId === currentUserIdRef.current) {
-            const optimisticIdx = prev.map((m) => m.id).lastIndexOf(
-              prev.slice().reverse().find((m) => m.id.startsWith("optimistic-"))?.id ?? ""
-            );
-            if (optimisticIdx !== -1) {
-              const updated = [...prev];
-              const existingOpt = prev[optimisticIdx];
-              if (!msg.replyTo?.text && existingOpt?.replyTo?.text) {
-                msg.replyTo = existingOpt.replyTo;
-              }
-              updated[optimisticIdx] = {
-                ...msg,
-                receipts: mergeReceipts(msg.receipts || [], existingOpt?.receipts),
-              };
-              return updated;
-            }
-          }
-
-          return [...prev, { ...msg, receipts: mergeReceipts(msg.receipts || []) }];
-        });
-      };
-
-      const baseMsg: GroupMessage = {
+      const newMsg: GroupMessage = {
         id: payload.id || Date.now().toString(),
         groupId: payload.groupId,
         senderId,
-        text: "",
+        text,
         createdAt: payload.createdAt || new Date().toISOString(),
         mediaUrl: payload.mediaUrl ?? undefined,
         mediaType: payload.mediaType ?? undefined,
         sender: payload.sender,
         receipts: payload.receipts || [],
+        reactions: payload.reactions || [],
+        poll: payload.poll || null,
+        isSystem: payload.isSystem,
+        systemEventType: payload.systemEventType,
+        systemMetadata: payload.systemMetadata,
         replyToId: payload.replyToId ?? null,
         replyTo: resolvedReplyTo,
       };
 
-      // Case 1: Pure media message — no ciphertext, skip decryption entirely
-      if (!payload.ciphertext && !payload.nonce) {
-        if (payload.mediaUrl || payload.mediaType) {
-          appendMessage(baseMsg);
-        }
-      } else {
-        // Case 2: Has ciphertext — need group key to decrypt
-        const gKey = groupKeyRef.current;
-        if (!gKey) {
-          console.warn("⚠️ [Socket] Missing group key — cannot decrypt incoming message. Rendering media only.");
-          if (payload.mediaUrl) {
-            appendMessage(baseMsg);
-          }
-        } else {
-          try {
-            const decrypted = await decryptGroupMessage(
-              payload.ciphertext,
-              payload.nonce,
-              gKey
-            );
-            const parsed = parseEditedText(decrypted);
-            appendMessage({ ...baseMsg, text: parsed.text, isEdited: parsed.isEdited });
-          } catch (err) {
-            console.error("❌ [Socket] Failed to decrypt group message:", err);
-            appendMessage({
-              ...baseMsg,
-              text: payload.mediaUrl ? "" : "🔒 Encrypted group message (Decryption Failed)",
-              isEdited: false,
-            });
-          }
-        }
-      }
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
 
-      // Automatically mark as delivered if the message is from someone else
       if (senderId !== currentUserIdRef.current) {
         socket.emit("group:mark_delivered", {
           groupId: payload.groupId,
@@ -600,400 +505,255 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
     };
 
-    const handleGroupError = (err: any) => {
-      console.error("🚨 [Socket] Group Chat Error:", err);
+    const handleStatusUpdate = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === payload.messageId) {
+            const receipts = [...(msg.receipts || [])];
+            const idx = receipts.findIndex((r) => r.userId === payload.userId);
+            const entry = {
+              id: Math.random().toString(),
+              userId: payload.userId,
+              deliveredAt: payload.status === "DELIVERED" || payload.status === "SEEN" ? payload.timestamp : null,
+              seenAt: payload.status === "SEEN" ? payload.timestamp : null,
+            };
+            if (idx !== -1) {
+              receipts[idx] = { ...receipts[idx], ...entry };
+            } else {
+              receipts.push(entry);
+            }
+            return { ...msg, receipts };
+          }
+          return msg;
+        })
+      );
     };
 
-    const handleMessageEdited = async (payload: any) => {
+    const handleReactionsUpdated = (payload: any) => {
       if (payload.groupId !== groupId) return;
-      const gKey = groupKeyRef.current;
-      let text = payload.ciphertext || "";
-      if (payload.ciphertext && payload.nonce && gKey) {
-        try {
-          text = await decryptGroupMessage(payload.ciphertext, payload.nonce, gKey);
-        } catch {}
-      }
-      const parsed = parseEditedText(text);
       setMessages((prev) =>
-        prev.map((m) => (m.id === payload.id ? { ...m, text: parsed.text, isEdited: parsed.isEdited } : m))
+        prev.map((m) => (m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m))
       );
+    };
+
+    const handlePinUpdated = async (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      const pinsRes = await groupService.fetchPinnedMessages(groupId);
+      if (pinsRes.success && pinsRes.data) {
+        setPinnedMessages(pinsRes.data);
+      }
+    };
+
+    const handlePollUpdated = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.poll && m.poll.id === payload.poll?.id ? { ...m, poll: payload.poll } : m))
+      );
+    };
+
+    const handleSettingsUpdated = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      setGroupDetails((prev: any) => (prev ? { ...prev, ...payload.settings } : prev));
+    };
+
+    const handleTypingStart = (payload: any) => {
+      if (payload.groupId !== groupId || payload.userId === currentUserIdRef.current) return;
+      setTypingUsers((prev) => {
+        const next = new Map(prev);
+        next.set(payload.userId, payload.userName || "Someone");
+        return next;
+      });
+
+      const existingTimeout = typingTimeoutsRef.current.get(payload.userId);
+      if (existingTimeout) clearTimeout(existingTimeout);
+
+      const timeout = setTimeout(() => {
+        setTypingUsers((prev) => {
+          const next = new Map(prev);
+          next.delete(payload.userId);
+          return next;
+        });
+      }, 4000);
+      typingTimeoutsRef.current.set(payload.userId, timeout);
+    };
+
+    const handleTypingStop = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      setTypingUsers((prev) => {
+        const next = new Map(prev);
+        next.delete(payload.userId);
+        return next;
+      });
+      const existingTimeout = typingTimeoutsRef.current.get(payload.userId);
+      if (existingTimeout) clearTimeout(existingTimeout);
     };
 
     const handleMessageUnsent = (payload: any) => {
       if (payload.groupId !== groupId) return;
-      const targetId = payload.messageId || payload.id;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === targetId
-            ? { ...m, isDeleted: true, text: "", mediaUrl: undefined, mediaType: undefined }
+          m.id === payload.messageId
+            ? { ...m, isDeleted: true, deletedByAdmin: payload.deletedByAdmin, text: "", mediaUrl: undefined }
             : m
         )
       );
     };
 
-    const handleStatusUpdate = (payload: any) => {
-      if (payload.groupId !== groupId) return;
-      
-      const newDeliveredAt =
-        payload.status === 'DELIVERED'
-          ? payload.timestamp
-          : payload.status === 'SEEN' && payload.deliveredAt
-          ? payload.deliveredAt
-          : payload.status === 'SEEN'
-          ? payload.timestamp
-          : null;
-
-      const newSeenAt = payload.status === 'SEEN' ? payload.timestamp : null;
-
-      const currentPending = pendingReceiptsRef.current.get(payload.messageId) || [];
-      const pIdx = currentPending.findIndex((r) => r.userId === payload.userId);
-      if (pIdx !== -1) {
-        currentPending[pIdx] = {
-          ...currentPending[pIdx],
-          deliveredAt: newDeliveredAt ?? currentPending[pIdx].deliveredAt,
-          seenAt: newSeenAt ?? currentPending[pIdx].seenAt,
-        };
-      } else {
-        currentPending.push({
-          id: Math.random().toString(),
-          userId: payload.userId,
-          deliveredAt: newDeliveredAt,
-          seenAt: newSeenAt,
-        });
-      }
-      pendingReceiptsRef.current.set(payload.messageId, currentPending);
-
-      setMessages((prev) => {
-        let matched = false;
-        const next = prev.map((msg) => {
-          if (msg.id === payload.messageId) {
-            matched = true;
-            const receipts = [...(msg.receipts || [])];
-            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
-            
-            if (existingIdx !== -1) {
-              const existing = receipts[existingIdx];
-              receipts[existingIdx] = {
-                ...existing,
-                deliveredAt: newDeliveredAt ?? existing.deliveredAt,
-                seenAt: newSeenAt ?? existing.seenAt,
-              };
-            } else {
-              receipts.push({
-                id: Math.random().toString(),
-                userId: payload.userId,
-                deliveredAt: newDeliveredAt,
-                seenAt: newSeenAt,
-              });
-            }
-            
-            return { ...msg, receipts };
-          }
-          return msg;
-        });
-
-        if (!matched) {
-          const optIdx = next.map((m) => m.id).lastIndexOf(
-            next.slice().reverse().find((m) => m.id.startsWith("optimistic-") && m.senderId === currentUserIdRef.current)?.id ?? ""
-          );
-          if (optIdx !== -1) {
-            const optMsg = next[optIdx];
-            const receipts = [...(optMsg.receipts || [])];
-            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
-            if (existingIdx !== -1) {
-              receipts[existingIdx] = {
-                ...receipts[existingIdx],
-                deliveredAt: newDeliveredAt ?? receipts[existingIdx].deliveredAt,
-                seenAt: newSeenAt ?? receipts[existingIdx].seenAt,
-              };
-            } else {
-              receipts.push({
-                id: Math.random().toString(),
-                userId: payload.userId,
-                deliveredAt: newDeliveredAt,
-                seenAt: newSeenAt,
-              });
-            }
-            next[optIdx] = { ...optMsg, receipts };
-          }
-        }
-
-        return next;
-      });
-    };
-
     socket.on("group:receive_message", handleReceiveMessage);
-    socket.on("group:message_edited", handleMessageEdited);
-    socket.on("group:message_unsent", handleMessageUnsent);
     socket.on("group:message_status_update", handleStatusUpdate);
-    socket.on("group:error", handleGroupError);
+    socket.on("group:reaction_updated", handleReactionsUpdated);
+    socket.on("group:pin_updated", handlePinUpdated);
+    socket.on("group:poll_updated", handlePollUpdated);
+    socket.on("group:settings_updated", handleSettingsUpdated);
+    socket.on("group:typing_start", handleTypingStart);
+    socket.on("group:typing_stop", handleTypingStop);
+    socket.on("group:message_unsent", handleMessageUnsent);
 
     return () => {
       socket.off("group:receive_message", handleReceiveMessage);
-      socket.off("group:message_edited", handleMessageEdited);
-      socket.off("group:message_unsent", handleMessageUnsent);
       socket.off("group:message_status_update", handleStatusUpdate);
-      socket.off("group:error", handleGroupError);
+      socket.off("group:reaction_updated", handleReactionsUpdated);
+      socket.off("group:pin_updated", handlePinUpdated);
+      socket.off("group:poll_updated", handlePollUpdated);
+      socket.off("group:settings_updated", handleSettingsUpdated);
+      socket.off("group:typing_start", handleTypingStart);
+      socket.off("group:typing_stop", handleTypingStop);
+      socket.off("group:message_unsent", handleMessageUnsent);
     };
   }, [socket, isConnected, groupId]);
 
-  // ── Mark Messages as Seen ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!socket || !isConnected || !groupId || !messages.length) return;
+  // ── Actions ────────────────────────────────────────────────────────────────
 
-    const currentUser = currentUserIdRef.current;
-    
-    const checkAndMarkSeen = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-
-      // Find messages not sent by us, where our receipt doesn't have a seenAt
-      const unreadMessages = messages.filter(m => {
-        if (m.senderId === currentUser) return false;
-        const myReceipt = m.receipts?.find(r => r.userId === currentUser);
-        return !myReceipt?.seenAt;
-      });
-
-      if (unreadMessages.length > 0) {
-        unreadMessages.forEach(m => {
-          socket.emit("group:mark_seen", {
-            groupId,
-            messageId: m.id,
-          });
-        });
-      }
-    };
-
-    checkAndMarkSeen();
-    const visibilityTimeout = setTimeout(checkAndMarkSeen, 300);
-
-    window.addEventListener("focus", checkAndMarkSeen);
-    window.addEventListener("click", checkAndMarkSeen);
-    document.addEventListener("visibilitychange", checkAndMarkSeen);
-
-    return () => {
-      clearTimeout(visibilityTimeout);
-      window.removeEventListener("focus", checkAndMarkSeen);
-      window.removeEventListener("click", checkAndMarkSeen);
-      document.removeEventListener("visibilitychange", checkAndMarkSeen);
-    };
-  }, [messages, socket, isConnected, groupId]);
-
-  // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (text: string, file: File | null = null, replyToMessage: QuotedMessage | null = null) => {
+    async (
+      text: string,
+      replyToId?: string | null,
+      mediaUrl?: string | null,
+      mediaType?: string | null
+    ) => {
+      if (!socket || !isConnected) throw new Error("Socket disconnected");
+
       const gKey = groupKeyRef.current;
-      if (!socket || !isConnected || !gKey || !groupId) {
-        console.error("Cannot send: missing group key, socket, or groupId");
-        return;
+      let ciphertext: string | null = null;
+      let nonce: string | null = null;
+
+      if (text && gKey) {
+        const enc = await encryptGroupMessage(text, gKey);
+        ciphertext = enc.ciphertext;
+        nonce = enc.nonce;
+      } else if (text && !gKey) {
+        ciphertext = text;
       }
 
-      const optimisticId = `optimistic-${Date.now()}`;
-      const replyToId = replyToMessage?.id || null;
-      let optimisticMediaType: string | undefined = undefined;
-      let optimisticMediaUrl: string | undefined = undefined;
-      if (file) {
-        optimisticMediaUrl = URL.createObjectURL(file);
-        if (file.type.startsWith("image")) optimisticMediaType = "image";
-        else if (file.type.startsWith("video")) optimisticMediaType = "video";
-        else if (file.type.startsWith("audio")) optimisticMediaType = "audio";
-        else optimisticMediaType = "document";
-      } else if (text) {
-        const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
-        if (urlMatch && urlMatch[0]) {
-          optimisticMediaUrl = urlMatch[0];
-          optimisticMediaType = "link";
-        }
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: optimisticId,
-          groupId,
-          senderId: currentUserIdRef.current,
-          text: file ? "Uploading media..." : text,
-          createdAt: new Date().toISOString(),
-          mediaUrl: optimisticMediaUrl,
-          mediaType: optimisticMediaType as any,
-          replyToId,
-          replyTo: replyToMessage,
-        },
-      ]);
-
-      try {
-        let mediaUrl;
-        let mediaType;
-
-        if (file) {
-          setIsUploading(true);
-          const uploadRes = await groupService.uploadGroupMedia(groupId, file);
-          if (uploadRes.success && uploadRes.data) {
-            mediaUrl = uploadRes.data.mediaUrl;
-            mediaType = uploadRes.data.mediaType;
-          }
-          setIsUploading(false);
-        } else if (text) {
-          const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
-          if (urlMatch && urlMatch[0]) {
-            mediaUrl = urlMatch[0];
-            mediaType = 'link';
-          }
-        }
-
-        let ciphertext, nonce;
-        if (text) {
-          const encrypted = await encryptGroupMessage(text, gKey);
-          ciphertext = encrypted.ciphertext;
-          nonce = encrypted.nonce;
-        }
-
-        let previewText = null;
-        if (text) {
-          previewText = text.substring(0, 100);
-        }
-
-        const payload = {
-          groupId,
-          ciphertext,
-          nonce,
-          mediaUrl,
-          mediaType,
-          previewText,
-          replyToId,
-        };
-        socket.emit("group:send_message", payload);
-        
-        if (!text) {
-          // If media only, optimistic message will be replaced by socket echo
-          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        }
-      } catch (err) {
-        console.error("Failed to encrypt and send group message:", err);
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        setIsUploading(false);
-      }
+      socket.emit("group:send_message", {
+        groupId,
+        ciphertext,
+        nonce,
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaType || null,
+        replyToId: replyToId || null,
+      });
     },
     [socket, isConnected, groupId]
   );
 
-  const pinnedMessages = useMemo(() => {
-    const map = new Map<string, PinnedMessage>();
-    const now = Date.now();
+  const startTyping = useCallback(() => {
+    if (socket && isConnected) {
+      socket.emit("group:typing_start", { groupId });
+    }
+  }, [socket, isConnected, groupId]);
 
-    for (const msg of messages) {
-      if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
-        try {
-          const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
-          if (payload && payload.messageId && payload.action) {
-            if (payload.action === "pin") {
-              const timestamp = payload.timestamp || new Date(msg.createdAt).getTime();
-              const pinnedUntil = payload.durationSeconds ? timestamp + payload.durationSeconds * 1000 : null;
-              
-              if (!pinnedUntil || pinnedUntil > now) {
-                map.set(payload.messageId, {
-                  messageId: payload.messageId,
-                  pinnedAt: timestamp,
-                  pinnedUntil,
-                  pinnerName: payload.pinnerName || "A member",
-                  previewText: payload.previewText,
-                  previewMedia: payload.previewMedia,
-                });
-              } else {
-                map.delete(payload.messageId);
-              }
-            } else if (payload.action === "unpin") {
-              map.delete(payload.messageId);
-            }
-          }
-        } catch (e) {
-          // Ignore malformed pin events
-        }
+  const stopTyping = useCallback(() => {
+    if (socket && isConnected) {
+      socket.emit("group:typing_stop", { groupId });
+    }
+  }, [socket, isConnected, groupId]);
+
+  const toggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      const msg = messages.find((m) => m.id === messageId);
+      const existing = msg?.reactions?.find((r) => r.userId === currentUserId && r.emoji === emoji);
+
+      if (existing) {
+        await groupService.removeReaction(groupId, messageId);
+      } else {
+        await groupService.addReaction(groupId, messageId, emoji);
       }
-    }
-
-    const result: PinnedMessage[] = [];
-    for (const pin of map.values()) {
-      const orig = messages.find((m) => m.id === pin.messageId);
-      result.push({
-        ...pin,
-        originalMessage: orig,
-      });
-    }
-
-    return result.sort((a, b) => b.pinnedAt - a.pinnedAt);
-  }, [messages]);
+    },
+    [groupId, messages, currentUserId]
+  );
 
   const pinMessage = useCallback(
-    (
-      messageId: string,
-      action: "pin" | "unpin",
-      durationSeconds?: number,
-      previewText?: string,
-      previewMedia?: string,
-      pinnerName: string = "A member"
-    ) => {
-      const payload = {
-        messageId,
-        action,
-        durationSeconds: durationSeconds || null,
-        timestamp: Date.now(),
-        pinnerName,
-        previewText: previewText || "",
-        previewMedia: previewMedia || "",
-      };
-      sendMessage(`__PIN_EVENT__:${JSON.stringify(payload)}`);
-    },
-    [sendMessage]
-  );
-
-  const editMessage = useCallback(
-    async (messageId: string, newText: string) => {
-      if (!socket || !isConnected || !groupId) return;
-      const formattedText = `__EDITED__:${newText}`;
-      const groupKey = groupKeyRef.current;
-      if (!groupKey) return;
-      const encrypted = await encryptGroupMessage(formattedText, groupKey);
-      socket.emit("group:edit_message", {
-        messageId,
-        groupId,
-        ciphertext: encrypted.ciphertext,
-        nonce: encrypted.nonce,
-      });
-      setMessages((prev) =>
-        prev.map((m) => (m.id === messageId ? { ...m, text: newText, isEdited: true } : m))
-      );
-    },
-    [socket, isConnected, groupId]
-  );
-
-  const unsendMessage = useCallback(
-    async (messageId: string) => {
-      try {
-        await groupService.unsendMessage(groupId, messageId);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === messageId
-              ? { ...m, isDeleted: true, text: "", mediaUrl: undefined, mediaType: undefined }
-              : m
-          )
-        );
-      } catch (err) {
-        console.error("Failed to unsend message", err);
-      }
+    async (messageId: string, durationSeconds?: number) => {
+      await groupService.pinMessage(groupId, messageId, durationSeconds);
     },
     [groupId]
   );
 
+  const unpinMessage = useCallback(
+    async (messageId: string) => {
+      await groupService.unpinMessage(groupId, messageId);
+    },
+    [groupId]
+  );
+
+  const createPoll = useCallback(
+    async (question: string, options: string[], allowMultiple: boolean) => {
+      return groupService.createPoll(groupId, question, options, allowMultiple);
+    },
+    [groupId]
+  );
+
+  const votePoll = useCallback(
+    async (optionId: string, allowMultiple: boolean) => {
+      return groupService.votePoll(groupId, optionId, allowMultiple);
+    },
+    [groupId]
+  );
+
+  const unsendMessage = useCallback(
+    async (messageId: string) => {
+      return groupService.unsendMessage(groupId, messageId);
+    },
+    [groupId]
+  );
+
+  const typingText = useMemo(() => {
+    const names = Array.from(typingUsers.values());
+    if (names.length === 0) return "";
+    if (names.length === 1) return `${names[0]} is typing...`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
+    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing...`;
+  }, [typingUsers]);
+
+  const myRole = groupDetails?.myRole || "MEMBER";
+  const isOwner = myRole === "OWNER" || groupDetails?.createdBy === currentUserId;
+  const isAdmin = myRole === "ADMIN" || isOwner;
+  const isAnnouncementOnly = groupDetails?.sendMessagesScope === "ONLY_ADMINS" && !isAdmin;
+
   return {
     messages,
-    sendMessage,
-    editMessage,
-    unsendMessage,
+    pinnedMessages,
+    groupDetails,
+    myRole,
+    isAdmin,
+    isOwner,
+    isAnnouncementOnly,
+    typingText,
     isReady,
     error,
     isUploading,
-    pinnedMessages,
+    setIsUploading,
+    sendMessage,
+    startTyping,
+    stopTyping,
+    toggleReaction,
     pinMessage,
+    unpinMessage,
+    createPoll,
+    votePoll,
+    unsendMessage,
     getGroupKey: () => groupKeyRef.current,
   };
 };

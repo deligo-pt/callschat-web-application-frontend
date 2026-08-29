@@ -25,6 +25,13 @@ import {
   Copy,
   ChevronDown,
   MessageSquare,
+  Smile,
+  BarChart2,
+  Info,
+  Shield,
+  UserPlus,
+  UserMinus,
+  Settings,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,31 +44,41 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
-  ContextMenuLabel,
-} from "@/components/ui/context-menu";
 import { toast } from "sonner";
 import { useCallContext } from "@/components/providers/CallContext";
+
+const SENDER_COLORS = [
+  "text-[#00A884] dark:text-[#25D366]",
+  "text-[#0284C7] dark:text-[#38BDF8]",
+  "text-[#7C3AED] dark:text-[#A78BFA]",
+  "text-[#D97706] dark:text-[#FBBF24]",
+  "text-[#E11D48] dark:text-[#FB7185]",
+  "text-[#0D9488] dark:text-[#2DD4BF]",
+];
+
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+function getSenderColor(id: string) {
+  if (!id) return SENDER_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % SENDER_COLORS.length;
+  return SENDER_COLORS[index];
+}
 
 const formatTextWithLinks = (text: string) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   return text.split(urlRegex).map((part, i) => {
     if (part.match(urlRegex)) {
       return (
-        <a 
-          key={i} 
-          href={part} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:opacity-80 transition-opacity text-[#0284C7] dark:text-[#53BDEB]"
           onClick={(e) => e.stopPropagation()}
         >
           {part}
@@ -88,6 +105,10 @@ interface GroupMessageBubbleProps {
     };
     isEdited?: boolean;
     isDeleted?: boolean;
+    deletedByAdmin?: boolean;
+    isSystem?: boolean;
+    systemEventType?: string | null;
+    systemMetadata?: any;
     replyToId?: string | null;
     replyTo?: {
       id: string;
@@ -103,8 +124,21 @@ interface GroupMessageBubbleProps {
       deliveredAt: string | null;
       seenAt: string | null;
     }[];
+    reactions?: Array<{
+      id: string;
+      emoji: string;
+      userId: string;
+      user?: {
+        profile?: {
+          displayName: string;
+          avatarUrl: string | null;
+        } | null;
+      } | null;
+    }>;
+    poll?: any;
   };
   isMe: boolean;
+  isAdmin?: boolean;
   showAvatar: boolean;
   isNextSameSender: boolean;
   isFirstFromSender: boolean;
@@ -117,6 +151,9 @@ interface GroupMessageBubbleProps {
   onReply?: (msg: any) => void;
   onReplyPrivately?: (senderId: string, msg: any) => void;
   onScrollToMessage?: (messageId: string) => void;
+  onShowMessageInfo?: (msg: any) => void;
+  onReact?: (messageId: string, emoji: string) => void;
+  onVotePoll?: (optionId: string, allowMultiple: boolean) => void;
   groupMembersCount?: number;
   currentUserId?: string;
 }
@@ -124,6 +161,7 @@ interface GroupMessageBubbleProps {
 export function GroupMessageBubble({
   msg,
   isMe,
+  isAdmin = false,
   showAvatar,
   isNextSameSender,
   isFirstFromSender,
@@ -136,106 +174,296 @@ export function GroupMessageBubble({
   onReply,
   onReplyPrivately,
   onScrollToMessage,
+  onShowMessageInfo,
+  onReact,
+  onVotePoll,
   groupMembersCount = 0,
   currentUserId,
 }: GroupMessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const { startGroupCall } = useCallContext();
+
+  const senderName = isMe ? "You" : (msg.sender?.profile?.displayName || "Member");
+  const senderColorClass = getSenderColor(msg.senderId);
 
   const getMessageStatus = () => {
     if (!msg.receipts || msg.receipts.length === 0) return "SENT";
-    
-    // For groups, if everyone else has seen it, it's SEEN
-    // If everyone else has it delivered, it's DELIVERED
     const otherReceipts = msg.receipts.filter((r) => r.userId !== msg.senderId);
     if (otherReceipts.length === 0) return "SENT";
 
     const expected = groupMembersCount ? Math.max(1, groupMembersCount - 1) : 1;
-    
     const seenCount = otherReceipts.filter((r) => r.seenAt).length;
     if (seenCount >= expected) return "SEEN";
-    
+
     const deliveredCount = otherReceipts.filter((r) => r.deliveredAt || r.seenAt).length;
     if (deliveredCount >= expected) return "DELIVERED";
-    
+
     return "SENT";
   };
   const status = getMessageStatus();
 
-  if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
-    try {
-      const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
-      if (payload && payload.action) {
-        const isPin = payload.action === "pin";
-        return (
-          <div className="flex justify-center my-3 w-full">
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-1.5 rounded-full text-[12px] font-medium text-[#64748B] flex items-center gap-1.5 shadow-xs">
-              <Pin className="w-3.5 h-3.5 text-[#3B58F5] shrink-0" />
-              <span>
-                <strong className="font-semibold text-[#334155]">{payload.pinnerName || "A member"}</strong>{" "}
-                {isPin ? "pinned" : "unpinned"} a message
-              </span>
-            </div>
-          </div>
-        );
-      }
-    } catch (e) {}
-    return null;
+  const formatTime = (dateStr: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
+
+  // ── Render System Activity Timeline Event ─────────────────────────────────
+  if (msg.isSystem || msg.systemEventType) {
+    let text = msg.text || "System activity";
+    let icon = <Info className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
+
+    if (msg.systemEventType === "GROUP_CREATED") {
+      icon = <Shield className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
+      text = "Group created with End-to-End Encryption.";
+    } else if (msg.systemEventType === "MEMBER_ADDED") {
+      icon = <UserPlus className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
+      text = text || "A new participant was added.";
+    } else if (msg.systemEventType === "MEMBER_JOINED_LINK") {
+      icon = <UserPlus className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
+      text = text || "A participant joined using this group's invite link.";
+    } else if (msg.systemEventType === "MEMBER_REMOVED" || msg.systemEventType === "MEMBER_LEFT") {
+      icon = <UserMinus className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
+      text = text || "A participant left the group.";
+    } else if (msg.systemEventType === "SETTINGS_UPDATED") {
+      icon = <Settings className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+      text = text || "Group permissions or settings were updated.";
+    } else if (msg.systemEventType === "DISAPPEARING_TIMER_UPDATED") {
+      icon = <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+      text = text || "Disappearing message timer was changed.";
+    }
+
+    return (
+      <div className="flex justify-center my-3 w-full animate-in fade-in duration-150">
+        <div className="bg-[#FFF8E7] dark:bg-[#182229] border border-[#FFE8A3]/60 dark:border-[#2A3942] px-4 py-1.5 rounded-full text-[12px] font-medium text-[#54656F] dark:text-[#8696A0] flex items-center gap-2 shadow-xs max-w-[85%] text-center">
+          {icon}
+          <span>{text}</span>
+        </div>
+      </div>
+    );
   }
 
+  // ── Render Group Call Activity Bubble ────────────────────────────────────
+  const isCallMessage =
+    msg.mediaType === "call" ||
+    (typeof msg.mediaUrl === "string" &&
+      msg.mediaUrl.trim().startsWith("{") &&
+      msg.mediaUrl.includes('"callId"'));
+
+  if (isCallMessage) {
+    let callData: {
+      callId?: string;
+      type?: "AUDIO" | "VIDEO";
+      status?: string;
+      durationSeconds?: number;
+      participantCount?: number;
+      participants?: string[];
+      failureReason?: string;
+    } | null = null;
+
+    try {
+      if (msg.mediaUrl) {
+        callData = JSON.parse(msg.mediaUrl);
+      }
+    } catch {}
+
+    const isVideo = callData?.type === "VIDEO";
+    const dur = callData?.durationSeconds ?? 0;
+    const isMissed =
+      callData?.status === "MISSED" ||
+      callData?.status === "DECLINED" ||
+      callData?.status === "FAILED";
+
+    const formatDur = (s: number) => {
+      if (!s) return "";
+      const m = Math.floor(s / 60);
+      const rem = s % 60;
+      if (m > 0) return `${m}m ${rem}s`;
+      return `${rem}s`;
+    };
+
+    let subtitle = "Group call ended";
+    if (callData?.failureReason === "BUSY") {
+      subtitle = "Members busy";
+    } else if (callData?.failureReason === "CANCELLED") {
+      subtitle = isMe ? "Canceled call" : "Missed group call";
+    } else if (callData?.failureReason === "TIMEOUT") {
+      subtitle = isMe ? "No answer" : "Missed group call";
+    } else if (callData?.status === "DECLINED") {
+      subtitle = "Call declined";
+    } else if (callData?.status === "MISSED") {
+      subtitle = isMe ? "No answer" : "Missed group call";
+    } else if (dur > 0) {
+      subtitle = formatDur(dur);
+      if (callData?.participantCount && callData.participantCount > 1) {
+        subtitle += ` · ${callData.participantCount} participants`;
+      }
+    } else if (callData?.participantCount) {
+      subtitle = `${callData.participantCount} participants`;
+    }
+
+    return (
+      <div className={cn("flex w-full z-10 flex-col my-1.5", isMe ? "items-end" : "items-start")}>
+        <div
+          onClick={() => groupId && startGroupCall(groupId, isVideo ? "VIDEO" : "AUDIO")}
+          className={cn(
+            "flex items-center gap-3.5 px-4 py-3 rounded-2xl border shadow-xs max-w-[320px] w-full transition-colors cursor-pointer",
+            isMe
+              ? "bg-[#D9FDD3] dark:bg-[#005C4B] border-emerald-200/60 dark:border-emerald-700/40 hover:bg-[#D0F8CA]"
+              : "bg-white dark:bg-[#202C33] border-gray-200/70 dark:border-[#2A3942] hover:bg-gray-50 dark:hover:bg-[#233138]"
+          )}
+        >
+          <div
+            className={cn(
+              "w-10 h-10 rounded-full shrink-0 flex items-center justify-center shadow-xs",
+              isMissed
+                ? "bg-red-50 dark:bg-red-950/40 text-red-500"
+                : isMe
+                ? "bg-[#00A884]/20 text-[#008069] dark:text-[#25D366]"
+                : "bg-emerald-50 dark:bg-emerald-950/40 text-[#00A884]"
+            )}
+          >
+            {isVideo ? (
+              <Video className="w-5 h-5" />
+            ) : isMissed ? (
+              <PhoneMissed className="w-5 h-5" />
+            ) : isMe ? (
+              <PhoneOutgoing className="w-5 h-5" />
+            ) : (
+              <PhoneIncoming className="w-5 h-5" />
+            )}
+          </div>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span
+              className={cn(
+                "font-semibold text-[14px] truncate",
+                isMissed ? "text-red-500" : "text-[#111B21] dark:text-[#E9EDEF]"
+              )}
+            >
+              {isVideo ? "Group video call" : "Group audio call"}
+            </span>
+            <span
+              className={cn(
+                "text-xs font-medium truncate",
+                isMissed ? "text-red-400" : "text-[#667781] dark:text-[#8696A0]"
+              )}
+            >
+              {subtitle}
+            </span>
+          </div>
+          <span className="text-[10px] text-[#8696A0] font-medium self-end ml-1 shrink-0">
+            {formatTime(msg.createdAt)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render Deleted Message ────────────────────────────────────────────────
   if (msg.isDeleted) {
     return (
-      <div className={cn("flex w-full mb-4 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
-        <div className={cn("flex flex-col max-w-[65%]", isMe ? "items-end" : "items-start")}>
+      <div className={cn("flex w-full mb-3 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+        <div className={cn("flex flex-col max-w-[70%]", isMe ? "items-end" : "items-start")}>
           {!isMe && (isFirstFromSender || showAvatar) && (
-            <span className="text-[12px] font-bold text-[#2563EB] mb-1 pl-1">
-              {msg.sender?.profile?.displayName || "Unknown"}
+            <span className={cn("text-[12.5px] font-semibold mb-1 pl-1", senderColorClass)}>
+              {senderName}
             </span>
           )}
           <div
             className={cn(
-              "px-4 py-2.5 text-[14px] italic text-[#8F95B2] bg-[#F8FAFC] border border-[#E2E8F0] rounded-[20px]",
-              isMe ? "rounded-tr-sm" : "rounded-tl-sm"
+              "px-3.5 py-2 text-[13.5px] italic text-[#8696A0] bg-[#F0F2F5] dark:bg-[#202C33] border border-[#E2E8F0] dark:border-[#2A3942] rounded-2xl",
+              isMe ? "rounded-tr-[4px]" : "rounded-tl-[4px]"
             )}
           >
-            🚫 This message was deleted
+            {msg.deletedByAdmin ? "🚫 This message was deleted by an admin" : "🚫 This message was deleted"}
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Grouped Reactions Summary ─────────────────────────────────────────────
+  const reactionCounts: { [emoji: string]: number } = {};
+  (msg.reactions || []).forEach((r) => {
+    reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
+  });
+  const hasReactions = Object.keys(reactionCounts).length > 0;
+
+  // ── Render Message Options Menu ───────────────────────────────────────────
   const renderOptionsMenu = () => {
-    if (msg.id.startsWith("optimistic-") || msg.isDeleted || (!msg.text && !msg.mediaUrl) || msg.text?.startsWith("__PIN_EVENT__:")) return null;
+    if (msg.id.startsWith("optimistic-") || msg.isDeleted) return null;
     return (
       <div
         className={cn(
-          "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1.5 shrink-0 z-20",
+          "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity self-center px-1 shrink-0 z-20",
           isMe ? "order-first" : "order-last"
         )}
       >
+        {/* Quick React Button */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowReactionPicker((p) => !p)}
+            className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors shadow-xs bg-white dark:bg-[#202C33] border border-black/5 dark:border-white/10 cursor-pointer"
+            title="React"
+          >
+            <Smile className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Floating Reaction Bar */}
+          {showReactionPicker && (
+            <div className="absolute bottom-full left-0 mb-1.5 flex items-center gap-1 p-1 bg-white dark:bg-[#233138] rounded-full shadow-2xl border border-black/10 dark:border-white/10 z-50 animate-in zoom-in-95 duration-100">
+              {QUICK_REACTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => {
+                    onReact?.(msg.id, emoji);
+                    setShowReactionPicker(false);
+                  }}
+                  className="p-1 text-base hover:scale-125 transition-transform"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => onReply?.(msg)}
-          className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+          className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors shadow-xs bg-white dark:bg-[#202C33] border border-black/5 dark:border-white/10 cursor-pointer"
           title="Reply"
         >
-          <Reply className="w-4 h-4" />
+          <Reply className="w-3.5 h-3.5" />
         </button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+              className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors shadow-xs bg-white dark:bg-[#202C33] border border-black/5 dark:border-white/10 cursor-pointer"
               title="Message options"
             >
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-3.5 h-3.5" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align={isMe ? "end" : "start"}
             className="w-52 bg-white dark:bg-[#233138] p-1.5 rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 z-50 text-[#111B21] dark:text-[#E9EDEF]"
           >
+            {/* Message Info */}
+            <DropdownMenuItem
+              onClick={() => onShowMessageInfo?.(msg)}
+              className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+            >
+              <Info className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+              <span>Message info</span>
+            </DropdownMenuItem>
+
             <DropdownMenuItem
               onClick={() => onReply?.(msg)}
               className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
@@ -267,47 +495,15 @@ export function GroupMessageBubble({
               </DropdownMenuItem>
             )}
 
+            {/* Pin Message */}
             {!isPinned ? (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer">
-                  <Pin className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-                  <span>Pin</span>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-48 bg-white dark:bg-[#233138] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 p-1.5">
-                  <DropdownMenuLabel className="text-[11px] font-semibold text-[#54656F] dark:text-[#8696A0] px-3 py-1">
-                    Choose duration
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem
-                    onClick={() => onPin?.(86400, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>For 24 hours</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>For 7 days</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onPin?.(2592000, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>For 30 days</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
-                  <DropdownMenuItem
-                    onClick={() => onPin?.(undefined, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Pin className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>Until unpinned</span>
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+              <DropdownMenuItem
+                onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+              >
+                <Pin className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>Pin message</span>
+              </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
                 onClick={() => onUnpin?.()}
@@ -318,28 +514,16 @@ export function GroupMessageBubble({
               </DropdownMenuItem>
             )}
 
-            {isMe && msg.text && (
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditText(msg.text);
-                  setIsEditing(true);
-                }}
-                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-              >
-                <Edit2 className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-                <span>Edit message</span>
-              </DropdownMenuItem>
-            )}
-
-            {isMe && (
+            {/* Unsend / Delete for Everyone */}
+            {(isMe || isAdmin) && onUnsend && (
               <>
                 <DropdownMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
                 <DropdownMenuItem
-                  onClick={() => onUnsend?.(msg.id)}
-                  className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                  onClick={() => onUnsend(msg.id)}
+                  className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4 text-red-500" />
-                  <span>Delete</span>
+                  <span>{isMe ? "Delete for everyone" : "Delete as Admin"}</span>
                 </DropdownMenuItem>
               </>
             )}
@@ -349,458 +533,192 @@ export function GroupMessageBubble({
     );
   };
 
-  const renderPinnedBadge = () => {
-    if (!isPinned) return null;
-    return (
+  return (
+    <div
+      id={`msg-${msg.id}`}
+      className={cn(
+        "flex w-full mb-1 group/bubble relative items-end",
+        isMe ? "justify-end" : "justify-start"
+      )}
+    >
+      {/* Left Avatar */}
+      {!isMe && (
+        <div className="w-7 h-7 mr-2 shrink-0 self-end mb-1">
+          {showAvatar ? (
+            <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-[#2A3942] overflow-hidden flex items-center justify-center text-xs font-semibold">
+              {msg.sender?.profile?.avatarUrl ? (
+                <img
+                  src={getOptimizedImageUrl(msg.sender.profile.avatarUrl)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                senderName[0]?.toUpperCase()
+              )}
+            </div>
+          ) : (
+            <div className="w-7" />
+          )}
+        </div>
+      )}
+
+      {renderOptionsMenu()}
+
+      {/* Main Bubble Content */}
       <div
         className={cn(
-          "flex items-center gap-1 text-[10px] font-bold mb-1.5 px-2 py-0.5 rounded-full w-fit shadow-2xs",
+          "flex flex-col max-w-[78%] md:max-w-[65%] rounded-2xl relative shadow-xs",
           isMe
-            ? "bg-white/20 text-white self-end"
-            : "bg-[#3B58F5]/10 text-[#3B58F5] self-start"
+            ? "bg-[#D9FDD3] dark:bg-[#005C4B] text-[#111B21] dark:text-[#E9EDEF] rounded-tr-[4px]"
+            : "bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] rounded-tl-[4px]"
         )}
       >
-        <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
-        <span>Pinned</span>
-      </div>
-    );
-  };
-  const { startGroupCall } = useCallContext();
-  const senderName = msg.sender?.profile?.displayName || "Unknown";
-  const senderInitials = senderName.charAt(0).toUpperCase();
-
-  const formatTime = (dateString: string) => {
-    const d = new Date(dateString);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  if (msg.mediaType === "call" && msg.mediaUrl) {
-    let callData: { callId: string; type: "AUDIO" | "VIDEO"; status: string; durationSeconds: number } | null = null;
-    try {
-      callData = JSON.parse(msg.mediaUrl);
-    } catch {}
-
-    const isVideo = callData?.type === "VIDEO";
-    const isMissed = callData?.status === "MISSED" || callData?.status === "DECLINED";
-    const dur = callData?.durationSeconds ?? 0;
-
-    const formatDur = (s: number) => {
-      if (!s) return "";
-      const m = Math.floor(s / 60);
-      const rem = s % 60;
-      if (m > 0) return `${m} mins`;
-      return `${rem} secs`;
-    };
-
-    const subtitle = isMissed 
-      ? (callData?.status === "DECLINED" ? "Declined" : "No answer") 
-      : (dur > 0 ? formatDur(dur) : "Call ended");
-
-    return (
-      <div id={`msg-${msg.id}`} className={cn("flex w-full mb-2 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
-        {renderOptionsMenu()}
-        <div className={cn("flex flex-col w-full max-w-[280px]", isMe ? "items-end" : "items-start")}>
-          <div
-            onClick={() => groupId && startGroupCall(groupId, isVideo ? 'VIDEO' : 'AUDIO')}
-            className={cn(
-              "flex flex-col px-4 py-3 rounded-xl border shadow-sm w-full transition-colors cursor-pointer",
-              isMe ? "bg-[#EEF2FF] border-[#E0E7FF] hover:bg-[#E0E7FF]" : "bg-[#EEF2FF] border-[#E0E7FF] hover:bg-[#E0E7FF]"
-            )}
-          >
-            {renderPinnedBadge()}
-            <div className="flex items-center gap-3 w-full">
-              <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[#2563EB]">
-                {isVideo ? <Video className="w-4 h-4" /> : isMissed ? <PhoneMissed className="w-4 h-4 text-red-500" /> : <Phone className="w-4 h-4" strokeWidth={2.5} />}
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className={cn("font-bold text-[13px] truncate", isMissed ? "text-red-500" : "text-[#2563EB]")}>
-                  {isVideo ? "Video call" : "Audio call"}
-                </span>
-                <span className="text-[11px] text-slate-500 font-medium">{subtitle}</span>
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium self-end mb-0.5">{formatTime(msg.createdAt).toLowerCase()}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const renderMedia = () => {
-    if (!msg.mediaUrl) return null;
-
-    const mediaKey = `media-${msg.id}-${msg.mediaUrl}`;
-    const isOptimistic = msg.id.startsWith("optimistic-");
-
-    if (msg.mediaType === 'link') {
-      return null;
-    }
-
-    if (msg.mediaType?.startsWith("image")) {
-      return (
-        <div className="relative mb-1">
-          <img
-            key={mediaKey}
-            src={getOptimizedImageUrl(msg.mediaUrl)}
-            alt="Attached Image"
-            className={cn("rounded-lg max-w-sm w-full cursor-pointer object-cover", isOptimistic && "opacity-70 blur-[2px]")}
-          />
-          {isOptimistic && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-black/50 p-3 rounded-full text-white shadow-lg backdrop-blur-sm">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (msg.mediaType?.startsWith("video")) {
-      return (
-        <div className="relative mb-1">
-          <video
-            key={mediaKey}
-            src={getRawMediaUrl(msg.mediaUrl)}
-            controls={!isOptimistic}
-            className={cn("rounded-lg max-w-sm w-full max-h-[300px]", isOptimistic && "opacity-70 blur-[2px]")}
-          />
-          {isOptimistic && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-black/50 p-3 rounded-full text-white shadow-lg backdrop-blur-sm">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (msg.mediaType?.startsWith("audio") || msg.mediaType === "audio") {
-      return <VoiceMessagePlayer key={`voice-${msg.id}`} src={getRawMediaUrl(msg.mediaUrl)} messageId={msg.id} isMe={isMe} />;
-    }
-
-    // Document / Email Card
-    const fileName = msg.mediaUrl ? decodeURIComponent(msg.mediaUrl.split('/').pop()?.split('?')[0] || "Document") : "Document";
-    const isEmailFile = fileName.toLowerCase().endsWith('.eml') || fileName.toLowerCase().endsWith('.msg');
-    return (
-      <a
-        key={mediaKey}
-        href={isOptimistic ? undefined : getRawMediaUrl(msg.mediaUrl)}
-        target={isOptimistic ? undefined : "_blank"}
-        rel="noopener noreferrer"
-        className={cn(
-          "flex items-center gap-3 p-3 rounded-xl mb-1 min-w-[200px] border shadow-sm transition-colors",
-          isMe 
-            ? "bg-white/10 border-white/20 hover:bg-white/20 text-white" 
-            : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-800",
-          isOptimistic && "pointer-events-none opacity-80"
-        )}
-      >
-        <div className={cn(
-          "flex items-center justify-center w-10 h-10 rounded-lg shrink-0",
-          isMe ? "bg-white/20" : "bg-blue-100 text-blue-600"
-        )}>
-          {isOptimistic ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <FileText className="w-5 h-5" />
-          )}
-        </div>
-        <div className="flex flex-col flex-1 truncate">
-          <span className="text-sm font-semibold truncate leading-tight" title={fileName}>{fileName}</span>
-          <span className={cn("text-xs font-medium", isMe ? "text-blue-100" : "text-slate-500")}>
-            {isOptimistic ? "Uploading..." : isEmailFile ? "Email File · Click to open" : "Document · Click to open"}
-          </span>
-        </div>
-        {!isOptimistic && (
-          <div className={cn("w-8 h-8 rounded-full flex items-center justify-center transition-colors", isMe ? "hover:bg-white/20" : "hover:bg-slate-200")}>
-            <Download className="w-4 h-4" />
-          </div>
-        )}
-      </a>
-    );
-  };
-
-  return (
-    <div id={`msg-${msg.id}`} className={cn("flex w-full mb-4 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
-      {renderOptionsMenu()}
-      <div className={cn("flex flex-col max-w-[65%]", isMe ? "items-end" : "items-start")}>
+        {/* Sender Name in group */}
         {!isMe && (isFirstFromSender || showAvatar) && (
-          <span className="text-[12px] font-bold text-[#2563EB] mb-1 pl-1">
-            {senderName}
-          </span>
+          <div className="px-3 pt-2">
+            <span className={cn("text-[12px] font-semibold tracking-wide", senderColorClass)}>
+              {senderName}
+            </span>
+          </div>
         )}
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div
-              className={cn(
-                "px-4 py-2.5 text-[14px] shadow-sm leading-relaxed flex flex-col group cursor-default select-text",
-                isMe
-                  ? "bg-[#2563EB] text-white rounded-[20px] rounded-tr-sm"
-                  : "bg-white text-[#1E293B] rounded-[20px] rounded-tl-sm"
-              )}
-            >
-              {/* WhatsApp-Style In-Bubble Quoted Card */}
-              {msg.replyTo && (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (msg.replyTo?.id) onScrollToMessage?.(msg.replyTo.id);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  className={cn(
-                    "relative mb-2 flex items-center justify-between gap-2 overflow-hidden rounded-[8px] p-2 pl-3 text-left cursor-pointer transition-all",
-                    isMe
-                      ? "bg-black/15 hover:bg-black/25 text-white"
-                      : "bg-black/[0.05] hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-[#111B21] dark:text-[#E9EDEF]"
-                  )}
-                >
-                  {/* WhatsApp Left Vertical Colored Stripe Bar */}
-                  <div
-                    className={cn(
-                      "absolute left-0 top-0 bottom-0 w-[4px]",
-                      msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
-                        ? isMe ? "bg-white" : "bg-[#027eb5] dark:bg-[#53bdeb]"
-                        : isMe ? "bg-white/80" : "bg-[#00a884] dark:bg-[#25d366]"
-                    )}
-                  />
 
-                  <div className="flex flex-col min-w-0 flex-1 pl-1">
-                    <span
-                      className={cn(
-                        "text-[12.5px] font-semibold tracking-tight truncate leading-tight",
-                        isMe
-                          ? "text-white/95"
-                          : msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
-                          ? "text-[#027eb5] dark:text-[#53bdeb]"
-                          : "text-[#008069] dark:text-[#25D366]"
-                      )}
-                    >
-                      {msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
-                        ? "You"
-                        : msg.replyTo.senderName || senderName || "Member"}
-                    </span>
+        {/* Quoted Message */}
+        {msg.replyTo && (
+          <div
+            onClick={() => msg.replyToId && onScrollToMessage?.(msg.replyToId)}
+            className="mx-2 mt-1.5 p-2 rounded-lg bg-black/5 dark:bg-black/20 border-l-4 border-emerald-500 text-xs cursor-pointer hover:opacity-90"
+          >
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400 block truncate">
+              {msg.replyTo.senderName || "Quoted message"}
+            </span>
+            <span className="text-gray-600 dark:text-gray-300 truncate block">
+              {msg.replyTo.text || (msg.replyTo.mediaType ? `[${msg.replyTo.mediaType}]` : "")}
+            </span>
+          </div>
+        )}
+
+        {/* Interactive Poll Widget */}
+        {msg.poll && (
+          <div className="p-3.5 space-y-3 min-w-[260px]">
+            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
+              <BarChart2 className="w-4 h-4" />
+              <span>{msg.poll.question}</span>
+            </div>
+            <p className="text-[11px] text-gray-500">
+              {msg.poll.allowMultiple ? "Select one or more options" : "Select one option"}
+            </p>
+
+            <div className="space-y-2">
+              {msg.poll.options?.map((opt: any) => {
+                const totalVotes = msg.poll.options.reduce(
+                  (acc: number, o: any) => acc + (o.votes?.length || 0),
+                  0
+                );
+                const optVotes = opt.votes?.length || 0;
+                const percentage = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+                const hasVoted = opt.votes?.some((v: any) => v.userId === currentUserId);
+
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onVotePoll?.(opt.id, msg.poll.allowMultiple)}
+                    className={cn(
+                      "w-full text-left p-2.5 rounded-xl border transition-all relative overflow-hidden",
+                      hasVoted
+                        ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30"
+                        : "border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-black/10 hover:border-emerald-300"
+                    )}
+                  >
+                    {/* Vote progress fill */}
                     <div
-                      className={cn(
-                        "flex items-center gap-1 text-[12.5px] truncate mt-0.5 leading-snug",
-                        isMe ? "text-white/85" : "text-[#54656F] dark:text-[#8696A0]"
-                      )}
-                    >
-                      {msg.replyTo.mediaType === "image" && <Camera className="h-3.5 w-3.5 shrink-0" />}
-                      {msg.replyTo.mediaType === "video" && <Video className="h-3.5 w-3.5 shrink-0" />}
-                      {msg.replyTo.mediaType === "audio" && <Mic className="h-3.5 w-3.5 shrink-0" />}
-                      {msg.replyTo.mediaType === "document" && <FileText className="h-3.5 w-3.5 shrink-0" />}
-                      <span className="truncate">
-                        {msg.replyTo.text ||
-                          (msg.replyTo.mediaType
-                            ? msg.replyTo.mediaType === "image"
-                              ? "Photo"
-                              : msg.replyTo.mediaType === "video"
-                              ? "Video"
-                              : msg.replyTo.mediaType === "audio"
-                              ? "Voice message"
-                              : "Document"
-                            : "")}
+                      className="absolute inset-0 bg-emerald-500/10 transition-all duration-300"
+                      style={{ width: `${percentage}%` }}
+                    />
+                    <div className="relative flex items-center justify-between z-10">
+                      <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                        {opt.text}
+                      </span>
+                      <span className="text-[11px] font-semibold text-gray-500">
+                        {optVotes} ({percentage}%)
                       </span>
                     </div>
-                  </div>
-                  {msg.replyTo.mediaUrl && msg.replyTo.mediaType?.startsWith("image") && (
-                    <img
-                      src={getOptimizedImageUrl(msg.replyTo.mediaUrl, 44, 44)}
-                      alt="Quoted attachment"
-                      className="h-10 w-10 rounded-[6px] object-cover ring-1 ring-black/5 shrink-0 ml-1.5"
-                    />
-                  )}
-                </div>
-              )}
-
-              {renderPinnedBadge()}
-              {renderMedia()}
-
-              {msg.text && (
-                isEditing ? (
-                  <div className="flex flex-col gap-2 w-full min-w-[200px] mt-1">
-                    <textarea
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          if (editText.trim() && editText.trim() !== msg.text) {
-                            onEdit?.(msg.id, editText.trim());
-                          }
-                          setIsEditing(false);
-                        } else if (e.key === "Escape") {
-                          setIsEditing(false);
-                          setEditText(msg.text);
-                        }
-                      }}
-                      className="w-full text-sm bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
-                      rows={2}
-                      autoFocus
-                    />
-                    <div className="flex justify-end gap-1.5 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditing(false);
-                          setEditText(msg.text);
-                        }}
-                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (editText.trim() && editText.trim() !== msg.text) {
-                            onEdit?.(msg.id, editText.trim());
-                          }
-                          setIsEditing(false);
-                        }}
-                        className="px-2.5 py-1 rounded bg-white font-medium text-[#2563EB] hover:bg-blue-50 transition-colors cursor-pointer"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <span
-                    className="whitespace-pre-wrap font-medium"
-                    style={{ wordBreak: "break-word" }}
-                  >
-                    {formatTextWithLinks(msg.text)}
-                  </span>
-                )
-              )}
+                  </button>
+                );
+              })}
             </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent className="w-52 bg-white dark:bg-[#233138] p-1.5 rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 z-50 text-[#111B21] dark:text-[#E9EDEF]">
-            <ContextMenuItem
-              onClick={() => onReply?.(msg)}
-              className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-            >
-              <Reply className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-              <span>Reply</span>
-            </ContextMenuItem>
+          </div>
+        )}
 
-            {!isMe && onReplyPrivately && (
-              <ContextMenuItem
-                onClick={() => onReplyPrivately(msg.senderId, msg)}
-                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+        {/* Media Attachments */}
+        {msg.mediaUrl && !isCallMessage && (
+          <div className="p-1">
+            {msg.mediaType?.startsWith("image") ? (
+              <img
+                src={getOptimizedImageUrl(msg.mediaUrl)}
+                alt=""
+                className="rounded-xl max-h-80 object-cover w-full"
+              />
+            ) : msg.mediaType?.startsWith("video") ? (
+              <video
+                src={getRawMediaUrl(msg.mediaUrl)}
+                controls
+                className="rounded-xl max-h-80 w-full"
+              />
+            ) : msg.mediaType?.startsWith("audio") ? (
+              <VoiceMessagePlayer
+                src={getRawMediaUrl(msg.mediaUrl)}
+                messageId={msg.id}
+                isMe={isMe}
+              />
+            ) : !msg.mediaUrl.trim().startsWith("{") ? (
+              <a
+                href={getRawMediaUrl(msg.mediaUrl)}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-3 p-3 bg-black/5 dark:bg-black/20 rounded-xl"
               >
-                <MessageSquare className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-                <span>Reply privately</span>
-              </ContextMenuItem>
-            )}
+                <FileText className="w-8 h-8 text-emerald-500" />
+                <span className="text-xs font-medium truncate flex-1">Document attachment</span>
+                <Download className="w-4 h-4 text-gray-400" />
+              </a>
+            ) : null}
+          </div>
+        )}
 
-            {msg.text && (
-              <ContextMenuItem
-                onClick={() => {
-                  navigator.clipboard.writeText(msg.text);
-                  toast.success("Copied to clipboard");
-                }}
-                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-              >
-                <Copy className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-                <span>Copy</span>
-              </ContextMenuItem>
-            )}
+        {/* Message Text */}
+        {msg.text && !msg.poll && (
+          <div className="px-3.5 py-2 text-[14px] leading-relaxed break-words whitespace-pre-wrap">
+            {formatTextWithLinks(msg.text)}
+          </div>
+        )}
 
-            {!isPinned ? (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer">
-                  <Pin className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-                  <span>Pin</span>
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent className="w-48 bg-white dark:bg-[#233138] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 p-1.5">
-                  <ContextMenuLabel className="text-[11px] font-semibold text-[#54656F] dark:text-[#8696A0] px-3 py-1">
-                    Choose duration
-                  </ContextMenuLabel>
-                  <ContextMenuItem
-                    onClick={() => onPin?.(86400, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>For 24 hours</span>
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>For 7 days</span>
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    onClick={() => onPin?.(2592000, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>For 30 days</span>
-                  </ContextMenuItem>
-                  <ContextMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
-                  <ContextMenuItem
-                    onClick={() => onPin?.(undefined, msg.text, msg.mediaType || undefined)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-                  >
-                    <Pin className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
-                    <span>Until unpinned</span>
-                  </ContextMenuItem>
-                </ContextMenuSubContent>
-              </ContextMenuSub>
-            ) : (
-              <ContextMenuItem
-                onClick={() => onUnpin?.()}
-                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-              >
-                <PinOff className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-                <span>Unpin message</span>
-              </ContextMenuItem>
-            )}
-
-            {isMe && msg.text && (
-              <ContextMenuItem
-                onClick={() => {
-                  setEditText(msg.text);
-                  setIsEditing(true);
-                }}
-                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
-              >
-                <Edit2 className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
-                <span>Edit message</span>
-              </ContextMenuItem>
-            )}
-
-            {isMe && (
-              <>
-                <ContextMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
-                <ContextMenuItem
-                  onClick={() => onUnsend?.(msg.id)}
-                  className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                  <span>Delete</span>
-                </ContextMenuItem>
-              </>
-            )}
-          </ContextMenuContent>
-        </ContextMenu>
-
-        {(!isNextSameSender || isMe) && (
-          <div className={cn("flex flex-col mt-1.5", isMe ? "items-end mr-1" : "ml-1")}>
-            <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-              {msg.isEdited && <span className="italic font-normal">(edited)</span>}
-              {formatTime(msg.createdAt).toUpperCase()}
-              {isMe && (
-                <span className="ml-0.5 inline-flex items-center">
-                  {status === "SENT" && <Check className="w-4 h-4 text-gray-400" strokeWidth={2.5} />}
-                  {status === "DELIVERED" && <CheckCheck className="w-4 h-4 text-gray-400" strokeWidth={2.5} />}
-                  {status === "SEEN" && <CheckCheck className="w-4 h-4 text-[#34B7F1]" strokeWidth={2.5} />}
-                </span>
+        {/* Bubble Footer (Time & Delivery Receipts) */}
+        <div className="flex items-center justify-end gap-1.5 px-3 pb-1.5 -mt-1 text-[10.5px] text-[#667781] dark:text-[#8696A0]">
+          {msg.isEdited && <span className="italic">edited</span>}
+          <span>{formatTime(msg.createdAt)}</span>
+          {isMe && (
+            <span>
+              {status === "SEEN" ? (
+                <CheckCheck className="w-3.5 h-3.5 text-[#53BDEB]" />
+              ) : status === "DELIVERED" ? (
+                <CheckCheck className="w-3.5 h-3.5" />
+              ) : (
+                <Check className="w-3.5 h-3.5" />
               )}
             </span>
+          )}
+        </div>
+
+        {/* Reaction Badges */}
+        {hasReactions && (
+          <div className="absolute -bottom-2.5 right-2 flex items-center gap-0.5 bg-white dark:bg-[#202C33] px-1.5 py-0.5 rounded-full shadow-md border border-gray-200 dark:border-gray-700 text-xs cursor-pointer hover:scale-105 transition-transform z-10">
+            {Object.entries(reactionCounts).map(([emoji, count]) => (
+              <span key={emoji} className="flex items-center gap-0.5">
+                <span>{emoji}</span>
+                {count > 1 && <span className="text-[10px] text-gray-500">{count}</span>}
+              </span>
+            ))}
           </div>
         )}
       </div>

@@ -19,10 +19,15 @@ export const IncomingCallModal = () => {
   }, [incomingCall?.callId]);
 
   useEffect(() => {
-    // Prefer the name sent directly in the escalated payload (callerName field)
     if (incomingCall?.callerName) {
       setCallerName(incomingCall.callerName);
-      setCallerAvatar("");
+    }
+    if (incomingCall?.callerAvatar) {
+      setCallerAvatar(getOptimizedImageUrl(incomingCall.callerAvatar, 80, 80));
+    }
+
+    // If both name and avatar are provided, skip fetch
+    if (incomingCall?.callerName && incomingCall?.callerAvatar) {
       return;
     }
     if (!incomingCall?.callerId) return;
@@ -48,8 +53,12 @@ export const IncomingCallModal = () => {
               caller.profile?.displayName ||
               caller.username ||
               "Anonymous";
-            setCallerName(displayName);
-            setCallerAvatar(getOptimizedImageUrl(caller.profile?.avatarUrl, 80, 80));
+            if (!incomingCall.callerName) {
+              setCallerName(displayName);
+            }
+            if (!incomingCall.callerAvatar && caller.profile?.avatarUrl) {
+              setCallerAvatar(getOptimizedImageUrl(caller.profile.avatarUrl, 80, 80));
+            }
           }
         }
       } catch (err) {
@@ -58,7 +67,7 @@ export const IncomingCallModal = () => {
     };
 
     fetchCallerProfile();
-  }, [incomingCall?.callerId, incomingCall?.callerName]);
+  }, [incomingCall?.callerId, incomingCall?.callerName, incomingCall?.callerAvatar]);
 
   if (!incomingCall) return null;
 
