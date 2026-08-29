@@ -12,6 +12,7 @@ export interface IncomingCall {
   callId: string;
   callerId: string;
   callerName?: string;
+  callerAvatar?: string | null;
   callType: 'AUDIO' | 'VIDEO';
   roomName: string; // backend also sends roomName in the incoming payload
   isGroup?: boolean;
@@ -164,7 +165,10 @@ export const useCallSignaling = () => {
         socket.emit('call:ringing_ack', { callId: payload.callId });
       }
 
-      pendingPeerRef.current = { name: payload.callerName };
+      pendingPeerRef.current = { 
+        name: payload.callerName,
+        avatar: payload.callerAvatar ?? undefined,
+      };
 
       // If already in an active call, treat as Call Waiting (non-blocking banner)
       if (activeCall) {
@@ -173,6 +177,7 @@ export const useCallSignaling = () => {
           callId: payload.callId,
           callerId: payload.callerId,
           callerName: payload.callerName,
+          callerAvatar: payload.callerAvatar,
           callType: payload.callType,
           roomName: payload.roomName,
         });
@@ -299,9 +304,14 @@ export const useCallSignaling = () => {
     };
 
     const handleCallError = (payload: { code?: string; message?: string } | unknown) => {
-      console.error('[Call] Call error:', payload);
+      const errPayload =
+        payload && typeof payload === 'object'
+          ? (payload as { code?: string; message?: string })
+          : {};
+      const code = errPayload.code;
+      const message = errPayload.message || 'Call failed or ended';
 
-      const code = (payload as { code?: string })?.code;
+      console.warn('[Call] Call signaling notice:', { code, message, payload });
 
       if (code === 'CALL_TIMEOUT') {
         handleCallTimeout(payload);

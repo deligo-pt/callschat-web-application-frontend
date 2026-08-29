@@ -31,7 +31,6 @@ import {
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
 import { InviteParticipantModal } from "./InviteParticipantModal";
-import { InviteParticipantSidebar } from "./InviteParticipantSidebar";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 // ---------------------------------------------------------------------------
@@ -294,13 +293,6 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     if (anyoneHasCamera) {
       return (
         <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#0A0F24]">
-          {/* Add Friends Modal (Overlay) */}
-          {inviteOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-              <InviteParticipantSidebar open={inviteOpen} onClose={onCloseInvite} roomId={activeCall.roomName} callType={activeCall.callType} />
-            </div>
-          )}
-
           <div className="flex-1 relative h-full">
             {/* Header */}
             <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-6 bg-gradient-to-b from-black/60 to-transparent">
@@ -348,20 +340,6 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     // ── Default: avatar layout ───────────────────────────────────────────────
     return (
       <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#102A63]">
-
-        
-        {/* ─── Add Friends Modal (Overlay) ─── */}
-        {inviteOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <InviteParticipantSidebar 
-              open={inviteOpen} 
-              onClose={onCloseInvite} 
-              roomId={activeCall.roomName} 
-              callType={activeCall.callType} 
-            />
-          </div>
-        )}
-
         {/* ─── Main Content Area ─── */}
         <div className="flex-1 relative flex flex-col h-full transition-all duration-300">
           
@@ -639,6 +617,7 @@ export const ActiveCallRoom = () => {
         isCallMinimized && "pointer-events-none" // Disable interaction in UI when minimized so clicks bubble to expand
       )}>
         <LiveKitRoom
+        key={activeCall.token}
         video={activeCall.callType === "VIDEO"}
         audio={true}
         token={activeCall.token}
@@ -662,15 +641,13 @@ export const ActiveCallRoom = () => {
         {/* System Integrity Control: renders remote audio tracks */}
         <RoomAudioRenderer muted={isSpeakerMuted} />
 
-        {/* Fallback modal for VIDEO calls */}
-        {activeCall.callType === "VIDEO" && (
-          <InviteParticipantModal
-            open={inviteOpen}
-            onClose={() => setInviteOpen(false)}
-            roomId={activeCall.roomName}
-            callType={activeCall.callType}
-          />
-        )}
+        {/* Unified Add People Modal for both Audio and Video calls */}
+        <InviteParticipantModal
+          open={inviteOpen}
+          onClose={() => setInviteOpen(false)}
+          roomId={activeCall.roomName}
+          callType={activeCall.callType}
+        />
       </LiveKitRoom>
       </div>
     </div>

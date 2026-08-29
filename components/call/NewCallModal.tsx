@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Phone, Video, Loader2 } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
@@ -39,16 +39,7 @@ export function NewCallModal({ isOpen, onClose, callType }: NewCallModalProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setQuery("");
-      setContacts([]);
-      setTimeout(() => inputRef.current?.focus(), 80);
-      fetchContacts();
-    }
-  }, [isOpen]);
-
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
     setLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
@@ -80,7 +71,16 @@ export function NewCallModal({ isOpen, onClose, callType }: NewCallModalProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuery("");
+      setContacts([]);
+      setTimeout(() => inputRef.current?.focus(), 80);
+      fetchContacts();
+    }
+  }, [isOpen, fetchContacts]);
 
   const normalQ = debouncedQuery.toLowerCase();
   const filteredContacts = contacts.filter(
@@ -112,7 +112,7 @@ export function NewCallModal({ isOpen, onClose, callType }: NewCallModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[100] bg-[#1D2A54]/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-xs"
             onClick={onClose}
           />
 
@@ -121,106 +121,108 @@ export function NewCallModal({ isOpen, onClose, callType }: NewCallModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: -16 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed left-1/2 top-[12%] z-[100] w-full max-w-[560px] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-2xl border border-[#E6EAFA] flex flex-col"
+            className="fixed left-1/2 top-[12%] z-[100] w-full max-w-[540px] -translate-x-1/2 overflow-hidden rounded-2xl bg-white dark:bg-[#111B21] shadow-2xl border border-[#E2E8F0] dark:border-[#2A3942] flex flex-col"
             style={{ maxHeight: "76vh" }}
           >
-            <div className="flex items-center justify-between border-b border-[#E6EAFA] px-4 py-3 bg-[#F8FAFC]">
-              <h2 className="text-[16px] font-bold text-[#1D2A54]">
+            <div className="flex items-center justify-between border-b border-[#E2E8F0] dark:border-[#2A3942] px-4 py-3 bg-[#F0F2F5]/70 dark:bg-[#182229]">
+              <h2 className="text-[16px] font-semibold text-[#111B21] dark:text-[#E9EDEF] tracking-tight">
                 Start {callType === "VIDEO" ? "Video" : "Audio"} Call
               </h2>
               <button
                 onClick={onClose}
-                className="rounded-full p-1.5 text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54] transition-colors"
+                className="rounded-full p-1.5 text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors cursor-pointer"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4.5 w-4.5" />
               </button>
             </div>
 
-            <div className="flex items-center gap-3 border-b border-[#E6EAFA] px-4 py-3.5">
-              <Search className="h-5 w-5 shrink-0 text-[#8F95B2]" />
+            <div className="flex items-center gap-3 border-b border-[#E2E8F0] dark:border-[#2A3942] px-4 py-3">
+              <Search className="h-4.5 w-4.5 shrink-0 text-[#8696A0]" />
               <input
                 ref={inputRef}
                 type="text"
                 placeholder="Search contacts to call..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="flex-1 bg-transparent text-[15px] font-medium text-[#1D2A54] placeholder-[#B0B8D4] outline-none"
+                className="flex-1 bg-transparent text-[14.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] outline-none"
                 autoComplete="off"
                 spellCheck={false}
               />
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="shrink-0 rounded-full p-1 text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54] transition-colors"
+                  className="shrink-0 rounded-full p-1 text-[#8696A0] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto py-2 px-2">
+            <div className="flex-1 overflow-y-auto py-2 px-2 custom-scrollbar">
               {loading && query === "" ? (
                 <div className="flex flex-col gap-2 p-3">
                   {[...Array(4)].map((_, i) => (
                     <div key={i} className="flex items-center gap-3 animate-pulse">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 shrink-0" />
+                      <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-white/5 shrink-0" />
                       <div className="flex-1 space-y-1.5">
-                        <div className="h-3 w-32 rounded bg-slate-100" />
-                        <div className="h-2.5 w-20 rounded bg-slate-100" />
+                        <div className="h-3 w-32 rounded bg-slate-100 dark:bg-white/5" />
+                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-white/5" />
                       </div>
                     </div>
                   ))}
                 </div>
               ) : filteredContacts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-14 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#F4F6FC] mb-3">
-                    <Search className="h-6 w-6 text-[#B0B8D4]" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F0F2F5] dark:bg-[#202C33] mb-3">
+                    <Search className="h-5 w-5 text-[#8696A0]" />
                   </div>
-                  <p className="text-[14px] font-bold text-[#1D2A54]">No contacts found</p>
-                  <p className="mt-1 text-[12px] text-[#8F95B2] max-w-xs">
+                  <p className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">No contacts found</p>
+                  <p className="mt-1 text-[12px] text-[#8696A0] max-w-xs">
                     Try searching with a different name.
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-0.5">
                   {filteredContacts.map((c) => (
                     <button
                       key={c.id}
                       onClick={() => handleSelectContact(c)}
-                      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-[#F0F3FF] focus:outline-none"
+                      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] cursor-pointer"
                     >
                       <div className="relative shrink-0">
                         {c.avatarUrl ? (
                           <img
                             src={getOptimizedImageUrl(c.avatarUrl)}
                             alt={c.name}
-                            className="h-10 w-10 rounded-full object-cover border border-[#E6EAFA]"
+                            className="h-10 w-10 rounded-full object-cover border border-[#E2E8F0] dark:border-[#2A3942]"
                           />
                         ) : (
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#EEF2FB] to-[#DCE6FF] border border-[#3B58F5]/20 flex items-center justify-center text-xs font-bold text-[#3B58F5]">
+                          <div className="h-10 w-10 rounded-full bg-[#00A884]/15 border border-[#00A884]/20 flex items-center justify-center text-xs font-bold text-[#008069] dark:text-[#25D366]">
                             {c.name.substring(0, 2).toUpperCase()}
                           </div>
                         )}
                         {c.isOnline && (
-                          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-white" />
+                          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21]" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="text-[14px] font-bold text-[#1D2A54] truncate block">
+                        <span className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate block">
                           {c.name}
                         </span>
                         {c.username && (
-                          <p className="text-[12px] font-medium text-[#8F95B2] truncate">
+                          <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
                             @{c.username}
                           </p>
                         )}
                       </div>
                       <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {callType === "VIDEO" ? (
-                          <Video className="h-4 w-4 text-[#3B58F5]" />
-                        ) : (
-                          <Phone className="h-4 w-4 text-[#3B58F5]" />
-                        )}
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00A884]/10 text-[#00A884]">
+                          {callType === "VIDEO" ? (
+                            <Video className="h-4 w-4" />
+                          ) : (
+                            <Phone className="h-4 w-4" />
+                          )}
+                        </div>
                       </div>
                     </button>
                   ))}

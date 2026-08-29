@@ -94,24 +94,24 @@ function ResultRow({
     <button
       onClick={onClick}
       disabled={loading}
-      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-[#F0F3FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3B58F5] disabled:opacity-60"
+      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] disabled:opacity-60"
     >
       <div className="shrink-0">{leading}</div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[14px] font-bold text-[#1D2A54] truncate">{primary}</span>
+          <span className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">{primary}</span>
           {badge}
         </div>
         {secondary && (
-          <p className="text-[12px] font-medium text-[#8F95B2] truncate">{secondary}</p>
+          <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">{secondary}</p>
         )}
       </div>
       {loading ? (
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#3B58F5]" />
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#00A884]" />
       ) : (
         <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           {trailing ?? (
-            <ArrowRight className="h-4 w-4 text-[#3B58F5]" />
+            <ArrowRight className="h-4 w-4 text-[#00A884]" />
           )}
         </div>
       )}
@@ -138,17 +138,17 @@ function Avatar({
         <img
           src={getOptimizedImageUrl(src)}
           alt={name}
-          className={`${dim} rounded-full object-cover border border-[#E6EAFA]`}
+          className={`${dim} rounded-full object-cover border border-[#E2E8F0] dark:border-[#2A3942]`}
         />
       ) : (
         <div
-          className={`${dim} rounded-full bg-gradient-to-br from-[#EEF2FB] to-[#DCE6FF] border border-[#3B58F5]/20 flex items-center justify-center ${text} font-bold text-[#3B58F5]`}
+          className={`${dim} rounded-full bg-[#00A884]/10 dark:bg-[#00A884]/20 border border-[#00A884]/20 flex items-center justify-center ${text} font-bold text-[#00A884]`}
         >
           {name.substring(0, 2).toUpperCase()}
         </div>
       )}
       {verified && (
-        <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-blue-500 flex items-center justify-center border-2 border-white">
+        <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-[#00A884] flex items-center justify-center border-2 border-white dark:border-[#111B21]">
           <CheckCircle2 className="h-2.5 w-2.5 text-white fill-white" />
         </div>
       )}
@@ -178,21 +178,8 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
   const [bizLoading, setBizLoading] = useState(false);
   const [initiatingBizId, setInitiatingBizId] = useState<string | null>(null);
 
-  // ── Reset when modal opens ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (isOpen) {
-      setQuery("");
-      setContacts([]);
-      setBusinesses([]);
-      setTimeout(() => inputRef.current?.focus(), 80);
-      // Pre-load the business directory so the list is ready instantly
-      fetchAllBusinesses();
-      fetchContacts();
-    }
-  }, [isOpen]);
-
   // ── Load full business directory (used as initial list + filter source) ───
-  const fetchAllBusinesses = async () => {
+  const fetchAllBusinesses = useCallback(async () => {
     setBizLoading(true);
     try {
       const res = await BusinessService.getDirectory();
@@ -215,10 +202,10 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
     } finally {
       setBizLoading(false);
     }
-  };
+  }, []);
 
   // ── Fetch contacts ──────────────────────────────────────────────────────────
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
     setContactsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
@@ -254,7 +241,20 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
     } finally {
       setContactsLoading(false);
     }
-  };
+  }, []);
+
+  // ── Reset when modal opens ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (isOpen) {
+      setQuery("");
+      setContacts([]);
+      setBusinesses([]);
+      setTimeout(() => inputRef.current?.focus(), 80);
+      // Pre-load the business directory so the list is ready instantly
+      fetchAllBusinesses();
+      fetchContacts();
+    }
+  }, [isOpen, fetchAllBusinesses, fetchContacts]);
 
   // ── Filtered results (derived, no extra network calls needed) ─────────────
   const isBusinessQuery = debouncedQuery.startsWith("@");
@@ -362,33 +362,33 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: -16 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed left-1/2 top-[12%] z-50 w-full max-w-[560px] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-2xl border border-[#E6EAFA] flex flex-col"
+            className="fixed left-1/2 top-[12%] z-50 w-full max-w-[560px] -translate-x-1/2 overflow-hidden rounded-2xl bg-white dark:bg-[#111B21] shadow-2xl border border-[#E2E8F0] dark:border-[#2A3942] flex flex-col"
             style={{ maxHeight: "76vh" }}
           >
             {/* ── Search Input ─────────────────────────────────────────── */}
-            <div className="flex items-center gap-3 border-b border-[#E6EAFA] px-4 py-3.5">
-              <Search className="h-5 w-5 shrink-0 text-[#8F95B2]" />
+            <div className="flex items-center gap-3 border-b border-[#E2E8F0] dark:border-[#2A3942] px-4 py-3.5">
+              <Search className="h-5 w-5 shrink-0 text-[#8696A0]" />
               <input
                 ref={inputRef}
                 type="text"
                 placeholder="Search contacts or type @handle to find a business…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="flex-1 bg-transparent text-[15px] font-medium text-[#1D2A54] placeholder-[#B0B8D4] outline-none"
+                className="flex-1 bg-transparent text-[15px] font-medium text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] outline-none"
                 autoComplete="off"
                 spellCheck={false}
               />
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="shrink-0 rounded-full p-1 text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54] transition-colors"
+                  className="shrink-0 rounded-full p-1 text-[#8696A0] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
               <button
                 onClick={onClose}
-                className="shrink-0 rounded-full p-1.5 text-[#8F95B2] hover:bg-[#F4F6FC] hover:text-[#1D2A54] transition-colors"
+                className="shrink-0 rounded-full p-1.5 text-[#8696A0] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -401,11 +401,11 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="flex items-center gap-2 bg-gradient-to-r from-[#EEF2FF] to-[#F0F9FF] px-4 py-2.5 text-[12px] font-semibold text-[#3B58F5] border-b border-[#E6EAFA]"
+                  className="flex items-center gap-2 bg-emerald-50/80 dark:bg-emerald-950/30 px-4 py-2.5 text-[12px] font-semibold text-[#008069] dark:text-[#25D366] border-b border-[#E2E8F0] dark:border-[#2A3942]"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   <span>
-                    Tip: Type <kbd className="font-mono bg-[#3B58F5]/10 px-1.5 py-0.5 rounded text-[11px]">@handle</kbd> to find and message a business directly
+                    Tip: Type <kbd className="font-mono bg-[#00A884]/15 px-1.5 py-0.5 rounded text-[11px]">@handle</kbd> to find and message a business directly
                   </span>
                 </motion.div>
               )}

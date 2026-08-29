@@ -87,38 +87,39 @@ function BusinessChatHeader({
   blockStatus?: any;
 }) {
   return (
-    <div className="flex items-center justify-between bg-gradient-to-r from-[#1D2A8A] via-[#254BCC] to-[#3B58F5] px-4 py-3 shadow-md z-20 shrink-0 text-white">
+    <div className="flex items-center justify-between bg-white/95 dark:bg-[#202C33]/95 backdrop-blur-md px-4 py-2.5 border-b border-[#E2E8F0] dark:border-[#222D34] shadow-xs z-20 shrink-0 text-[#111B21] dark:text-[#E9EDEF]">
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="md:hidden rounded-full p-2 transition-colors hover:bg-white/10"
+          className="md:hidden rounded-full p-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10 text-[#54656F] dark:text-[#8696A0]"
+          aria-label="Back"
         >
-          <ArrowLeft className="h-6 w-6 text-white" strokeWidth={2.5} />
+          <ArrowLeft className="h-5 w-5" strokeWidth={2} />
         </button>
 
         {/* Business Avatar */}
-        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 border border-white/30">
-          <Building2 className="h-5 w-5 text-white" strokeWidth={2} />
+        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#00A884]/15 dark:bg-[#00A884]/20 border border-[#00A884]/20">
+          <Building2 className="h-5 w-5 text-[#00A884]" strokeWidth={2} />
         </div>
 
         {/* Details */}
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-[17px] font-bold text-white tracking-tight">
+            <h2 className="text-[16px] font-semibold text-[#111B21] dark:text-[#E9EDEF] tracking-tight">
               {bizName}
             </h2>
             {bizVerified && (
               <span
                 title="Verified Business"
-                className="flex items-center gap-0.5 bg-white/20 border border-white/30 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold text-white"
+                className="flex items-center gap-0.5 bg-[#00A884]/15 text-[#008069] dark:text-[#00A884] px-1.5 py-0.5 rounded-full text-[10px] font-bold"
               >
-                <ShieldCheck className="h-2.5 w-2.5 fill-white/80" />
+                <ShieldCheck className="h-2.5 w-2.5 fill-current" />
                 Verified
               </span>
             )}
           </div>
-          <span className="text-[12px] font-semibold text-white/70">
-            @{bizHandle} · Support Chat
+          <span className="text-[11.5px] font-medium text-[#667781] dark:text-[#8696A0]">
+            @{bizHandle} · Official Business
           </span>
         </div>
       </div>
@@ -136,9 +137,10 @@ function BusinessChatHeader({
                 )
               }
               disabled={blockStatus?.isBlocked}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors disabled:opacity-50"
+              title="Video call"
             >
-              <Video className="h-5 w-5" strokeWidth={2} />
+              <Video className="h-4.5 w-4.5" strokeWidth={1.8} />
             </button>
             <button
               onClick={() =>
@@ -150,15 +152,16 @@ function BusinessChatHeader({
                 )
               }
               disabled={blockStatus?.isBlocked}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors disabled:opacity-50"
+              title="Audio call"
             >
-              <Phone className="h-5 w-5" strokeWidth={2} />
+              <Phone className="h-4.5 w-4.5" strokeWidth={1.8} />
             </button>
           </>
         )}
-        <div className="flex items-center gap-1.5 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 ml-1">
-          <Lock className="h-3 w-3 text-white/80" />
-          <span className="text-[11px] font-semibold text-white/80">
+        <div className="flex items-center gap-1 rounded-full bg-[#00A884]/10 dark:bg-[#00A884]/15 px-2.5 py-1 ml-1 text-[#008069] dark:text-[#00A884]">
+          <Lock className="h-3 w-3" />
+          <span className="text-[11px] font-semibold">
             Secure
           </span>
         </div>
@@ -560,22 +563,21 @@ function ChatRoomPageContent() {
           blockStatus={blockStatus}
         />
       ) : (
-        <div className="flex items-center justify-between bg-[#254BCC] px-4 py-3 shadow-md z-20 shrink-0 text-white">
+        <div className="flex items-center justify-between bg-white/95 dark:bg-[#202C33]/95 backdrop-blur-md px-4 py-2.5 border-b border-[#E2E8F0] dark:border-[#222D34] shadow-xs z-20 shrink-0 text-[#111B21] dark:text-[#E9EDEF]">
           <div className="flex items-center gap-3">
             <Link
               href={basePath}
-              className="md:hidden rounded-full p-2 transition-colors hover:bg-white/10"
+              className="md:hidden rounded-full p-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10 text-[#54656F] dark:text-[#8696A0]"
+              aria-label="Back"
             >
-              <ArrowLeft className="h-6 w-6 text-white" strokeWidth={2.5} />
+              <ArrowLeft className="h-5 w-5" strokeWidth={2} />
             </Link>
-            <div className="flex items-center gap-3">
+            <div 
+              className="flex items-center gap-3 cursor-pointer group"
+              onClick={() => setIsContactProfileOpen(true)}
+            >
               <div
-                className={cn(
-                  "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E6EAFA]",
-                  (!blockStatus?.isBlocked && ((isMounted && isUserOnline(recipientId)) || recipient?.isOnline))
-                    ? "border-[2.5px] border-emerald-400 p-[2px]"
-                    : ""
-                )}
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F0F2F5] dark:bg-[#2A3942] overflow-hidden shadow-xs"
               >
                 {recipient?.avatarUrl ? (
                   <img
@@ -584,34 +586,34 @@ function ChatRoomPageContent() {
                     className="h-full w-full rounded-full object-cover"
                   />
                 ) : (
-                  <div className="text-[#8F95B2] font-bold">
+                  <div className="text-[#00A884] font-bold text-sm">
                     {recipient?.name?.charAt(0) || "U"}
                   </div>
                 )}
                 {(!blockStatus?.isBlocked && ((isMounted && isUserOnline(recipientId)) || recipient?.isOnline)) && (
                   <span
                     aria-hidden="true"
-                    className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#254BCC] bg-emerald-400"
+                    className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white dark:border-[#202C33] bg-[#25D366]"
                   />
                 )}
               </div>
               <div className="flex flex-col">
-                <h2 className="text-[17px] font-bold text-white tracking-tight">
+                <h2 className="text-[16px] font-semibold text-[#111B21] dark:text-[#E9EDEF] tracking-tight group-hover:text-[#00A884] transition-colors">
                   {recipient?.name || "Loading..."}
                 </h2>
                 {isInitializing ? (
-                  <span className="text-[12px] font-medium text-white/70">
+                  <span className="text-[11.5px] font-normal text-[#667781] dark:text-[#8696A0]">
                     Connecting...
                   </span>
                 ) : blockStatus?.isBlocked ? (
-                  <span className="text-[12px] font-medium text-white/50">Offline</span>
+                  <span className="text-[11.5px] font-normal text-[#667781] dark:text-[#8696A0]">Offline</span>
                 ) : (isMounted && isUserOnline(recipientId)) || recipient?.isOnline ? (
-                  <span className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-[#00A884]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#25D366] animate-pulse" />
                     Active now
                   </span>
                 ) : (
-                  <span className="text-[12px] font-medium text-white/50">
+                  <span className="text-[11.5px] font-normal text-[#667781] dark:text-[#8696A0]">
                     Offline
                   </span>
                 )}
@@ -631,9 +633,10 @@ function ChatRoomPageContent() {
                 )
               }
               disabled={!recipientId || blockStatus?.isBlocked}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors disabled:opacity-50"
+              title="Video call"
             >
-              <Video className="h-5 w-5" strokeWidth={2} />
+              <Video className="h-4.5 w-4.5" strokeWidth={1.8} />
             </button>
             <button
               onClick={() =>
@@ -646,9 +649,10 @@ function ChatRoomPageContent() {
                 )
               }
               disabled={!recipientId || blockStatus?.isBlocked}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors disabled:opacity-50"
+              title="Audio call"
             >
-              <Phone className="h-5 w-5" strokeWidth={2} />
+              <Phone className="h-4.5 w-4.5" strokeWidth={1.8} />
             </button>
             {recipientId && (
               <ChatOptionsMenu
@@ -671,18 +675,17 @@ function ChatRoomPageContent() {
 
       {/* ── B2C Welcome Banner ────────────────────────────────────────────── */}
       {isBizChat && !bizTicketCreated && messages.length === 0 && (
-        <div className="shrink-0 border-b border-[#E6EAFA] bg-gradient-to-r from-[#EEF2FF] to-[#F0F9FF] px-5 py-4">
+        <div className="shrink-0 border-b border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#182229] px-4 py-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#3B58F5]/10 border border-[#3B58F5]/20">
-              <Building2 className="h-5 w-5 text-[#3B58F5]" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#00A884]/15 border border-[#00A884]/20">
+              <Building2 className="h-4.5 w-4.5 text-[#00A884]" />
             </div>
             <div>
-              <p className="text-[13px] font-bold text-[#1D2A54]">
+              <p className="text-[13px] font-bold text-[#111B21] dark:text-[#E9EDEF]">
                 You're chatting with {bizName || bizHandle}
               </p>
-              <p className="text-[12px] text-[#6B7A99] mt-0.5">
-                Send your first message to open a support ticket. A team member
-                will reply soon.
+              <p className="text-[12px] text-[#667781] dark:text-[#8696A0] mt-0.5">
+                Send your first message to open a support ticket. A team member will reply soon.
               </p>
             </div>
           </div>
@@ -691,16 +694,16 @@ function ChatRoomPageContent() {
 
       {/* ── Ephemeral Banner ──────────────────────────────────────────────── */}
       {!isBizChat && (disappearAfterSeconds || messages.some((m) => (m as any).disappearAfterSeconds)) && (
-        <div className="shrink-0 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-violet-50 px-5 py-2.5 flex items-center justify-between gap-3">
+        <div className="shrink-0 border-b border-purple-200/60 dark:border-purple-900/40 bg-purple-50/80 dark:bg-purple-950/20 px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-[15px]" role="img" aria-label="timer">⏱️</span>
-            <span className="text-[12px] font-bold text-[#6D28D9]">
+            <span className="text-[14px]" role="img" aria-label="timer">⏱️</span>
+            <span className="text-[12px] font-bold text-purple-700 dark:text-purple-300">
               Disappearing messages
             </span>
             {disappearAfterSeconds && (
               <>
                 <span className="text-[11px] font-medium text-purple-400">·</span>
-                <span className="text-[11px] font-medium text-[#7C3AED]">
+                <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
                   {disappearAfterSeconds === 86400
                     ? "24 hours"
                     : disappearAfterSeconds === 604800
@@ -712,27 +715,27 @@ function ChatRoomPageContent() {
               </>
             )}
           </div>
-          <span className="text-[10px] font-medium text-purple-400">
-            New messages auto-delete
+          <span className="text-[11px] font-medium text-purple-500">
+            Auto-delete active
           </span>
         </div>
       )}
 
       {/* ── Add to Contact Banner ──────────────────────────────────────────── */}
       {!isBizChat && !isRecipientInContacts && !isInitializing && !blockStatus?.isBlocked && (
-        <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-5 py-3 flex items-center justify-between gap-3 shadow-sm z-10">
+        <div className="shrink-0 border-b border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#182229] px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xs z-10">
           <div className="flex flex-col">
-            <span className="text-[13px] font-semibold text-blue-900">
-              Know {recipient?.name || "this user"}? Add to your contacts.
+            <span className="text-[12.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
+              Know {recipient?.name || "this user"}? Add to contacts.
             </span>
-            <span className="text-[11px] text-blue-700/80">
-              This helps you find them easily later.
+            <span className="text-[11px] text-[#667781] dark:text-[#8696A0]">
+              Save this contact to find them easily in chats and calls.
             </span>
           </div>
           <button
             onClick={handleAddContact}
             disabled={isAddingContact}
-            className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 rounded-full bg-[#00A884] hover:bg-[#008069] px-3.5 py-1 text-xs font-bold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
           >
             {isAddingContact ? (
               <span className="flex items-center gap-1">
@@ -747,7 +750,7 @@ function ChatRoomPageContent() {
 
       {/* Pinned Messages Banner */}
       {pinnedMessages && pinnedMessages.length > 0 && (
-        <div className="bg-[#EFF6FF] border-b border-[#DBEAFE] px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xs transition-all duration-200 z-10">
+        <div className="bg-[#FFF8E7] dark:bg-[#202C33] border-b border-[#FFE8A3]/70 dark:border-[#2A3942] px-4 py-2 flex items-center justify-between shrink-0 shadow-2xs transition-all duration-200 z-10">
           <div 
             className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group/pin"
             onClick={() => {
@@ -764,21 +767,21 @@ function ChatRoomPageContent() {
               }
             }}
           >
-            <div className="w-8 h-8 rounded-full bg-[#3B58F5]/10 flex items-center justify-center shrink-0 text-[#3B58F5] group-hover/pin:bg-[#3B58F5]/20 transition-colors">
-              <Pin className="w-4 h-4 rotate-45" />
+            <div className="w-7 h-7 rounded-full bg-[#00A884]/15 flex items-center justify-center shrink-0 text-[#00A884] group-hover/pin:bg-[#00A884]/25 transition-colors">
+              <Pin className="w-3.5 h-3.5 rotate-45" />
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-[#3B58F5] tracking-wide uppercase">
+                <span className="text-[11px] font-bold text-[#008069] dark:text-[#00A884] tracking-wide uppercase">
                   Pinned Message {pinnedMessages.length > 1 ? `(1 of ${pinnedMessages.length})` : ""}
                 </span>
                 {pinnedMessages[0]?.pinnedUntil && (
-                  <span className="text-[10px] font-medium text-slate-400">
+                  <span className="text-[10px] font-medium text-[#8696A0]">
                     · Expires {new Date(pinnedMessages[0].pinnedUntil).toLocaleDateString()}
                   </span>
                 )}
               </div>
-              <p className="text-[13px] font-medium text-[#1E293B] truncate">
+              <p className="text-[13px] font-medium text-[#111B21] dark:text-[#E9EDEF] truncate">
                 {pinnedMessages[0]?.previewText || pinnedMessages[0]?.originalMessage?.text || (
                   pinnedMessages[0]?.previewMedia ? `📷 ${pinnedMessages[0].previewMedia}` : "Pinned attachment"
                 )}
@@ -790,51 +793,42 @@ function ChatRoomPageContent() {
             <button
               type="button"
               onClick={() => pinMessage(pinnedMessages[0].messageId, "unpin", undefined, undefined, undefined, "You")}
-              className="p-1.5 rounded-full hover:bg-red-100/80 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+              className="p-1 rounded-full hover:bg-red-100/80 dark:hover:bg-red-950/40 text-[#8696A0] hover:text-red-600 transition-colors cursor-pointer"
               title="Unpin message"
             >
-              <PinOff className="w-4 h-4" />
+              <PinOff className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       )}
 
       {/* ── Messages ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-[#F0F2F5] relative">
-        {/* Chat Background Pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{
-            backgroundImage:
-              'url("https://www.transparenttextures.com/patterns/cubes.png")',
-          }}
-        />
-
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-3 chat-canvas-bg custom-scrollbar relative">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2]">
             {isReady || isBizChat ? (
               disappearAfterSeconds ? (
                 <div className="flex flex-col items-center gap-3 text-center max-w-[280px]">
                   <div className="text-4xl animate-bounce">🔥</div>
-                  <div className="bg-purple-50 border border-purple-100 rounded-2xl px-5 py-4 text-center shadow-sm">
-                    <p className="text-[13px] font-bold text-[#6D28D9] mb-1">
+                  <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/40 rounded-2xl px-5 py-4 text-center shadow-xs">
+                    <p className="text-[13px] font-bold text-purple-700 dark:text-purple-300 mb-1">
                       Ephemeral Chat Active
                     </p>
-                    <p className="text-[11px] font-medium text-purple-400 leading-relaxed">
+                    <p className="text-[11px] font-medium text-purple-500 leading-relaxed">
                       Messages in this conversation disappear automatically. Send your first secret message.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="bg-[#FFF8C6] text-[#665D1E] text-xs px-4 py-2 rounded-lg text-center shadow-sm max-w-sm">
-                  <Lock className="inline-block h-3 w-3 mr-1 mb-0.5" />
+                <div className="bg-[#FFF8C6] dark:bg-[#182229] text-[#54656F] dark:text-[#8696A0] text-xs px-4 py-2 rounded-lg text-center shadow-2xs max-w-sm border border-[#FFE8A3]/40 dark:border-white/5 mx-auto">
+                  <Lock className="inline-block h-3 w-3 mr-1 mb-0.5 text-[#00A884]" />
                   {isBizChat
                     ? "Your messages to this business are private and secure."
                     : "Messages are end-to-end encrypted. No one outside of this chat, not even CallsChat, can read or listen to them."}
                 </div>
               )
             ) : (
-              <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
+              <Loader2 className="h-6 w-6 animate-spin text-[#00A884]" />
             )}
           </div>
         ) : (

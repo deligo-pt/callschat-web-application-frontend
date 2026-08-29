@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2, Loader2, Star, Camera , Heart} from "lucide-react";
+import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2, Loader2, Star, Camera, Heart, Lock } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -9,7 +9,7 @@ import { groupService } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
 import { useContacts } from "@/hooks/useContacts";
 import { generateGroupKey, encryptMessage } from "@/utils/crypto";
-import { getUserPrivateKey } from "@/utils/keyStore";
+import { getUserPrivateKey, storeGroupKey } from "@/utils/keyStore";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useGroupStore } from "@/hooks/useGroupStore";
 import { getOptimizedImageUrl } from "@/utils/image";
@@ -178,6 +178,11 @@ export default function CreateGroupPage() {
         }
       }
 
+      // Store symmetric group key in IndexedDB
+      if (groupRes.data.id && myUserId) {
+        await storeGroupKey(groupRes.data.id, myUserId, plaintextGroupKey);
+      }
+
       // Add to store instantly & trigger background sync
       useGroupStore.getState().addGroup({
         ...groupRes.data,
@@ -195,63 +200,65 @@ export default function CreateGroupPage() {
   };
 
   return (
-    <div className="flex h-full w-full bg-[#F8FAFC]">
+    <div className="flex h-full w-full bg-white dark:bg-[#111B21] overflow-hidden">
       {/* Left Panel (Wizard) */}
-      <div className="flex h-full w-full flex-col border-r border-[#E6EAFA] bg-white md:w-[350px] shrink-0">
+      <div className="flex h-full w-full flex-col border-r border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] md:w-[380px] lg:w-[420px] shrink-0">
         
         {/* Header */}
-        <div className="flex flex-col px-6 pt-8 pb-4 shrink-0">
+        <div className="flex flex-col px-4 pt-5 pb-3 border-b border-[#E2E8F0]/60 dark:border-[#222D34] shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {step > 1 && (
-                <button onClick={handleBack} className="text-slate-400 hover:text-blue-500 transition-colors">
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-              )}
-              <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">Groups</h1>
+            <div className="flex items-center gap-2.5">
+              <button 
+                onClick={() => {
+                  if (step > 1) handleBack();
+                  else router.push('/groups');
+                }} 
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors cursor-pointer"
+                title={step > 1 ? "Back" : "Cancel"}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="flex flex-col">
+                <h1 className="text-[20px] font-bold tracking-tight text-[#111B21] dark:text-[#E9EDEF]">New Group</h1>
+                <span className="text-[11.5px] font-medium text-[#667781] dark:text-[#8696A0]">Step {step} of 3</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
-                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+            <div className="flex items-center gap-1">
+              <Link 
+                href="/chats/favorites" 
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#FFB020] transition-colors"
+                title="Favorites"
+              >
+                <Heart className="h-5 w-5 fill-[#FFB020] text-[#FFB020]" />
               </Link>
               <NotificationDropdown />
             </div>
           </div>
-          
-          <div className="mt-4 relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              disabled
-              className="h-10 w-full rounded-full bg-[#EEF2FF] pl-10 pr-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none opacity-50 cursor-not-allowed"
-            />
-          </div>
         </div>
 
         {/* Wizard Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-2 flex flex-col scrollbar-hide">
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col custom-scrollbar">
           {step === 1 && (
-            <div className="flex flex-col items-center w-full animate-in fade-in duration-300">
+            <div className="flex flex-col items-center w-full animate-in fade-in duration-200">
               <div 
                 onClick={() => fileInputRef.current?.click()}
-                className="relative h-20 w-20 rounded-full cursor-pointer group flex items-center justify-center mb-2 shadow-lg shadow-blue-500/10 overflow-hidden bg-[#EEF2FF] border-2 border-dashed border-[#CBD5E1] hover:border-[#3B58F5] transition-all"
+                className="relative h-24 w-24 rounded-full cursor-pointer group flex items-center justify-center mb-2 shadow-md overflow-hidden bg-[#F0F2F5] dark:bg-[#202C33] border-2 border-dashed border-[#CBD5E1] dark:border-[#374248] hover:border-[#00A884] transition-all"
                 title="Click to upload group photo"
               >
                 {avatarPreview ? (
                   <img src={avatarPreview} alt="Group Preview" className="h-full w-full object-cover" />
                 ) : (
-                  <Users className="h-8 w-8 text-[#3B58F5]" />
+                  <Users className="h-10 w-10 text-[#8696A0]" />
                 )}
-                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold pointer-events-none">
-                  <Camera className="h-4 w-4 mb-0.5" />
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[11px] font-semibold pointer-events-none">
+                  <Camera className="h-5 w-5 mb-0.5" />
                   Upload
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-[12px] font-bold text-[#2563EB] hover:underline mb-4"
+                className="text-[12.5px] font-semibold text-[#00A884] hover:underline mb-5 cursor-pointer"
               >
                 {avatarPreview ? "Change Photo" : "Add Group Photo"}
               </button>
@@ -263,28 +270,25 @@ export default function CreateGroupPage() {
                 className="hidden"
               />
 
-              <h2 className="text-[18px] font-bold text-[#0F172A] mb-1">Group Details</h2>
-              <p className="text-[12px] font-medium text-slate-500 mb-6">Give your group a name and description</p>
-
               <div className="w-full space-y-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-700">Group Name *</label>
+                  <label className="text-[12px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">Group Subject *</label>
                   <input
                     type="text"
-                    placeholder="Team Design"
+                    placeholder="Enter group subject..."
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
-                    className="h-[42px] w-full rounded-xl border border-[#E6EAFA] bg-[#F8FAFC] px-4 text-[13px] font-medium text-slate-800 focus:border-[#2563EB] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2563EB]/20 transition-all"
+                    className="h-11 w-full rounded-xl border border-[#E2E8F0] dark:border-[#2A3942] bg-[#F0F2F5] dark:bg-[#202C33] px-3.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:border-[#00A884] focus:outline-none transition-all"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-700">Description (Optional)</label>
+                  <label className="text-[12px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">Description (Optional)</label>
                   <textarea
-                    placeholder="What's this group about?"
+                    placeholder="Provide a description for this group..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    rows={4}
-                    className="w-full rounded-xl border border-[#E6EAFA] bg-[#F8FAFC] p-4 text-[13px] font-medium text-slate-800 focus:border-[#2563EB] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2563EB]/20 transition-all resize-none"
+                    rows={3}
+                    className="w-full rounded-xl border border-[#E2E8F0] dark:border-[#2A3942] bg-[#F0F2F5] dark:bg-[#202C33] p-3 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:border-[#00A884] focus:outline-none transition-all resize-none"
                   />
                 </div>
               </div>
@@ -292,45 +296,41 @@ export default function CreateGroupPage() {
           )}
 
           {step === 2 && (
-            <div className="flex flex-col items-center w-full animate-in fade-in duration-300 h-full">
-              <h2 className="text-[18px] font-bold text-[#0F172A] mb-1">Add Members</h2>
-              <p className="text-[12px] font-medium text-slate-500 mb-6">Select contacts to add to the group (optional)</p>
-
+            <div className="flex flex-col items-center w-full animate-in fade-in duration-200 h-full">
               <div className="w-full flex flex-col flex-1 min-h-0">
-                <div className="relative mb-4 shrink-0">
+                <div className="relative mb-3 shrink-0">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696A0]" />
                   <input
                     type="text"
                     placeholder="Search contacts..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-[#E6EAFA] bg-[#F8FAFC] px-4 text-[13px] focus:border-[#2563EB] focus:bg-white focus:outline-none transition-colors"
+                    className="w-full h-10 rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] pl-10 pr-4 text-[13.5px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:outline-none transition-colors"
                   />
                 </div>
                 
-                {selectedMembers.length > 0 ? (
-                  <div className="flex items-center justify-between bg-[#EEF2FF] rounded-lg px-3 py-2 mb-2 shrink-0">
-                    <span className="text-[11px] font-bold text-[#2563EB]">
-                      {selectedMembers.length} members selected
+                {selectedMembers.length > 0 && (
+                  <div className="flex items-center justify-between bg-[#00A884]/10 dark:bg-[#00A884]/15 rounded-xl px-3.5 py-2 mb-2.5 shrink-0">
+                    <span className="text-[12px] font-semibold text-[#008069] dark:text-[#25D366]">
+                      {selectedMembers.length} {selectedMembers.length === 1 ? "member" : "members"} selected
                     </span>
                     <button
                       onClick={() => setSelectedMembers([])}
-                      className="text-[11px] font-bold text-[#2563EB] hover:underline"
+                      className="text-[11.5px] font-semibold text-[#008069] dark:text-[#25D366] hover:underline cursor-pointer"
                     >
                       Clear all
                     </button>
                   </div>
-                ) : (
-                  <div className="mb-2 shrink-0 h-[32px]" /> // Spacer to prevent layout shift
                 )}
 
-                <div className="flex-1 overflow-y-auto scrollbar-hide space-y-1">
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
                   {isLoadingContacts ? (
                     <div className="flex w-full items-center justify-center py-10">
-                      <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
+                      <Loader2 className="h-6 w-6 animate-spin text-[#00A884]" />
                     </div>
                   ) : filteredContacts.length === 0 ? (
                     <div className="flex w-full justify-center py-8">
-                      <p className="text-[12px] text-slate-500">No contacts found.</p>
+                      <p className="text-[13px] text-[#8696A0]">No contacts found.</p>
                     </div>
                   ) : (
                     filteredContacts.map((contact) => {
@@ -339,26 +339,31 @@ export default function CreateGroupPage() {
                         <div
                           key={contact.id}
                           onClick={() => toggleMember(contact.id)}
-                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-[#E6EAFA]"
+                          className={cn(
+                            "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors",
+                            isSelected 
+                              ? "bg-[#00A884]/10 dark:bg-[#00A884]/15" 
+                              : "hover:bg-[#F0F2F5] dark:hover:bg-[#202C33]"
+                          )}
                         >
                           <div className="flex items-center gap-3">
                             {contact.avatarUrl ? (
-                              <img src={getOptimizedImageUrl(contact.avatarUrl)} className="h-9 w-9 rounded-full object-cover bg-slate-100" />
+                              <img src={getOptimizedImageUrl(contact.avatarUrl)} className="h-10 w-10 rounded-full object-cover bg-slate-100 dark:bg-slate-800" />
                             ) : (
-                              <div className={cn("h-9 w-9 rounded-full flex items-center justify-center text-white font-bold text-[12px]", contact.color)}>
+                              <div className={cn("h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-[13px]", contact.color)}>
                                 {contact.initials}
                               </div>
                             )}
                             <div className="flex flex-col">
-                              <span className="text-[13px] font-bold text-[#0F172A]">{contact.name}</span>
-                              {contact.phone && <span className="text-[11px] font-medium text-slate-500">{contact.phone}</span>}
+                              <span className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">{contact.name}</span>
+                              {contact.phone && <span className="text-[11.5px] text-[#667781] dark:text-[#8696A0]">{contact.phone}</span>}
                             </div>
                           </div>
                           <div className={cn(
                             "h-[22px] w-[22px] rounded-full border flex items-center justify-center transition-colors shrink-0",
-                            isSelected ? "bg-[#3B58F5] border-[#3B58F5]" : "border-[#CBD5E1]"
+                            isSelected ? "bg-[#00A884] border-[#00A884]" : "border-[#CBD5E1] dark:border-[#374248]"
                           )}>
-                            {isSelected && <Check className="h-3 w-3 text-white stroke-[3]" />}
+                            {isSelected && <Check className="h-3.5 w-3.5 text-white stroke-[3]" />}
                           </div>
                         </div>
                       );
@@ -370,33 +375,30 @@ export default function CreateGroupPage() {
           )}
 
           {step === 3 && (
-            <div className="flex flex-col items-center w-full animate-in fade-in duration-300 pb-6">
-              <h2 className="text-[18px] font-bold text-[#0F172A] mb-1 mt-4">Privacy Settings</h2>
-              <p className="text-[12px] font-medium text-slate-500 mb-6">Configure member visibility</p>
-
-              <div className="w-full space-y-5">
+            <div className="flex flex-col items-center w-full animate-in fade-in duration-200 pb-4">
+              <div className="w-full space-y-4">
                 {/* Privacy Toggle */}
-                <div className="bg-[#EEF2FF] rounded-xl p-4">
+                <div className="bg-[#00A884]/10 dark:bg-[#00A884]/15 rounded-2xl p-4 border border-[#00A884]/20">
                   <div className="flex items-start gap-3">
-                    <LockIcon className="h-4 w-4 text-[#3B58F5] shrink-0 mt-0.5" />
+                    <Shield className="h-5 w-5 text-[#00A884] dark:text-[#25D366] shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h3 className="text-[13px] font-bold text-[#1D2A54]">Enable Privacy Protection</h3>
-                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                        Hide member phone numbers from other group members. Only you (the admin) can see contact details.
+                      <h3 className="text-[13.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">End-to-End Privacy Protection</h3>
+                      <p className="text-[11.5px] text-[#667781] dark:text-[#8696A0] mt-1 leading-relaxed">
+                        Messages and calls are secured with group symmetric keys. Only authorized members can decrypt content.
                       </p>
                     </div>
                   </div>
-                  <div className="flex justify-start mt-3 ml-7">
+                  <div className="flex justify-start mt-3 ml-8">
                     <button
                       onClick={() => setPrivacyEnabled(!privacyEnabled)}
                       className={cn(
-                        "relative h-6 w-11 rounded-full transition-colors",
-                        privacyEnabled ? "bg-[#3B58F5]" : "bg-slate-300"
+                        "relative h-6 w-11 rounded-full transition-colors cursor-pointer",
+                        privacyEnabled ? "bg-[#00A884]" : "bg-slate-300 dark:bg-slate-700"
                       )}
                     >
                       <div
                         className={cn(
-                          "absolute top-[2px] left-[2px] h-5 w-5 rounded-full bg-white transition-transform shadow-sm",
+                          "absolute top-[2px] left-[2px] h-5 w-5 rounded-full bg-white transition-transform shadow-xs",
                           privacyEnabled ? "translate-x-5" : "translate-x-0"
                         )}
                       />
@@ -405,50 +407,31 @@ export default function CreateGroupPage() {
                 </div>
 
                 {/* Info Cards */}
-                <div className="flex flex-col gap-3">
-                  <h4 className="text-[12px] font-bold text-[#0F172A]">What members will see:</h4>
+                <div className="flex flex-col gap-2.5">
+                  <h4 className="text-[12px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">Group security properties:</h4>
                   
-                  <div className="flex items-center gap-3 bg-[#F0FDF4] border border-[#DCFCE7] rounded-xl p-3">
-                    <Check className="h-4 w-4 text-[#16A34A] shrink-0" />
+                  <div className="flex items-center gap-3 bg-[#F0FDF4] dark:bg-emerald-950/20 border border-[#DCFCE7] dark:border-emerald-900/30 rounded-xl p-3">
+                    <CheckCircle2 className="h-4 w-4 text-[#16A34A] dark:text-[#25D366] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="text-[12px] font-bold text-[#166534]">Name & Profile Photo</span>
-                      <span className="text-[11px] font-medium text-[#166534]/70">Visible to all group members</span>
+                      <span className="text-[12px] font-semibold text-[#166534] dark:text-[#25D366]">E2EE Group Keys</span>
+                      <span className="text-[11px] text-[#166534]/70 dark:text-emerald-400/70">Generated and encrypted uniquely per member</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 bg-[#F0FDF4] border border-[#DCFCE7] rounded-xl p-3">
-                    <Check className="h-4 w-4 text-[#16A34A] shrink-0" />
+                  <div className="flex items-center gap-3 bg-[#F0FDF4] dark:bg-emerald-950/20 border border-[#DCFCE7] dark:border-emerald-900/30 rounded-xl p-3">
+                    <CheckCircle2 className="h-4 w-4 text-[#16A34A] dark:text-[#25D366] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="text-[12px] font-bold text-[#166534]">Messages</span>
-                      <span className="text-[11px] font-medium text-[#166534]/70">All members can see group messages</span>
+                      <span className="text-[12px] font-semibold text-[#166534] dark:text-[#25D366]">Group Calls & Media</span>
+                      <span className="text-[11px] text-[#166534]/70 dark:text-emerald-400/70">Encrypted audio, video, and attachments</span>
                     </div>
                   </div>
 
-                  <div className={cn(
-                    "flex items-center gap-3 rounded-xl p-3 border transition-colors",
-                    privacyEnabled ? "bg-[#FEF2F2] border-[#FEE2E2]" : "bg-[#F0FDF4] border-[#DCFCE7]"
-                  )}>
-                    {privacyEnabled ? (
-                      <X className="h-4 w-4 text-[#DC2626] shrink-0" />
-                    ) : (
-                      <Check className="h-4 w-4 text-[#16A34A] shrink-0" />
-                    )}
+                  <div className="flex items-center gap-3 bg-[#FFF8E7] dark:bg-[#202C33] border border-[#FFE8A3] dark:border-[#2A3942] rounded-xl p-3">
+                    <Shield className="h-4 w-4 text-[#D97706] dark:text-[#FFB020] shrink-0" />
                     <div className="flex flex-col">
-                      <span className={cn("text-[12px] font-bold", privacyEnabled ? "text-[#991B1B]" : "text-[#166534]")}>
-                        Phone Numbers {privacyEnabled ? "(Hidden)" : "(Visible)"}
-                      </span>
-                      <span className={cn("text-[11px] font-medium", privacyEnabled ? "text-[#991B1B]/70" : "text-[#166534]/70")}>
-                        {privacyEnabled ? "Only you can see member phone numbers" : "Visible to all group members"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 bg-[#FEFCE8] border border-[#FEF08A] rounded-xl p-3">
-                    <div className="h-[14px] w-[14px] rounded-full border-[2px] border-[#CA8A04] shrink-0 opacity-70" />
-                    <div className="flex flex-col">
-                      <span className="text-[12px] font-bold text-[#854D0E]">You're the Admin</span>
-                      <span className="text-[11px] font-medium text-[#854D0E]/70 leading-relaxed">
-                        As the group creator, you'll have full access to member details and group management settings.
+                      <span className="text-[12px] font-semibold text-[#854D0E] dark:text-[#FFB020]">You are the Group Admin</span>
+                      <span className="text-[11px] text-[#854D0E]/80 dark:text-amber-300/70 leading-relaxed">
+                        You can manage members, re-sync keys, and configure group settings at any time.
                       </span>
                     </div>
                   </div>
@@ -459,7 +442,7 @@ export default function CreateGroupPage() {
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 pb-8 pt-2 bg-white shrink-0">
+        <div className="px-5 pb-6 pt-2 bg-white dark:bg-[#111B21] border-t border-[#E2E8F0]/60 dark:border-[#222D34] shrink-0">
           <button
             onClick={() => {
               if (step < 3) handleNext();
@@ -470,40 +453,43 @@ export default function CreateGroupPage() {
               isCreating
             }
             className={cn(
-              "w-full flex items-center justify-center py-3 rounded-xl font-bold text-[13px] transition-colors",
+              "w-full flex items-center justify-center py-3 rounded-2xl font-semibold text-[14px] transition-all cursor-pointer shadow-xs",
               ((step === 1 && !groupName.trim()) || isCreating)
-                ? "bg-[#E2E8F0] text-slate-400 cursor-not-allowed"
-                : "bg-[#3B58F5] hover:bg-blue-700 text-white shadow-sm"
+                ? "bg-[#E2E8F0] dark:bg-[#202C33] text-[#8696A0] cursor-not-allowed"
+                : "bg-[#00A884] hover:bg-[#008069] text-white hover:scale-[1.01] active:scale-[0.99]"
             )}
           >
             {isCreating ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Creating...
+                Creating group & exchanging keys...
               </>
             ) : (
               <>
-                {step === 3 ? "Create Group" : "Next >"}
+                {step === 3 ? "Create Group" : "Next"}
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* Right Content Area (Empty State - Static) */}
-      <div className="hidden flex-1 flex-col items-center justify-center bg-white md:flex w-full">
-         <div className="flex flex-col items-center text-center max-w-sm">
-            <div className="relative mb-8">
-              <div className="h-[120px] w-[120px] rounded-full bg-[#EEF2FF] flex items-center justify-center border border-[#E0E7FF] shadow-2xl shadow-blue-500/10">
-                <Users className="h-16 w-16 text-[#3B58F5]" strokeWidth={1.5} />
-              </div>
-            </div>
-            
-            <h2 className="text-[22px] font-bold text-[#0F172A] mb-3">No Groups Yet</h2>
-            <p className="text-[13px] font-semibold text-[#1E293B] leading-relaxed max-w-[240px]">
-              You haven't joined or created any<br />groups yet.
-            </p>
-         </div>
+      {/* Right Content Area (WhatsApp E2EE Standby Canvas) */}
+      <div className="hidden flex-1 flex-col items-center justify-center chat-canvas-bg md:flex w-full select-none p-8 relative">
+        <div className="relative z-10 flex flex-col items-center max-w-[460px] text-center bg-white/80 dark:bg-[#202C33]/80 backdrop-blur-md p-8 rounded-3xl border border-white/60 dark:border-white/10 shadow-xl">
+          <div className="h-20 w-20 rounded-full bg-gradient-to-tr from-[#00A884] to-[#25D366] flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 mb-6 animate-in zoom-in duration-300">
+            <Users className="h-9 w-9" />
+          </div>
+          
+          <h2 className="text-[24px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-2 tracking-tight">Create a Group</h2>
+          <p className="text-[14px] text-[#54656F] dark:text-[#8696A0] leading-relaxed mb-6">
+            Bring your friends, family, or teammates together. All group communications are private and secure.
+          </p>
+
+          <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#667781] dark:text-[#8696A0] bg-[#00A884]/10 dark:bg-[#00A884]/15 px-3 py-1.5 rounded-full">
+            <Lock className="h-3.5 w-3.5 text-[#00A884]" />
+            <span>End-to-end encrypted group rooms</span>
+          </div>
+        </div>
       </div>
     </div>
   );

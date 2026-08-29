@@ -64,17 +64,18 @@ export function TypingIndicator({ name, avatarUrl }: TypingIndicatorProps) {
         */}
         <div
           className="
-            flex items-center gap-[6px]
-            bg-black/[.08] dark:bg-white/[.12]
-            rounded-[20px] rounded-bl-[5px]
-            px-[14px] py-[11px]
-            text-black/50 dark:text-white/50
-            shadow-none
+            flex items-center gap-[5px]
+            bg-white dark:bg-[#202C33]
+            border border-black/[0.04] dark:border-white/[0.04]
+            rounded-[18px] rounded-bl-[4px]
+            px-[14px] py-[10px]
+            text-[#8696A0]
+            shadow-xs
           "
         >
-          <span className="typing-dot" style={{ animationDelay: "0ms" }} />
-          <span className="typing-dot" style={{ animationDelay: "190ms" }} />
-          <span className="typing-dot" style={{ animationDelay: "380ms" }} />
+          <span className="typing-dot bg-[#00A884]" style={{ animationDelay: "0ms" }} />
+          <span className="typing-dot bg-[#00A884]" style={{ animationDelay: "190ms" }} />
+          <span className="typing-dot bg-[#00A884]" style={{ animationDelay: "380ms" }} />
         </div>
       </div>
     </div>

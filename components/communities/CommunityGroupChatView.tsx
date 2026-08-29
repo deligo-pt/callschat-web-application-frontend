@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useGroupChat, GroupMessage } from "@/hooks/useGroupChat";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
 import { GroupInput } from "@/components/group/GroupInput";
+import { groupService } from "@/services/group.service";
 
 interface CommunityGroupChatViewProps {
   group: CommunityDetailGroup;
@@ -82,7 +83,14 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
 
     setIsUploading(true);
     try {
-      await sendMessage(text, file);
+      if (file) {
+        const uploadRes = await groupService.uploadGroupMedia(group.id, file);
+        if (uploadRes.success && uploadRes.data?.mediaUrl) {
+          await sendMessage(text, null, uploadRes.data.mediaUrl, uploadRes.data.mediaType);
+        }
+      } else {
+        await sendMessage(text);
+      }
     } finally {
       setIsUploading(false);
     }
