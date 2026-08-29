@@ -35,7 +35,7 @@ export default function RootLayout({
       >
         <ClientIntlProvider>
           <main className="flex-1">{children}</main>
-          <Toaster position="top-center" richColors />
+          <Toaster position="top-right" richColors />
         </ClientIntlProvider>
       </body>
     </html>

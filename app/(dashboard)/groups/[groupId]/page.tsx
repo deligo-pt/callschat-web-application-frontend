@@ -8,7 +8,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import apiClient from "@/services/api.client";
-import { useGroupChat } from "@/hooks/useGroupChat";
+import { useGroupChat, QuotedMessage } from "@/hooks/useGroupChat";
 import { useContacts, Contact } from "@/hooks/useContacts";
 import { encryptMessage } from "@/utils/crypto";
 import { chatService } from "@/services/chat.service";
@@ -63,7 +63,21 @@ export default function GroupChatPage() {
   const [isLiveTranslationEnabled, setIsLiveTranslationEnabled] = useState(false);
   const [isPrivacyModeEnabled, setIsPrivacyModeEnabled] = useState(false);
   const [isFavourite, setIsFavourite] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<QuotedMessage | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("highlight-pulse");
+      void el.offsetWidth; // trigger reflow
+      el.classList.add("highlight-pulse");
+      setTimeout(() => el.classList.remove("highlight-pulse"), 2500);
+    } else {
+      toast.info("Original message is further up in history");
+    }
+  };
 
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
@@ -683,6 +697,34 @@ export default function GroupChatPage() {
                   }
                   onEdit={(msgId, newText) => editMessage(msgId, newText)}
                   onUnsend={unsendMessage}
+                  onReply={(m) =>
+                    setReplyingTo({
+                      id: m.id,
+                      senderId: m.senderId,
+                      senderName:
+                        m.senderId === currentUserId
+                          ? "You"
+                          : m.sender?.profile?.displayName || "Member",
+                      text: m.text,
+                      mediaUrl: m.mediaUrl,
+                      mediaType: m.mediaType,
+                    })
+                  }
+                  onReplyPrivately={async (senderId) => {
+                    if (!senderId || senderId === currentUserId) return;
+                    try {
+                      const res = await chatService.initiateConversation(senderId);
+                      if (res?.data?.id) {
+                        router.push(`/chats/${res.data.id}?recipientId=${senderId}`);
+                      } else {
+                        router.push(`/chats?recipientId=${senderId}`);
+                      }
+                    } catch {
+                      router.push(`/chats?recipientId=${senderId}`);
+                    }
+                  }}
+                  onScrollToMessage={scrollToMessage}
+                  currentUserId={currentUserId}
                 />
               );
             })
@@ -692,7 +734,13 @@ export default function GroupChatPage() {
         </div>
 
         {/* Input Form */}
-        <GroupInput onSend={handleSend} isReady={isReady} isUploading={isUploading} />
+        <GroupInput
+          onSend={handleSend}
+          isReady={isReady}
+          isUploading={isUploading}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingTo(null)}
+        />
       </div>
 
       {/* Sidebar - Group Info */}

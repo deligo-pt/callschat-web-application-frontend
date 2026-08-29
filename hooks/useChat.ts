@@ -13,6 +13,15 @@ export interface MessageReceipt {
   seenAt: string | null;
 }
 
+export interface QuotedMessage {
+  id: string;
+  senderId: string;
+  senderName?: string;
+  text: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -26,6 +35,8 @@ export interface ChatMessage {
   /** Per-message disappear timer in seconds, stamped at send time. */
   disappearAfterSeconds?: number | null;
   receipts?: MessageReceipt[];
+  replyToId?: string | null;
+  replyTo?: QuotedMessage | null;
 }
 
 export interface PinnedMessage {
@@ -43,6 +54,93 @@ const parseEditedText = (rawText: string) => {
     return { text: rawText.substring("__EDITED__:".length), isEdited: true };
   }
   return { text: rawText, isEdited: false };
+};
+
+const resolveQuotedMessage = async (
+  replyToRaw: any,
+  currentUid: string,
+  privKey?: string | null,
+  peerKeys?: string[],
+  myPub?: string | null,
+  isBiz: boolean = false,
+  knownDecryptedMap?: Map<string, string>
+): Promise<QuotedMessage | null> => {
+  if (!replyToRaw || !replyToRaw.id) return null;
+  const senderName =
+    replyToRaw.senderId === currentUid || replyToRaw.senderName === "You"
+      ? "You"
+      : replyToRaw.sender?.profile?.displayName ||
+        replyToRaw.sender?.profile?.username ||
+        replyToRaw.senderName ||
+        "Contact";
+
+  if (replyToRaw.isDeleted) {
+    return {
+      id: replyToRaw.id,
+      senderId: replyToRaw.senderId,
+      senderName,
+      text: "🚫 This message was deleted",
+      mediaUrl: null,
+      mediaType: null,
+    };
+  }
+
+  let text = replyToRaw.text || "";
+
+  // 1. Check known decrypted map first if available
+  if (!text && knownDecryptedMap && knownDecryptedMap.has(replyToRaw.id)) {
+    text = knownDecryptedMap.get(replyToRaw.id)!;
+  }
+
+  // 2. If plaintext (B2C or missing nonce), extract directly
+  if (!text && replyToRaw.ciphertext && (!replyToRaw.nonce || isBiz)) {
+    text = parseEditedText(replyToRaw.ciphertext).text;
+  }
+
+  // 3. If E2EE ciphertext, decrypt with candidate keys
+  if (!text && replyToRaw.ciphertext && replyToRaw.nonce && privKey) {
+    let keysToTry = peerKeys && peerKeys.length > 0 ? [...peerKeys] : [];
+    if (keysToTry.length === 0 && replyToRaw.senderId) {
+      try {
+        const res = await chatService.fetchRecipientKey(replyToRaw.senderId);
+        if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+          keysToTry = res.data.map((d: any) => d.publicKey);
+        } else if (res?.success && res?.data?.publicKey) {
+          keysToTry = [res.data.publicKey];
+        }
+      } catch {}
+    }
+    for (const k of keysToTry) {
+      try {
+        const dec = await decryptMessage(replyToRaw.ciphertext, replyToRaw.nonce, k, privKey);
+        text = parseEditedText(dec).text;
+        break;
+      } catch {}
+    }
+    if (!text && myPub) {
+      try {
+        const dec = await decryptMessage(replyToRaw.ciphertext, replyToRaw.nonce, myPub, privKey);
+        text = parseEditedText(dec).text;
+      } catch {}
+    }
+  }
+
+  // 4. Media fallback text
+  if (!text && replyToRaw.mediaType) {
+    if (replyToRaw.mediaType === "image") text = "Photo";
+    else if (replyToRaw.mediaType === "video") text = "Video";
+    else if (replyToRaw.mediaType === "audio") text = "Voice message";
+    else if (replyToRaw.mediaType === "document") text = "Document";
+  }
+
+  return {
+    id: replyToRaw.id,
+    senderId: replyToRaw.senderId,
+    senderName,
+    text,
+    mediaUrl: replyToRaw.mediaUrl || null,
+    mediaType: replyToRaw.mediaType || null,
+  };
 };
 
 export const useChat = (conversationId: string, currentUserId: string, activePeerId: string, isBizChat: boolean = false) => {
@@ -66,6 +164,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const currentUserIdRef = useRef<string>(currentUserId);
   const activePeerIdRef = useRef<string>(activePeerId);
   const isBizChatRef = useRef<boolean>(isBizChat);
+  const pendingReceiptsRef = useRef<Map<string, MessageReceipt[]>>(new Map());
 
   useEffect(() => {
     isBizChatRef.current = isBizChat;
@@ -143,107 +242,83 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             : historyRes.data.messages;
 
           if (Array.isArray(rawMessages)) {
+            // Resolve ALL public keys for this peer
+            const resolvePeerKeys = async (uid: string): Promise<string[]> => {
+              try {
+                const res = await chatService.fetchRecipientKey(uid);
+                if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+                  return res.data.map((d: { publicKey: string }) => d.publicKey);
+                } else if (res?.success && res?.data?.publicKey) {
+                  return [res.data.publicKey];
+                }
+              } catch { /* ignore */ }
+              return [];
+            };
+
+            const peerKeys = activePeerId ? await resolvePeerKeys(activePeerId) : [];
+
+            // Step 1: Pre-decrypt all message texts and build a lookup map
+            const decryptedTextsMap = new Map<string, string>();
+            for (const msg of rawMessages) {
+              const isTicketMessage = !!msg.ticketId;
+              if (!msg.ciphertext || !msg.nonce || isBizChat || isTicketMessage) {
+                if (msg.ciphertext) {
+                  decryptedTextsMap.set(msg.id, parseEditedText(msg.ciphertext).text);
+                }
+              } else if (myPrivateKey && peerKeys.length > 0) {
+                for (const candidateKey of peerKeys) {
+                  try {
+                    const dec = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKey);
+                    decryptedTextsMap.set(msg.id, parseEditedText(dec).text);
+                    break;
+                  } catch {}
+                }
+                if (!decryptedTextsMap.has(msg.id) && myPublicKey) {
+                  try {
+                    const dec = await decryptMessage(msg.ciphertext, msg.nonce, myPublicKey, myPrivateKey);
+                    decryptedTextsMap.set(msg.id, parseEditedText(dec).text);
+                  } catch {}
+                }
+              }
+            }
+
+            // Step 2: Build final decrypted messages with fully resolved quoted replies
             const decryptedHistory = await Promise.all(
               rawMessages.map(async (msg: any) => {
-                // ── Plaintext bypass rules ─────────────────────────────────────
-                // A message must NOT go through libsodium decryption when ANY of:
-                //   1. msg.ticketId is set → B2C support ticket message.
-                //   2. isBizChat flag → the whole conversation is a B2C thread.
-                //   3. nonce is absent → plaintext was stored directly.
-                //   4. ciphertext is absent → media-only message.
                 const isTicketMessage = !!msg.ticketId;
-                if (!msg.ciphertext || !msg.nonce || isBizChat || isTicketMessage) {
-                  const parsed = parseEditedText(msg.ciphertext || "");
-                  return {
-                    id: msg.id,
-                    conversationId: msg.conversationId,
-                    senderId: msg.senderId,
-                    text: parsed.text,
-                    isEdited: parsed.isEdited,
-                    createdAt: msg.createdAt,
-                    mediaUrl: msg.mediaUrl,
-                    mediaType: msg.mediaType,
-                    isDeleted: msg.isDeleted,
-                    disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
-                  };
-                }
+                const replyTo = await resolveQuotedMessage(
+                  msg.replyTo,
+                  currentUserId,
+                  myPrivateKey,
+                  peerKeys,
+                  myPublicKey,
+                  isBizChat || isTicketMessage,
+                  decryptedTextsMap
+                );
 
-                try {
-                  if (!myPrivateKey) throw new Error("Missing private key");
+                const text =
+                  decryptedTextsMap.get(msg.id) ??
+                  (msg.ciphertext
+                    ? isBizChat || !msg.nonce
+                      ? parseEditedText(msg.ciphertext).text
+                      : "🔒 Encrypted Message"
+                    : "");
 
-                  // ── Key selection logic ────────────────────────────────────
-                  const isSentByMe = msg.senderId === currentUserId;
-                  const targetUserId = isSentByMe ? activePeerId : msg.senderId;
-
-                  // Resolve ALL public keys for this peer (for key-rotation-aware decryption)
-                  const resolvePeerKeys = async (uid: string): Promise<string[]> => {
-                    try {
-                      const res = await chatService.fetchRecipientKey(uid);
-                      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                        // Backend returns keys newest-first (desc); keep that order
-                        return res.data.map((d: { publicKey: string }) => d.publicKey);
-                      } else if (res?.success && res?.data?.publicKey) {
-                        return [res.data.publicKey];
-                      }
-                    } catch { /* ignore */ }
-                    return [];
-                  };
-
-                  const peerKeys = await resolvePeerKeys(targetUserId);
-                  if (peerKeys.length === 0) throw new Error("No public key available for decryption");
-
-                  // ── Try every registered key for the peer (handles key rotation) ──
-                  let text: string | undefined;
-                  let decrypted = false;
-
-                  for (const candidateKey of peerKeys) {
-                    try {
-                      text = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKey);
-                      decrypted = true;
-                      break;
-                    } catch { /* try next key */ }
-                  }
-
-                  // ── Final fallback: use MY OWN public key ─────────────────────
-                  if (!decrypted && myPublicKey) {
-                    try {
-                      text = await decryptMessage(msg.ciphertext, msg.nonce, myPublicKey, myPrivateKey);
-                      console.log(`[History] Decrypted msg ${msg.id} using own public key (key rotation recovery).`);
-                      decrypted = true;
-                    } catch { /* all attempts exhausted */ }
-                  }
-
-                  if (!decrypted || text === undefined) {
-                    throw new Error("All decryption attempts failed");
-                  }
-
-                  const parsed = parseEditedText(text!);
-                  return {
-                    id: msg.id,
-                    conversationId: msg.conversationId,
-                    senderId: msg.senderId,
-                    text: parsed.text,
-                    isEdited: parsed.isEdited,
-                    createdAt: msg.createdAt,
-                    mediaUrl: msg.mediaUrl,
-                    mediaType: msg.mediaType,
-                    isDeleted: msg.isDeleted,
-                    disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
-                  };
-                } catch {
-                  return {
-                    id: msg.id,
-                    conversationId: msg.conversationId,
-                    senderId: msg.senderId,
-                    text: "🔒 Encrypted Message",
-                    isEdited: false,
-                    createdAt: msg.createdAt,
-                    mediaUrl: msg.mediaUrl,
-                    mediaType: msg.mediaType,
-                    isDeleted: msg.isDeleted,
-                    disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
-                  };
-                }
+                return {
+                  id: msg.id,
+                  conversationId: msg.conversationId,
+                  senderId: msg.senderId,
+                  text: text,
+                  isEdited: msg.isEdited ?? false,
+                  createdAt: msg.createdAt,
+                  mediaUrl: msg.mediaUrl,
+                  mediaType: msg.mediaType,
+                  isDeleted: msg.isDeleted,
+                  disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
+                  replyToId: msg.replyToId ?? null,
+                  replyTo,
+                  receipts: msg.receipts || [],
+                };
               })
             );
             // Sort ascending (oldest first)
@@ -252,6 +327,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             );
             setMessages(decryptedHistory);
+
+            // Proactively acknowledge delivery for any messages not yet marked as delivered
+            if (socket && isConnected) {
+              const undelivered = rawMessages.filter(
+                (m) =>
+                  m.senderId !== currentUserId &&
+                  (!m.receipts ||
+                    !m.receipts.some(
+                      (r: any) => r.userId === currentUserId && r.deliveredAt
+                    ))
+              );
+              undelivered.forEach((m) => {
+                socket.emit("chat:mark_delivered", {
+                  conversationId,
+                  messageId: m.id,
+                });
+              });
+            }
           }
         }
       } catch (err) {
@@ -312,6 +405,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       // a nonce before the plaintext-only B2C path was enforced.
       const noPeer = !activePeerIdRef.current;
       const isTicket = !!(payload.ticketId);
+      let allPeerKeys: string[] = pubKey ? [pubKey] : [];
 
       if (!isBiz && !noPeer && !isTicket && payload.ciphertext && payload.nonce) {
         if (!privKey) {
@@ -330,7 +424,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           const targetUserId = senderId === currentUser ? peerUser : senderId;
 
           // Fetch ALL registered public keys for the target user (newest first)
-          let allPeerKeys: string[] = [];
           try {
             // Use cached key as the first candidate if it matches the target
             if (pubKey && (!targetUserId || targetUserId === peerUser)) {
@@ -389,6 +482,55 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
           console.log("✅ [Socket] Decrypted message:", text);
 
+          // Build known messages map
+          const knownMap = new Map<string, string>();
+          messages.forEach((m) => {
+            if (m.text) knownMap.set(m.id, m.text);
+          });
+
+          let resolvedReplyTo = await resolveQuotedMessage(
+            payload.replyTo,
+            currentUserIdRef.current,
+            privKey,
+            allPeerKeys,
+            myPublicKeyRef.current,
+            isBiz,
+            knownMap
+          );
+
+          // Helper to merge server receipts, optimistic receipts, and buffered pending receipts
+          const pendingForThis = pendingReceiptsRef.current.get(payload.id) || [];
+          const mergeReceipts = (base: MessageReceipt[] = [], opt?: MessageReceipt[]) => {
+            const res = [...base];
+            if (opt) {
+              for (const r of opt) {
+                const idx = res.findIndex((x) => x.userId === r.userId);
+                if (idx !== -1) {
+                  res[idx] = {
+                    ...res[idx],
+                    deliveredAt: r.deliveredAt ?? res[idx].deliveredAt,
+                    seenAt: r.seenAt ?? res[idx].seenAt,
+                  };
+                } else {
+                  res.push(r);
+                }
+              }
+            }
+            for (const pr of pendingForThis) {
+              const idx = res.findIndex((x) => x.userId === pr.userId);
+              if (idx !== -1) {
+                res[idx] = {
+                  ...res[idx],
+                  deliveredAt: pr.deliveredAt ?? res[idx].deliveredAt,
+                  seenAt: pr.seenAt ?? res[idx].seenAt,
+                };
+              } else {
+                res.push(pr);
+              }
+            }
+            return res;
+          };
+
           setMessages((prev) => {
             // Replace an existing optimistic placeholder if present,
             // otherwise deduplicate by real server ID
@@ -396,6 +538,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             if (hasRealId) {
               console.log("🔄 [Socket] Duplicate message by server ID, skipping");
               return prev;
+            }
+
+            // If quote text missing, check prev state
+            if (resolvedReplyTo && !resolvedReplyTo.text && payload.replyToId) {
+              const matchedPrev = prev.find((m) => m.id === payload.replyToId);
+              if (matchedPrev?.text) {
+                resolvedReplyTo.text = matchedPrev.text;
+              }
             }
 
             // Look for an optimistic placeholder to replace (last optimistic msg
@@ -406,6 +556,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             if (optimisticIdx !== -1) {
               const updated = [...prev];
               const parsed = parseEditedText(text);
+              const existingOpt = prev[optimisticIdx];
+              const finalReplyTo =
+                resolvedReplyTo?.text
+                  ? resolvedReplyTo
+                  : existingOpt?.replyTo?.text
+                  ? existingOpt.replyTo
+                  : resolvedReplyTo;
+
               updated[optimisticIdx] = {
                 id: payload.id,
                 conversationId: payload.conversationId,
@@ -416,7 +574,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
-                receipts: payload.receipts || [],
+                receipts: mergeReceipts(payload.receipts || [], existingOpt?.receipts),
+                replyToId: payload.replyToId ?? null,
+                replyTo: finalReplyTo,
               };
               return updated;
             }
@@ -434,7 +594,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
-                receipts: payload.receipts || [],
+                receipts: mergeReceipts(payload.receipts || []),
+                replyToId: payload.replyToId ?? null,
+                replyTo: resolvedReplyTo,
               },
             ];
           });
@@ -442,6 +604,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           console.error("❌ [Socket] Failed to decrypt message:", err);
           
           const fallbackSenderId = payload.senderId || payload.sender?.id || "unknown";
+          const resolvedReplyTo = await resolveQuotedMessage(
+            payload.replyTo,
+            currentUserIdRef.current,
+            privKey,
+            allPeerKeys,
+            myPublicKeyRef.current,
+            isBiz
+          );
 
           // Still add the message as unreadable rather than losing it
           setMessages((prev) => {
@@ -459,6 +629,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
                 receipts: payload.receipts || [],
+                replyToId: payload.replyToId ?? null,
+                replyTo: resolvedReplyTo,
               },
             ];
           });
@@ -467,6 +639,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         // Plaintext: no nonce, B2C chat, peer not resolved, or ticket message
         console.log("ℹ️ [Socket] Plaintext message received");
         const parsed = parseEditedText(payload.ciphertext || "");
+        const resolvedReplyTo = await resolveQuotedMessage(
+          payload.replyTo,
+          currentUserIdRef.current,
+          privKey,
+          [],
+          null,
+          true
+        );
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
           return [
@@ -482,11 +662,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               mediaType: payload.mediaType,
               disappearAfterSeconds: payload.disappearAfterSeconds,
               receipts: payload.receipts || [],
+              replyToId: payload.replyToId ?? null,
+              replyTo: resolvedReplyTo,
             },
           ];
         });
       } else if (payload.mediaType || payload.mediaUrl) {
         // Media-only messages (no text)
+        const resolvedReplyTo = await resolveQuotedMessage(
+          payload.replyTo,
+          currentUserIdRef.current,
+          privKey,
+          allPeerKeys,
+          myPublicKeyRef.current,
+          isBiz
+        );
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
           return [
@@ -501,12 +691,27 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               mediaType: payload.mediaType,
               disappearAfterSeconds: payload.disappearAfterSeconds,
               receipts: payload.receipts || [],
+              replyToId: payload.replyToId ?? null,
+              replyTo: resolvedReplyTo,
             },
           ];
         });
       }
       
-      // Note: chat:mark_delivered is now handled globally in SocketProvider
+      // Proactively mark message as delivered whenever received from another participant
+      if (senderId !== currentUserIdRef.current && payload.id) {
+        socket.emit("chat:mark_delivered", {
+          conversationId,
+          messageId: payload.id,
+        });
+      }
+
+      // If receiver is actively in the chat and tab is visible, mark conversation as seen immediately
+      if (senderId !== currentUserIdRef.current && typeof document !== 'undefined' && document.visibilityState !== 'hidden') {
+        socket.emit("chat:mark_conversation_seen", {
+          conversationId,
+        });
+      }
     };
 
     const handleChatError = (err: any) => {
@@ -562,48 +767,129 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     const handleStatusUpdate = (payload: any) => {
       if (payload.conversationId !== conversationId) return;
       
-      setMessages((prev) => prev.map((msg) => {
-        if (msg.id === payload.messageId) {
-          const receipts = [...(msg.receipts || [])];
-          const existing = receipts.find((r) => r.userId === payload.userId);
-          
-          if (existing) {
-            if (payload.status === 'DELIVERED') existing.deliveredAt = payload.timestamp;
-            if (payload.status === 'SEEN') existing.seenAt = payload.timestamp;
-          } else {
-            receipts.push({
-              id: Math.random().toString(), // local fallback ID
-              userId: payload.userId,
-              deliveredAt: payload.status === 'DELIVERED' ? payload.timestamp : null,
-              seenAt: payload.status === 'SEEN' ? payload.timestamp : null,
-            });
+      const newDeliveredAt =
+        payload.status === 'DELIVERED'
+          ? payload.timestamp
+          : payload.status === 'SEEN' && payload.deliveredAt
+          ? payload.deliveredAt
+          : payload.status === 'SEEN'
+          ? payload.timestamp
+          : null;
+
+      const newSeenAt = payload.status === 'SEEN' ? payload.timestamp : null;
+
+      // Buffer in pendingReceiptsRef in case this status update arrived before
+      // the message finished async decryption/optimistic replacement
+      const currentPending = pendingReceiptsRef.current.get(payload.messageId) || [];
+      const pIdx = currentPending.findIndex((r) => r.userId === payload.userId);
+      if (pIdx !== -1) {
+        currentPending[pIdx] = {
+          ...currentPending[pIdx],
+          deliveredAt: newDeliveredAt ?? currentPending[pIdx].deliveredAt,
+          seenAt: newSeenAt ?? currentPending[pIdx].seenAt,
+        };
+      } else {
+        currentPending.push({
+          id: Math.random().toString(),
+          userId: payload.userId,
+          deliveredAt: newDeliveredAt,
+          seenAt: newSeenAt,
+        });
+      }
+      pendingReceiptsRef.current.set(payload.messageId, currentPending);
+
+      setMessages((prev) => {
+        let matched = false;
+        const next = prev.map((msg) => {
+          if (msg.id === payload.messageId) {
+            matched = true;
+            const receipts = [...(msg.receipts || [])];
+            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
+            
+            if (existingIdx !== -1) {
+              const existing = receipts[existingIdx];
+              receipts[existingIdx] = {
+                ...existing,
+                deliveredAt: newDeliveredAt ?? existing.deliveredAt,
+                seenAt: newSeenAt ?? existing.seenAt,
+              };
+            } else {
+              receipts.push({
+                id: Math.random().toString(),
+                userId: payload.userId,
+                deliveredAt: newDeliveredAt,
+                seenAt: newSeenAt,
+              });
+            }
+            
+            return { ...msg, receipts };
           }
-          
-          return { ...msg, receipts };
+          return msg;
+        });
+
+        // If not matched by real server ID (message is still an optimistic placeholder),
+        // update the latest optimistic message immediately so checkmarks update with zero lag
+        if (!matched) {
+          const optIdx = next.map((m) => m.id).lastIndexOf(
+            next.slice().reverse().find((m) => m.id.startsWith("optimistic-") && m.senderId === currentUserIdRef.current)?.id ?? ""
+          );
+          if (optIdx !== -1) {
+            const optMsg = next[optIdx];
+            const receipts = [...(optMsg.receipts || [])];
+            const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
+            if (existingIdx !== -1) {
+              receipts[existingIdx] = {
+                ...receipts[existingIdx],
+                deliveredAt: newDeliveredAt ?? receipts[existingIdx].deliveredAt,
+                seenAt: newSeenAt ?? receipts[existingIdx].seenAt,
+              };
+            } else {
+              receipts.push({
+                id: Math.random().toString(),
+                userId: payload.userId,
+                deliveredAt: newDeliveredAt,
+                seenAt: newSeenAt,
+              });
+            }
+            next[optIdx] = { ...optMsg, receipts };
+          }
         }
-        return msg;
-      }));
+
+        return next;
+      });
     };
 
     const handleConversationStatusUpdate = (payload: any) => {
       if (payload.conversationId !== conversationId) return;
       if (payload.status !== 'SEEN') return;
 
-      const updatedReceiptsMap = new Map(payload.receipts.map((r: any) => [r.messageId, r.timestamp]));
+      // Build a map of messageId -> { seenAt, deliveredAt } from the receipt list
+      const updatedReceiptsMap = new Map(
+        payload.receipts.map((r: any) => [r.messageId, r])
+      );
 
       setMessages((prev) => prev.map((msg) => {
-        const seenAtStr = updatedReceiptsMap.get(msg.id) as string;
-        if (seenAtStr) {
+        const receiptData = updatedReceiptsMap.get(msg.id) as any;
+        if (receiptData) {
+          const seenAtStr = receiptData.timestamp;
+          const deliveredAtStr = receiptData.deliveredAt ?? null;
           const receipts = [...(msg.receipts || [])];
-          const existing = receipts.find((r) => r.userId === payload.userId);
+          const existingIdx = receipts.findIndex((r) => r.userId === payload.userId);
           
-          if (existing) {
-            existing.seenAt = seenAtStr;
+          if (existingIdx !== -1) {
+            const existing = receipts[existingIdx];
+            receipts[existingIdx] = {
+              ...existing,
+              // Preserve existing deliveredAt if backend didn't send one (never overwrite with null)
+              deliveredAt: deliveredAtStr ?? existing.deliveredAt,
+              seenAt: seenAtStr,
+            };
           } else {
             receipts.push({
               id: Math.random().toString(),
               userId: payload.userId,
-              deliveredAt: null,
+              // seen implies delivered — use backend value or fall back to seenAt timestamp
+              deliveredAt: deliveredAtStr ?? seenAtStr,
               seenAt: seenAtStr,
             });
           }
@@ -662,11 +948,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     if (!socket || !isConnected || !conversationId || !messages.length) return;
 
     const currentUser = currentUserIdRef.current;
-    let visibilityTimeout: NodeJS.Timeout;
     
     const checkAndMarkSeen = () => {
-      // Only mark as seen if the document is focused and visible
-      if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+      // Mark as seen if page is not hidden
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return;
       }
 
@@ -684,23 +969,32 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
     };
 
-    // Check initially (with slight delay to allow rendering/focus changes)
-    visibilityTimeout = setTimeout(checkAndMarkSeen, 500);
+    // Check immediately and also with slight delay for render stability
+    checkAndMarkSeen();
+    const visibilityTimeout = setTimeout(checkAndMarkSeen, 300);
 
-    // Also check when window regains focus or visibility changes
+    // Also check when window regains focus, becomes visible, or receives user interaction
     window.addEventListener("focus", checkAndMarkSeen);
+    window.addEventListener("click", checkAndMarkSeen);
     document.addEventListener("visibilitychange", checkAndMarkSeen);
 
     return () => {
       clearTimeout(visibilityTimeout);
       window.removeEventListener("focus", checkAndMarkSeen);
+      window.removeEventListener("click", checkAndMarkSeen);
       document.removeEventListener("visibilitychange", checkAndMarkSeen);
     };
   }, [messages, socket, isConnected, conversationId]);
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (text: string, currentUserId: string, file: File | null = null, skipEncryption: boolean = false) => {
+    async (
+      text: string,
+      currentUserId: string,
+      file: File | null = null,
+      skipEncryption: boolean = false,
+      replyToMessage: QuotedMessage | null = null
+    ) => {
       if (!socket || !isConnected || !conversationId) {
         console.error("Cannot send: missing socket or conversationId");
         return;
@@ -719,6 +1013,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
       // Optimistic local update with a temporary ID
       const optimisticId = `optimistic-${Date.now()}`;
+      const replyToId = replyToMessage?.id || null;
       
       let optimisticMediaType: string | undefined = undefined;
       let optimisticMediaUrl: string | undefined = undefined;
@@ -746,6 +1041,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           createdAt: new Date().toISOString(),
           mediaUrl: optimisticMediaUrl,
           mediaType: optimisticMediaType,
+          replyToId,
+          replyTo: replyToMessage,
         },
       ]);
 
@@ -763,8 +1060,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           if (uploadRes.success) {
             mediaUrl = uploadRes.data.mediaUrl;
             mediaType = uploadRes.data.mediaType;
-            
-            // Update the optimistic message to show the media preview (if it's local URL we could use ObjectURL, but we just wait for real msg)
           }
           setIsUploading(false);
         } else if (text) {
@@ -818,7 +1113,15 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           nonce = crypto.randomUUID();
         }
 
-        const payload = { conversationId, ciphertext, nonce, mediaUrl, mediaType, previewText };
+        const payload = {
+          conversationId,
+          ciphertext,
+          nonce,
+          mediaUrl,
+          mediaType,
+          previewText,
+          replyToId,
+        };
         socket.emit("chat:send_message", payload);
         
         // Remove optimistic message if no text, as server will echo it back

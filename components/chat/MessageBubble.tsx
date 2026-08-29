@@ -1,8 +1,30 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
-import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2, FileText, Download, MoreHorizontal, Edit2, Pin, PinOff, Clock, Trash2, Check, CheckCheck } from "lucide-react";
+import {
+  Phone,
+  Video,
+  PhoneMissed,
+  PhoneIncoming,
+  PhoneOutgoing,
+  Loader2,
+  FileText,
+  Download,
+  MoreHorizontal,
+  Edit2,
+  Pin,
+  PinOff,
+  Clock,
+  Trash2,
+  Check,
+  CheckCheck,
+  Reply,
+  Camera,
+  Mic,
+  Copy,
+  ChevronDown,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -10,7 +32,22 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+  ContextMenuLabel,
+} from "@/components/ui/context-menu";
+import { toast } from "sonner";
 import { useCallContext } from "@/components/providers/CallContext";
 
 const formatTextWithLinks = (text: string) => {
@@ -44,6 +81,15 @@ interface MessageBubbleProps {
     mediaType?: string | null;
     isEdited?: boolean;
     isDeleted?: boolean;
+    replyToId?: string | null;
+    replyTo?: {
+      id: string;
+      senderId: string;
+      senderName?: string;
+      text: string;
+      mediaUrl?: string | null;
+      mediaType?: string | null;
+    } | null;
     receipts?: {
       id: string;
       userId: string;
@@ -61,11 +107,30 @@ interface MessageBubbleProps {
   onPin?: (durationSeconds?: number, previewText?: string, previewMedia?: string) => void;
   onUnpin?: () => void;
   onUnsend?: (messageId: string) => void;
+  onReply?: (msg: any) => void;
+  onScrollToMessage?: (messageId: string) => void;
   /** Per-message disappear timer in seconds, or null if not set. */
   disappearAfterSeconds?: number | null;
+  currentUserId?: string;
 }
 
-export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvatar, onEdit, isPinned, onPin, onUnpin, onUnsend, disappearAfterSeconds }: MessageBubbleProps) {
+export function MessageBubble({
+  msg,
+  isMe,
+  showTail,
+  peerId,
+  peerName,
+  peerAvatar,
+  onEdit,
+  isPinned,
+  onPin,
+  onUnpin,
+  onUnsend,
+  onReply,
+  onScrollToMessage,
+  disappearAfterSeconds,
+  currentUserId,
+}: MessageBubbleProps) {
   const { initiateCall } = useCallContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -74,8 +139,10 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
 
   const getMessageStatus = () => {
     if (!msg.receipts || msg.receipts.length === 0) return "SENT";
-    if (msg.receipts.some((r) => r.seenAt)) return "SEEN";
-    if (msg.receipts.some((r) => r.deliveredAt)) return "DELIVERED";
+    const recipientReceipts = msg.receipts.filter((r) => r.userId !== msg.senderId);
+    const targetReceipts = recipientReceipts.length > 0 ? recipientReceipts : msg.receipts;
+    if (targetReceipts.some((r) => r.seenAt)) return "SEEN";
+    if (targetReceipts.some((r) => r.deliveredAt)) return "DELIVERED";
     return "SENT";
   };
   const status = getMessageStatus();
@@ -155,6 +222,14 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
           isMe ? "order-first" : "order-last"
         )}
       >
+        <button
+          type="button"
+          onClick={() => onReply?.(msg)}
+          className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+          title="Reply"
+        >
+          <Reply className="w-4 h-4" />
+        </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -162,80 +237,109 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
               className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
               title="Message options"
             >
-              <MoreHorizontal className="w-4 h-4" />
+              <ChevronDown className="w-4 h-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align={isMe ? "end" : "start"}
-            className="w-48 bg-white p-1.5 rounded-xl shadow-lg border border-slate-100 z-50"
+            className="w-52 bg-white dark:bg-[#233138] p-1.5 rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 z-50 text-[#111B21] dark:text-[#E9EDEF]"
           >
-            {isMe && (
-              <>
-                {msg.text && (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setEditText(msg.text);
-                      setIsEditing(true);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 text-[#3B58F5]" />
-                    <span>Edit message</span>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={() => onUnsend?.(msg.id)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                  <span>Unsend for everyone</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="my-1 bg-slate-100" />
-              </>
+            <DropdownMenuItem
+              onClick={() => onReply?.(msg)}
+              className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+            >
+              <Reply className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+              <span>Reply</span>
+            </DropdownMenuItem>
+
+            {msg.text && (
+              <DropdownMenuItem
+                onClick={() => {
+                  navigator.clipboard.writeText(msg.text);
+                  toast.success("Copied to clipboard");
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+              >
+                <Copy className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>Copy</span>
+              </DropdownMenuItem>
             )}
+
             {!isPinned ? (
-              <>
-                <DropdownMenuLabel className="text-[11px] font-semibold text-slate-400 px-2 py-1">
-                  Pin Message
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => onPin?.(86400, msg.text, msg.mediaType || undefined)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-                >
-                  <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
-                  <span>For 24 hours</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-                >
-                  <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
-                  <span>For 7 days</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onPin?.(2592000, msg.text, msg.mediaType || undefined)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-                >
-                  <Clock className="w-3.5 h-3.5 text-[#3B58F5]" />
-                  <span>For 30 days</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="my-1 bg-slate-100" />
-                <DropdownMenuItem
-                  onClick={() => onPin?.(undefined, msg.text, msg.mediaType || undefined)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 rounded-lg hover:bg-slate-50 cursor-pointer"
-                >
-                  <Pin className="w-3.5 h-3.5 text-[#3B58F5]" />
-                  <span>Until unpinned</span>
-                </DropdownMenuItem>
-              </>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer">
+                  <Pin className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                  <span>Pin</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-48 bg-white dark:bg-[#233138] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 p-1.5">
+                  <DropdownMenuLabel className="text-[11px] font-semibold text-[#54656F] dark:text-[#8696A0] px-3 py-1">
+                    Choose duration
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => onPin?.(86400, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>For 24 hours</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>For 7 days</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onPin?.(2592000, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>For 30 days</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
+                  <DropdownMenuItem
+                    onClick={() => onPin?.(undefined, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Pin className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>Until unpinned</span>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             ) : (
               <DropdownMenuItem
                 onClick={() => onUnpin?.()}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
               >
-                <PinOff className="w-3.5 h-3.5 text-red-500" />
+                <PinOff className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
                 <span>Unpin message</span>
               </DropdownMenuItem>
+            )}
+
+            {isMe && msg.text && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setEditText(msg.text);
+                  setIsEditing(true);
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+              >
+                <Edit2 className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>Edit message</span>
+              </DropdownMenuItem>
+            )}
+
+            {isMe && (
+              <>
+                <DropdownMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
+                <DropdownMenuItem
+                  onClick={() => onUnsend?.(msg.id)}
+                  className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <span>Delete</span>
+                </DropdownMenuItem>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -461,76 +565,256 @@ export function MessageBubble({ msg, isMe, showTail, peerId, peerName, peerAvata
   };
 
   return (
-    <div id={`msg-${msg.id}`} className={cn("flex w-full z-10 my-1 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
+    <div
+      id={`msg-${msg.id}`}
+      className={cn("flex w-full z-10 my-1 group/bubble relative items-center transition-all", isMe ? "justify-end" : "justify-start")}
+    >
       {renderOptionsMenu()}
       <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
         {renderPinnedBadge()}
-        <div
-          className={cn(
-            "relative px-5 py-3 text-[15px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex flex-col group",
-            isMe ? "bg-[#254BCC] text-white rounded-[24px] rounded-br-[6px]" : "bg-white text-[#11142D] rounded-[24px] rounded-bl-[6px]"
-          )}
-        >
-
-          {renderMedia()}
-
-          {msg.text && (
-            isEditing ? (
-              <div className="flex flex-col gap-2 w-full min-w-[200px] mt-1">
-                <textarea
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (editText.trim() && editText.trim() !== msg.text) {
-                        onEdit?.(msg.id, editText.trim());
-                      }
-                      setIsEditing(false);
-                    } else if (e.key === "Escape") {
-                      setIsEditing(false);
-                      setEditText(msg.text);
-                    }
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div
+              className={cn(
+                "relative px-5 py-3 text-[15px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex flex-col group cursor-default select-text",
+                isMe ? "bg-[#254BCC] text-white rounded-[24px] rounded-br-[6px]" : "bg-white text-[#11142D] rounded-[24px] rounded-bl-[6px]"
+              )}
+            >
+              {/* WhatsApp-Style In-Bubble Quoted Card */}
+              {msg.replyTo && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (msg.replyTo?.id) onScrollToMessage?.(msg.replyTo.id);
                   }}
-                  className="w-full text-sm bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
-                  rows={2}
-                  autoFocus
-                />
-                <div className="flex justify-end gap-1.5 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditText(msg.text);
-                    }}
-                    className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editText.trim() && editText.trim() !== msg.text) {
-                        onEdit?.(msg.id, editText.trim());
-                      }
-                      setIsEditing(false);
-                    }}
-                    className="px-2.5 py-1 rounded bg-white font-medium text-[#254BCC] hover:bg-blue-50 transition-colors cursor-pointer"
-                  >
-                    Save
-                  </button>
+                  role="button"
+                  tabIndex={0}
+                  className={cn(
+                    "relative mb-2 flex items-center justify-between gap-2 overflow-hidden rounded-[8px] p-2 pl-3 text-left cursor-pointer transition-all",
+                    isMe
+                      ? "bg-black/15 hover:bg-black/25 text-white"
+                      : "bg-black/[0.05] hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-[#111B21] dark:text-[#E9EDEF]"
+                  )}
+                >
+                  {/* WhatsApp Left Vertical Colored Stripe Bar */}
+                  <div
+                    className={cn(
+                      "absolute left-0 top-0 bottom-0 w-[4px]",
+                      msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                        ? isMe ? "bg-white" : "bg-[#027eb5] dark:bg-[#53bdeb]"
+                        : isMe ? "bg-white/80" : "bg-[#027eb5] dark:bg-[#53bdeb]"
+                    )}
+                  />
+
+                  <div className="flex flex-col min-w-0 flex-1 pl-1">
+                    <span
+                      className={cn(
+                        "text-[12.5px] font-semibold tracking-tight truncate leading-tight",
+                        isMe
+                          ? "text-white/95"
+                          : msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                          ? "text-[#027eb5] dark:text-[#53bdeb]"
+                          : "text-[#027eb5] dark:text-[#53bdeb]"
+                      )}
+                    >
+                      {msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                        ? "You"
+                        : msg.replyTo.senderName || peerName || "Contact"}
+                    </span>
+                    <div
+                      className={cn(
+                        "flex items-center gap-1 text-[12.5px] truncate mt-0.5 leading-snug",
+                        isMe ? "text-white/85" : "text-[#54656F] dark:text-[#8696A0]"
+                      )}
+                    >
+                      {msg.replyTo.mediaType === "image" && <Camera className="h-3.5 w-3.5 shrink-0" />}
+                      {msg.replyTo.mediaType === "video" && <Video className="h-3.5 w-3.5 shrink-0" />}
+                      {msg.replyTo.mediaType === "audio" && <Mic className="h-3.5 w-3.5 shrink-0" />}
+                      {msg.replyTo.mediaType === "document" && <FileText className="h-3.5 w-3.5 shrink-0" />}
+                      <span className="truncate">
+                        {msg.replyTo.text ||
+                          (msg.replyTo.mediaType
+                            ? msg.replyTo.mediaType === "image"
+                              ? "Photo"
+                              : msg.replyTo.mediaType === "video"
+                              ? "Video"
+                              : msg.replyTo.mediaType === "audio"
+                              ? "Voice message"
+                              : "Document"
+                            : "")}
+                      </span>
+                    </div>
+                  </div>
+                  {msg.replyTo.mediaUrl && msg.replyTo.mediaType?.startsWith("image") && (
+                    <img
+                      src={getOptimizedImageUrl(msg.replyTo.mediaUrl, 44, 44)}
+                      alt="Quoted attachment"
+                      className="h-10 w-10 rounded-[6px] object-cover ring-1 ring-black/5 shrink-0 ml-1.5"
+                    />
+                  )}
                 </div>
-              </div>
-            ) : (
-              <span
-                className="leading-snug whitespace-pre-wrap"
-                style={{ wordBreak: "break-word" }}
+              )}
+
+              {renderMedia()}
+
+              {msg.text && (
+                isEditing ? (
+                  <div className="flex flex-col gap-2 w-full min-w-[200px] mt-1">
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          if (editText.trim() && editText.trim() !== msg.text) {
+                            onEdit?.(msg.id, editText.trim());
+                          }
+                          setIsEditing(false);
+                        } else if (e.key === "Escape") {
+                          setIsEditing(false);
+                          setEditText(msg.text);
+                        }
+                      }}
+                      className="w-full text-sm bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
+                      rows={2}
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-1.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setEditText(msg.text);
+                        }}
+                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editText.trim() && editText.trim() !== msg.text) {
+                            onEdit?.(msg.id, editText.trim());
+                          }
+                          setIsEditing(false);
+                        }}
+                        className="px-2.5 py-1 rounded bg-white font-medium text-[#254BCC] hover:bg-blue-50 transition-colors cursor-pointer"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <span
+                    className="leading-snug whitespace-pre-wrap"
+                    style={{ wordBreak: "break-word" }}
+                  >
+                    {formatTextWithLinks(msg.text)}
+                  </span>
+                )
+              )}
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-52 bg-white dark:bg-[#233138] p-1.5 rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 z-50 text-[#111B21] dark:text-[#E9EDEF]">
+            <ContextMenuItem
+              onClick={() => onReply?.(msg)}
+              className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+            >
+              <Reply className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+              <span>Reply</span>
+            </ContextMenuItem>
+
+            {msg.text && (
+              <ContextMenuItem
+                onClick={() => {
+                  navigator.clipboard.writeText(msg.text);
+                  toast.success("Copied to clipboard");
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
               >
-                {formatTextWithLinks(msg.text)}
-              </span>
-            )
-          )}
-        </div>
+                <Copy className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>Copy</span>
+              </ContextMenuItem>
+            )}
+
+            {!isPinned ? (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer">
+                  <Pin className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                  <span>Pin</span>
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="w-48 bg-white dark:bg-[#233138] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 p-1.5">
+                  <ContextMenuLabel className="text-[11px] font-semibold text-[#54656F] dark:text-[#8696A0] px-3 py-1">
+                    Choose duration
+                  </ContextMenuLabel>
+                  <ContextMenuItem
+                    onClick={() => onPin?.(86400, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>For 24 hours</span>
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => onPin?.(604800, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>For 7 days</span>
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => onPin?.(2592000, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>For 30 days</span>
+                  </ContextMenuItem>
+                  <ContextMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
+                  <ContextMenuItem
+                    onClick={() => onPin?.(undefined, msg.text, msg.mediaType || undefined)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+                  >
+                    <Pin className="w-3.5 h-3.5 text-[#00A884] dark:text-[#25D366]" />
+                    <span>Until unpinned</span>
+                  </ContextMenuItem>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            ) : (
+              <ContextMenuItem
+                onClick={() => onUnpin?.()}
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+              >
+                <PinOff className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>Unpin message</span>
+              </ContextMenuItem>
+            )}
+
+            {isMe && msg.text && (
+              <ContextMenuItem
+                onClick={() => {
+                  setEditText(msg.text);
+                  setIsEditing(true);
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+              >
+                <Edit2 className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>Edit message</span>
+              </ContextMenuItem>
+            )}
+
+            {isMe && (
+              <>
+                <ContextMenuSeparator className="my-1 bg-slate-100 dark:bg-white/10" />
+                <ContextMenuItem
+                  onClick={() => onUnsend?.(msg.id)}
+                  className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <span>Delete</span>
+                </ContextMenuItem>
+              </>
+            )}
+          </ContextMenuContent>
+        </ContextMenu>
         
         {/* Timestamp + disappear countdown outside the bubble */}
         <div className={cn("flex items-center gap-1.5 mt-1 px-1", isMe ? "justify-end text-gray-500" : "justify-start text-gray-500")}>

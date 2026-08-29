@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useChat } from "@/hooks/useChat";
+import { useChat, QuotedMessage } from "@/hooks/useChat";
 import {
   Send,
   ArrowLeft,
@@ -237,12 +237,26 @@ function ChatRoomPageContent() {
   const [tick, setTick] = useState(0);
 
   const [isMuted, setIsMuted] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<QuotedMessage | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("highlight-pulse");
+      void el.offsetWidth; // trigger reflow
+      el.classList.add("highlight-pulse");
+      setTimeout(() => el.classList.remove("highlight-pulse"), 2500);
+    } else {
+      toast.info("Original message is further up in history");
+    }
+  }, []);
 
   // ── Initialization ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -518,7 +532,9 @@ function ChatRoomPageContent() {
     }
 
     // Personal P2P DM path — encrypted WebSocket channel.
-    sendMessage(text, currentUserId, file, false);
+    const currentReply = replyingTo;
+    setReplyingTo(null);
+    sendMessage(text, currentUserId, file, false, currentReply);
   };
 
   if (!conversationId) {
@@ -869,6 +885,23 @@ function ChatRoomPageContent() {
                     )
                   }
                   onUnsend={unsendMessage}
+                  onReply={(m) =>
+                    setReplyingTo({
+                      id: m.id,
+                      senderId: m.senderId,
+                      senderName:
+                        m.senderId === currentUserId
+                          ? "You"
+                          : isBizChat
+                          ? bizName
+                          : recipient?.name || "Contact",
+                      text: m.text,
+                      mediaUrl: m.mediaUrl,
+                      mediaType: m.mediaType,
+                    })
+                  }
+                  onScrollToMessage={scrollToMessage}
+                  currentUserId={currentUserId}
                 />
               );
             })
@@ -900,6 +933,8 @@ function ChatRoomPageContent() {
           isReady={isBizChat ? true : isReady}
           isUploading={isUploading || isSendingFirstBizMessage}
           onTyping={handleTyping}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingTo(null)}
         />
       )}
 

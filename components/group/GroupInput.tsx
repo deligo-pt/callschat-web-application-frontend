@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, Smile } from "lucide-react";
+import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, Smile, Video, FileText } from "lucide-react";
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
+import { getOptimizedImageUrl } from "@/utils/image";
 import dynamic from "next/dynamic";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
@@ -10,9 +11,17 @@ interface GroupInputProps {
   onSend: (text: string, file: File | null) => void;
   isReady: boolean;
   isUploading: boolean;
+  replyingTo?: {
+    id: string;
+    senderName?: string;
+    text: string;
+    mediaType?: string | null;
+    mediaUrl?: string | null;
+  } | null;
+  onCancelReply?: () => void;
 }
 
-export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
+export function GroupInput({ onSend, isReady, isUploading, replyingTo, onCancelReply }: GroupInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -20,6 +29,12 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
   const docInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (replyingTo && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [replyingTo]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -61,6 +76,11 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape" && replyingTo) {
+      e.preventDefault();
+      onCancelReply?.();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -130,6 +150,58 @@ export function GroupInput({ onSend, isReady, isUploading }: GroupInputProps) {
               onClick={handleCapturePhoto}
               className="absolute bottom-4 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white border-4 border-gray-300 hover:scale-105 transition-transform"
             />
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp-style Quoted Reply Preview Bar */}
+      {replyingTo && (
+        <div className="mb-2.5 mx-auto max-w-4xl flex items-center justify-between rounded-2xl border border-[#E9EDEF] bg-[#F0F2F5] p-2.5 shadow-xs transition-all animate-in slide-in-from-bottom-2 duration-150 dark:border-[#222E35] dark:bg-[#202C33]">
+          {/* Left Vertical WhatsApp Green Accent Bar + Content */}
+          <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 pl-0.5">
+            <div className="h-9 w-1 shrink-0 rounded-full bg-[#00A884] dark:bg-[#25D366]" />
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-[13px] font-bold tracking-tight text-[#008069] dark:text-[#25D366] truncate">
+                {replyingTo.senderName || "Replying to message"}
+              </span>
+              <div className="flex items-center gap-1.5 text-[12.5px] text-[#54656F] dark:text-[#8696A0] truncate">
+                {replyingTo.mediaType === "image" && <Camera className="h-3.5 w-3.5 shrink-0 text-[#00A884] dark:text-[#25D366]" />}
+                {replyingTo.mediaType === "video" && <Video className="h-3.5 w-3.5 shrink-0 text-[#00A884] dark:text-[#25D366]" />}
+                {replyingTo.mediaType === "audio" && <Mic className="h-3.5 w-3.5 shrink-0 text-[#00A884] dark:text-[#25D366]" />}
+                {replyingTo.mediaType === "document" && <FileText className="h-3.5 w-3.5 shrink-0 text-[#00A884] dark:text-[#25D366]" />}
+                <span className="truncate">
+                  {replyingTo.text ||
+                    (replyingTo.mediaType
+                      ? replyingTo.mediaType === "image"
+                        ? "Photo"
+                        : replyingTo.mediaType === "video"
+                        ? "Video"
+                        : replyingTo.mediaType === "audio"
+                        ? "Voice message"
+                        : "Document"
+                      : "")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Thumbnail Preview (if media exists) & Dismiss Button */}
+          <div className="flex items-center gap-2 shrink-0 ml-2">
+            {replyingTo.mediaUrl && replyingTo.mediaType?.startsWith("image") && (
+              <img
+                src={getOptimizedImageUrl(replyingTo.mediaUrl, 40, 40)}
+                alt="Reply preview"
+                className="h-10 w-10 rounded-lg object-cover ring-1 ring-black/5"
+              />
+            )}
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[#54656F] transition-colors hover:bg-black/10 hover:text-[#111B21] dark:text-[#8696A0] dark:hover:bg-white/10 dark:hover:text-white"
+              title="Cancel reply (Esc)"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
       )}

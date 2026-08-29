@@ -59,6 +59,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const [typingConvIds, setTypingConvIds] = useState<Set<string>>(new Set());
   // Tracks the last time the user read each conversation (persisted to localStorage)
   const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
+  // Real-time unread counts per conversation (incremented on new messages, cleared on seen)
+  const [realtimeUnreadCounts, setRealtimeUnreadCounts] = useState<Record<string, number>>({});
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -67,6 +69,10 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const { isUserOnline } = usePresence();
   const { currentMode } = useUser();
   const { socket } = useSocket();
+  const currentUserIdRef = React.useRef(currentUserId);
+  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
+  const pathnameRef = React.useRef(pathname);
+  useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
   const basePath = pathname.startsWith("/business") ? "/business/chats" : "/chats";
   const isRootChatsPage = pathname === basePath;
@@ -134,6 +140,11 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore parse errors
     }
+    // Clear the real-time badge for the currently active conversation
+    const activeConvId = pathname.split('/chats/')[1]?.split('?')[0];
+    if (activeConvId) {
+      setRealtimeUnreadCounts((prev) => ({ ...prev, [activeConvId]: 0 }));
+    }
     fetchData();
   }, [pathname, fetchData]);
 
@@ -149,15 +160,68 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!socket) return;
 
-    const handleMessageUpdate = () => {
-      fetchData();
+    const handleNewMessage = (payload: any) => {
+      // Update the last message in the conversation list in-place (no full refetch)
+      const convId = payload.conversationId;
+      if (!convId) {
+        fetchData();
+        return;
+      }
+
+      // Increment real-time unread count if not currently viewing this conversation
+      const activeConvId = pathnameRef.current.split('/chats/')[1]?.split('?')[0];
+      const senderId = payload.senderId || payload.sender?.id;
+      if (senderId && senderId !== currentUserIdRef.current && activeConvId !== convId) {
+        setRealtimeUnreadCounts((prev) => ({
+          ...prev,
+          [convId]: (prev[convId] || 0) + 1,
+        }));
+      }
+
+      // Update the last message inline
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === convId);
+        if (idx === -1) {
+          // New conversation — do a full refetch
+          fetchData();
+          return prev;
+        }
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx],
+          lastMessage: {
+            id: payload.id || '',
+            senderId: payload.senderId || payload.sender?.id || '',
+            ciphertext: payload.ciphertext || null,
+            nonce: payload.nonce || null,
+            mediaType: payload.mediaType || null,
+            mediaUrl: payload.mediaUrl || null,
+            isDeleted: false,
+            createdAt: payload.createdAt || new Date().toISOString(),
+          },
+        };
+        // Move to top (WhatsApp behaviour: most recent conversation floats up)
+        const [moved] = updated.splice(idx, 1);
+        return [moved, ...updated];
+      });
+    };
+
+    const handleConversationSeen = (payload: any) => {
+      // If the current user is the one who saw messages, clear their unread count for that conv
+      const convId = payload.conversationId;
+      if (!convId) return;
+
+      // Clear unread badge if it's the current user reading OR if we just read it
+      if (payload.userId === currentUserIdRef.current) {
+        setRealtimeUnreadCounts((prev) => ({ ...prev, [convId]: 0 }));
+        // Also update lastReadMap so hasUnread returns false
+        const now = new Date().toISOString();
+        setLastReadMap((prev) => ({ ...prev, [convId]: now }));
+      }
     };
 
     // Also re-fetch when a message is unsent so the sidebar falls back
-    // to the previous visible message (WhatsApp behaviour).
-    const handleUnsent = () => {
-      fetchData();
-    };
+    const handleUnsent = () => { fetchData(); };
 
     const handleTypingStart = (payload: { conversationId: string; userId: string }) => {
       setTypingConvIds((prev) => {
@@ -175,14 +239,16 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       });
     };
 
-    socket.on("chat:receive_message", handleMessageUpdate);
+    socket.on("chat:receive_message", handleNewMessage);
     socket.on("chat:message_unsent", handleUnsent);
+    socket.on("chat:conversation_status_update", handleConversationSeen);
     socket.on("chat:typing_start", handleTypingStart);
     socket.on("chat:typing_stop", handleTypingStop);
 
     return () => {
-      socket.off("chat:receive_message", handleMessageUpdate);
+      socket.off("chat:receive_message", handleNewMessage);
       socket.off("chat:message_unsent", handleUnsent);
+      socket.off("chat:conversation_status_update", handleConversationSeen);
       socket.off("chat:typing_start", handleTypingStart);
       socket.off("chat:typing_stop", handleTypingStop);
     };
@@ -206,19 +272,53 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   }, [socket]);
 
   /**
+   * Returns the unread count for a conversation.
+   * Uses real-time tracking first, falls back to API-provided count.
+   */
+  const getUnreadCount = useCallback((conv: Conversation): number => {
+    if (!conv.lastMessage) return 0;
+    if (conv.lastMessage.senderId === currentUserId) return 0;
+
+    // Prefer real-time count if available
+    const rtCount = realtimeUnreadCounts[conv.id];
+    if (rtCount !== undefined) return rtCount;
+
+    // Fall back to API count
+    const apiCount = conv.unreadCount || 0;
+
+    // Validate against lastReadMap: if already read, return 0
+    const lastReadAt = lastReadMap[conv.id];
+    if (lastReadAt && new Date(conv.lastMessage.createdAt) <= new Date(lastReadAt)) return 0;
+
+    return apiCount;
+  }, [currentUserId, lastReadMap, realtimeUnreadCounts]);
+
+  /**
    * Returns true when the conversation has an unread last message.
-   * A message is considered unread when:
-   *   - its senderId is NOT the current user (we never count our own messages), AND
-   *   - its createdAt is AFTER the lastRead timestamp stored in localStorage (or no
-   *     lastRead record exists at all, meaning the conversation has never been opened).
    */
   const hasUnread = useCallback((conv: Conversation): boolean => {
-    if (!conv.lastMessage) return false;
-    if (conv.lastMessage.senderId === currentUserId) return false;
-    const lastReadAt = lastReadMap[conv.id];
-    if (!lastReadAt) return true; // never opened → treat as unread
-    return new Date(conv.lastMessage.createdAt) > new Date(lastReadAt);
-  }, [currentUserId, lastReadMap]);
+    return getUnreadCount(conv) > 0;
+  }, [getUnreadCount]);
+
+  // Sync API unread counts into realtimeUnreadCounts on initial load
+  useEffect(() => {
+    if (conversations.length === 0) return;
+    setRealtimeUnreadCounts((prev) => {
+      const merged = { ...prev };
+      for (const conv of conversations) {
+        // Only initialise from API if we don't already have a real-time value
+        if (merged[conv.id] === undefined && conv.unreadCount !== undefined) {
+          const lastReadAt = lastReadMap[conv.id];
+          if (!lastReadAt || !conv.lastMessage || new Date(conv.lastMessage.createdAt) > new Date(lastReadAt)) {
+            merged[conv.id] = conv.unreadCount;
+          } else {
+            merged[conv.id] = 0;
+          }
+        }
+      }
+      return merged;
+    });
+  }, [conversations, lastReadMap]);
 
 
 
@@ -562,10 +662,16 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
                             {/* Content */}
                             <div className="flex flex-1 flex-col items-start overflow-hidden">
-                              <h3 className="text-[15px] font-bold text-[#1D2A54]">
+                              <h3 className={cn(
+                                "text-[15px]",
+                                hasUnread(conv) && !isActive ? "font-bold text-[#1D2A54]" : "font-semibold text-[#1D2A54]"
+                              )}>
                                 {conv.otherUserName}
                               </h3>
-                              <p className="mt-0.5 w-full truncate text-left text-[13px] font-medium text-[#8F95B2] flex items-center gap-1">
+                              <p className={cn(
+                                "mt-0.5 w-full truncate text-left text-[13px]",
+                                hasUnread(conv) && !isActive ? "font-semibold text-[#1D2A54]" : "font-medium text-[#8F95B2]"
+                              )}>
                                 {(() => {
                                   const preview = getLastMessagePreview(conv);
                                   const isTyping = typingConvIds.has(conv.id);
@@ -582,13 +688,19 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
                             {/* Time & Unread Count */}
                             <div className="flex flex-col items-end justify-center gap-1.5 shrink-0">
-                              <span className="text-[11px] font-semibold text-[#8F95B2]">
+                              <span className={cn(
+                                "text-[11px] font-semibold",
+                                hasUnread(conv) && !isActive ? "text-[#00a884]" : "text-[#8F95B2]"
+                              )}>
                                 {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : formatTime(conv.updatedAt)}
                               </span>
-                              {/* Show badge only when not currently viewing this conversation */}
+                              {/* Show badge with actual unread count when not currently viewing */}
                               {!isActive && hasUnread(conv) ? (
-                                <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3B58F5] px-1 text-[10px] font-bold text-white shadow-sm">
-                                  {conv.unreadCount && conv.unreadCount > 0 ? conv.unreadCount : "●"}
+                                <div className="flex h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#00a884] px-1.5 text-[11px] font-bold text-white shadow-sm">
+                                  {(() => {
+                                    const count = getUnreadCount(conv);
+                                    return count > 99 ? '99+' : count > 0 ? count : '●';
+                                  })()}
                                 </div>
                               ) : null}
                             </div>

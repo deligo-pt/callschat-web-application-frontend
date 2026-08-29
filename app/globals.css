@@ -250,3 +250,24 @@
 .typing-indicator-enter {
   animation: slideUpFade 0.22s ease-out both;
 }
+
+/* ──  Message Highlight Pulse ─────────────────────────────────────── */
+
+@keyframes messageHighlightPulse {
+  0% {
+    background-color: rgba(37, 211, 102, 0.28);
+    box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.2);
+  }
+  60% {
+    background-color: rgba(37, 211, 102, 0.18);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.highlight-pulse {
+  animation: messageHighlightPulse 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-radius: 18px;
+}
