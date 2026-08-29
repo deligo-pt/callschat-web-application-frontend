@@ -22,7 +22,7 @@ export interface CallContextType {
   activeGroupCalls: string[];
   initiateCall: (receiverId: string, callType: 'AUDIO' | 'VIDEO', receiverName?: string, receiverAvatar?: string) => void;
   acceptCall: (callId: string, roomName: string, peerName?: string, peerAvatar?: string) => void;
-  acceptEscalatedCall: (roomName: string, callType: 'AUDIO' | 'VIDEO') => Promise<void>;
+  acceptEscalatedCall: (roomName: string, callType: 'AUDIO' | 'VIDEO', peerName?: string, peerAvatar?: string) => Promise<void>;
   rejectCall: (callId: string, roomName: string, isGroup?: boolean, isEscalated?: boolean) => void;
   acceptCallWaiting: () => void;
   declineCallWaiting: () => void;

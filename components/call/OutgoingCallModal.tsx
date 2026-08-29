@@ -16,26 +16,63 @@ export const OutgoingCallModal = () => {
     ? getOptimizedImageUrl(outgoingCall.receiverAvatar, 80, 80)
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff&size=128`;
 
-  // Determine state labels and styles
+  // Determine state labels, subtitles, and visual themes
   let badgeLabel = `Calling (${outgoingCall.callType.toLowerCase()})...`;
   let statusSubtitle = "Calling...";
-  let isErrorState = false;
+  let glowColor = "bg-[#3B58F5] opacity-20";
+  let ringColor = "border-[#3B58F5]";
+  let ringColorInner = "border-[#3B58F5]/50";
+  let badgeStyle = "bg-white/10 text-white/90 border-white/5 animate-pulse";
+  let subtitleStyle = "text-white/60";
 
   if (outgoingCallStatus === "RINGING") {
     badgeLabel = `Ringing (${outgoingCall.callType.toLowerCase()})...`;
     statusSubtitle = "Ringing...";
+    glowColor = "bg-emerald-500 opacity-25";
+    ringColor = "border-emerald-500";
+    ringColorInner = "border-emerald-500/50";
+    badgeStyle = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 animate-pulse";
+    subtitleStyle = "text-emerald-300/80 font-medium";
+  } else if (outgoingCallStatus === "WAITING") {
+    badgeLabel = "On Another Call";
+    statusSubtitle = "Waiting...";
+    glowColor = "bg-amber-500 opacity-25";
+    ringColor = "border-amber-500";
+    ringColorInner = "border-amber-500/50";
+    badgeStyle = "bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse";
+    subtitleStyle = "text-amber-300/90 font-medium";
   } else if (outgoingCallStatus === "BUSY") {
     badgeLabel = "User Busy";
     statusSubtitle = "User is on another call";
-    isErrorState = true;
+    glowColor = "bg-red-500 opacity-25";
+    ringColor = "border-red-500";
+    ringColorInner = "border-red-500/50";
+    badgeStyle = "bg-red-500/20 text-red-300 border-red-500/30";
+    subtitleStyle = "text-red-400 font-semibold";
   } else if (outgoingCallStatus === "DECLINED") {
     badgeLabel = "Call Declined";
     statusSubtitle = "Call was declined";
-    isErrorState = true;
+    glowColor = "bg-red-500 opacity-25";
+    ringColor = "border-red-500";
+    ringColorInner = "border-red-500/50";
+    badgeStyle = "bg-red-500/20 text-red-300 border-red-500/30";
+    subtitleStyle = "text-red-400 font-semibold";
+  } else if (outgoingCallStatus === "NOT_ANSWERED") {
+    badgeLabel = "No Answer";
+    statusSubtitle = "User did not answer";
+    glowColor = "bg-orange-500 opacity-25";
+    ringColor = "border-orange-500";
+    ringColorInner = "border-orange-500/50";
+    badgeStyle = "bg-orange-500/20 text-orange-300 border-orange-500/30";
+    subtitleStyle = "text-orange-400 font-semibold";
   } else if (outgoingCallStatus === "UNAVAILABLE") {
     badgeLabel = "Unavailable";
     statusSubtitle = "User is unavailable";
-    isErrorState = true;
+    glowColor = "bg-slate-500 opacity-20";
+    ringColor = "border-slate-500";
+    ringColorInner = "border-slate-500/50";
+    badgeStyle = "bg-slate-500/20 text-slate-300 border-slate-500/30";
+    subtitleStyle = "text-slate-400 font-semibold";
   }
 
   return (
@@ -48,19 +85,13 @@ export const OutgoingCallModal = () => {
         
         {/* Subtle background glow effect */}
         <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 ${
-            isErrorState ? "bg-red-500 opacity-25" : "bg-[#3B58F5] opacity-20"
-          } blur-[80px] rounded-full pointer-events-none transition-colors duration-500`}
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 ${glowColor} blur-[80px] rounded-full pointer-events-none transition-colors duration-500`}
         />
 
         {/* Top Header Badge */}
         <div className="flex w-full items-center justify-center mb-10 z-10">
           <span
-            className={`px-4 py-1.5 rounded-full ${
-              isErrorState
-                ? "bg-red-500/20 text-red-300 border-red-500/30"
-                : "bg-white/10 text-white/90 border-white/5 animate-pulse"
-            } text-xs font-semibold tracking-wider uppercase backdrop-blur-md border shadow-sm transition-all duration-300`}
+            className={`px-4 py-1.5 rounded-full ${badgeStyle} text-xs font-semibold tracking-wider uppercase backdrop-blur-md border shadow-sm transition-all duration-300`}
           >
             {badgeLabel}
           </span>
@@ -70,16 +101,12 @@ export const OutgoingCallModal = () => {
         <div className="relative mb-8 z-10">
           {/* Outer pulsing ring */}
           <div
-            className={`absolute inset-0 rounded-full border-2 ${
-              isErrorState ? "border-red-500" : "border-[#3B58F5]"
-            } animate-ping opacity-75`}
+            className={`absolute inset-0 rounded-full border-2 ${ringColor} animate-ping opacity-75`}
             style={{ animationDuration: '2s' }}
           />
           {/* Inner solid ring */}
           <div
-            className={`absolute -inset-4 rounded-full border-2 ${
-              isErrorState ? "border-red-500/50" : "border-[#3B58F5]/50"
-            } animate-pulse`}
+            className={`absolute -inset-4 rounded-full border-2 ${ringColorInner} animate-pulse`}
           />
           
           <img 
@@ -95,9 +122,7 @@ export const OutgoingCallModal = () => {
             {displayName}
           </h2>
           <p
-            className={`mt-1.5 text-sm font-medium ${
-              isErrorState ? "text-red-400 font-semibold" : "text-white/60"
-            } transition-colors duration-300`}
+            className={`mt-1.5 text-sm ${subtitleStyle} transition-colors duration-300`}
           >
             {statusSubtitle}
           </p>

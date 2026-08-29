@@ -78,7 +78,12 @@ export const IncomingCallModal = () => {
     try {
       if (isEscalated) {
         // Phase 4: Escalated path — hit REST token API, skip call:accept socket event
-        await acceptEscalatedCall(incomingCall.roomName, incomingCall.callType);
+        await acceptEscalatedCall(
+          incomingCall.roomName,
+          incomingCall.callType,
+          callerName || undefined,
+          callerAvatar || undefined,
+        );
       } else if (incomingCall.isGroup && incomingCall.groupId) {
         joinGroupCall(incomingCall.groupId);
         rejectCall(incomingCall.callId, incomingCall.roomName, true);

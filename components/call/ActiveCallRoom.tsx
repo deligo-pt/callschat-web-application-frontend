@@ -524,16 +524,14 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
           >
             <ChevronDown className="h-5 w-5" />
           </button>
-          {!activeCall?.isGroup && (
-            <button
-              onClick={onOpenInvite}
-              className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
-              title="Add participant"
-              aria-label="Invite someone to this call"
-            >
-              <UserPlus className="h-5 w-5" />
-            </button>
-          )}
+          <button
+            onClick={onOpenInvite}
+            className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+            title="Add participant"
+            aria-label="Invite someone to this call"
+          >
+            <UserPlus className="h-5 w-5" />
+          </button>
           <button
             className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
             aria-label="More options"
@@ -665,7 +663,7 @@ export const ActiveCallRoom = () => {
         <RoomAudioRenderer muted={isSpeakerMuted} />
 
         {/* Fallback modal for VIDEO calls */}
-        {!activeCall.isGroup && activeCall.callType === "VIDEO" && (
+        {activeCall.callType === "VIDEO" && (
           <InviteParticipantModal
             open={inviteOpen}
             onClose={() => setInviteOpen(false)}
