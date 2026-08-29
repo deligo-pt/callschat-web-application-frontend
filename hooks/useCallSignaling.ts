@@ -56,7 +56,14 @@ export interface OutgoingGroupCall {
   roomName?: string;
 }
 
-export type OutgoingCallStatus = 'CALLING' | 'RINGING' | 'BUSY' | 'UNAVAILABLE' | 'DECLINED';
+export type OutgoingCallStatus =
+  | 'CALLING'
+  | 'RINGING'
+  | 'WAITING'
+  | 'BUSY'
+  | 'UNAVAILABLE'
+  | 'DECLINED'
+  | 'NOT_ANSWERED';
 
 export interface CallWaitingInfo {
   callId: string;
@@ -95,6 +102,11 @@ export const useCallSignaling = () => {
    * for Socket.io to recover and provide a fresh token.
    */
   const [isAwaitingLocalReconnect, setIsAwaitingLocalReconnect] = useState<boolean>(false);
+
+  const activeCallRef = useRef<ActiveCall | null>(null);
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   const pendingCancelRef = useRef<boolean>(false);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
@@ -186,10 +198,14 @@ export const useCallSignaling = () => {
       }, 2500);
     };
 
-    const handleCallWaiting = (payload: CallWaitingInfo) => {
+    const handleCallWaiting = (payload: CallWaitingInfo | { status?: string; message?: string }) => {
       console.log('[Call] Call waiting notification received:', payload);
+      if ('status' in payload && payload.status === 'WAITING') {
+        setOutgoingCallStatus('WAITING');
+        return;
+      }
       playNotificationSound('call_waiting');
-      setCallWaiting(payload);
+      setCallWaiting(payload as CallWaitingInfo);
     };
 
     const handleCallCancelled = (payload: { callId: string }) => {
@@ -219,6 +235,17 @@ export const useCallSignaling = () => {
 
     const handleCallEnded = (payload?: { callId?: string; reason?: string }) => {
       console.log('[Call] Call ended/missed/rejected:', payload);
+
+      // If a specific callId is received and we are currently in an active call, only tear down if it matches
+      if (payload?.callId && activeCallRef.current) {
+        const currentCallId = activeCallRef.current.callId;
+        const currentRoomName = activeCallRef.current.roomName;
+        if (payload.callId !== currentCallId && payload.callId !== currentRoomName) {
+          console.log('[Call] Ignored call:ended for unrelated callId:', payload.callId);
+          return;
+        }
+      }
+
       stopRingtone();
       playNotificationSound('call_ended');
       setIncomingCall(null);
@@ -246,7 +273,18 @@ export const useCallSignaling = () => {
       setTimeout(() => {
         setOutgoingCall(null);
         setOutgoingCallStatus('CALLING');
-      }, 1500);
+      }, 2500);
+    };
+
+    const handleCallTimeout = (payload?: unknown) => {
+      console.log('[Call] Call timed out (no answer):', payload);
+      stopRingtone();
+      playNotificationSound('call_ended');
+      setOutgoingCallStatus('NOT_ANSWERED');
+      setTimeout(() => {
+        setOutgoingCall(null);
+        setOutgoingCallStatus('CALLING');
+      }, 2500);
     };
 
     const handleCallUnavailable = (payload?: unknown) => {
@@ -257,7 +295,7 @@ export const useCallSignaling = () => {
       setTimeout(() => {
         setOutgoingCall(null);
         setOutgoingCallStatus('CALLING');
-      }, 1500);
+      }, 2500);
     };
 
     const handleCallError = (payload: { code?: string; message?: string } | unknown) => {
@@ -265,33 +303,21 @@ export const useCallSignaling = () => {
 
       const code = (payload as { code?: string })?.code;
 
+      if (code === 'CALL_TIMEOUT') {
+        handleCallTimeout(payload);
+        return;
+      }
+
       // INVITE_TIMEOUT / INVITE_FAILED are informational events for the
       // InviteParticipantModal only — they must NOT disturb the active call UI,
-      // stop any ringtone, or clear outgoing/incoming call state.  The modal
-      // has its own call:error listener that handles these codes.
+      // stop any ringtone, or clear outgoing/incoming call state.
       if (code === 'INVITE_TIMEOUT' || code === 'INVITE_FAILED') {
         return;
       }
 
       stopRingtone();
-      // IMPORTANT: Do NOT clear activeCall on call:error.
-      //
-      // call:error is emitted for per-operation failures (bad payload, user
-      // offline, invite failed, etc.).  If we clear activeCall here, any
-      // transient socket error during an active call would kill the live room
-      // and trigger the onDisconnected → hangupCall cascade, ending the call
-      // for BOTH parties.
-      //
-      // Errors that should close the call UI (call:ended, call:missed,
-      // call:rejected) are handled by handleCallEnded above.
-      //
-      // The InviteParticipantModal has its own call:error listener for
-      // INVITE_FAILED / INVITE_TIMEOUT errors — it does NOT rely on this handler.
       setOutgoingCall(null);
       setIncomingCall(null);
-      // Only clear activeCall if the error code explicitly signals call failure
-      // (e.g. INITIATE_FAILED before any room was joined).  A connected call
-      // should survive any error that doesn't come via call:ended.
       if (code === 'INITIATE_FAILED' || code === 'ACCEPT_FAILED') {
         setActiveCall(null);
       }
@@ -371,6 +397,7 @@ export const useCallSignaling = () => {
     socket.on('call:ended', handleCallEnded);
     socket.on('call:missed', handleCallEnded);
     socket.on('call:rejected', handleCallRejected);
+    socket.on('call:timeout', handleCallTimeout);
     socket.on('call:unavailable', handleCallUnavailable);
     socket.on('call:error', handleCallError);
 
@@ -465,6 +492,7 @@ export const useCallSignaling = () => {
       socket.off('call:ended', handleCallEnded);
       socket.off('call:missed', handleCallEnded);
       socket.off('call:rejected', handleCallRejected);
+      socket.off('call:timeout', handleCallTimeout);
       socket.off('call:unavailable', handleCallUnavailable);
       socket.off('call:error', handleCallError);
       socket.off('call:reconnecting', handleCallReconnecting);
@@ -543,7 +571,7 @@ export const useCallSignaling = () => {
   // was created for this escalation.
   // -------------------------------------------------------------------------
   const acceptEscalatedCall = useCallback(
-    async (roomName: string, callType: 'AUDIO' | 'VIDEO') => {
+    async (roomName: string, callType: 'AUDIO' | 'VIDEO', peerName?: string, peerAvatar?: string) => {
       console.log('[Call] Accepting escalated call for room', roomName);
       stopRingtone();
       setIncomingCall(null);
@@ -558,6 +586,9 @@ export const useCallSignaling = () => {
           serverUrl: result.livekitUrl,
           roomName: result.roomName,
           callType,
+          isGroup: true, // Mark as multi-party call so leaver doesn't terminate room
+          peerName: peerName || pendingPeerRef.current.name,
+          peerAvatar: peerAvatar || pendingPeerRef.current.avatar,
         });
       } catch (err) {
         console.error('[Call] Failed to obtain token for escalated call:', err);
@@ -628,7 +659,11 @@ export const useCallSignaling = () => {
       console.log('[Call] Hanging up call', callId);
       stopRingtone();
       userInitiatedHangupRef.current = true;
-      socket.emit('call:hangup', { callId });
+      if (activeCallRef.current?.isGroup) {
+        socket.emit('group:call_leave', { callId });
+      } else {
+        socket.emit('call:hangup', { callId });
+      }
       setActiveCall(null);
       setReconnectingUserId(null);
       setIsAwaitingLocalReconnect(false);

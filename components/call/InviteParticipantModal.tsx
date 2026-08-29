@@ -138,6 +138,25 @@ export const InviteParticipantModal = ({
     };
   }, [socket]);
 
+  // Whenever room participants change, clear ringing states for anyone who joined
+  useEffect(() => {
+    setInviteStates((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const id of Object.keys(next)) {
+        if (participantIdentities.has(id)) {
+          delete next[id];
+          if (errorTimeouts.current[id]) {
+            clearTimeout(errorTimeouts.current[id]);
+            delete errorTimeouts.current[id];
+          }
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [participantIdentities]);
+
   // -----------------------------------------------------------------------
   // Invite action
   // -----------------------------------------------------------------------
