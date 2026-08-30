@@ -171,7 +171,7 @@ export const useCallSignaling = () => {
       };
 
       // If already in an active call, treat as Call Waiting (non-blocking banner)
-      if (activeCall) {
+      if (activeCallRef.current) {
         playNotificationSound('call_waiting');
         setCallWaiting({
           callId: payload.callId,
@@ -395,11 +395,25 @@ export const useCallSignaling = () => {
       // Case B: nothing to do beyond clearing the overlay (already done above)
     };
 
+    const handleAnsweredElsewhere = (payload: { callId?: string; reason?: string }) => {
+      console.log('[Call] Call answered on another device:', payload);
+      stopRingtone();
+      setIncomingCall(null);
+      setCallWaiting(null);
+    };
+
+    const handleGroupAnsweredElsewhere = (payload: { groupId: string; callId?: string }) => {
+      console.log('[Call] Group call joined on another device:', payload);
+      stopRingtone();
+      setIncomingGroupCall(null);
+    };
+
     socket.on('call:incoming', handleIncomingCall);
     socket.on('call:ringing', handleCallRinging);
     socket.on('call:busy', handleCallBusy);
     socket.on('call:waiting', handleCallWaiting);
     socket.on('call:cancelled', handleCallCancelled);
+    socket.on('call:answered_elsewhere', handleAnsweredElsewhere);
     socket.on('call:reconnecting', handleCallReconnecting);
     socket.on('call:reconnected', handleCallReconnected);
 
@@ -467,25 +481,65 @@ export const useCallSignaling = () => {
     socket.on('group:call_missed', handleGroupCallTerminated);
     socket.on('group:call_terminated', handleGroupCallTerminated);
     socket.on('group:call_ended', handleGroupCallEnded);
+    socket.on('group:call_answered_elsewhere', handleGroupAnsweredElsewhere);
 
     // FCM Fallback Handler
     const handleFCMCall = (e: Event) => {
       const customEvent = e as CustomEvent;
-      const data = customEvent.detail;
+      const data = customEvent.detail || {};
 
       console.log('[Call] FCM incoming call fallback triggered:', data);
 
+      const resolvedCallId = data.callId || data.call_id || data.routeId;
+      if (!resolvedCallId) return;
+
+      const isVideo =
+        data.is_video === 'true' ||
+        data.callType === 'VIDEO' ||
+        data.call_type?.toUpperCase() === 'VIDEO';
+
+      const callerId = data.callerId || data.caller_id || data.routeId || '';
+      const callerName = data.callerName || data.caller_name;
+      const callerAvatar = data.callerAvatar || data.caller_avatar || null;
+      const roomName = data.roomName || data.room_name || resolvedCallId;
+      const isGroup =
+        data.isGroup === 'true' ||
+        data.type === 'GROUP_CALL' ||
+        data.type === 'group_call';
+      const groupId = data.groupId || data.group_id || (isGroup ? data.routeId : undefined);
+
+      pendingPeerRef.current = {
+        name: callerName,
+        avatar: callerAvatar ?? undefined,
+      };
+
+      if (activeCallRef.current) {
+        playNotificationSound('call_waiting');
+        setCallWaiting({
+          callId: resolvedCallId,
+          callerId,
+          callerName,
+          callerAvatar,
+          callType: isVideo ? 'VIDEO' : 'AUDIO',
+          roomName,
+        });
+        return;
+      }
+
       // Prevent deduplication if already ringing via sockets
       setIncomingCall(prev => {
-        if (prev && prev.callId === data.callId) return prev;
+        if (prev && prev.callId === resolvedCallId) return prev;
+        playRingtone();
 
         return {
-          callId: data.callId || data.routeId,
-          callerId: data.callerId || data.routeId,
-          callType: data.callType || 'VIDEO',
-          roomName: data.roomName || data.callId || data.routeId,
-          isGroup: data.isGroup === 'true' || data.type === 'GROUP_CALL',
-          groupId: data.groupId || (data.isGroup === 'true' ? data.routeId : undefined),
+          callId: resolvedCallId,
+          callerId,
+          callerName,
+          callerAvatar,
+          callType: isVideo ? 'VIDEO' : 'AUDIO',
+          roomName,
+          isGroup,
+          groupId,
         };
       });
     };
@@ -498,6 +552,7 @@ export const useCallSignaling = () => {
       socket.off('call:busy', handleCallBusy);
       socket.off('call:waiting', handleCallWaiting);
       socket.off('call:cancelled', handleCallCancelled);
+      socket.off('call:answered_elsewhere', handleAnsweredElsewhere);
       socket.off('call:connected', handleCallConnected);
       socket.off('call:ended', handleCallEnded);
       socket.off('call:missed', handleCallEnded);
@@ -512,6 +567,7 @@ export const useCallSignaling = () => {
       socket.off('group:call_missed', handleGroupCallTerminated);
       socket.off('group:call_terminated', handleGroupCallTerminated);
       socket.off('group:call_ended', handleGroupCallEnded);
+      socket.off('group:call_answered_elsewhere', handleGroupAnsweredElsewhere);
       window.removeEventListener('fcm:incoming_call', handleFCMCall);
     };
   }, [socket]);

@@ -80,11 +80,17 @@ export const useFCM = () => {
         console.log('[FCM] Received foreground message', payload);
         
         const data = payload.data || {};
-        const type = data.type; // 'CHAT' | 'GROUP' | 'CALL'
+        const type = data.type; // 'CHAT' | 'GROUP' | 'CALL' | 'incoming_call'
         const routeId = data.routeId;
 
         // Call Interception: bypass the standard toast and trigger our full-screen Ringing UI
-        if (type === 'CALL') {
+        const isIncomingCall =
+          type === 'CALL' ||
+          type === 'incoming_call' ||
+          type === 'GROUP_CALL' ||
+          Boolean(data.call_id || data.callId);
+
+        if (isIncomingCall) {
           playNotificationSound('call');
           window.dispatchEvent(new CustomEvent('fcm:incoming_call', { detail: data }));
           return;

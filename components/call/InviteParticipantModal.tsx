@@ -347,7 +347,7 @@ export const InviteParticipantModal = ({
     return (
       <button
         onClick={() => handleInvite(user)}
-        className="flex items-center gap-1.5 rounded-full bg-[#3B58F5] hover:bg-blue-600 active:scale-95 px-4 py-1.5 text-xs font-bold text-white shadow-[0_4px_14px_rgba(59,88,245,0.4)] transition-all cursor-pointer"
+        className="flex items-center gap-1.5 rounded-full bg-[#00A884] hover:bg-[#008069] active:scale-95 px-4 py-1.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
       >
         <UserPlus className="h-3.5 w-3.5" />
         Add
@@ -358,28 +358,28 @@ export const InviteParticipantModal = ({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent 
-        overlayClassName="z-[150] bg-black/60 backdrop-blur-xs" 
-        className="z-[200] w-[95vw] max-w-[440px] max-h-[85vh] h-[640px] overflow-hidden flex flex-col bg-[#111936] border border-white/10 rounded-3xl p-0 shadow-[0_20px_70px_rgba(0,0,0,0.7)] text-white gap-0 animate-in zoom-in-95 duration-200"
+        overlayClassName="z-[150] bg-black/75 backdrop-blur-xs" 
+        className="z-[200] w-[95vw] max-w-[440px] max-h-[85vh] h-[640px] overflow-hidden flex flex-col bg-[#111B21] border border-[#222D34] rounded-3xl p-0 shadow-[0_20px_70px_rgba(0,0,0,0.8)] text-[#E9EDEF] gap-0 animate-in zoom-in-95 duration-200"
       >
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-white/10 bg-[#152042]/80 backdrop-blur-md shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-[#222D34] bg-[#202C33]/60 backdrop-blur-md shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#3B58F5]/20 border border-[#3B58F5]/30 text-[#7B96FF] shadow-inner">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#00A884]/20 border border-[#00A884]/30 text-[#25D366] shadow-inner">
                 <UserPlus className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-[17px] font-bold text-white tracking-tight">
+                <DialogTitle className="text-[17px] font-bold text-[#E9EDEF] tracking-tight">
                   Add people to call
                 </DialogTitle>
-                <p className="text-xs text-white/50 mt-0.5">
+                <p className="text-xs text-[#8696A0] mt-0.5">
                   Invite friends to join this active {callType.toLowerCase()} call
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="rounded-full p-1.5 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+              className="rounded-full p-1.5 text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/10 transition-colors cursor-pointer"
               title="Close"
             >
               <X className="h-4.5 w-4.5" />
@@ -388,22 +388,22 @@ export const InviteParticipantModal = ({
 
           {/* Search bar */}
           <div className="relative mt-4">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696A0]" />
             <input
               type="text"
               placeholder="Search by name, @username, or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl bg-white/5 border border-white/10 pl-10 pr-9 py-2.5 text-sm text-white placeholder:text-white/35 focus:outline-none focus:border-[#3B58F5]/60 focus:bg-white/[0.08] transition-all"
+              className="w-full rounded-2xl bg-[#202C33] border border-[#2A3942] pl-10 pr-9 py-2.5 text-sm text-[#E9EDEF] placeholder:text-[#8696A0] focus:outline-none focus:border-[#00A884] transition-all"
               autoFocus
             />
             {isSearchingRemote && (
-              <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#7B96FF] animate-spin" />
+              <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#25D366] animate-spin" />
             )}
             {search && !isSearchingRemote && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -414,19 +414,19 @@ export const InviteParticipantModal = ({
         {/* User list */}
         <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0 custom-scrollbar">
           {contactsLoading && allDisplayUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-white/40">
-              <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
+            <div className="flex flex-col items-center justify-center gap-3 py-20 text-[#8696A0]">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00A884]" />
               <span className="text-sm">Loading contacts…</span>
             </div>
           ) : allDisplayUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-white/40 text-center px-4">
-              <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/30 mb-1 border border-white/5">
+            <div className="flex flex-col items-center justify-center gap-3 py-20 text-[#8696A0] text-center px-4">
+              <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center text-[#8696A0] mb-1 border border-white/5">
                 <Users className="h-6 w-6" />
               </div>
-              <p className="text-sm font-semibold text-white/80">
+              <p className="text-sm font-semibold text-[#E9EDEF]">
                 {search ? "No users found" : "No contacts available"}
               </p>
-              <p className="text-xs text-white/40 max-w-xs">
+              <p className="text-xs text-[#8696A0] max-w-xs">
                 {search
                   ? "Try searching with a different name, username, or phone number."
                   : "All your contacts are already in this call or offline."}
@@ -437,7 +437,7 @@ export const InviteParticipantModal = ({
               {allDisplayUsers.map((user) => {
                 const avatarUrl =
                   user.avatarUrl ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3B58F5&color=fff&size=96`;
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=00A884&color=fff&size=96`;
 
                 const subtext =
                   user.username ? `@${user.username}` : user.phone || (user.isContact ? "Contact" : "CallsChat user");
@@ -452,26 +452,26 @@ export const InviteParticipantModal = ({
                       <img
                         src={getOptimizedImageUrl(avatarUrl)}
                         alt={user.name}
-                        className="h-11 w-11 rounded-full object-cover border border-white/10 group-hover:border-[#3B58F5]/50 transition-colors shadow-sm"
+                        className="h-11 w-11 rounded-full object-cover border border-white/10 group-hover:border-[#00A884]/50 transition-colors shadow-xs bg-[#202C33]"
                       />
                       {user.isOnline && (
-                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-400 border-2 border-[#111936] shadow-sm" />
+                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[#25D366] border-2 border-[#111B21] shadow-xs" />
                       )}
                     </div>
 
                     {/* Name & Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-bold text-white truncate">
+                        <p className="text-sm font-bold text-[#E9EDEF] truncate">
                           {user.name}
                         </p>
                         {user.isContact && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-white/60 font-medium shrink-0">
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-[#8696A0] font-medium shrink-0">
                             Contact
                           </span>
                         )}
                       </div>
-                      <p className="text-xs font-medium text-white/50 truncate">
+                      <p className="text-xs font-medium text-[#8696A0] truncate">
                         {subtext}
                       </p>
                     </div>
@@ -488,10 +488,10 @@ export const InviteParticipantModal = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-white/10 bg-[#152042]/50 backdrop-blur-md shrink-0 flex items-center justify-between text-xs text-white/40">
+        <div className="px-6 py-3.5 border-t border-[#222D34] bg-[#202C33]/40 backdrop-blur-md shrink-0 flex items-center justify-between text-xs text-[#8696A0]">
           <span className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-[#7B96FF]" />
-            WhatsApp-style live join invitation
+            <Sparkles className="h-3.5 w-3.5 text-[#25D366]" />
+            Live join invitation
           </span>
           <span>45s ring guardrail</span>
         </div>

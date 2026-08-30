@@ -512,14 +512,18 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           if (msg.id === payload.messageId) {
             const receipts = [...(msg.receipts || [])];
             const idx = receipts.findIndex((r) => r.userId === payload.userId);
+            const isSeen = payload.status === "SEEN";
+            const isDelivered = payload.status === "DELIVERED";
+            const existing = idx !== -1 ? receipts[idx] : null;
+
             const entry = {
-              id: Math.random().toString(),
+              id: existing?.id || Math.random().toString(),
               userId: payload.userId,
-              deliveredAt: payload.status === "DELIVERED" || payload.status === "SEEN" ? payload.timestamp : null,
-              seenAt: payload.status === "SEEN" ? payload.timestamp : null,
+              deliveredAt: isDelivered ? payload.timestamp : (existing?.deliveredAt || payload.timestamp),
+              seenAt: isSeen ? payload.timestamp : existing?.seenAt,
             };
             if (idx !== -1) {
-              receipts[idx] = { ...receipts[idx], ...entry };
+              receipts[idx] = entry;
             } else {
               receipts.push(entry);
             }
@@ -622,6 +626,71 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       socket.off("group:message_unsent", handleMessageUnsent);
     };
   }, [socket, isConnected, groupId]);
+
+  // ── Mark Group Messages as Seen ────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket || !isConnected || !groupId || !messages.length) return;
+
+    const currentUser = currentUserIdRef.current;
+
+    const checkAndMarkSeen = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
+      const unseen = messages.filter((m) => {
+        if (m.senderId === currentUser || m.id.startsWith("optimistic-")) return false;
+        const myReceipt = m.receipts?.find((r) => r.userId === currentUser);
+        return !myReceipt?.seenAt;
+      });
+
+      unseen.forEach((m) => {
+        socket.emit("group:mark_seen", {
+          groupId,
+          messageId: m.id,
+        });
+      });
+    };
+
+    checkAndMarkSeen();
+    const visibilityTimeout = setTimeout(checkAndMarkSeen, 300);
+
+    window.addEventListener("focus", checkAndMarkSeen);
+    window.addEventListener("click", checkAndMarkSeen);
+    document.addEventListener("visibilitychange", checkAndMarkSeen);
+
+    return () => {
+      clearTimeout(visibilityTimeout);
+      window.removeEventListener("focus", checkAndMarkSeen);
+      window.removeEventListener("click", checkAndMarkSeen);
+      document.removeEventListener("visibilitychange", checkAndMarkSeen);
+    };
+  }, [socket, isConnected, groupId, messages]);
+
+  // ── Reactive Group Delivery Receipt Catch-Up ───────────────────────────────
+  useEffect(() => {
+    if (!socket || !isConnected || !groupId || !messages.length) return;
+
+    const currentUser = currentUserIdRef.current;
+    const undelivered = messages.filter(
+      (m) =>
+        m.senderId !== currentUser &&
+        !m.id.startsWith("optimistic-") &&
+        (!m.receipts ||
+          !m.receipts.some(
+            (r: any) => r.userId === currentUser && r.deliveredAt
+          ))
+    );
+
+    if (undelivered.length > 0) {
+      undelivered.forEach((m) => {
+        socket.emit("group:mark_delivered", {
+          groupId,
+          messageId: m.id,
+        });
+      });
+    }
+  }, [socket, isConnected, groupId, messages]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 

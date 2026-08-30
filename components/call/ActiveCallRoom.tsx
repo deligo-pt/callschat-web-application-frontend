@@ -27,6 +27,7 @@ import {
   VolumeX,
   ChevronDown,
   Maximize2,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
@@ -82,17 +83,6 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     requestPermissions: activeCall?.callType === "VIDEO" || isCameraEnabled
   });
 
-  // -------------------------------------------------------------------------
-  // Phase 5: Dynamic Grid Engine
-  //
-  // useTracks() automatically re-renders whenever a participant joins or
-  // leaves, so the grid reflows seamlessly when the 3rd (or 4th) participant
-  // joins via the escalated invite flow.
-  //
-  // We subscribe to Camera tracks (with placeholder so offline-camera users
-  // still occupy a tile) and ScreenShare tracks (no placeholder — only show
-  // when someone is actively sharing).
-  // -------------------------------------------------------------------------
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -127,19 +117,15 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
 
   // Auto-scaling grid algorithm
   let gridClass =
-    "grid gap-3 w-full h-full pb-32 pt-24 px-4 transition-all duration-300";
+    "grid gap-3 w-full h-full pb-28 pt-20 px-4 transition-all duration-300";
 
   if (tracks.length === 1) {
-    // 1 Participant: Full viewport
     gridClass += " grid-cols-1 grid-rows-1";
   } else if (tracks.length === 2) {
-    // 2 Participants: Stack on mobile, side-by-side on desktop
     gridClass += " grid-cols-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1";
   } else if (tracks.length <= 4) {
-    // 3–4 Participants: Uniform 2×2
     gridClass += " grid-cols-2 grid-rows-2";
   } else {
-    // 5+ Participants: 3-column mosaic with vertical scroll
     gridClass +=
       " grid-cols-2 md:grid-cols-3 auto-rows-[minmax(200px,1fr)] overflow-y-auto";
   }
@@ -170,74 +156,94 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Shared control dock
+  // Modern WhatsApp Control Dock
   // ─────────────────────────────────────────────────────────────────────────
   const ControlDock = ({ compact = false }: { compact?: boolean }) => (
     <div className={cn(
-      "flex items-center justify-between",
+      "flex items-center justify-between gap-3 md:gap-5 z-50 rounded-full bg-[#202C33]/90 px-6 py-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl border border-white/10",
       compact
-        ? "absolute -bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-[44px] bg-white/5 px-8 py-5 shadow-[0_12px_50px_0_rgba(0,0,0,0.4),inset_0_1.5px_0_0_rgba(255,255,255,0.1)] backdrop-blur-xl border border-white/10 w-[95vw] max-w-[545px]"
-        : "absolute bottom-10 left-1/2 z-50 flex -translate-x-1/2 rounded-[44px] bg-white/5 p-8 shadow-[0_12px_50px_0_rgba(0,0,0,0.4),inset_0_1.5px_0_0_rgba(255,255,255,0.1)] backdrop-blur-xl border border-white/10 w-full max-w-[545px]",
+        ? "absolute bottom-6 left-1/2 -translate-x-1/2 w-auto max-w-[90vw]"
+        : "absolute bottom-8 left-1/2 -translate-x-1/2 w-auto max-w-[90vw]"
     )}>
-      <div className="flex flex-col items-center gap-[12px]">
+      {/* Video Toggle */}
+      <div className="flex flex-col items-center gap-1">
         <button
           onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
           className={cn(
-            "flex h-[84px] w-[84px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
             isCameraEnabled
-              ? "bg-white/20 border-[1.7px] border-white/30 text-white shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
-              : "bg-white/10 border-[1.7px] border-white/20 text-white/80 hover:bg-white/20 shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]",
+              ? "bg-[#00A884] text-white shadow-md hover:bg-[#008069]"
+              : "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
           )}
           aria-label={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
+          title={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
         >
-          {isCameraEnabled ? <Video className="h-8 w-8" /> : <VideoOff className="h-8 w-8" />}
+          {isCameraEnabled ? <Video className="h-5 w-5 md:h-6 md:w-6" /> : <VideoOff className="h-5 w-5 md:h-6 md:w-6" />}
         </button>
-        <span className="text-[15.5px] font-normal text-white/50">Video</span>
+        <span className="text-[11px] font-medium text-[#8696A0]">Video</span>
       </div>
 
-      <div className="flex flex-col items-center gap-[12px]">
+      {/* Mic Toggle */}
+      <div className="flex flex-col items-center gap-1">
         <button
           onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
           className={cn(
-            "flex h-[84px] w-[84px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
             isMicrophoneEnabled
-              ? "bg-[#2563EB] text-white shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
-              : "bg-white/10 border-[1.7px] border-white/20 text-white/80 hover:bg-white/20 shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]",
+              ? "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
+              : "bg-[#EA0038] text-white shadow-md hover:bg-[#d00030]"
           )}
           aria-label={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
+          title={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
         >
-          {isMicrophoneEnabled ? <Mic className="h-8 w-8" /> : <MicOff className="h-8 w-8" />}
+          {isMicrophoneEnabled ? <Mic className="h-5 w-5 md:h-6 md:w-6" /> : <MicOff className="h-5 w-5 md:h-6 md:w-6" />}
         </button>
-        <span className="text-[15.5px] font-normal text-white/50">Mic</span>
+        <span className="text-[11px] font-medium text-[#8696A0]">{isMicrophoneEnabled ? "Mic" : "Muted"}</span>
       </div>
 
-      <div className="flex flex-col items-center gap-[12px]">
+      {/* Speaker Toggle */}
+      <div className="flex flex-col items-center gap-1">
         <button
           onClick={() => setIsSpeakerMuted(!isSpeakerMuted)}
           className={cn(
-            "flex h-[84px] w-[84px] items-center justify-center rounded-full transition-all duration-300",
+            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
             !isSpeakerMuted
-              ? "bg-white/10 border-[1.7px] border-white/20 text-white hover:bg-white/20 shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
-              : "bg-[#2563EB] text-white shadow-[0_6px_9px_-6px_rgba(0,0,0,0.1),0_15.5px_23px_-4px_rgba(0,0,0,0.1)]"
+              ? "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
+              : "bg-[#EA0038] text-white shadow-md hover:bg-[#d00030]"
           )}
           aria-label={!isSpeakerMuted ? "Mute Speaker" : "Unmute Speaker"}
+          title={!isSpeakerMuted ? "Mute Speaker" : "Unmute Speaker"}
         >
-          {!isSpeakerMuted ? <VolumeX className="h-8 w-8" /> : <Volume2 className="h-8 w-8" />}
+          {!isSpeakerMuted ? <Volume2 className="h-5 w-5 md:h-6 md:w-6" /> : <VolumeX className="h-5 w-5 md:h-6 md:w-6" />}
         </button>
-        <span className="text-[15.5px] font-normal text-white/50">Mute</span>
+        <span className="text-[11px] font-medium text-[#8696A0]">Speaker</span>
       </div>
 
-      <div className="flex flex-col items-center gap-[12px]">
+      {/* Add Participant shortcut */}
+      <div className="flex flex-col items-center gap-1">
+        <button
+          onClick={onOpenInvite}
+          className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer"
+          aria-label="Add People"
+          title="Add People to Call"
+        >
+          <UserPlus className="h-5 w-5 md:h-6 md:w-6" />
+        </button>
+        <span className="text-[11px] font-medium text-[#8696A0]">Add</span>
+      </div>
+
+      {/* End Call Button */}
+      <div className="flex flex-col items-center gap-1">
         <button
           onClick={handleEndCall}
-          className="flex h-[84px] w-[84px] items-center justify-center rounded-full bg-gradient-to-br from-[#F43F5E] to-[#DC2626] text-white transition-all duration-300 hover:scale-105 active:scale-95 shadow-[0_6px_31px_0_rgba(244,63,94,0.5)]"
+          className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#EA0038] text-white transition-all duration-200 hover:bg-[#d00030] hover:scale-105 active:scale-95 shadow-[0_0_25px_rgba(234,0,56,0.4)] cursor-pointer"
           aria-label="End call"
+          title="End Call"
         >
-          <PhoneOff className="h-8 w-8" fill="currentColor" />
+          <PhoneOff className="h-5 w-5 md:h-6 md:w-6" fill="currentColor" />
         </button>
-        <span className="text-[15.5px] font-normal text-[#F43F5E]">End</span>
+        <span className="text-[11px] font-medium text-red-400">End</span>
       </div>
-
     </div>
   );
 
@@ -250,12 +256,10 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     
     const remotePeer = remoteParticipants[0];
     
-    // Seed from the stored peer info (captured at call initiation/reception)
     let singlePeerName = activeCall.peerName || "Unknown";
     let singleAvatarUrl = activeCall.peerAvatar || "";
     
     if (remotePeer) {
-      // Only override if we have better data from the live participant
       const liveName = remotePeer.name || remotePeer.identity || "";
       try {
         const metadata = JSON.parse(remotePeer.metadata || "{}");
@@ -269,7 +273,6 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
         }
       } catch (e) {}
       
-      // Fallback to contacts lookup if name is still just the raw identity
       if (!singlePeerName || singlePeerName === remotePeer.identity || singlePeerName === "Unknown") {
         const contact = contacts.find(c => c.userId === remotePeer.identity);
         if (contact) {
@@ -282,39 +285,45 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
         const contact = contacts.find(c => c.userId === remotePeer.identity);
         if (contact?.avatarUrl) singleAvatarUrl = contact.avatarUrl;
       }
-    } else {
-      // Remote hasn't joined yet — look up from contacts as fallback
-      // (we don't know the peer userId here, but peerName is already set from context)
     }
 
-    const finalSingleAvatarUrl = singleAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(singlePeerName)}&background=3B58F5&color=fff&size=256`;
+    const finalSingleAvatarUrl = singleAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(singlePeerName)}&background=00A884&color=fff&size=256`;
 
-    // ── Messenger-style camera upgrade: someone turned on video ──────────────
+    // If someone turned on camera, show video layout seamlessly
     if (anyoneHasCamera) {
       return (
-        <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#0A0F24]">
+        <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#0C1317]">
           <div className="flex-1 relative h-full">
-            {/* Header */}
-            <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-6 bg-gradient-to-b from-black/60 to-transparent">
-              <button onClick={handleEndCall} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 backdrop-blur-md">
+            {/* Top Navigation Header */}
+            <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/70 to-transparent">
+              <button 
+                onClick={handleEndCall} 
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                title="End Call"
+              >
                 <ArrowLeft className="h-5 w-5" />
               </button>
+              
               <div className="flex flex-col items-center">
-                <p className="text-xs font-semibold text-white/70 bg-[#3B58F5]/40 px-3 py-1 rounded-full">📷 Video On · {formatDuration(duration)}</p>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00A884]/20 border border-[#00A884]/30 backdrop-blur-md">
+                  <span className="text-xs font-semibold text-[#25D366]">📷 Video Active · {formatDuration(duration)}</span>
+                </div>
               </div>
-              <div className="flex gap-3">
+
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsCallMinimized(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-md"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
                   title="Minimize Call"
                 >
                   <ChevronDown className="h-5 w-5" />
                 </button>
-                <button onClick={onOpenInvite} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-md">
+                <button 
+                  onClick={onOpenInvite} 
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                  title="Add People"
+                >
                   <UserPlus className="h-5 w-5" />
-                </button>
-                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-md">
-                  <MoreVertical className="h-5 w-5" />
                 </button>
               </div>
             </div>
@@ -337,78 +346,79 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
       );
     }
 
-    // ── Default: avatar layout ───────────────────────────────────────────────
+    // Default Audio Call Layout
     return (
-      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#102A63]">
-        {/* ─── Main Content Area ─── */}
+      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#0C1317]">
         <div className="flex-1 relative flex flex-col h-full transition-all duration-300">
           
-          {/* ─── Top Header ─── */}
-          <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-6">
+          {/* Top Header */}
+          <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/60 to-transparent">
             <button
               onClick={handleEndCall}
-              className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-[#E9EFFD] border border-[#9BB7F6] text-[#2563EB] transition-all hover:bg-blue-100 backdrop-blur-md shadow-sm"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
               aria-label="Back / End call"
+              title="Back"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
     
-            <div className="flex flex-col items-center">
-               <h2 className="text-[20px] font-bold tracking-wide text-white">
-                 {activeCall?.isGroup ? "Call" : ""}
-               </h2>
-               {/* Timer moved down for 1-on-1 */}
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#8696A0] bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                <Lock className="w-3 h-3 text-[#00A884]" />
+                <span>End-to-End Encrypted</span>
+              </div>
+              <h2 className="text-[16px] font-semibold tracking-wide text-[#E9EDEF]">
+                {activeCall?.isGroup ? "CallsChat Group Call" : "CallsChat Call"}
+              </h2>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsCallMinimized(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
                 title="Minimize Call"
               >
                 <ChevronDown className="h-5 w-5" />
               </button>
               <button
                 onClick={onOpenInvite}
-                className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
                 title="Add participant"
                 aria-label="Invite someone to this call"
               >
                 <UserPlus className="h-5 w-5" />
               </button>
-              <button
-                className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
-                aria-label="More options"
-              >
-                <MoreVertical className="h-5 w-5" />
-              </button>
             </div>
           </div>
     
-          {/* ─── Center Content (Avatar, Name, Timer) ─── */}
-          <div className="flex flex-1 flex-col items-center justify-center pt-10 px-8 pb-32">
+          {/* Center Content (Avatar, Name, Timer) */}
+          <div className="flex flex-1 flex-col items-center justify-center pt-8 px-6 pb-28">
             {!activeCall.isGroup && remoteParticipants.length <= 1 ? (
-              // 1-on-1 Layout
-              <div className="flex flex-col items-center justify-center gap-4">
+              // 1-on-1 Audio Layout
+              <div className="flex flex-col items-center justify-center gap-5">
                 <div className="relative mb-2">
+                  {/* Outer emerald wave pulse ring */}
+                  <div className="absolute -inset-6 rounded-full border-2 border-[#00A884]/30 animate-pulse" />
+                  <div className="absolute -inset-12 rounded-full border border-[#00A884]/15 animate-ping" style={{ animationDuration: '3s' }} />
+                  
                   <img 
                     src={getOptimizedImageUrl(finalSingleAvatarUrl)} 
                     alt="Avatar" 
-                    className="relative h-56 w-56 rounded-full object-cover border-[4px] border-[#2563EB] shadow-2xl"
+                    className="relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 border-[#00A884] shadow-2xl bg-[#202C33]"
                   />
                 </div>
-                <div className="flex flex-col items-center gap-[14px]">
-                  <h1 className="text-[40px] font-semibold text-white leading-[1.2em] text-center px-4">
+                <div className="flex flex-col items-center gap-2">
+                  <h1 className="text-[28px] md:text-[34px] font-bold text-[#E9EDEF] tracking-tight text-center px-4">
                     {singlePeerName}
                   </h1>
-                  <p className="text-[20px] font-normal text-white leading-[29px] text-center">
+                  <span className="text-[18px] md:text-[20px] font-semibold text-[#25D366] text-center">
                     {formatDuration(duration)}
-                  </p>
+                  </span>
                 </div>
               </div>
             ) : (
-              // Group Layout (Grid of Avatars)
-              <div className="w-full max-w-3xl grid grid-cols-2 md:grid-cols-2 gap-y-12 gap-x-8 items-center justify-items-center">
+              // Group Audio Layout (Grid of Avatars)
+              <div className="w-full max-w-3xl grid grid-cols-2 md:grid-cols-2 gap-y-10 gap-x-8 items-center justify-items-center">
                 {allParticipants.map((p, idx) => {
                   const isLocal = p.identity === localParticipant.identity;
                   let name = isLocal ? "You" : p.name || p.identity || "Unknown";
@@ -423,8 +433,6 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
                          name = meta.displayName;
                        }
                     } catch(e) {}
-                  } else {
-                     // Try to get local user avatar if needed, else fallback
                   }
                   
                   if (!isLocal && (name === p.identity || name === "Unknown" || name === p.name || !pAvatar)) {
@@ -441,18 +449,18 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
                     }
                   }
                   
-                  const av = pAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(isLocal ? "Y" : name)}&background=3B58F5&color=fff&size=256`;
+                  const av = pAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(isLocal ? "Y" : name)}&background=00A884&color=fff&size=256`;
 
                   return (
                     <div key={p.identity || idx} className="flex flex-col items-center">
-                       <div className="relative mb-4">
+                       <div className="relative mb-3">
                           <img 
                             src={getOptimizedImageUrl(av)} 
                             alt={name} 
-                            className="relative h-32 w-32 md:h-40 md:w-40 rounded-full object-cover border-[3px] border-[#3B58F5] shadow-2xl"
+                            className="relative h-28 w-28 md:h-36 md:w-36 rounded-full object-cover border-3 border-[#00A884] shadow-2xl bg-[#202C33]"
                           />
                        </div>
-                       <h2 className="text-[18px] md:text-[20px] font-bold text-white text-center">
+                       <h2 className="text-[16px] md:text-[18px] font-semibold text-[#E9EDEF] text-center">
                           {name}
                        </h2>
                     </div>
@@ -472,59 +480,54 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
   const localTrack = tracks.find(t => t.participant.isLocal);
   const remoteTrack = tracks.find(t => !t.participant.isLocal);
 
+  // VIDEO CALL UI
   return (
-    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#102A63]">
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0C1317]">
       
-      {/* ─── Top Header ─── */}
-      <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-6">
+      {/* Top Header */}
+      <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/70 to-transparent">
         <button
           onClick={handleEndCall}
-          className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-[#E9EFFD] border border-[#9BB7F6] text-[#2563EB] transition-all hover:bg-blue-100 shadow-md"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
           aria-label="Back / End call"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
 
-        <div className="flex flex-col items-center">
-          <h2 className="text-[20px] font-bold tracking-wide text-white">
-            {activeCall?.isGroup ? "Group Call" : "Call"}
+        <div className="flex flex-col items-center gap-0.5">
+          <h2 className="text-[16px] font-semibold tracking-wide text-[#E9EDEF]">
+            {activeCall?.isGroup ? "Group Video Call" : "Video Call"}
           </h2>
-          <p className="text-[13px] font-medium text-white/70">
+          <span className="text-[13px] font-semibold text-[#25D366]">
             {formatDuration(duration)}
-          </p>
+          </span>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setIsCallMinimized(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
             title="Minimize Call"
           >
             <ChevronDown className="h-5 w-5" />
           </button>
           <button
             onClick={onOpenInvite}
-            className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
             title="Add participant"
             aria-label="Invite someone to this call"
           >
             <UserPlus className="h-5 w-5" />
           </button>
-          <button
-            className="flex h-10 w-10 items-center justify-center rounded-[15px] bg-white/10 border border-white/15 text-white transition-all hover:bg-white/20 backdrop-blur-md"
-            aria-label="More options"
-          >
-            <MoreVertical className="h-5 w-5" />
-          </button>
         </div>
       </div>
 
-      {/* ─── Main Video Area ─── */}
-      <div className="flex-1 flex flex-col pt-24 pb-32 px-6">
+      {/* Main Video Area */}
+      <div className="flex-1 flex flex-col pt-20 pb-28 px-4 md:px-6">
         {isOneOnOne && localTrack && remoteTrack ? (
           // 1-on-1 Picture-in-Picture Layout
-          <div className="relative w-full h-full max-w-5xl mx-auto rounded-[32px] overflow-visible shadow-2xl bg-[#0F172A]">
-             <div className="absolute inset-0 rounded-[32px] overflow-hidden bg-black">
+          <div className="relative w-full h-full max-w-5xl mx-auto rounded-3xl overflow-visible shadow-2xl bg-[#111B21]">
+             <div className="absolute inset-0 rounded-3xl overflow-hidden bg-black">
                 <ParticipantTile 
                   key={`${remoteTrack.participant.identity}-remote`} 
                   trackRef={remoteTrack} 
@@ -535,17 +538,17 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
              </div>
              
              {/* PiP Local Video */}
-             <div className="absolute bottom-6 right-6 w-32 h-44 md:w-48 md:h-64 z-10">
-                <ParticipantTile key={`${localTrack.participant.identity}-local`} trackRef={localTrack} disableOverlay hideName className="shadow-2xl ring-2 ring-white/20" />
+             <div className="absolute bottom-6 right-6 w-32 h-44 md:w-48 md:h-64 z-20 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20">
+                <ParticipantTile key={`${localTrack.participant.identity}-local`} trackRef={localTrack} disableOverlay hideName className="shadow-none rounded-none" />
              </div>
 
              {/* Dock overlaying the bottom edge */}
-             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
+             <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
                <ControlDock compact />
              </div>
           </div>
         ) : (
-          // Group Call or other layout
+          // Group Call or multi-party layout
           <div className="relative w-full h-full">
             <div className={cn("absolute inset-0 z-0", gridClass)}>
               {tracks.map((trackRef, idx) => (
@@ -556,17 +559,17 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
                 />
               ))}
             </div>
-            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
               <ControlDock compact />
             </div>
           </div>
         )}
       </div>
 
-      {/* Local Reconnecting Overlay (when OUR network drops) */}
+      {/* Local Reconnecting Overlay */}
       {isLocalReconnecting && (
         <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[#3B58F5] mb-4" />
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[#00A884] mb-4" />
           <h3 className="text-xl font-bold text-white mb-2">Reconnecting...</h3>
           <p className="text-white/70 text-center max-w-[300px]">
             Please wait while we try to restore your connection.
@@ -581,11 +584,10 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
 
 // ---------------------------------------------------------------------------
 // ActiveCallRoom — public export
-// Wraps <LiveKitRoom> and passes the invite modal state into the inner layout
 // ---------------------------------------------------------------------------
 
 export const ActiveCallRoom = () => {
-  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected, isCallMinimized, setIsCallMinimized } = useCallContext();
+  const { activeCall, isCallMinimized, setIsCallMinimized, onLiveKitDisconnected } = useCallContext();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
 
@@ -596,7 +598,7 @@ export const ActiveCallRoom = () => {
       className={cn(
         "z-[100] bg-black pointer-events-auto transition-all duration-300 overflow-hidden shadow-2xl",
         isCallMinimized
-          ? "fixed bottom-6 right-6 w-56 h-80 rounded-2xl cursor-pointer hover:scale-105 active:scale-95 group border-2 border-white/20"
+          ? "fixed bottom-6 right-6 w-56 h-80 rounded-3xl cursor-pointer hover:scale-105 active:scale-95 group border-2 border-emerald-500/40 shadow-emerald-500/10"
           : "fixed inset-0 flex items-center justify-center"
       )}
       onClick={() => {
@@ -604,8 +606,8 @@ export const ActiveCallRoom = () => {
       }}
     >
       {isCallMinimized && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md shadow-lg">
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/50 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00A884] text-white shadow-lg">
             <Maximize2 className="h-6 w-6" />
           </div>
           <span className="text-white text-xs font-semibold mt-2 drop-shadow-md">Tap to Expand</span>
@@ -614,7 +616,7 @@ export const ActiveCallRoom = () => {
       
       <div className={cn(
         "w-full h-full relative",
-        isCallMinimized && "pointer-events-none" // Disable interaction in UI when minimized so clicks bubble to expand
+        isCallMinimized && "pointer-events-none"
       )}>
         <LiveKitRoom
         key={activeCall.token}
@@ -626,10 +628,6 @@ export const ActiveCallRoom = () => {
         onDisconnected={onLiveKitDisconnected}
         className="w-full h-full"
       >
-        {/* Phase 5: CustomCallLayout uses useTracks() which reflows the grid
-            automatically when a 3rd participant joins via the escalated invite.
-            Camera/mic state is managed by LiveKit internally and is unaffected
-            by participant count changes. */}
         <CustomCallLayout 
            inviteOpen={inviteOpen} 
            onOpenInvite={() => setInviteOpen(true)} 
@@ -638,10 +636,8 @@ export const ActiveCallRoom = () => {
            setIsSpeakerMuted={setIsSpeakerMuted}
         />
 
-        {/* System Integrity Control: renders remote audio tracks */}
         <RoomAudioRenderer muted={isSpeakerMuted} />
 
-        {/* Unified Add People Modal for both Audio and Video calls */}
         <InviteParticipantModal
           open={inviteOpen}
           onClose={() => setInviteOpen(false)}
@@ -653,3 +649,4 @@ export const ActiveCallRoom = () => {
     </div>
   );
 };
+

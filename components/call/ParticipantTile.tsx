@@ -25,7 +25,7 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
   const isVideoOn = participant.isCameraEnabled && trackRef.source === Track.Source.Camera;
   const isMicrophoneEnabled = participant.isMicrophoneEnabled;
   let name = participant.name || participant.identity || "Unknown";
-  let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B58F5&color=fff&size=256`;
+  let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00A884&color=fff&size=256`;
   
   if (!participant.isLocal) {
     try {
@@ -57,10 +57,10 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
         } else if (!avatarUrl.includes("ui-avatars.com")) {
            // keep current avatar
         } else {
-          avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B58F5&color=fff&size=256`;
+          avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00A884&color=fff&size=256`;
         }
       } else {
-         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B58F5&color=fff&size=256`;
+         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00A884&color=fff&size=256`;
       }
     }
   }
@@ -68,8 +68,8 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
   return (
     <div
       className={cn(
-        "relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-[#0F172A] shadow-lg transition-all duration-300",
-        isSpeaking ? "ring-4 ring-[#3B58F5] shadow-[0_0_20px_rgba(59,88,245,0.5)]" : "ring-1 ring-white/10",
+        "relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-[#182229] shadow-xl transition-all duration-300 border border-white/5",
+        isSpeaking ? "ring-3 ring-[#25D366] shadow-[0_0_25px_rgba(37,211,102,0.45)]" : "ring-1 ring-white/10",
         className
       )}
     >
@@ -80,18 +80,18 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
           className="h-full w-full object-cover"
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-[#1D2A54]">
+        <div className="flex h-full w-full items-center justify-center bg-[#111B21]">
           <div className="relative">
             {isSpeaking && (
               <>
-                <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-20" style={{ animationDuration: '3s' }} />
-                <div className="absolute -inset-8 rounded-full border border-[#3B58F5]/30 animate-pulse" />
+                <div className="absolute inset-0 rounded-full border-2 border-[#25D366] animate-ping opacity-30" style={{ animationDuration: '2.5s' }} />
+                <div className="absolute -inset-6 rounded-full border border-[#25D366]/40 animate-pulse" />
               </>
             )}
             <img
               src={getOptimizedImageUrl(avatarUrl)}
               alt={name}
-              className="relative h-24 w-24 md:h-32 md:w-32 rounded-full object-cover border-4 border-[#3B58F5] shadow-lg"
+              className="relative h-24 w-24 md:h-32 md:w-32 rounded-full object-cover border-4 border-[#00A884] shadow-xl bg-[#202C33]"
             />
           </div>
         </div>
@@ -99,9 +99,9 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
 
       {/* Reconnecting Overlay (WhatsApp-style) */}
       {isReconnecting && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px]">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-[#3B58F5] mb-3" />
-          <span className="text-sm font-semibold text-white tracking-wide">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/70 backdrop-blur-[3px]">
+          <div className="h-8 w-8 animate-spin rounded-full border-3 border-white/20 border-t-[#00A884] mb-3" />
+          <span className="text-sm font-semibold text-[#E9EDEF] tracking-wide">
             Reconnecting...
           </span>
         </div>
@@ -109,11 +109,11 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
 
       {/* Status Overlays */}
       {!disableOverlay && (
-        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
           {/* Name Tag */}
           {!hideName ? (
-            <div className="flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-md">
-              <span className="text-sm font-medium text-white shadow-sm drop-shadow-md truncate max-w-[120px] md:max-w-[200px]">
+            <div className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 backdrop-blur-md border border-white/10 shadow-xs">
+              <span className="text-[12.5px] font-medium text-[#E9EDEF] truncate max-w-[120px] md:max-w-[200px]">
                 {name} {participant.isLocal && "(You)"}
               </span>
             </div>
@@ -123,13 +123,14 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
 
           {/* Mic Indicator */}
           <div className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md",
-            isMicrophoneEnabled ? "bg-black/50 text-white" : "bg-red-500/80 text-white"
+            "flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-md shadow-xs border border-white/10",
+            isMicrophoneEnabled ? "bg-black/60 text-[#25D366]" : "bg-[#EA0038] text-white"
           )}>
-            {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            {isMicrophoneEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
           </div>
         </div>
       )}
     </div>
   );
 }
+
