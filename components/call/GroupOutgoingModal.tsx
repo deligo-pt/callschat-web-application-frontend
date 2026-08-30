@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PhoneOff } from "lucide-react";
+import { PhoneOff, Lock, Users } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
 import { getOptimizedImageUrl } from "@/utils/image";
 
@@ -56,59 +56,85 @@ export const GroupOutgoingModal = () => {
   if (!outgoingGroupCall) return null;
 
   const displayName = groupName;
-  const avatarUrl = groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff&size=128`;
+  const avatarUrl = groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
-      <div className="flex flex-col items-center">
-        <h2 className="text-white/80 text-lg mb-8 font-medium animate-pulse">Calling Group...</h2>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
+      <div className="relative w-[380px] overflow-hidden rounded-[2.5rem] bg-[#111B21] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.8)] border border-white/10 animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 ease-out flex flex-col items-center">
         
-        <div className="flex flex-wrap justify-center gap-4 mb-8 z-10 max-w-[280px]">
+        {/* Subtle background emerald aura */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#00A884]/20 blur-[90px] rounded-full pointer-events-none" />
+
+        {/* Top Header with E2EE Notice & Badge */}
+        <div className="flex flex-col items-center gap-2 mb-8 z-10 w-full">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#8696A0] bg-white/5 px-3 py-1 rounded-full border border-white/5">
+            <Lock className="w-3 h-3 text-[#00A884]" />
+            <span>End-to-End Encrypted</span>
+          </div>
+          <span className="px-3.5 py-1 rounded-full bg-[#00A884]/15 text-[#25D366] text-[11.5px] font-semibold tracking-wide uppercase backdrop-blur-md border border-[#00A884]/30 shadow-xs animate-pulse">
+            Calling Group...
+          </span>
+        </div>
+        
+        {/* Multi-member or Single Avatar Pulse Area */}
+        <div className="flex flex-wrap justify-center gap-3 mb-8 z-10 max-w-[260px]">
           {members.length > 0 ? (
             members.map((m, idx) => {
-              const mAvatar = m.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=3B58F5&color=fff&size=128`;
+              const mAvatar = m.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=00A884&color=fff&size=128`;
               return (
                 <div key={m.id || idx} className="relative">
-                  <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-50" style={{ animationDuration: '2s', animationDelay: `${idx * 0.2}s` }} />
+                  <div className="absolute inset-0 rounded-full border-2 border-[#25D366] animate-ping opacity-50" style={{ animationDuration: '2s', animationDelay: `${idx * 0.2}s` }} />
                   <img 
                     src={getOptimizedImageUrl(mAvatar)} 
                     alt={m.name}
-                    className="relative h-20 w-20 rounded-full object-cover border-2 border-[#1D2A54] shadow-xl"
+                    className="relative h-16 w-16 rounded-full object-cover border-2 border-[#111B21] shadow-xl bg-[#202C33]"
                   />
                 </div>
               );
             })
           ) : (
-            <div className="relative mb-12 z-10">
-              <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-75" style={{ animationDuration: '2s' }} />
-              <div className="absolute -inset-4 rounded-full border-2 border-[#3B58F5]/50 animate-pulse" />
+            <div className="relative mb-2 z-10">
+              <div className="absolute inset-0 rounded-full border-2 border-[#25D366] animate-ping opacity-60" style={{ animationDuration: '2s' }} />
+              <div className="absolute -inset-4 rounded-full border-2 border-[#00A884]/60 animate-pulse" />
               
               <img 
                 src={getOptimizedImageUrl(avatarUrl)} 
                 alt={displayName}
-                className="relative h-32 w-32 rounded-full object-cover border-4 border-[#1D2A54] shadow-2xl"
+                className="relative h-28 w-28 rounded-full object-cover border-4 border-[#111B21] shadow-2xl bg-[#202C33]"
               />
             </div>
           )}
         </div>
 
-        <h1 className="text-white text-3xl font-bold mb-16 tracking-tight">
-          {displayName}
-        </h1>
+        {/* Group Name & Info */}
+        <div className="flex flex-col items-center text-center z-10 mb-10 w-full">
+          <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
+            {displayName}
+          </h2>
+          <p className="mt-1 text-[13.5px] font-medium text-[#8696A0]">
+            Connecting members...
+          </p>
+        </div>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            cancelGroupCall(outgoingGroupCall.groupId);
-          }}
-          className="group flex flex-col items-center gap-3"
-        >
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 transition-all hover:bg-red-600 hover:scale-105 active:scale-95 shadow-lg shadow-red-500/30">
-            <PhoneOff className="h-7 w-7 text-white" fill="currentColor" />
+        {/* Bottom Action Bar */}
+        <div className="flex w-full justify-center items-center bg-[#202C33]/60 backdrop-blur-xl border border-white/10 rounded-3xl p-4 z-10 shadow-inner shadow-white/5">
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                cancelGroupCall(outgoingGroupCall.groupId);
+              }}
+              className="group flex h-14 w-14 items-center justify-center rounded-full bg-[#EA0038] transition-all hover:bg-[#d00030] hover:scale-105 active:scale-95 shadow-[0_0_25px_rgba(234,0,56,0.4)] cursor-pointer"
+              aria-label="Cancel Call"
+            >
+              <PhoneOff className="h-6 w-6 text-white transition-transform group-hover:rotate-12" fill="currentColor" />
+            </button>
+            <span className="text-[11.5px] font-medium text-red-400">Cancel</span>
           </div>
-          <span className="text-sm font-semibold text-white/70">Cancel</span>
-        </button>
+        </div>
+
       </div>
     </div>
   );
 };
+

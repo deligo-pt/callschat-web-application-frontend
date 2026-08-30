@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Phone, PhoneOff, Video, UserPlus } from "lucide-react";
+import { Phone, PhoneOff, Video, UserPlus, Lock } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
@@ -75,7 +75,7 @@ export const IncomingCallModal = () => {
   const displayName = callerName || incomingCall.callerId;
   const avatarUrl =
     callerAvatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B58F5&color=fff&size=128`;
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   // ------------------------------------------------------------------
   // Accept handler – diverges based on escalation flag
@@ -129,11 +129,11 @@ export const IncomingCallModal = () => {
     : "CallsChat Call";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
-      <div className="relative w-[380px] overflow-hidden rounded-[2.5rem] bg-[#1D2A54] p-8 shadow-[0_0_80px_rgba(29,42,84,0.6)] border border-white/10 animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 ease-out flex flex-col items-center">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
+      <div className="relative w-[380px] overflow-hidden rounded-[2.5rem] bg-[#111B21] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.8)] border border-white/10 animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 ease-out flex flex-col items-center">
 
-        {/* Background glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#3B58F5] opacity-20 blur-[80px] rounded-full pointer-events-none" />
+        {/* Subtle background emerald aura */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#25D366]/20 blur-[90px] rounded-full pointer-events-none" />
 
         {/* Escalated call indicator ribbon */}
         {isEscalated && (
@@ -146,66 +146,71 @@ export const IncomingCallModal = () => {
           </div>
         )}
 
-        {/* Top Header */}
-        <div className="flex w-full items-center justify-center mb-10 z-10">
-          <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold tracking-wider uppercase backdrop-blur-md border border-white/5 shadow-sm">
+        {/* Top Header with E2EE Notice & Badge */}
+        <div className="flex flex-col items-center gap-2 mb-8 z-10 w-full">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#8696A0] bg-white/5 px-3 py-1 rounded-full border border-white/5">
+            <Lock className="w-3 h-3 text-[#00A884]" />
+            <span>End-to-End Encrypted</span>
+          </div>
+          <span className="px-3.5 py-1 rounded-full bg-[#00A884]/15 text-[#25D366] text-[11.5px] font-semibold tracking-wide uppercase backdrop-blur-md border border-[#00A884]/30 shadow-xs animate-pulse">
             {callLabel}
           </span>
         </div>
 
-        {/* Avatar */}
+        {/* Avatar with Concentric Radar Pulse Rings */}
         <div className="relative mb-8 z-10">
-          <div className="absolute inset-0 rounded-full border-2 border-[#3B58F5] animate-ping opacity-75" style={{ animationDuration: '2s' }} />
-          <div className="absolute -inset-4 rounded-full border-2 border-[#3B58F5]/50 animate-pulse" />
+          <div className="absolute inset-0 rounded-full border-2 border-[#25D366] animate-ping opacity-60" style={{ animationDuration: '2s' }} />
+          <div className="absolute -inset-4 rounded-full border-2 border-[#00A884]/60 animate-pulse" />
           <img
             src={getOptimizedImageUrl(avatarUrl)}
             alt={displayName}
-            className="relative h-28 w-28 rounded-full object-cover border-4 border-[#1D2A54] shadow-xl"
+            className="relative h-28 w-28 rounded-full object-cover border-4 border-[#111B21] shadow-2xl bg-[#202C33]"
           />
           {/* UserPlus badge for escalated invitations */}
-          {isEscalated && (
-            <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 border-2 border-[#1D2A54] shadow-lg">
-              <UserPlus className="h-4 w-4 text-white" />
+          {isEscalated ? (
+            <div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366] border-2 border-[#111B21] shadow-lg text-white">
+              <UserPlus className="h-4 w-4" />
+            </div>
+          ) : (
+            <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-[#00A884] border-2 border-[#111B21] text-white shadow-md">
+              {incomingCall.callType === "VIDEO" ? <Video className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" fill="currentColor" />}
             </div>
           )}
         </div>
 
         {/* Caller Info */}
-        <div className="flex flex-col items-center text-center z-10 mb-12 w-full">
-          <h2 className="text-[26px] font-bold text-white tracking-tight truncate w-full px-4">
+        <div className="flex flex-col items-center text-center z-10 mb-10 w-full">
+          <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
             {displayName}
           </h2>
-          <p className="mt-1.5 text-sm font-medium text-white/60">{subtitleLabel}</p>
+          <p className="mt-1 text-[13.5px] font-medium text-[#8696A0]">{subtitleLabel}</p>
         </div>
 
         {/* Action Bar */}
-        <div className="flex w-full justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-4 z-10 shadow-inner shadow-white/5">
+        <div className="flex w-full justify-between items-center bg-[#202C33]/60 backdrop-blur-xl border border-white/10 rounded-3xl p-4 z-10 shadow-inner shadow-white/5">
 
           {/* Decline */}
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={handleDecline}
               disabled={isAccepting}
-              className="group flex h-14 w-14 items-center justify-center rounded-full bg-red-500 transition-all hover:bg-red-600 hover:scale-105 active:scale-95 shadow-lg shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group flex h-14 w-14 items-center justify-center rounded-full bg-[#EA0038] transition-all hover:bg-[#d00030] hover:scale-105 active:scale-95 shadow-[0_0_25px_rgba(234,0,56,0.4)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               aria-label="Decline"
             >
               <PhoneOff className="h-6 w-6 text-white transition-transform group-hover:rotate-12" fill="currentColor" />
             </button>
-            <span className="text-[11px] font-semibold text-white/70">
+            <span className="text-[11.5px] font-medium text-red-400">
               {isEscalated ? "Ignore" : "Decline"}
             </span>
           </div>
 
           {/* Accept */}
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={handleAccept}
               disabled={isAccepting}
               className={cn(
-                "group flex h-16 w-16 items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 animate-bounce disabled:animate-none",
-                isEscalated
-                  ? "bg-emerald-500 hover:bg-emerald-600 shadow-[0_0_30px_rgba(16,185,129,0.5)]"
-                  : "bg-[#22C55E] hover:bg-[#16A34A] shadow-[0_0_30px_rgba(34,197,94,0.4)]",
+                "group flex h-15 w-15 items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 animate-bounce disabled:animate-none cursor-pointer bg-[#25D366] hover:bg-[#20bd5a] shadow-[0_0_30px_rgba(37,211,102,0.45)]",
                 isAccepting && "opacity-70 cursor-not-allowed",
               )}
               aria-label="Accept"
@@ -223,10 +228,7 @@ export const IncomingCallModal = () => {
                 <Phone className="h-7 w-7 text-white" fill="currentColor" />
               )}
             </button>
-            <span className={cn(
-              "text-[11px] font-semibold",
-              isEscalated ? "text-emerald-400" : "text-[#22C55E]",
-            )}>
+            <span className="text-[11.5px] font-semibold text-[#25D366]">
               {isAccepting ? "Joining..." : isEscalated ? "Join Call" : "Accept"}
             </span>
           </div>
@@ -236,3 +238,4 @@ export const IncomingCallModal = () => {
     </div>
   );
 };
+
