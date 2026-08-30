@@ -138,6 +138,9 @@ export function MessageBubble({
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   const getMessageStatus = () => {
+    if (msg.id.startsWith("optimistic-") && (!msg.receipts || msg.receipts.length === 0)) {
+      return "SENDING";
+    }
     if (!msg.receipts || msg.receipts.length === 0) return "SENT";
     const recipientReceipts = msg.receipts.filter((r) => r.userId !== msg.senderId);
     const targetReceipts = recipientReceipts.length > 0 ? recipientReceipts : msg.receipts;
@@ -844,9 +847,10 @@ export function MessageBubble({
             {formatTime(msg.createdAt)}
             {isMe && (
               <span className="ml-0.5 inline-flex items-center">
-                {status === "SENT" && <Check className="w-4 h-4 text-gray-400" strokeWidth={2.5} />}
-                {status === "DELIVERED" && <CheckCheck className="w-4 h-4 text-gray-400" strokeWidth={2.5} />}
-                {status === "SEEN" && <CheckCheck className="w-4 h-4 text-[#34B7F1]" strokeWidth={2.5} />}
+                {status === "SENDING" && <Clock className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 animate-pulse" />}
+                {status === "SENT" && <Check className="w-4 h-4 text-gray-400 dark:text-gray-400" strokeWidth={2.2} />}
+                {status === "DELIVERED" && <CheckCheck className="w-4 h-4 text-gray-400 dark:text-gray-400" strokeWidth={2.2} />}
+                {status === "SEEN" && <CheckCheck className="w-4 h-4 text-[#53BDEB]" strokeWidth={2.2} />}
               </span>
             )}
           </span>

@@ -56,11 +56,15 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     console.log("[Socket] Connecting to", socketUrl);
 
     const socketInstance = io(socketUrl, {
-      auth: { token },
+      auth: (cb) => {
+        const currentToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+        cb({ token: currentToken });
+      },
       transports: ["websocket", "polling"], // allow polling fallback
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socketInstance.on("connect", () => {
@@ -71,10 +75,17 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     socketInstance.on("disconnect", (reason) => {
       console.warn("[Socket] Disconnected:", reason);
       setIsConnected(false);
+      // If server forcibly disconnected or auth failed, try connecting again
+      if (reason === "io server disconnect") {
+        socketInstance.connect();
+      }
     });
 
     socketInstance.on("connect_error", (err) => {
       console.error("[Socket] Connection error:", err.message);
+      // Ensure the latest token is present for the next attempt
+      const latestToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      socketInstance.auth = { token: latestToken };
     });
 
     // Backend emits this on successful auth
@@ -82,10 +93,26 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("[Socket] Auth confirmed by server:", data);
     });
 
+    // Reconnect immediately when window/tab is focused or network comes online
+    const handleWindowFocus = () => {
+      if (socketInstance.disconnected) {
+        console.log("[Socket] Window focused & disconnected — reconnecting...");
+        const latestToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+        socketInstance.auth = { token: latestToken };
+        socketInstance.connect();
+      }
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("online", handleWindowFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        handleWindowFocus();
+      }
+    });
+
     // Global listener to mark incoming messages as delivered
     const handleGlobalMessage = (payload: any) => {
-      // Decode userId locally inside the handler since currentUserId might be stale in closure,
-      // or we can use the one calculated above since it's from localStorage.
       const userId = typeof window !== "undefined" ? (() => {
         const t = localStorage.getItem("accessToken");
         if (!t) return null;
@@ -110,6 +137,8 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     setSocket(socketInstance);
 
     return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("online", handleWindowFocus);
       socketInstance.off("chat:receive_message", handleGlobalMessage);
       socketInstance.off("NEW_MESSAGE", handleGlobalMessage);
       socketInstance.disconnect();

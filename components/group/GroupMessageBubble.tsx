@@ -189,6 +189,9 @@ export function GroupMessageBubble({
   const senderColorClass = getSenderColor(msg.senderId);
 
   const getMessageStatus = () => {
+    if (msg.id.startsWith("optimistic-") && (!msg.receipts || msg.receipts.length === 0)) {
+      return "SENDING";
+    }
     if (!msg.receipts || msg.receipts.length === 0) return "SENT";
     const otherReceipts = msg.receipts.filter((r) => r.userId !== msg.senderId);
     if (otherReceipts.length === 0) return "SENT";
@@ -698,13 +701,15 @@ export function GroupMessageBubble({
           {msg.isEdited && <span className="italic">edited</span>}
           <span>{formatTime(msg.createdAt)}</span>
           {isMe && (
-            <span>
-              {status === "SEEN" ? (
-                <CheckCheck className="w-3.5 h-3.5 text-[#53BDEB]" />
+            <span className="inline-flex items-center">
+              {status === "SENDING" ? (
+                <Clock className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 animate-pulse" />
+              ) : status === "SEEN" ? (
+                <CheckCheck className="w-3.5 h-3.5 text-[#53BDEB]" strokeWidth={2.2} />
               ) : status === "DELIVERED" ? (
-                <CheckCheck className="w-3.5 h-3.5" />
+                <CheckCheck className="w-3.5 h-3.5 text-gray-400 dark:text-gray-400" strokeWidth={2.2} />
               ) : (
-                <Check className="w-3.5 h-3.5" />
+                <Check className="w-3.5 h-3.5 text-gray-400 dark:text-gray-400" strokeWidth={2.2} />
               )}
             </span>
           )}

@@ -34,15 +34,20 @@ if (firebaseConfig.apiKey) {
       console.log('[firebase-messaging-sw.js] Received background message ', payload);
       
       const type = payload.data?.type;
-      
+      const isCall =
+        type === 'CALL' ||
+        type === 'incoming_call' ||
+        type === 'GROUP_CALL' ||
+        Boolean(payload.data?.call_id || payload.data?.callId);
+
       const notificationTitle = payload.notification?.title || 'New Notification';
       const notificationOptions = {
         body: payload.notification?.body || '',
-        icon: payload.data?.senderAvatar || '/icon.png',
+        icon: payload.data?.senderAvatar || payload.data?.caller_avatar || '/icon.png',
         data: payload.data || {}
       };
 
-      if (type === 'CALL') {
+      if (isCall) {
         notificationOptions.requireInteraction = true;
       }
 
@@ -57,21 +62,23 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[firebase-messaging-sw.js] Notification click received.', event);
   event.notification.close();
 
-  const data = event.notification.data;
-  if (!data || !data.routeId) {
-    return;
-  }
+  const data = event.notification.data || {};
+  const routeId = data.routeId || data.call_id || data.callId;
+  const type = data.type; // 'CHAT' | 'GROUP' | 'CALL' | 'incoming_call'
 
-  const routeId = data.routeId;
-  const type = data.type; // 'CHAT' | 'GROUP' | 'CALL'
+  const isCall =
+    type === 'CALL' ||
+    type === 'incoming_call' ||
+    type === 'GROUP_CALL' ||
+    Boolean(data.call_id || data.callId);
 
   let targetUrl = '/';
-  if (type === 'CHAT') {
+  if (isCall) {
+    targetUrl = '/'; // Calls happen on the main screen overlaid
+  } else if (type === 'CHAT' && routeId) {
     targetUrl = '/chats/' + routeId;
-  } else if (type === 'GROUP') {
+  } else if (type === 'GROUP' && routeId) {
     targetUrl = '/groups/' + routeId;
-  } else if (type === 'CALL') {
-    targetUrl = '/'; // Calls usually happen on the main screen overlaid
   }
 
   event.waitUntil(
