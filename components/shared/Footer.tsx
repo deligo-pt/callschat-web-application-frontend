@@ -27,10 +27,31 @@ export default function Footer() {
                     {/* Left Block: Branding Description & App Store Downloads */}
                     <div className="flex flex-col items-start max-w-md">
                         {/* Logo Section — click returns to the homepage */}
-                        <Link href="/" className="flex items-center -ml-2">
-                            <Image src="/call_chats_logo.png" height={70} width={70} alt="CallsChat Logo" priority style={{ width: "auto", height: "auto" }} />
-                            <span className="text-2xl font-bold text-[#0A2540] -ml-2">
-                                <span className="text-2xl">Calls<span className="text-[#1A62E8]">Chat</span></span>
+                        <Link
+                            href="/"
+                            className="flex items-center group transition-transform duration-200 hover:scale-[1.02] focus:outline-none select-none -ml-3"
+                            aria-label="CallsChat Home"
+                        >
+                            <Image
+                                src="/call_chats_logo.png"
+                                alt="CallsChat Logo"
+                                width={79}
+                                height={57}
+                                className="object-contain transition-transform duration-300 group-hover:scale-105"
+                                priority
+                            />
+                            <span
+                                className="inline-block"
+                                style={{
+                                    fontFamily: "Inter",
+                                    fontWeight: 700,
+                                    fontSize: 23.75,
+                                    lineHeight: 1,
+                                    marginLeft: -12,
+                                }}
+                            >
+                                <span style={{ color: "#02235F" }}>Calls</span>
+                                <span style={{ color: "#037CFD" }}>Chat</span>
                             </span>
                         </Link>
 

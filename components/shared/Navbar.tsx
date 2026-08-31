@@ -151,19 +151,31 @@ export default function Navbar() {
             <div className="container mx-auto flex h-20 max-w-7xl items-center justify-between px-6 sm:px-8">
                 
                 {/* Brand Logo (Left) */}
-                <Link href="/" className="flex items-center gap-2.5 group select-none">
-                    <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl">
-                        <Image
-                            src="/call_chats_logo.png"
-                            height={40}
-                            width={40}
-                            alt="CallsChat Logo"
-                            priority
-                            className="object-contain transition-transform duration-300 group-hover:scale-105"
-                        />
-                    </div>
-                    <span className="text-2xl font-bold tracking-tight text-[#111b21] dark:text-white">
-                        CallsChat
+                <Link
+                    href="/"
+                    className="flex items-center group transition-transform duration-200 hover:scale-[1.02] focus:outline-none select-none"
+                    aria-label="CallsChat Home"
+                >
+                    <Image
+                        src="/call_chats_logo.png"
+                        alt="CallsChat"
+                        width={79}
+                        height={57}
+                        className="object-contain transition-transform duration-300 group-hover:scale-105"
+                        priority
+                    />
+                    <span
+                        className="inline-block"
+                        style={{
+                            fontFamily: "Inter",
+                            fontWeight: 700,
+                            fontSize: 23.75,
+                            lineHeight: 1,
+                            marginLeft: -12,
+                        }}
+                    >
+                        <span style={{ color: "#02235F" }} className="dark:text-white">Calls</span>
+                        <span style={{ color: "#037CFD" }}>Chat</span>
                     </span>
                 </Link>
 
