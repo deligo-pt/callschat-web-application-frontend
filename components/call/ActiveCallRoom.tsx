@@ -38,9 +38,122 @@ import { getOptimizedImageUrl } from "@/utils/image";
 // ---------------------------------------------------------------------------
 // Inner layout — must be a child of <LiveKitRoom> so LiveKit hooks work
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 1v1 Audio Participant Avatar with Heartbeat & Voice-Activity
+// ---------------------------------------------------------------------------
+const SafeParticipantAvatar = ({
+  participant,
+  avatarUrl,
+}: {
+  participant?: any;
+  avatarUrl: string;
+}) => {
+  if (!participant) {
+    return (
+      <div className="relative mb-2">
+        <div className="absolute -inset-10 rounded-full border border-[#25D366]/25 animate-heartbeat-ring-2 pointer-events-none" />
+        <div className="absolute -inset-6 rounded-full border-2 border-[#00A884]/40 animate-heartbeat-ring-1 pointer-events-none" />
+        <div className="absolute -inset-2 rounded-full bg-radial from-[#00A884]/40 to-transparent blur-md transition-all duration-300 pointer-events-none animate-call-heartbeat opacity-60" />
+        <img
+          src={getOptimizedImageUrl(avatarUrl)}
+          alt="Avatar"
+          className="relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)] animate-call-heartbeat bg-[#202C33]"
+        />
+      </div>
+    );
+  }
+
+  return <ActiveSpeaker1v1Avatar participant={participant} avatarUrl={avatarUrl} />;
+};
+
+const ActiveSpeaker1v1Avatar = ({
+  participant,
+  avatarUrl,
+}: {
+  participant: any;
+  avatarUrl: string;
+}) => {
+  const isSpeaking = useIsSpeaking(participant);
+
+  return (
+    <div className="relative mb-2">
+      {/* Concentric Heartbeat Rings */}
+      <div
+        className={cn(
+          "absolute -inset-10 rounded-full border border-[#25D366]/25 animate-heartbeat-ring-2 pointer-events-none",
+          isSpeaking && "border-[#25D366]/40 scale-110"
+        )}
+      />
+      <div
+        className={cn(
+          "absolute -inset-6 rounded-full border-2 border-[#00A884]/40 animate-heartbeat-ring-1 pointer-events-none",
+          isSpeaking && "border-[#25D366]/60"
+        )}
+      />
+      <div
+        className={cn(
+          "absolute -inset-2 rounded-full bg-radial from-[#00A884]/40 to-transparent blur-md transition-all duration-300 pointer-events-none",
+          isSpeaking ? "animate-call-heartbeat-fast opacity-90" : "animate-call-heartbeat opacity-60"
+        )}
+      />
+
+      <img
+        src={getOptimizedImageUrl(avatarUrl)}
+        alt="Avatar"
+        className={cn(
+          "relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl bg-[#202C33]",
+          isSpeaking
+            ? "border-[#25D366] shadow-[0_0_40px_rgba(37,211,102,0.5)] animate-heartbeat-speaking"
+            : "border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)] animate-call-heartbeat"
+        )}
+      />
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Group Audio Participant Avatar with Heartbeat & Voice-Activity
 // ---------------------------------------------------------------------------
 const GroupAudioAvatar = ({
+  participant,
+  isLocal,
+  name,
+  avatarUrl,
+}: {
+  participant?: any;
+  isLocal: boolean;
+  name: string;
+  avatarUrl: string;
+}) => {
+  if (!participant) {
+    return (
+      <div className="flex flex-col items-center">
+        <div className="relative mb-3">
+          <div className="absolute -inset-3 rounded-full border border-[#00A884]/20 animate-heartbeat-ring-1 pointer-events-none opacity-40" />
+          <img
+            src={getOptimizedImageUrl(avatarUrl)}
+            alt={name}
+            className="relative h-28 w-28 md:h-36 md:w-36 rounded-full object-cover border-3 border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)] animate-call-heartbeat bg-[#202C33]"
+          />
+        </div>
+        <h2 className="text-[16px] md:text-[18px] font-semibold text-[#E9EDEF] text-center">
+          {name}
+        </h2>
+      </div>
+    );
+  }
+
+  return (
+    <ActiveSpeakerGroupAvatar
+      participant={participant}
+      isLocal={isLocal}
+      name={name}
+      avatarUrl={avatarUrl}
+    />
+  );
+};
+
+const ActiveSpeakerGroupAvatar = ({
   participant,
   isLocal,
   name,
@@ -309,9 +422,6 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     const allParticipants = [localParticipant, ...remoteParticipants];
     
     const remotePeer = remoteParticipants[0];
-    const isLocalSpeaking = useIsSpeaking(localParticipant);
-    const isRemoteSpeaking = useIsSpeaking(remotePeer);
-    const isAnyoneSpeaking = isLocalSpeaking || isRemoteSpeaking;
     
     let singlePeerName = activeCall.peerName || "Unknown";
     let singleAvatarUrl = activeCall.peerAvatar || "";
@@ -461,41 +571,10 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
             {!activeCall.isGroup && remoteParticipants.length <= 1 ? (
               // 1-on-1 Audio Layout
               <div className="flex flex-col items-center justify-center gap-5">
-                <div className="relative mb-2">
-                  {/* Concentric Heartbeat Rings */}
-                  {/* Outermost rhythmic wave */}
-                  <div
-                    className={cn(
-                      "absolute -inset-10 rounded-full border border-[#25D366]/25 animate-heartbeat-ring-2 pointer-events-none",
-                      isAnyoneSpeaking && "border-[#25D366]/40 scale-110"
-                    )}
-                  />
-                  {/* Inner expanding cardiac wave */}
-                  <div
-                    className={cn(
-                      "absolute -inset-6 rounded-full border-2 border-[#00A884]/40 animate-heartbeat-ring-1 pointer-events-none",
-                      isAnyoneSpeaking && "border-[#25D366]/60"
-                    )}
-                  />
-                  {/* Active heartbeat aura layer directly backing avatar */}
-                  <div
-                    className={cn(
-                      "absolute -inset-2 rounded-full bg-radial from-[#00A884]/40 to-transparent blur-md transition-all duration-300 pointer-events-none",
-                      isAnyoneSpeaking ? "animate-call-heartbeat-fast opacity-90" : "animate-call-heartbeat opacity-60"
-                    )}
-                  />
-                  
-                  <img 
-                    src={getOptimizedImageUrl(finalSingleAvatarUrl)} 
-                    alt="Avatar" 
-                    className={cn(
-                      "relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl bg-[#202C33]",
-                      isAnyoneSpeaking
-                        ? "border-[#25D366] shadow-[0_0_40px_rgba(37,211,102,0.5)] animate-heartbeat-speaking"
-                        : "border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)] animate-call-heartbeat"
-                    )}
-                  />
-                </div>
+                <SafeParticipantAvatar
+                  participant={remotePeer || localParticipant}
+                  avatarUrl={finalSingleAvatarUrl}
+                />
                 <div className="flex flex-col items-center gap-2">
                   <h1 className="text-[28px] md:text-[34px] font-bold text-[#E9EDEF] tracking-tight text-center px-4">
                     {singlePeerName}
