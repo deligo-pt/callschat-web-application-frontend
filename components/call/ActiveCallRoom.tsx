@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
 import { InviteParticipantModal } from "./InviteParticipantModal";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { resolveLivekitUrl } from "@/utils/livekit";
 
 // ---------------------------------------------------------------------------
 // Inner layout — must be a child of <LiveKitRoom> so LiveKit hooks work
@@ -792,8 +793,11 @@ export const ActiveCallRoom = () => {
         video={activeCall.callType === "VIDEO"}
         audio={true}
         token={activeCall.token}
-        serverUrl={activeCall.serverUrl}
+        serverUrl={resolveLivekitUrl(activeCall.serverUrl)}
         connect={true}
+        onError={(error) => {
+          console.warn("[LiveKit] Room connection notice:", error);
+        }}
         onDisconnected={onLiveKitDisconnected}
         className="w-full h-full"
       >

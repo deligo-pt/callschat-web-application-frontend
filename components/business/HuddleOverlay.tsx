@@ -7,15 +7,15 @@ import { useMeetingStore } from "@/hooks/useMeetingStore";
 import { MeetingService } from "@/services/meeting.service";
 import { useUser } from "@/context/UserContext";
 
+import { resolveLivekitUrl } from "@/utils/livekit";
+
 export function HuddleOverlay() {
   const { token, meetingId, clearMeeting } = useMeetingStore();
   const { workspace } = useUser();
   const [wsUrl, setWsUrl] = useState<string>("");
 
   useEffect(() => {
-    // In production, this should be an env variable (e.g. NEXT_PUBLIC_LIVEKIT_URL)
-    // We'll try to extract it from env or fallback to the actual LiveKit cloud URL.
-    const url = process.env.NEXT_PUBLIC_LIVEKIT_URL || "wss://callschat-mvp-qay10xfl.livekit.cloud";
+    const url = resolveLivekitUrl(process.env.NEXT_PUBLIC_LIVEKIT_URL);
     setWsUrl(url);
   }, []);
 
