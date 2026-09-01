@@ -52,13 +52,10 @@ const SafeParticipantAvatar = ({
   if (!participant) {
     return (
       <div className="relative mb-2">
-        <div className="absolute -inset-10 rounded-full border border-[#25D366]/25 animate-heartbeat-ring-2 pointer-events-none" />
-        <div className="absolute -inset-6 rounded-full border-2 border-[#00A884]/40 animate-heartbeat-ring-1 pointer-events-none" />
-        <div className="absolute -inset-2 rounded-full bg-radial from-[#00A884]/40 to-transparent blur-md transition-all duration-300 pointer-events-none animate-call-heartbeat opacity-60" />
         <img
           src={getOptimizedImageUrl(avatarUrl)}
           alt="Avatar"
-          className="relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)] animate-call-heartbeat bg-[#202C33]"
+          className="relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)] bg-[#202C33]"
         />
       </div>
     );
@@ -78,25 +75,14 @@ const ActiveSpeaker1v1Avatar = ({
 
   return (
     <div className="relative mb-2">
-      {/* Concentric Heartbeat Rings */}
-      <div
-        className={cn(
-          "absolute -inset-10 rounded-full border border-[#25D366]/25 animate-heartbeat-ring-2 pointer-events-none",
-          isSpeaking && "border-[#25D366]/40 scale-110"
-        )}
-      />
-      <div
-        className={cn(
-          "absolute -inset-6 rounded-full border-2 border-[#00A884]/40 animate-heartbeat-ring-1 pointer-events-none",
-          isSpeaking && "border-[#25D366]/60"
-        )}
-      />
-      <div
-        className={cn(
-          "absolute -inset-2 rounded-full bg-radial from-[#00A884]/40 to-transparent blur-md transition-all duration-300 pointer-events-none",
-          isSpeaking ? "animate-call-heartbeat-fast opacity-90" : "animate-call-heartbeat opacity-60"
-        )}
-      />
+      {/* Concentric Heartbeat Rings — ONLY active while user is speaking */}
+      {isSpeaking && (
+        <>
+          <div className="absolute -inset-10 rounded-full border border-[#25D366]/40 scale-110 animate-heartbeat-ring-2 pointer-events-none" />
+          <div className="absolute -inset-6 rounded-full border-2 border-[#25D366]/60 animate-heartbeat-ring-1 pointer-events-none" />
+          <div className="absolute -inset-2 rounded-full bg-radial from-[#25D366]/40 to-transparent blur-md transition-all duration-300 pointer-events-none animate-call-heartbeat-fast opacity-90" />
+        </>
+      )}
 
       <img
         src={getOptimizedImageUrl(avatarUrl)}
@@ -105,7 +91,7 @@ const ActiveSpeaker1v1Avatar = ({
           "relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl bg-[#202C33]",
           isSpeaking
             ? "border-[#25D366] shadow-[0_0_40px_rgba(37,211,102,0.5)] animate-heartbeat-speaking"
-            : "border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)] animate-call-heartbeat"
+            : "border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)]"
         )}
       />
     </div>
@@ -130,11 +116,10 @@ const GroupAudioAvatar = ({
     return (
       <div className="flex flex-col items-center">
         <div className="relative mb-3">
-          <div className="absolute -inset-3 rounded-full border border-[#00A884]/20 animate-heartbeat-ring-1 pointer-events-none opacity-40" />
           <img
             src={getOptimizedImageUrl(avatarUrl)}
             alt={name}
-            className="relative h-28 w-28 md:h-36 md:w-36 rounded-full object-cover border-3 border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)] animate-call-heartbeat bg-[#202C33]"
+            className="relative h-28 w-28 md:h-36 md:w-36 rounded-full object-cover border-3 border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)] bg-[#202C33]"
           />
         </div>
         <h2 className="text-[16px] md:text-[18px] font-semibold text-[#E9EDEF] text-center">
@@ -170,15 +155,13 @@ const ActiveSpeakerGroupAvatar = ({
   return (
     <div className="flex flex-col items-center">
       <div className="relative mb-3">
-        {/* Heartbeat aura when speaking or ambient */}
-        {isSpeaking ? (
+        {/* Heartbeat aura — ONLY render when user is actively speaking */}
+        {isSpeaking && (
           <>
             <div className="absolute -inset-6 rounded-full border border-[#25D366]/40 animate-heartbeat-ring-1 pointer-events-none" />
             <div className="absolute -inset-10 rounded-full border border-[#25D366]/20 animate-heartbeat-ring-2 pointer-events-none" />
             <div className="absolute -inset-2 rounded-full bg-radial from-[#25D366]/40 to-transparent blur-md animate-call-heartbeat-fast pointer-events-none" />
           </>
-        ) : (
-          <div className="absolute -inset-3 rounded-full border border-[#00A884]/20 animate-heartbeat-ring-1 pointer-events-none opacity-40" />
         )}
         <img
           src={getOptimizedImageUrl(avatarUrl)}
@@ -187,7 +170,7 @@ const ActiveSpeakerGroupAvatar = ({
             "relative h-28 w-28 md:h-36 md:w-36 rounded-full object-cover border-3 transition-all duration-300 shadow-2xl bg-[#202C33]",
             isSpeaking
               ? "border-[#25D366] shadow-[0_0_30px_rgba(37,211,102,0.5)] animate-heartbeat-speaking"
-              : "border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)] animate-call-heartbeat"
+              : "border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)]"
           )}
         />
       </div>
