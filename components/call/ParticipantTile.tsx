@@ -82,16 +82,24 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-[#111B21]">
           <div className="relative">
-            {isSpeaking && (
+            {isSpeaking ? (
               <>
-                <div className="absolute inset-0 rounded-full border-2 border-[#25D366] animate-ping opacity-30" style={{ animationDuration: '2.5s' }} />
-                <div className="absolute -inset-6 rounded-full border border-[#25D366]/40 animate-pulse" />
+                <div className="absolute -inset-6 rounded-full border border-[#25D366]/40 animate-heartbeat-ring-1 pointer-events-none" />
+                <div className="absolute -inset-10 rounded-full border border-[#25D366]/20 animate-heartbeat-ring-2 pointer-events-none" />
+                <div className="absolute -inset-2 rounded-full bg-radial from-[#25D366]/40 to-transparent blur-md animate-call-heartbeat-fast pointer-events-none" />
               </>
+            ) : (
+              <div className="absolute -inset-3 rounded-full border border-[#00A884]/20 animate-heartbeat-ring-1 pointer-events-none opacity-40" />
             )}
             <img
               src={getOptimizedImageUrl(avatarUrl)}
               alt={name}
-              className="relative h-24 w-24 md:h-32 md:w-32 rounded-full object-cover border-4 border-[#00A884] shadow-xl bg-[#202C33]"
+              className={cn(
+                "relative h-24 w-24 md:h-32 md:w-32 rounded-full object-cover border-4 transition-all duration-300 shadow-xl bg-[#202C33]",
+                isSpeaking
+                  ? "border-[#25D366] shadow-[0_0_30px_rgba(37,211,102,0.5)] animate-heartbeat-speaking"
+                  : "border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)] animate-call-heartbeat"
+              )}
             />
           </div>
         </div>

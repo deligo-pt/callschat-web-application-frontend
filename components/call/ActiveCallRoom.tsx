@@ -9,6 +9,7 @@ import {
   useTracks,
   useMediaDeviceSelect,
   useConnectionState,
+  useIsSpeaking,
 } from "@livekit/components-react";
 import { Track, ConnectionState } from "livekit-client";
 import "@livekit/components-styles";
@@ -37,6 +38,59 @@ import { getOptimizedImageUrl } from "@/utils/image";
 // ---------------------------------------------------------------------------
 // Inner layout — must be a child of <LiveKitRoom> so LiveKit hooks work
 // ---------------------------------------------------------------------------
+// Group Audio Participant Avatar with Heartbeat & Voice-Activity
+// ---------------------------------------------------------------------------
+const GroupAudioAvatar = ({
+  participant,
+  isLocal,
+  name,
+  avatarUrl,
+}: {
+  participant: any;
+  isLocal: boolean;
+  name: string;
+  avatarUrl: string;
+}) => {
+  const isSpeaking = useIsSpeaking(participant);
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative mb-3">
+        {/* Heartbeat aura when speaking or ambient */}
+        {isSpeaking ? (
+          <>
+            <div className="absolute -inset-6 rounded-full border border-[#25D366]/40 animate-heartbeat-ring-1 pointer-events-none" />
+            <div className="absolute -inset-10 rounded-full border border-[#25D366]/20 animate-heartbeat-ring-2 pointer-events-none" />
+            <div className="absolute -inset-2 rounded-full bg-radial from-[#25D366]/40 to-transparent blur-md animate-call-heartbeat-fast pointer-events-none" />
+          </>
+        ) : (
+          <div className="absolute -inset-3 rounded-full border border-[#00A884]/20 animate-heartbeat-ring-1 pointer-events-none opacity-40" />
+        )}
+        <img
+          src={getOptimizedImageUrl(avatarUrl)}
+          alt={name}
+          className={cn(
+            "relative h-28 w-28 md:h-36 md:w-36 rounded-full object-cover border-3 transition-all duration-300 shadow-2xl bg-[#202C33]",
+            isSpeaking
+              ? "border-[#25D366] shadow-[0_0_30px_rgba(37,211,102,0.5)] animate-heartbeat-speaking"
+              : "border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)] animate-call-heartbeat"
+          )}
+        />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <h2 className="text-[16px] md:text-[18px] font-semibold text-[#E9EDEF] text-center">
+          {name}
+        </h2>
+        {isSpeaking && (
+          <span className="relative flex h-2 w-2 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75 animate-heartbeat-dot" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#25D366]" />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 interface CustomCallLayoutProps {
   inviteOpen: boolean;
@@ -255,6 +309,9 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
     const allParticipants = [localParticipant, ...remoteParticipants];
     
     const remotePeer = remoteParticipants[0];
+    const isLocalSpeaking = useIsSpeaking(localParticipant);
+    const isRemoteSpeaking = useIsSpeaking(remotePeer);
+    const isAnyoneSpeaking = isLocalSpeaking || isRemoteSpeaking;
     
     let singlePeerName = activeCall.peerName || "Unknown";
     let singleAvatarUrl = activeCall.peerAvatar || "";
@@ -305,7 +362,11 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
               </button>
               
               <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00A884]/20 border border-[#00A884]/30 backdrop-blur-md">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#00A884]/20 border border-[#00A884]/30 backdrop-blur-md">
+                  <span className="relative flex h-2 w-2 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75 animate-heartbeat-dot" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#25D366]" />
+                  </span>
                   <span className="text-xs font-semibold text-[#25D366]">📷 Video Active · {formatDuration(duration)}</span>
                 </div>
               </div>
@@ -363,7 +424,11 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
             </button>
     
             <div className="flex flex-col items-center gap-1">
-              <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#8696A0] bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+              <div className="flex items-center gap-2 text-[11px] font-medium text-[#8696A0] bg-white/5 px-3 py-0.5 rounded-full border border-white/10 shadow-xs">
+                <span className="relative flex h-2 w-2 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75 animate-heartbeat-dot" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#25D366]" />
+                </span>
                 <Lock className="w-3 h-3 text-[#00A884]" />
                 <span>End-to-End Encrypted</span>
               </div>
@@ -397,14 +462,38 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
               // 1-on-1 Audio Layout
               <div className="flex flex-col items-center justify-center gap-5">
                 <div className="relative mb-2">
-                  {/* Outer emerald wave pulse ring */}
-                  <div className="absolute -inset-6 rounded-full border-2 border-[#00A884]/30 animate-pulse" />
-                  <div className="absolute -inset-12 rounded-full border border-[#00A884]/15 animate-ping" style={{ animationDuration: '3s' }} />
+                  {/* Concentric Heartbeat Rings */}
+                  {/* Outermost rhythmic wave */}
+                  <div
+                    className={cn(
+                      "absolute -inset-10 rounded-full border border-[#25D366]/25 animate-heartbeat-ring-2 pointer-events-none",
+                      isAnyoneSpeaking && "border-[#25D366]/40 scale-110"
+                    )}
+                  />
+                  {/* Inner expanding cardiac wave */}
+                  <div
+                    className={cn(
+                      "absolute -inset-6 rounded-full border-2 border-[#00A884]/40 animate-heartbeat-ring-1 pointer-events-none",
+                      isAnyoneSpeaking && "border-[#25D366]/60"
+                    )}
+                  />
+                  {/* Active heartbeat aura layer directly backing avatar */}
+                  <div
+                    className={cn(
+                      "absolute -inset-2 rounded-full bg-radial from-[#00A884]/40 to-transparent blur-md transition-all duration-300 pointer-events-none",
+                      isAnyoneSpeaking ? "animate-call-heartbeat-fast opacity-90" : "animate-call-heartbeat opacity-60"
+                    )}
+                  />
                   
                   <img 
                     src={getOptimizedImageUrl(finalSingleAvatarUrl)} 
                     alt="Avatar" 
-                    className="relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 border-[#00A884] shadow-2xl bg-[#202C33]"
+                    className={cn(
+                      "relative h-44 w-44 md:h-52 md:w-52 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl bg-[#202C33]",
+                      isAnyoneSpeaking
+                        ? "border-[#25D366] shadow-[0_0_40px_rgba(37,211,102,0.5)] animate-heartbeat-speaking"
+                        : "border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)] animate-call-heartbeat"
+                    )}
                   />
                 </div>
                 <div className="flex flex-col items-center gap-2">
@@ -452,18 +541,13 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
                   const av = pAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(isLocal ? "Y" : name)}&background=00A884&color=fff&size=256`;
 
                   return (
-                    <div key={p.identity || idx} className="flex flex-col items-center">
-                       <div className="relative mb-3">
-                          <img 
-                            src={getOptimizedImageUrl(av)} 
-                            alt={name} 
-                            className="relative h-28 w-28 md:h-36 md:w-36 rounded-full object-cover border-3 border-[#00A884] shadow-2xl bg-[#202C33]"
-                          />
-                       </div>
-                       <h2 className="text-[16px] md:text-[18px] font-semibold text-[#E9EDEF] text-center">
-                          {name}
-                       </h2>
-                    </div>
+                    <GroupAudioAvatar
+                      key={p.identity || idx}
+                      participant={p}
+                      isLocal={isLocal}
+                      name={name}
+                      avatarUrl={av}
+                    />
                   );
                 })}
               </div>
@@ -495,9 +579,15 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
         </button>
 
         <div className="flex flex-col items-center gap-0.5">
-          <h2 className="text-[16px] font-semibold tracking-wide text-[#E9EDEF]">
-            {activeCall?.isGroup ? "Group Video Call" : "Video Call"}
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75 animate-heartbeat-dot" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#25D366]" />
+            </span>
+            <h2 className="text-[16px] font-semibold tracking-wide text-[#E9EDEF]">
+              {activeCall?.isGroup ? "Group Video Call" : "Video Call"}
+            </h2>
+          </div>
           <span className="text-[13px] font-semibold text-[#25D366]">
             {formatDuration(duration)}
           </span>
