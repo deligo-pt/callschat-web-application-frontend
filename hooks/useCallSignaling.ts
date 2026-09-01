@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '@/components/providers/SocketProvider';
 import { playNotificationSound } from '@/utils/sounds';
 import { CallService } from '@/services/call.service';
+import { resolveLivekitUrl } from '@/utils/livekit';
 import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
@@ -229,7 +230,7 @@ export const useCallSignaling = () => {
       setActiveCall({
         callId: payload.callId,
         token: payload.token,
-        serverUrl: payload.livekitUrl,
+        serverUrl: resolveLivekitUrl(payload.livekitUrl),
         roomName: payload.roomName,
         callType: payload.callType,
         peerName: pendingPeerRef.current.name,
@@ -382,14 +383,14 @@ export const useCallSignaling = () => {
             return {
               callId: payload.callId,
               token: payload.token!,
-              serverUrl: payload.livekitUrl!,
+              serverUrl: resolveLivekitUrl(payload.livekitUrl),
               roomName: payload.roomName!,
               // Preserve call type and group from the pending peer ref if available
               callType: 'AUDIO',
             };
           }
           // Already mounted (LiveKit auto-reconnected) — just refresh the token
-          return { ...current, token: payload.token!, callId: payload.callId };
+          return { ...current, token: payload.token!, callId: payload.callId, serverUrl: resolveLivekitUrl(payload.livekitUrl || current.serverUrl) };
         });
       }
       // Case B: nothing to do beyond clearing the overlay (already done above)
@@ -649,7 +650,7 @@ export const useCallSignaling = () => {
           // Use the roomName as a stable local ID since no CallLog was created
           callId: result.roomName,
           token: result.token,
-          serverUrl: result.livekitUrl,
+          serverUrl: resolveLivekitUrl(result.livekitUrl),
           roomName: result.roomName,
           callType,
           isGroup: true, // Mark as multi-party call so leaver doesn't terminate room
@@ -807,7 +808,7 @@ export const useCallSignaling = () => {
           setActiveCall({
             callId: response.callId || groupId,
             token: response.token,
-            serverUrl: response.livekitUrl,
+            serverUrl: resolveLivekitUrl(response.livekitUrl),
             roomName: response.roomName,
             callType: response.callType || 'AUDIO',
             isGroup: true,
@@ -840,7 +841,7 @@ export const useCallSignaling = () => {
           setActiveCall({
             callId: response.callId || groupId,
             token: response.token,
-            serverUrl: response.livekitUrl,
+            serverUrl: resolveLivekitUrl(response.livekitUrl),
             roomName: response.roomName,
             callType: response.callType || 'AUDIO',
             isGroup: true,
