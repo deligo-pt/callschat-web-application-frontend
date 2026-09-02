@@ -581,10 +581,24 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     const youPrefix = isMe ? "You: " : "";
 
     // ── Media-type previews ──────────────────────────────────────────
-    if (msg.mediaType === "image") return `${youPrefix}📷 Photo`;
-    if (msg.mediaType === "video") return `${youPrefix}🎥 Video`;
-    if (msg.mediaType === "audio") return `${youPrefix}🎤 Voice message`;
-    if (msg.mediaType === "document") return `${youPrefix}📄 Document`;
+    if (msg.mediaType === "image" || msg.mediaType?.startsWith("image")) return `${youPrefix}📷 Photo`;
+    if (msg.mediaType === "video" || msg.mediaType?.startsWith("video")) return `${youPrefix}🎥 Video`;
+    if (msg.mediaType === "audio" || msg.mediaType?.startsWith("audio")) return `${youPrefix}🎤 Voice message`;
+    if (
+      msg.mediaType === "document" ||
+      msg.mediaType === "file" ||
+      msg.mediaType === "raw" ||
+      (msg.mediaUrl &&
+        !msg.mediaType?.startsWith("image") &&
+        !msg.mediaType?.startsWith("video") &&
+        !msg.mediaType?.startsWith("audio") &&
+        msg.mediaType !== "link" &&
+        msg.mediaType !== "call")
+    ) {
+      const raw = msg.mediaUrl ? decodeURIComponent(msg.mediaUrl.split("/").pop()?.split("?")[0] || "") : "";
+      const clean = raw.replace(/^\d{10,14}_/, "");
+      return `${youPrefix}📄 ${clean ? (clean.length > 25 ? `${clean.slice(0, 22)}...` : clean) : "Document"}`;
+    }
 
     if (msg.mediaType === "call") {
       if (msg.mediaUrl) {
