@@ -19,6 +19,7 @@ import {
   X,
   Play,
   Maximize2,
+  Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -44,6 +45,40 @@ export default function MediaPage() {
   const [gallerySearch, setGallerySearch] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownload = async (mediaUrl: string, filename: string, itemId?: string) => {
+    if (itemId) setDownloadingId(itemId);
+    const rawUrl = getRawMediaUrl(mediaUrl);
+
+    try {
+      const res = await fetch(rawUrl);
+      if (!res.ok) throw new Error("Fetch failed");
+
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success(`Downloaded ${filename}`);
+    } catch {
+      // Fallback for strict CORS: direct link click with download intent
+      const link = document.createElement("a");
+      link.href = rawUrl;
+      link.target = "_blank";
+      link.download = filename;
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      if (itemId) setDownloadingId(null);
+    }
+  };
 
   const handleStartChat = async (targetUserId: string) => {
     try {
@@ -523,44 +558,95 @@ export default function MediaPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                         {group.items.map((item) => {
-                          const filename = item.mediaUrl.split("/").pop() || "Document";
-                          const ext = filename.split(".").pop()?.toUpperCase() || "FILE";
+                          const raw = item.mediaUrl.split("/").pop() || "Document";
+                          const decoded = decodeURIComponent(raw).split("?")[0];
+                          
+                          // Safely extract extension (only if valid 1-5 alphanumeric chars after dot)
+                          const match = decoded.match(/\.([a-zA-Z0-9]{1,5})$/);
+                          const ext = match ? match[1].toUpperCase() : "DOC";
+                          
+                          // Clean display name (strip leading timestamp prefix if present)
+                          let cleanName = decoded;
+                          if (/^\d{10,14}_/.test(cleanName)) {
+                            cleanName = cleanName.replace(/^\d{10,14}_/, "");
+                          }
+
+                          // File type specific accent colors
+                          let badgeStyle = "bg-[#00A884]/10 text-[#00A884] border-[#00A884]/25 group-hover:bg-[#00A884] group-hover:text-white";
+                          let iconStyle = "text-[#00A884] group-hover:text-white";
+
+                          if (["PDF"].includes(ext)) {
+                            badgeStyle = "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50 group-hover:bg-rose-600 group-hover:text-white";
+                            iconStyle = "text-rose-600 dark:text-rose-400 group-hover:text-white";
+                          } else if (["DOC", "DOCX", "TXT", "RTF", "ODT"].includes(ext)) {
+                            badgeStyle = "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 group-hover:bg-blue-600 group-hover:text-white";
+                            iconStyle = "text-blue-600 dark:text-blue-400 group-hover:text-white";
+                          } else if (["XLS", "XLSX", "CSV", "ODS"].includes(ext)) {
+                            badgeStyle = "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50 group-hover:bg-emerald-600 group-hover:text-white";
+                            iconStyle = "text-emerald-600 dark:text-emerald-400 group-hover:text-white";
+                          } else if (["PPT", "PPTX", "KEY"].includes(ext)) {
+                            badgeStyle = "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 group-hover:bg-amber-600 group-hover:text-white";
+                            iconStyle = "text-amber-600 dark:text-amber-400 group-hover:text-white";
+                          } else if (["ZIP", "RAR", "7Z", "TAR", "GZ"].includes(ext)) {
+                            badgeStyle = "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/50 group-hover:bg-purple-600 group-hover:text-white";
+                            iconStyle = "text-purple-600 dark:text-purple-400 group-hover:text-white";
+                          }
                           
                           return (
                             <div
                               key={item.id}
-                              className="flex items-center gap-3.5 bg-white dark:bg-[#111B21] p-3.5 rounded-2xl border border-[#E2E8F0] dark:border-[#222D34] hover:border-[#00A884]/50 dark:hover:border-[#00A884]/50 hover:shadow-md transition-all group"
+                              className="relative flex items-center justify-between gap-3.5 bg-white dark:bg-[#111B21] p-3.5 rounded-2xl border border-[#E2E8F0] dark:border-[#222D34] hover:border-[#00A884]/40 dark:hover:border-[#00A884]/40 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)] transition-all duration-200 group overflow-hidden"
                             >
-                              {/* File Extension Badge */}
-                              <div className="flex flex-col items-center justify-center h-12 w-12 shrink-0 rounded-xl bg-[#00A884]/10 text-[#00A884] font-bold text-[11px] border border-[#00A884]/20 group-hover:bg-[#00A884] group-hover:text-white transition-colors">
-                                <FileText className="h-5 w-5 mb-0.5" />
-                                <span className="leading-none text-[9px]">{ext}</span>
+                              {/* File Extension Badge Icon */}
+                              <div className={cn(
+                                "flex flex-col items-center justify-center h-12 w-12 shrink-0 rounded-xl border transition-colors relative overflow-hidden",
+                                badgeStyle
+                              )}>
+                                <FileText className={cn("h-5 w-5 mb-0.5 shrink-0 transition-colors", iconStyle)} />
+                                <span className="leading-none text-[8.5px] font-extrabold uppercase tracking-tight max-w-[36px] truncate text-center select-none">
+                                  {ext.slice(0, 4)}
+                                </span>
                               </div>
 
-                              {/* File Details */}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate group-hover:text-[#00A884] transition-colors">
-                                  {filename}
+                              {/* File Details (Cleanly Truncated) */}
+                              <div className="flex-1 min-w-0 pr-1">
+                                <p
+                                  className="text-[13.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate group-hover:text-[#00A884] dark:group-hover:text-[#25D366] transition-colors"
+                                  title={decoded}
+                                >
+                                  {cleanName}
                                 </p>
-                                <p className="text-[12px] text-[#667781] dark:text-[#8696A0] mt-0.5">
-                                  {new Date(item.createdAt).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </p>
+                                <div className="flex items-center gap-1.5 text-[11.5px] font-normal text-[#667781] dark:text-[#8696A0] mt-0.5">
+                                  <span>
+                                    {new Date(item.createdAt).toLocaleDateString([], {
+                                      month: "short",
+                                      day: "numeric",
+                                    })}
+                                  </span>
+                                  <span>•</span>
+                                  <span>
+                                    {new Date(item.createdAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                </div>
                               </div>
 
                               {/* Download Action */}
-                              <a
-                                href={getRawMediaUrl(item.mediaUrl)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download={filename}
+                              <button
+                                type="button"
+                                onClick={() => handleDownload(item.mediaUrl, cleanName, item.id)}
+                                disabled={downloadingId === item.id}
                                 title="Download file"
-                                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884] hover:text-white transition-colors shrink-0"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884] hover:text-white dark:hover:bg-[#00A884] dark:hover:text-white transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-60"
                               >
-                                <Download className="h-4 w-4" />
-                              </a>
+                                {downloadingId === item.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-[#00A884]" />
+                                ) : (
+                                  <Download className="h-4 w-4" />
+                                )}
+                              </button>
                             </div>
                           );
                         })}
@@ -690,16 +776,23 @@ export default function MediaPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <a
-                href={getRawMediaUrl(selectedMedia.mediaUrl)}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
+              <button
+                type="button"
+                onClick={() => {
+                  const rawFilename = selectedMedia.mediaUrl.split("/").pop() || "media";
+                  const filename = decodeURIComponent(rawFilename).split("?")[0];
+                  handleDownload(selectedMedia.mediaUrl, filename, selectedMedia.id);
+                }}
+                disabled={downloadingId === selectedMedia.id}
                 title="Download original"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors cursor-pointer disabled:opacity-60"
               >
-                <Download className="h-5 w-5" />
-              </a>
+                {downloadingId === selectedMedia.id ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Download className="h-5 w-5" />
+                )}
+              </button>
               <button
                 onClick={() => setSelectedMedia(null)}
                 title="Close"

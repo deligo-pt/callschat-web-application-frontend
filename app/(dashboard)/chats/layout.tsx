@@ -40,6 +40,7 @@ interface Conversation {
     mediaType: string | null;
     mediaUrl?: string | null;
     isDeleted?: boolean;
+    receipts?: Array<{ id?: string; userId: string; deliveredAt?: string | null; seenAt?: string | null }>;
     createdAt: string;
   } | null;
 }
@@ -63,7 +64,11 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const [realtimeUnreadCounts, setRealtimeUnreadCounts] = useState<Record<string, number>>({});
   const pathname = usePathname();
   const router = useRouter();
+  // Read the "view" query param once (frozen) — only needed to decide which sidebar to show.
+  // Using useSearchParams() is SSR-safe; useState initializer freezes the value so
+  // subsequent query-param changes (e.g. ?recipientId=xxx) don't re-render this layout.
   const searchParams = useSearchParams();
+  const [viewParam] = useState(() => searchParams.get("view") || "");
 
   // Real-time presence — comes from the global PresenceProvider.
   const { isUserOnline } = usePresence();
@@ -132,7 +137,10 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   }, [fetchData, currentMode]);
 
   // Load the last-read timestamps from localStorage so unread badges survive page refreshes.
-  // Re-runs when pathname changes so the sidebar picks up writes made by the child page.
+  // Re-runs when the pathname's chat segment changes (not query params) to avoid
+  // fetching on every `?recipientId=xxx` change as conversations are clicked.
+  const pathnameConvSegment = pathname.split('/chats/')[1]?.split('?')[0] ?? '';
+  const prevConvSegmentRef = React.useRef('');
   useEffect(() => {
     try {
       const raw = localStorage.getItem("lastReadMap");
@@ -141,12 +149,18 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       // ignore parse errors
     }
     // Clear the real-time badge for the currently active conversation
-    const activeConvId = pathname.split('/chats/')[1]?.split('?')[0];
-    if (activeConvId) {
-      setRealtimeUnreadCounts((prev) => ({ ...prev, [activeConvId]: 0 }));
+    if (pathnameConvSegment) {
+      setRealtimeUnreadCounts((prev) => ({ ...prev, [pathnameConvSegment]: 0 }));
     }
-    fetchData();
-  }, [pathname, fetchData]);
+    // Only refetch conversations when navigating to a completely different conversation,
+    // not on every query-param change (which triggers useSearchParams re-renders).
+    const prevSegment = prevConvSegmentRef.current;
+    prevConvSegmentRef.current = pathnameConvSegment;
+    if (pathnameConvSegment !== prevSegment) {
+      fetchData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathnameConvSegment]);
 
   // Subscribe socket to all active conversation rooms so real-time updates reach the sidebar
   useEffect(() => {
@@ -197,6 +211,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             mediaType: payload.mediaType || null,
             mediaUrl: payload.mediaUrl || null,
             isDeleted: false,
+            receipts: payload.receipts || [],
             createdAt: payload.createdAt || new Date().toISOString(),
           },
         };
@@ -217,7 +232,98 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         // Also update lastReadMap so hasUnread returns false
         const now = new Date().toISOString();
         setLastReadMap((prev) => ({ ...prev, [convId]: now }));
+      } else {
+        // Opposing user saw our messages — update outgoing lastMessage receipts to SEEN
+        setConversations((prev) => {
+          const idx = prev.findIndex((c) => c.id === convId);
+          if (idx === -1) return prev;
+
+          const conv = prev[idx];
+          if (!conv.lastMessage || conv.lastMessage.senderId !== currentUserIdRef.current) {
+            return prev;
+          }
+
+          const now = new Date().toISOString();
+          const receipts = [...(conv.lastMessage.receipts || [])];
+          const rIdx = receipts.findIndex((r) => r.userId === payload.userId);
+          if (rIdx !== -1) {
+            receipts[rIdx] = {
+              ...receipts[rIdx],
+              deliveredAt: receipts[rIdx].deliveredAt || now,
+              seenAt: now,
+            };
+          } else {
+            receipts.push({
+              id: Math.random().toString(),
+              userId: payload.userId,
+              deliveredAt: now,
+              seenAt: now,
+            });
+          }
+
+          const updated = [...prev];
+          updated[idx] = {
+            ...conv,
+            lastMessage: {
+              ...conv.lastMessage,
+              receipts,
+            },
+          };
+          return updated;
+        });
       }
+    };
+
+    const handleStatusUpdate = (payload: any) => {
+      const convId = payload.conversationId;
+      if (!convId) return;
+
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === convId);
+        if (idx === -1) return prev;
+
+        const conv = prev[idx];
+        if (!conv.lastMessage || (payload.messageId && conv.lastMessage.id !== payload.messageId)) {
+          return prev;
+        }
+
+        const newDeliveredAt =
+          payload.status === "DELIVERED"
+            ? payload.timestamp
+            : payload.status === "SEEN" && payload.deliveredAt
+            ? payload.deliveredAt
+            : payload.status === "SEEN"
+            ? payload.timestamp
+            : null;
+        const newSeenAt = payload.status === "SEEN" ? payload.timestamp : null;
+
+        const receipts = [...(conv.lastMessage.receipts || [])];
+        const rIdx = receipts.findIndex((r) => r.userId === payload.userId);
+        if (rIdx !== -1) {
+          receipts[rIdx] = {
+            ...receipts[rIdx],
+            deliveredAt: newDeliveredAt ?? receipts[rIdx].deliveredAt,
+            seenAt: newSeenAt ?? receipts[rIdx].seenAt,
+          };
+        } else {
+          receipts.push({
+            id: Math.random().toString(),
+            userId: payload.userId,
+            deliveredAt: newDeliveredAt,
+            seenAt: newSeenAt,
+          });
+        }
+
+        const updated = [...prev];
+        updated[idx] = {
+          ...conv,
+          lastMessage: {
+            ...conv.lastMessage,
+            receipts,
+          },
+        };
+        return updated;
+      });
     };
 
     // Also re-fetch when a message is unsent so the sidebar falls back
@@ -241,6 +347,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
     socket.on("chat:receive_message", handleNewMessage);
     socket.on("chat:message_unsent", handleUnsent);
+    socket.on("chat:message_status_update", handleStatusUpdate);
     socket.on("chat:conversation_status_update", handleConversationSeen);
     socket.on("chat:typing_start", handleTypingStart);
     socket.on("chat:typing_stop", handleTypingStop);
@@ -248,6 +355,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     return () => {
       socket.off("chat:receive_message", handleNewMessage);
       socket.off("chat:message_unsent", handleUnsent);
+      socket.off("chat:message_status_update", handleStatusUpdate);
       socket.off("chat:conversation_status_update", handleConversationSeen);
       socket.off("chat:typing_start", handleTypingStart);
       socket.off("chat:typing_stop", handleTypingStop);
@@ -531,8 +639,19 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
   const getPreviewStatusIcon = (conv: Conversation) => {
     if (!conv.lastMessage || conv.lastMessage.senderId !== currentUserId) return null;
-    // Real checkmarks icon for outgoing message preview
-    return <CheckCheck className="h-3.5 w-3.5 shrink-0 text-[#8696A0] inline-block mr-1" />;
+    const msg = conv.lastMessage;
+    if (msg.id.startsWith("optimistic-") && (!msg.receipts || msg.receipts.length === 0)) {
+      return <Clock className="h-3.5 w-3.5 shrink-0 text-[#8696A0] animate-pulse inline-block mr-1" />;
+    }
+    const recipientReceipts = (msg.receipts || []).filter((r) => r.userId !== currentUserId);
+    const targetReceipts = recipientReceipts.length > 0 ? recipientReceipts : (msg.receipts || []);
+    if (targetReceipts.some((r) => r.seenAt)) {
+      return <CheckCheck className="h-3.5 w-3.5 shrink-0 text-[#53BDEB] inline-block mr-1" strokeWidth={2.2} />;
+    }
+    if (targetReceipts.some((r) => r.deliveredAt)) {
+      return <CheckCheck className="h-3.5 w-3.5 shrink-0 text-[#8696A0] inline-block mr-1" strokeWidth={2.2} />;
+    }
+    return <Check className="h-3.5 w-3.5 shrink-0 text-[#8696A0] inline-block mr-1" strokeWidth={2.2} />;
   };
 
   return (
@@ -544,7 +663,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           !isRootChatsPage && "hidden md:flex"
         )}
       >
-        {currentMode === "BUSINESS" && searchParams.get("view") === "channels" ? (
+        {currentMode === "BUSINESS" && viewParam === "channels" ? (
           <BusinessSidebar />
         ) : (
           <>
@@ -710,6 +829,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                         >
                           <Link
                             href={`${basePath}/${conv.id}?recipientId=${conv.otherUserId}`}
+                            prefetch={false}
                             className={cn(
                               "flex w-full items-center gap-3.5 px-4 py-3 transition-colors relative",
                               isActive

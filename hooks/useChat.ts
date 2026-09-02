@@ -966,6 +966,12 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         socket.emit("chat:mark_conversation_seen", {
           conversationId,
         });
+        try {
+          const raw = localStorage.getItem("lastReadMap") || "{}";
+          const map = JSON.parse(raw);
+          map[conversationId] = new Date().toISOString();
+          localStorage.setItem("lastReadMap", JSON.stringify(map));
+        } catch {}
       }
     };
 
@@ -986,30 +992,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     };
   }, [messages, socket, isConnected, conversationId]);
 
-  // ── Reactive Delivery Receipt Catch-Up ──────────────────────────────────────
-  useEffect(() => {
-    if (!socket || !isConnected || !conversationId || !messages.length) return;
 
-    const currentUser = currentUserIdRef.current;
-    const undelivered = messages.filter(
-      (m) =>
-        m.senderId !== currentUser &&
-        !m.id.startsWith("optimistic-") &&
-        (!m.receipts ||
-          !m.receipts.some(
-            (r: any) => r.userId === currentUser && r.deliveredAt
-          ))
-    );
-
-    if (undelivered.length > 0) {
-      undelivered.forEach((m) => {
-        socket.emit("chat:mark_delivered", {
-          conversationId,
-          messageId: m.id,
-        });
-      });
-    }
-  }, [socket, isConnected, conversationId, messages]);
+  // Note: Delivery catch-up on reconnect is handled server-side in socket.ts
+  // (markPendingMessagesDeliveredForUser) which fires on every socket connection.
+  // No client-side polling loop is needed here.
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
