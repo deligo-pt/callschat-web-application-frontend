@@ -8,27 +8,125 @@ import { E2EEProvider } from "@/components/providers/E2EEProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
 import { UserProvider, useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
+import { useSocket } from "@/components/providers/SocketProvider";
+import { chatService } from "@/services/chat.service";
 import { Briefcase, CheckCircle2, Contact, Folder, MessageSquare, PhoneCall, Share2, UserCircle2, Users, UsersRound } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 
 function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const { user, currentMode, businessProfile, workspace, isLoading } = useUser();
+  const { socket } = useSocket();
+  const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
   const isBusiness = currentMode === "BUSINESS";
   const isOnboarding = pathname === "/business/onboarding";
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
 
+  const pathnameRef = useRef(pathname);
   useEffect(() => {
-    if (!isLoading && isBusiness && workspace === null && !isOnboarding) {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
+  const currentUserId = user?.id || "";
+  const currentUserIdRef = useRef(currentUserId);
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  // Initial fetch of unread counts
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    chatService.fetchMyConversations().then((res) => {
+      if (cancelled || !res?.data) return;
+      const counts: Record<string, number> = {};
+      res.data.forEach((conv: any) => {
+        if (conv.unreadCount && conv.unreadCount > 0) {
+          counts[conv.id] = conv.unreadCount;
+        }
+      });
+      setUnreadMap(counts);
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Clear unread for current conversation when visiting it
+  useEffect(() => {
+    const activeConvId = pathname.split('/chats/')[1]?.split('?')[0];
+    if (activeConvId) {
+      setUnreadMap((prev) => {
+        if (!prev[activeConvId]) return prev;
+        const next = { ...prev };
+        delete next[activeConvId];
+        return next;
+      });
+    }
+  }, [pathname]);
+
+  // Real-time unread counts from socket
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (payload: any) => {
+      const senderId = payload.senderId || payload.sender?.id;
+      if (!senderId || senderId === currentUserIdRef.current) return;
+
+      const convId = payload.conversationId;
+      if (!convId) return;
+
+      const activeConvId = pathnameRef.current.split('/chats/')[1]?.split('?')[0];
+      if (activeConvId === convId) return;
+
+      setUnreadMap((prev) => ({
+        ...prev,
+        [convId]: (prev[convId] || 0) + 1,
+      }));
+    };
+
+    const handleConversationSeen = (payload: any) => {
+      const convId = payload.conversationId;
+      if (!convId) return;
+
+      if (payload.userId === currentUserIdRef.current) {
+        setUnreadMap((prev) => {
+          if (!prev[convId]) return prev;
+          const next = { ...prev };
+          delete next[convId];
+          return next;
+        });
+      }
+    };
+
+    socket.on("chat:receive_message", handleNewMessage);
+    socket.on("chat:conversation_status_update", handleConversationSeen);
+
+    return () => {
+      socket.off("chat:receive_message", handleNewMessage);
+      socket.off("chat:conversation_status_update", handleConversationSeen);
+    };
+  }, [socket]);
+
+  const totalUnreadMessages = Object.values(unreadMap).reduce((sum, count) => sum + count, 0);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isLoading && isBusiness && workspace === null && !isOnboarding) {
       router.replace("/business/onboarding");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, isBusiness, workspace, isOnboarding]);
+  }, [mounted, isLoading, isBusiness, workspace, isOnboarding, router]);
 
   useEffect(() => {
     const handleWorkspaceChange = (e: any) => {
@@ -105,6 +203,8 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
+            const isMessagesTab = item.href === "/chats" || item.href === "/business/chats";
+            const showBadge = isMessagesTab && totalUnreadMessages > 0;
             
             return (
                 <Link 
@@ -114,13 +214,18 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
                 >
                   <div 
                     className={cn(
-                      "flex h-[46px] w-[46px] items-center justify-center rounded-[18px] transition-all duration-300 shadow-xs",
+                      "flex h-[46px] w-[46px] items-center justify-center rounded-[18px] transition-all duration-300 shadow-xs relative",
                       isActive 
                         ? "bg-[#EEF2FF] text-[#2563EB] border border-[#E0E7FF] shadow-blue-500/10"
                         : "bg-[#F8FAFC] border border-transparent text-[#64748B] hover:bg-[#EEF2FF]/60 hover:text-[#2563EB]"
                     )}
                   >
                     <Icon className="h-5 w-5" strokeWidth={isActive ? 2.3 : 1.8} />
+                    {showBadge && (
+                      <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-white shadow-xs border-2 border-white animate-in zoom-in-50 duration-200">
+                        {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
+                      </span>
+                    )}
                   </div>
                   <span className={cn(
                     "text-[11px] font-semibold mt-1.5 transition-colors",
@@ -173,17 +278,24 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;
+          const isMessagesTab = item.href === "/chats" || item.href === "/business/chats";
+          const showBadge = isMessagesTab && totalUnreadMessages > 0;
           
           return (
             <Link key={item.name} href={item.href} className="flex flex-col items-center gap-1.5 shrink-0 min-w-[50px]">
               <div className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-[12px] transition-colors",
+                "flex h-9 w-9 items-center justify-center rounded-[12px] transition-colors relative",
                 isActive ? "bg-[#EEF2FF] text-[#2563EB]" : "text-[#64748B]"
               )}>
                 <Icon 
                   className="h-5 w-5" 
                   strokeWidth={isActive ? 2.3 : 1.8} 
                 />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#25D366] px-0.5 text-[9px] font-bold text-white shadow-xs border border-white">
+                    {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
+                  </span>
+                )}
               </div>
               <span className={cn("text-[10px] font-semibold", isActive ? "text-[#2563EB] font-bold" : "text-[#64748B]")}>
                 {item.name}

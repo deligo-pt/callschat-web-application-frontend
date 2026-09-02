@@ -8,13 +8,17 @@ import { useUser } from "@/context/UserContext";
 export default function ChannelsPage() {
   const router = useRouter();
   const { currentMode } = useUser();
+  const [mounted, setMounted] = React.useState(false);
 
-  useEffect(() => {
-    if (currentMode === "BUSINESS") {
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (mounted && currentMode === "BUSINESS") {
       router.replace("/business/channels");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMode]);
+  }, [mounted, currentMode, router]);
 
   return (
     <div className="hidden flex-1 flex-col items-center justify-center bg-white md:flex w-full h-full">

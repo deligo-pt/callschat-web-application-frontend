@@ -193,14 +193,19 @@ function ChatRoomPageContent() {
 
   // The route param is the CONVERSATION ID
   const conversationId = params.chatId as string;
-  // Recipient user ID passed as a query param (for personal DMs)
-  const recipientIdFromQuery = searchParams.get("recipientId") || "";
+
+  // Read query params via useState initializer functions — this is SSR-safe
+  // (useSearchParams() is consistent between server and client) and the values
+  // are frozen after the first render (useState init only runs once), so
+  // subsequent re-renders triggered by useSearchParams() won't re-initialize
+  // the component or cause cascading state changes.
+  const [recipientIdFromQuery] = useState(() => searchParams.get("recipientId") || "");
 
   // ── B2C Bridge params ──────────────────────────────────────────────────────
   // When a user clicks a business in NewMessageModal, these params are set.
-  const bizHandle = searchParams.get("bizHandle") || "";
-  const bizName = searchParams.get("bizName") || "";
-  const bizVerified = searchParams.get("bizVerified") === "true";
+  const [bizHandle] = useState(() => searchParams.get("bizHandle") || "");
+  const [bizName] = useState(() => searchParams.get("bizName") || "");
+  const [bizVerified] = useState(() => searchParams.get("bizVerified") === "true");
   const [isBizChat, setIsBizChat] = useState<boolean>(!!bizHandle);
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -425,13 +430,18 @@ function ChatRoomPageContent() {
     useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
-  // Always runs every second so BOTH conversation-level AND per-message timers
-  // are re-evaluated. Without this, messages sent under a now-disabled
-  // conversation timer would never get re-filtered out of the list.
+  // Runs every second ONLY when there are active disappearing messages so timers
+  // are re-evaluated without forcing continuous re-renders on regular chats.
   useEffect(() => {
+    const hasDisappearing =
+      disappearAfterSeconds !== null ||
+      messages.some((m) => m.disappearAfterSeconds != null);
+
+    if (!hasDisappearing) return;
+
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [disappearAfterSeconds, messages]);
 
   // ── Socket: listen for real-time disappear setting changes ───────────────
   const { socket } = useSocket();

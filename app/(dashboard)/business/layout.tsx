@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { Loader2 } from "lucide-react";
@@ -9,13 +9,17 @@ export default function BusinessSectionLayout({ children }: { children: React.Re
   const { workspace, isLoading, currentMode } = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && currentMode === "BUSINESS" && workspace === null && pathname !== "/business/onboarding") {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isLoading && currentMode === "BUSINESS" && workspace === null && pathname !== "/business/onboarding") {
       router.replace("/business/onboarding");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, currentMode, workspace, pathname]);
+  }, [mounted, isLoading, currentMode, workspace, pathname, router]);
 
   if (isLoading || (currentMode === "BUSINESS" && workspace === undefined && pathname !== "/business/onboarding")) {
     return (

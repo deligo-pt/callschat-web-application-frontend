@@ -679,22 +679,32 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         );
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
-          return [
-            ...prev,
-            {
-              id: payload.id || Date.now().toString(),
-              conversationId: payload.conversationId,
-              senderId: payload.senderId || payload.sender?.id || "unknown",
-              text: "",
-              createdAt: payload.createdAt || new Date().toISOString(),
-              mediaUrl: payload.mediaUrl,
-              mediaType: payload.mediaType,
-              disappearAfterSeconds: payload.disappearAfterSeconds,
-              receipts: payload.receipts || [],
-              replyToId: payload.replyToId ?? null,
-              replyTo: resolvedReplyTo,
-            },
-          ];
+
+          const optimisticIdx = prev.map((m) => m.id).lastIndexOf(
+            prev.slice().reverse().find((m) => m.id.startsWith("optimistic-"))?.id ?? ""
+          );
+
+          const newMsg = {
+            id: payload.id || Date.now().toString(),
+            conversationId: payload.conversationId,
+            senderId: payload.senderId || payload.sender?.id || "unknown",
+            text: "",
+            createdAt: payload.createdAt || new Date().toISOString(),
+            mediaUrl: payload.mediaUrl,
+            mediaType: payload.mediaType || "document",
+            disappearAfterSeconds: payload.disappearAfterSeconds,
+            receipts: payload.receipts || [],
+            replyToId: payload.replyToId ?? null,
+            replyTo: resolvedReplyTo,
+          };
+
+          if (optimisticIdx !== -1) {
+            const updated = [...prev];
+            updated[optimisticIdx] = newMsg;
+            return updated;
+          }
+
+          return [...prev, newMsg];
         });
       }
       
@@ -966,6 +976,12 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         socket.emit("chat:mark_conversation_seen", {
           conversationId,
         });
+        try {
+          const raw = localStorage.getItem("lastReadMap") || "{}";
+          const map = JSON.parse(raw);
+          map[conversationId] = new Date().toISOString();
+          localStorage.setItem("lastReadMap", JSON.stringify(map));
+        } catch {}
       }
     };
 
@@ -986,30 +1002,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     };
   }, [messages, socket, isConnected, conversationId]);
 
-  // ── Reactive Delivery Receipt Catch-Up ──────────────────────────────────────
-  useEffect(() => {
-    if (!socket || !isConnected || !conversationId || !messages.length) return;
 
-    const currentUser = currentUserIdRef.current;
-    const undelivered = messages.filter(
-      (m) =>
-        m.senderId !== currentUser &&
-        !m.id.startsWith("optimistic-") &&
-        (!m.receipts ||
-          !m.receipts.some(
-            (r: any) => r.userId === currentUser && r.deliveredAt
-          ))
-    );
-
-    if (undelivered.length > 0) {
-      undelivered.forEach((m) => {
-        socket.emit("chat:mark_delivered", {
-          conversationId,
-          messageId: m.id,
-        });
-      });
-    }
-  }, [socket, isConnected, conversationId, messages]);
+  // Note: Delivery catch-up on reconnect is handled server-side in socket.ts
+  // (markPendingMessagesDeliveredForUser) which fires on every socket connection.
+  // No client-side polling loop is needed here.
 
   // ── Send Message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
@@ -1072,8 +1068,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       ]);
 
       try {
-        let mediaUrl;
-        let mediaType;
+        let mediaUrl: string | undefined;
+        let mediaType: string | undefined;
         
         if (file) {
           setIsUploading(true);
@@ -1084,7 +1080,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           const uploadRes = await chatService.uploadMedia(conversationId, finalFile);
           if (uploadRes.success) {
             mediaUrl = uploadRes.data.mediaUrl;
-            mediaType = uploadRes.data.mediaType;
+            mediaType = uploadRes.data.mediaType || (file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'document');
+            
+            // Update optimistic message with real uploaded mediaUrl
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === optimisticId ? { ...m, mediaUrl, mediaType } : m
+              )
+            );
           }
           setIsUploading(false);
         } else if (text) {
@@ -1140,19 +1143,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
         const payload = {
           conversationId,
-          ciphertext,
+          ciphertext: ciphertext || null,
           nonce,
-          mediaUrl,
-          mediaType,
+          mediaUrl: mediaUrl || null,
+          mediaType: mediaType || null,
           previewText,
           replyToId,
         };
         socket.emit("chat:send_message", payload);
-        
-        // Remove optimistic message if no text, as server will echo it back
-        if (!text) {
-          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        }
       } catch (err) {
         console.error("Failed to encrypt and send message:", err);
         // Roll back optimistic update on failure
