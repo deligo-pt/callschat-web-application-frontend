@@ -1,32 +1,31 @@
 "use client";
 
+import React, { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
-  MessageSquare,
-  Phone,
   Search,
   Users,
   Video,
-  Plus,
-  X,
-  Star,
-  Bell,
+  Phone,
+  MessageSquare,
   UserPlus,
-  User,
   Heart,
   Loader2,
-  Check,
+  X,
+  Star,
+  Building2,
+  Lock,
+  ShieldCheck,
+  ArrowUpRight,
+  User,
+  Plus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
-import { useState, useEffect } from "react";
 import { chatService } from "@/services/chat.service";
 import { useContacts, type Contact } from "@/hooks/useContacts";
 import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
-import { Building2 } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { useTranslations } from "next-intl";
@@ -43,6 +42,9 @@ export default function ContactsPage() {
   const router = useRouter();
   const { initiateCall } = useCallContext();
   const { contacts, isLoading, searchQuery, setSearchQuery, fetchContacts, handleToggleFavourite } = useContacts();
+
+  // Filter tab state
+  const [filterTab, setFilterTab] = useState<"all" | "favorites" | "invitable">("all");
 
   // Search by Name, Username, Phone API state
   const [searchResults, setSearchResults] = useState<SearchUserItem[]>([]);
@@ -216,102 +218,197 @@ export default function ContactsPage() {
     }
   };
 
-  // Group default contacts by first letter
-  const groupedContacts = contacts.reduce((acc, contact) => {
-    const letter = contact.name.charAt(0).toUpperCase();
-    if (!acc[letter]) {
-      acc[letter] = [];
-    }
-    acc[letter].push(contact);
-    return acc;
-  }, {} as Record<string, Contact[]>);
+  // Filtered contacts based on active filter tab
+  const filteredContacts = useMemo(() => {
+    return contacts.filter((contact) => {
+      if (filterTab === "favorites") return contact.isFavourite;
+      if (filterTab === "invitable") return contact.isUnregistered;
+      return true;
+    });
+  }, [contacts, filterTab]);
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase();
-  };
+  // Group filtered contacts by first letter
+  const groupedContacts = useMemo(() => {
+    return filteredContacts.reduce((acc, contact) => {
+      const letter = (contact.name || "Unknown").charAt(0).toUpperCase();
+      const safeLetter = /[A-Z]/.test(letter) ? letter : "#";
+      if (!acc[safeLetter]) {
+        acc[safeLetter] = [];
+      }
+      acc[safeLetter].push(contact);
+      return acc;
+    }, {} as Record<string, Contact[]>);
+  }, [filteredContacts]);
 
-  const getRandomColor = (name: string) => {
-    const colors = [
-      "bg-red-500",
-      "bg-blue-500",
-      "bg-green-500",
-      "bg-yellow-500",
-      "bg-purple-500",
-      "bg-pink-500",
-      "bg-indigo-500",
-      "bg-teal-500",
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
+  const sortedLetters = useMemo(() => {
+    return Object.keys(groupedContacts).sort((a, b) => {
+      if (a === "#") return 1;
+      if (b === "#") return -1;
+      return a.localeCompare(b);
+    });
+  }, [groupedContacts]);
 
   const isQuerying = Boolean(searchQuery.trim());
+  const favoriteCount = useMemo(() => contacts.filter((c) => c.isFavourite).length, [contacts]);
+  const invitableCount = useMemo(() => contacts.filter((c) => c.isUnregistered).length, [contacts]);
 
   return (
-    <div className="flex h-full w-full bg-white">
-      {/* Left Panel - Contacts & Search List */}
-      <div className="flex h-full w-full flex-col border-r border-[#E6EAFA] bg-white md:w-[380px] shrink-0">
-        {/* Header Area */}
-        <div className="flex flex-col bg-white px-6 pt-8 pb-4 shrink-0">
-          <div className="flex items-center justify-between">
-            <h1 className="text-[28px] font-bold text-[#3B58F5]">{tNav("contacts")}</h1>
-            <div className="flex items-center gap-2">
+    <div className="flex h-full w-full bg-white dark:bg-[#111B21] overflow-hidden">
+      {/* ── Left Sidebar Panel ────────────────────────────────────────────── */}
+      <div className="flex h-full w-full flex-col border-r border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] md:w-[380px] shrink-0">
+        
+        {/* Top Header */}
+        <div className="flex flex-col bg-white dark:bg-[#111B21] px-4 pt-4 pb-2 shrink-0 border-b border-[#E2E8F0]/60 dark:border-[#222D34]">
+          <div className="flex items-center justify-between h-11">
+            <h1 className="text-[22px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight">
+              {tNav("contacts")}
+            </h1>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsAddContactPanelOpen(true)}
+                title="Add New Contact"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] transition-colors cursor-pointer"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
               <Link
                 href="/chats/favorites"
-                className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full"
+                title="Favorite Messages"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] transition-colors"
               >
-                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+                <Heart className="h-4.5 w-4.5 fill-red-500 text-red-500" />
               </Link>
               <NotificationDropdown />
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="mt-6 relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          {/* Capsule Search Bar */}
+          <div className="mt-3 relative">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8696A0]" />
             <input
               type="text"
-              placeholder="Search by name, @username, or phone..."
+              placeholder="Search contacts, @usernames, or phones..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-[42px] w-full rounded-xl bg-[#F0F2F5] pl-11 pr-10 text-[14px] font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3B58F5] transition-colors"
+              className="h-[38px] w-full rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] pl-10 pr-9 text-[13.5px] font-normal text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:outline-none focus:ring-1 focus:ring-[#00A884] border border-transparent transition-all"
             />
             {isSearching ? (
-              <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#3B58F5]" />
+              <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#00A884]" />
             ) : searchQuery ? (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             ) : null}
           </div>
+
+          {/* Filter Pills (All / Favorites / Invitable) */}
+          {!isQuerying && (
+            <div className="flex items-center gap-1.5 mt-3 pb-1 overflow-x-auto scrollbar-hide">
+              <button
+                onClick={() => setFilterTab("all")}
+                className={cn(
+                  "px-3 py-1 rounded-full text-[12.5px] font-medium transition-all cursor-pointer shrink-0",
+                  filterTab === "all"
+                    ? "bg-[#00A884] text-white shadow-xs font-semibold"
+                    : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
+                )}
+              >
+                All ({contacts.length})
+              </button>
+              <button
+                onClick={() => setFilterTab("favorites")}
+                className={cn(
+                  "flex items-center gap-1 px-3 py-1 rounded-full text-[12.5px] font-medium transition-all cursor-pointer shrink-0",
+                  filterTab === "favorites"
+                    ? "bg-[#00A884] text-white shadow-xs font-semibold"
+                    : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
+                )}
+              >
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span>Favorites</span>
+                {favoriteCount > 0 && <span className="opacity-80">({favoriteCount})</span>}
+              </button>
+              {invitableCount > 0 && (
+                <button
+                  onClick={() => setFilterTab("invitable")}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-[12.5px] font-medium transition-all cursor-pointer shrink-0",
+                    filterTab === "invitable"
+                      ? "bg-[#00A884] text-white shadow-xs font-semibold"
+                      : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
+                  )}
+                >
+                  Invitable ({invitableCount})
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Scrollable List Area */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide pb-4">
+        {/* Scrollable Contacts List Area */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 md:pb-6">
+          
+          {/* Quick Action Rows (Shown when not searching and on 'All' tab) */}
+          {!isQuerying && filterTab === "all" && (
+            <div className="flex flex-col border-b border-[#E2E8F0]/60 dark:border-[#222D34]">
+              {/* New Contact Action */}
+              <div
+                onClick={() => setIsAddContactPanelOpen(true)}
+                className="flex items-center gap-3.5 px-4 py-3 hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] transition-colors cursor-pointer group"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00A884] text-white shadow-xs group-hover:scale-105 transition-transform">
+                  <UserPlus className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
+                    New contact
+                  </span>
+                  <span className="text-[12px] text-[#667781] dark:text-[#8696A0]">
+                    Add by phone number or username
+                  </span>
+                </div>
+                <ArrowUpRight className="h-4 w-4 text-[#8696A0] group-hover:text-[#00A884] transition-colors" />
+              </div>
+
+              {/* Explore Businesses Action */}
+              <div
+                onClick={() => setIsExploreOpen(true)}
+                className="flex items-center gap-3.5 px-4 py-3 hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] transition-colors cursor-pointer group"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#6366F1] text-white shadow-xs group-hover:scale-105 transition-transform">
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
+                    Explore Businesses
+                  </span>
+                  <span className="text-[12px] text-[#667781] dark:text-[#8696A0]">
+                    Discover official channels & accounts
+                  </span>
+                </div>
+                <ArrowUpRight className="h-4 w-4 text-[#8696A0] group-hover:text-[#6366F1] transition-colors" />
+              </div>
+            </div>
+          )}
+
           {/* Case 1: Backend Search Active */}
           {isQuerying ? (
             isSearching ? (
-              <div className="flex flex-col items-center justify-center p-12 text-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5] mb-3" />
-                <p className="text-[14px] font-medium text-slate-400">Searching users & contacts...</p>
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-[#00A884] mb-3" />
+                <p className="text-[14px] font-medium text-[#8696A0]">Searching users & contacts...</p>
               </div>
             ) : searchResults.length === 0 && unregisteredSearchResults.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 text-center h-full">
-                <Search className="h-10 w-10 text-slate-300 mb-3 opacity-60" />
-                <p className="text-[15px] font-bold text-slate-700 mb-1">No users found</p>
-                <p className="text-[13px] text-slate-400 max-w-[240px]">
-                  No results for &ldquo;{searchQuery}&rdquo;. Try searching with their display name, @username, or phone number.
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="h-12 w-12 rounded-full bg-[#F0F2F5] dark:bg-[#202C33] flex items-center justify-center text-[#8696A0] mb-3">
+                  <Search className="h-6 w-6" />
+                </div>
+                <p className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">No users found</p>
+                <p className="text-[12.5px] text-[#8696A0] mt-1 max-w-[240px]">
+                  No results for &ldquo;{searchQuery}&rdquo;. Try searching with display name, @username, or phone number.
                 </p>
               </div>
             ) : (
@@ -319,103 +416,94 @@ export default function ContactsPage() {
                 {/* 1. CallsChat Registered Users */}
                 {searchResults.length > 0 && (
                   <div>
-                    <div className="bg-[#F8FAFC] px-6 py-2 text-[12px] font-bold uppercase tracking-wider text-slate-500">
+                    <div className="sticky top-0 z-10 bg-[#F0F2F5] dark:bg-[#182229] px-4 py-1.5 text-[11.5px] font-bold uppercase tracking-wider text-[#008069] dark:text-[#00A884] border-y border-[#E2E8F0]/60 dark:border-[#222D34]">
                       Users on CallsChat ({searchResults.length})
                     </div>
                     <div className="flex flex-col">
                       {searchResults.map((user) => (
                         <div
                           key={user.id}
-                          className="group flex w-full items-center justify-between px-6 py-3 transition-colors hover:bg-slate-50"
+                          className="group flex w-full items-center justify-between px-4 py-3 transition-colors hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] cursor-pointer"
                         >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            {/* Avatar */}
+                          <div className="flex items-center gap-3.5 min-w-0 pr-2">
                             <div className="relative shrink-0">
-                              {user.avatarUrl ? (
-                                <img
-                                  src={getOptimizedImageUrl(user.avatarUrl, 52, 52)}
-                                  alt={user.displayName}
-                                  className="h-[42px] w-[42px] rounded-full object-cover"
-                                />
-                              ) : (
-                                <div
-                                  className={cn(
-                                    "flex h-[42px] w-[42px] items-center justify-center rounded-full text-[14px] font-bold text-white",
-                                    getRandomColor(user.displayName)
-                                  )}
-                                >
-                                  {getInitials(user.displayName)}
-                                </div>
-                              )}
+                              <img
+                                src={getOptimizedImageUrl(
+                                  user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName)}&background=00A884&color=fff`,
+                                  52,
+                                  52
+                                )}
+                                alt={user.displayName}
+                                className="h-[44px] w-[44px] rounded-full object-cover bg-gray-100 dark:bg-gray-800"
+                              />
                               {user.isOnline && (
-                                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21]" />
                               )}
                             </div>
 
-                            {/* Info */}
-                            <div className="flex flex-col items-start overflow-hidden">
-                              <div className="flex items-center gap-1.5 w-full">
-                                <h3 className="text-[15px] font-bold text-slate-900 truncate text-left">
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
                                   {user.displayName}
                                 </h3>
                                 {user.isContact && (
-                                  <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-emerald-50 text-emerald-600">
+                                  <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-[#00A884]/15 text-[#008069] dark:text-[#25D366]">
                                     Contact
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[12px] font-medium text-slate-500 truncate text-left">
+                              <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
                                 {user.username ? `@${user.username}` : user.phone || "CallsChat User"}
                               </p>
                             </div>
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={(e) => {
-                                e.preventDefault();
+                                e.stopPropagation();
                                 handleStartChat(user.id);
                               }}
                               title="Message"
-                              className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#3B58F5] transition-colors hover:bg-blue-100"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
                             >
-                              <MessageSquare className="h-4 w-4" strokeWidth={2.5} />
+                              <MessageSquare className="h-4 w-4" />
                             </button>
                             <button
                               onClick={(e) => {
-                                e.preventDefault();
+                                e.stopPropagation();
                                 initiateCall(user.id, "AUDIO", user.displayName, user.avatarUrl || undefined);
                               }}
                               title="Voice Call"
-                              className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
                             >
-                              <Phone className="h-4 w-4" strokeWidth={2.5} />
+                              <Phone className="h-4 w-4" />
                             </button>
                             <button
                               onClick={(e) => {
-                                e.preventDefault();
+                                e.stopPropagation();
                                 initiateCall(user.id, "VIDEO", user.displayName, user.avatarUrl || undefined);
                               }}
                               title="Video Call"
-                              className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
                             >
-                              <Video className="h-4 w-4" strokeWidth={2.5} />
+                              <Video className="h-4 w-4" />
                             </button>
                             {!user.isContact && (
                               <button
                                 onClick={(e) => {
-                                  e.preventDefault();
+                                  e.stopPropagation();
                                   handleAddUserAsContact(user);
                                 }}
                                 disabled={addingContactId === user.id}
                                 title="Add to Contacts"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00A884] text-white hover:bg-[#008069] transition-colors cursor-pointer disabled:opacity-50"
                               >
                                 {addingContactId === user.id ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                 ) : (
-                                  <UserPlus className="h-4 w-4" strokeWidth={2.5} />
+                                  <UserPlus className="h-3.5 w-3.5" />
                                 )}
                               </button>
                             )}
@@ -429,29 +517,24 @@ export default function ContactsPage() {
                 {/* 2. Unregistered Phonebook Contacts */}
                 {unregisteredSearchResults.length > 0 && (
                   <div className="mt-2">
-                    <div className="bg-[#F8FAFC] px-6 py-2 text-[12px] font-bold uppercase tracking-wider text-slate-500">
+                    <div className="sticky top-0 z-10 bg-[#F0F2F5] dark:bg-[#182229] px-4 py-1.5 text-[11.5px] font-bold uppercase tracking-wider text-[#008069] dark:text-[#00A884] border-y border-[#E2E8F0]/60 dark:border-[#222D34]">
                       Invitable Contacts ({unregisteredSearchResults.length})
                     </div>
                     <div className="flex flex-col">
                       {unregisteredSearchResults.map((contact) => (
                         <div
                           key={contact.id}
-                          className="group flex w-full items-center justify-between px-6 py-3 transition-colors hover:bg-slate-50"
+                          className="group flex w-full items-center justify-between px-4 py-3 transition-colors hover:bg-[#F0F2F5] dark:hover:bg-[#202C33]"
                         >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <div
-                              className={cn(
-                                "flex h-[42px] w-[42px] items-center justify-center rounded-full text-[14px] font-bold text-white shrink-0",
-                                getRandomColor(contact.name)
-                              )}
-                            >
-                              {getInitials(contact.name)}
+                          <div className="flex items-center gap-3.5 min-w-0 pr-2">
+                            <div className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-[#00A884]/20 text-[#008069] dark:text-[#25D366] font-bold text-[15px]">
+                              {(contact.name || "U").charAt(0).toUpperCase()}
                             </div>
-                            <div className="flex flex-col items-start overflow-hidden">
-                              <h3 className="text-[15px] font-bold text-slate-900 truncate w-full text-left">
+                            <div className="flex flex-col min-w-0">
+                              <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
                                 {contact.name}
                               </h3>
-                              <p className="text-[12px] font-medium text-slate-500 truncate text-left">
+                              <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
                                 {contact.phone}
                               </p>
                             </div>
@@ -466,7 +549,7 @@ export default function ContactsPage() {
                                 toast.error("Failed to send invitation SMS");
                               }
                             }}
-                            className="px-3.5 py-1.5 rounded-full bg-[#EEF2FF] hover:bg-[#3B58F5] text-[#3B58F5] hover:text-white text-[12px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1"
+                            className="px-3.5 py-1.5 rounded-full bg-[#00A884]/15 hover:bg-[#00A884] text-[#008069] dark:text-[#25D366] hover:text-white text-[12px] font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
                           >
                             <span>Invite</span>
                           </button>
@@ -478,104 +561,145 @@ export default function ContactsPage() {
               </div>
             )
           ) : isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#3B58F5] border-t-transparent" />
+            <div className="flex items-center justify-center py-16">
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#00A884] border-t-transparent" />
             </div>
-          ) : Object.keys(groupedContacts).length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center h-full">
-              <Users className="h-12 w-12 text-slate-300 mb-4 opacity-50" />
-              <p className="text-[15px] font-medium text-slate-400">{t("no_contacts")}</p>
+          ) : sortedLetters.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <div className="h-12 w-12 rounded-full bg-[#F0F2F5] dark:bg-[#202C33] flex items-center justify-center text-[#8696A0] mb-3">
+                <Users className="h-6 w-6" />
+              </div>
+              <p className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
+                {filterTab === "favorites" ? "No favorite contacts" : t("no_contacts")}
+              </p>
+              <p className="text-[12.5px] text-[#8696A0] mt-1 max-w-xs">
+                {filterTab === "favorites"
+                  ? "Star your most frequent contacts to easily access them here."
+                  : "Add phone numbers or search users to start connecting."}
+              </p>
+              {filterTab === "all" && (
+                <button
+                  onClick={() => setIsAddContactPanelOpen(true)}
+                  className="mt-4 px-4 py-2 rounded-full bg-[#00A884] hover:bg-[#008069] text-white text-[13px] font-semibold transition-colors cursor-pointer"
+                >
+                  Add Contact
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex flex-col">
-              {Object.keys(groupedContacts)
-                .sort()
-                .map((letter) => (
-                  <div key={letter}>
-                    {/* Letter Header */}
-                    <div className="bg-[#F8FAFC] px-6 py-2.5 text-[13px] font-bold text-slate-500">{letter}</div>
+              {sortedLetters.map((letter) => (
+                <div key={letter}>
+                  {/* Alphabet Sticky Header */}
+                  <div className="sticky top-0 z-10 bg-[#F0F2F5] dark:bg-[#182229] px-4 py-1 text-[11.5px] font-bold uppercase tracking-wider text-[#008069] dark:text-[#00A884] border-y border-[#E2E8F0]/60 dark:border-[#222D34]">
+                    {letter}
+                  </div>
 
-                    {/* Contacts for this letter */}
-                    <div className="flex flex-col">
-                      {groupedContacts[letter].map((contact) => (
+                  {/* Contacts under this letter */}
+                  <div className="flex flex-col">
+                    {groupedContacts[letter].map((contact) => {
+                      const avatarUrl =
+                        contact.avatarUrl ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=00A884&color=fff`;
+
+                      return (
                         <div
                           key={contact.id}
-                          className="group flex w-full items-center justify-between px-6 py-3 transition-colors hover:bg-slate-50"
+                          onClick={() => {
+                            if (!contact.isUnregistered && contact.userId) {
+                              handleStartChat(contact.userId);
+                            }
+                          }}
+                          className="group relative flex w-full items-center justify-between px-4 py-2.5 transition-colors hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] cursor-pointer"
                         >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            {/* Avatar */}
+                          <div className="flex items-center gap-3.5 min-w-0 pr-2">
                             <div className="relative shrink-0">
-                              {contact.avatarUrl ? (
-                                <img
-                                  src={getOptimizedImageUrl(contact.avatarUrl)}
-                                  alt={contact.name}
-                                  className="h-[42px] w-[42px] rounded-full object-cover"
-                                />
-                              ) : (
-                                <div
-                                  className={cn(
-                                    "flex h-[42px] w-[42px] items-center justify-center rounded-full text-[14px] font-bold text-white",
-                                    getRandomColor(contact.name)
-                                  )}
-                                >
-                                  {getInitials(contact.name)}
-                                </div>
-                              )}
+                              <img
+                                src={getOptimizedImageUrl(avatarUrl, 52, 52)}
+                                alt={contact.name}
+                                className="h-[44px] w-[44px] rounded-full object-cover bg-gray-100 dark:bg-gray-800"
+                              />
                               {contact.isOnline && (
-                                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21]" />
                               )}
                             </div>
 
-                            {/* Contact Info */}
-                            <div className="flex flex-col items-start overflow-hidden">
-                              <h3 className="text-[15px] font-bold text-slate-900 truncate w-full text-left">
-                                {contact.name}
-                              </h3>
-                              <p className="text-[12px] font-medium text-slate-500 truncate text-left">
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
+                                  {contact.name}
+                                </h3>
+                                {contact.isFavourite && (
+                                  <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
+                                )}
+                              </div>
+                              <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
                                 {contact.phone}
                               </p>
                             </div>
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             {!contact.isUnregistered ? (
                               <>
                                 <button
+                                  type="button"
                                   onClick={(e) => {
-                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleToggleFavourite(contact.id, contact.isFavourite);
+                                  }}
+                                  title={contact.isFavourite ? "Remove from Favorites" : "Add to Favorites"}
+                                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-amber-500 transition-colors cursor-pointer"
+                                >
+                                  <Star
+                                    className={cn(
+                                      "h-4 w-4",
+                                      contact.isFavourite
+                                        ? "fill-amber-400 text-amber-400"
+                                        : "text-[#8696A0] group-hover:opacity-100 opacity-60"
+                                    )}
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     handleStartChat(contact.userId);
                                   }}
                                   title="Message"
-                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#3B58F5] transition-colors hover:bg-blue-100"
+                                  className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
                                 >
-                                  <MessageSquare className="h-4 w-4" strokeWidth={2.5} />
+                                  <MessageSquare className="h-4 w-4" />
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={(e) => {
-                                    e.preventDefault();
+                                    e.stopPropagation();
                                     initiateCall(contact.userId, "AUDIO", contact.name, contact.avatarUrl || undefined);
                                   }}
                                   title="Voice Call"
-                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-500 transition-colors hover:bg-green-100"
+                                  className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
                                 >
-                                  <Phone className="h-4 w-4" strokeWidth={2.5} />
+                                  <Phone className="h-4 w-4" />
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={(e) => {
-                                    e.preventDefault();
+                                    e.stopPropagation();
                                     initiateCall(contact.userId, "VIDEO", contact.name, contact.avatarUrl || undefined);
                                   }}
                                   title="Video Call"
-                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-500 transition-colors hover:bg-purple-100"
+                                  className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
                                 >
-                                  <Video className="h-4 w-4" strokeWidth={2.5} />
+                                  <Video className="h-4 w-4" />
                                 </button>
                               </>
                             ) : (
                               <button
+                                type="button"
                                 onClick={async (e) => {
-                                  e.preventDefault();
+                                  e.stopPropagation();
                                   try {
                                     await ContactService.inviteContact({ phoneNumber: contact.phone });
                                     toast.success(`Invitation SMS sent to ${contact.name}!`);
@@ -583,87 +707,129 @@ export default function ContactsPage() {
                                     toast.error("Failed to send invitation SMS");
                                   }
                                 }}
-                                className="px-3.5 py-1.5 rounded-full bg-[#EEF2FF] hover:bg-[#3B58F5] text-[#3B58F5] hover:text-white text-[12px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1"
+                                className="px-3 py-1 rounded-full bg-[#00A884]/15 hover:bg-[#00A884] text-[#008069] dark:text-[#25D366] hover:text-white text-[11.5px] font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
                               >
                                 <span>Invite</span>
                               </button>
                             )}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* Middle Panel - Empty State */}
-      <div className="hidden flex-1 flex-col items-center justify-center bg-white md:flex">
-        <div className="flex flex-col items-center text-center p-8 max-w-sm">
-          <div className="mb-6 flex flex-col items-center justify-center h-32 w-32 rounded-xl bg-[#3B58F5] text-white shadow-lg shadow-blue-500/20">
-            <UserPlus className="h-10 w-10 mb-2" strokeWidth={2} />
-            <span className="text-[13px] font-semibold">{t("add_contact")}</span>
+      {/* ── Middle/Main Standby Canvas (WhatsApp Web Design) ─────────────── */}
+      <div className="hidden md:flex flex-1 flex-col items-center justify-center chat-canvas-bg relative p-8 select-none">
+        <div className="relative z-10 flex flex-col items-center max-w-[460px] text-center bg-white/85 dark:bg-[#202C33]/85 backdrop-blur-md p-8 rounded-3xl border border-white/60 dark:border-white/10 shadow-xl">
+          
+          {/* Animated Hero Graphic */}
+          <div className="relative mb-6">
+            <div className="h-20 w-20 rounded-full bg-gradient-to-tr from-[#00A884] to-[#25D366] flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 animate-in zoom-in duration-300">
+              <Users className="h-9 w-9" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-white dark:bg-[#111B21] flex items-center justify-center shadow-md">
+              <ShieldCheck className="h-5 w-5 text-[#00A884]" />
+            </div>
           </div>
-          <p className="text-[15px] font-medium text-slate-500 leading-relaxed mb-8">
-            {t("add_contact_desc")}
+
+          <h2 className="text-[24px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight mb-2">
+            CallsChat Contacts
+          </h2>
+          <p className="text-[14px] text-[#54656F] dark:text-[#8696A0] leading-relaxed mb-8">
+            Manage your address book, find friends, and connect with instant audio or video calls.
           </p>
-          <button
-            onClick={() => setIsAddContactPanelOpen(true)}
-            className="rounded-full bg-[#1D2A54] px-6 py-2.5 text-[14px] font-bold text-white transition-colors hover:bg-[#2A3F7A]"
-          >
-            {t("add_number")}
-          </button>
+
+          {/* Action Triggers */}
+          <div className="flex flex-wrap justify-center gap-3 w-full mb-6">
+            <button
+              onClick={() => setIsAddContactPanelOpen(true)}
+              className="flex-1 min-w-[170px] flex items-center justify-center gap-2 bg-[#00A884] hover:bg-[#008069] text-white px-5 py-3 rounded-2xl font-semibold text-[14px] shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <UserPlus className="h-4.5 w-4.5" />
+              <span>{t("add_number")}</span>
+            </button>
+            <button
+              onClick={() => setIsExploreOpen(true)}
+              className="flex-1 min-w-[170px] flex items-center justify-center gap-2 bg-white dark:bg-[#2A3942] border border-[#E2E8F0] dark:border-[#374248] hover:bg-[#F0F2F5] dark:hover:bg-[#323D45] text-[#111B21] dark:text-[#E9EDEF] px-5 py-3 rounded-2xl font-semibold text-[14px] shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <Building2 className="h-4.5 w-4.5 text-[#00A884]" />
+              <span>Explore Businesses</span>
+            </button>
+          </div>
+
+          {/* Encryption Guarantee Footer */}
+          <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#667781] dark:text-[#8696A0] bg-[#00A884]/10 dark:bg-[#00A884]/15 px-3 py-1.5 rounded-full">
+            <Lock className="h-3.5 w-3.5 text-[#00A884]" />
+            <span>End-to-end encrypted contacts & communications</span>
+          </div>
         </div>
       </div>
 
-      {/* Right Panel - Add Contact Form */}
+      {/* ── Right Slide-Over Panel: Add Contact Form ──────────────────────── */}
       {isAddContactPanelOpen && (
-        <div className="hidden h-full w-[380px] flex-col border-l border-[#E6EAFA] bg-white lg:flex shrink-0 animate-in slide-in-from-right duration-200">
-          <div className="flex items-center gap-4 border-b border-[#E6EAFA] px-6 py-5">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[400px] flex-col border-l border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] shadow-2xl animate-in slide-in-from-right duration-200">
+          {/* Header */}
+          <div className="flex items-center gap-3 border-b border-[#E2E8F0] dark:border-[#222D34] px-6 py-5 bg-[#F0F2F5]/60 dark:bg-[#202C33]/60 backdrop-blur-md">
             <button
               onClick={() => setIsAddContactPanelOpen(false)}
-              className="text-slate-400 hover:text-slate-600 transition-colors"
+              className="rounded-full p-1.5 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              title="Close"
             >
               <X className="h-5 w-5" />
             </button>
-            <h2 className="text-[16px] font-bold text-slate-800">{t("new_contact")}</h2>
+            <h2 className="text-[17px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight">
+              {t("new_contact")}
+            </h2>
           </div>
 
-          <div className="p-6">
+          {/* Form */}
+          <div className="flex-1 overflow-y-auto p-6">
             <form onSubmit={handleAddContact} className="flex flex-col gap-6">
-              <div className="flex items-end gap-3">
-                <User className="h-5 w-5 text-[#3B58F5] mb-2 shrink-0" />
-                <div className="flex-1 border-b border-slate-300 pb-2">
+              
+              {/* First Name */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
+                  {t("first_name")}
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696A0]" />
                   <input
                     type="text"
-                    placeholder={t("first_name")}
+                    placeholder="Enter first name"
                     value={newContactFirstName}
                     onChange={(e) => setNewContactFirstName(e.target.value)}
-                    className="w-full text-[14px] font-medium text-slate-900 placeholder-slate-400 focus:outline-none bg-transparent"
+                    className="w-full rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] pl-10 pr-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all"
                     required
                   />
                 </div>
               </div>
 
-              <div className="flex items-end gap-3 ml-8">
-                <div className="flex-1 border-b border-slate-300 pb-2">
-                  <input
-                    type="text"
-                    placeholder={t("last_name")}
-                    value={newContactLastName}
-                    onChange={(e) => setNewContactLastName(e.target.value)}
-                    className="w-full text-[14px] font-medium text-slate-900 placeholder-slate-400 focus:outline-none bg-transparent"
-                  />
-                </div>
+              {/* Last Name */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
+                  {t("last_name")}
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter last name (optional)"
+                  value={newContactLastName}
+                  onChange={(e) => setNewContactLastName(e.target.value)}
+                  className="w-full rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] px-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all"
+                />
               </div>
 
-              <div className="mt-4">
-                <label className="block text-[13px] font-bold text-slate-500 mb-3 ml-8">
+              {/* Phone Number */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
                   {t("phone_number")}
                 </label>
-                <div className="ml-8">
+                <div className="whatsapp-phone-input">
                   <PhoneInput
                     international
                     defaultCountry="US"
@@ -672,28 +838,36 @@ export default function ContactsPage() {
                     className="flex w-full gap-3"
                     numberInputProps={{
                       className:
-                        "flex-1 rounded-xl border border-slate-200 px-4 py-3 text-[14px] font-medium text-slate-900 focus:border-[#3B58F5] focus:outline-none focus:ring-1 focus:ring-[#3B58F5] transition-colors",
+                        "flex-1 rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] px-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all",
                     }}
                   />
                 </div>
               </div>
 
               {addContactError && (
-                <div className="rounded-lg bg-red-50 p-3 mt-2 ml-8">
-                  <p className="text-[13px] font-medium text-red-600">{addContactError}</p>
+                <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 p-3">
+                  <p className="text-[13px] font-medium text-red-600 dark:text-red-400">{addContactError}</p>
                 </div>
               )}
 
-              <div className="mt-8 flex justify-center">
+              {/* Save CTA */}
+              <div className="mt-4 flex flex-col gap-3">
                 <button
                   type="submit"
                   disabled={isAddingContact}
-                  className="rounded-full bg-[#3B58F5] px-10 py-2.5 text-[14px] font-bold text-white transition-colors hover:bg-[#2A41C7] disabled:opacity-70 flex items-center gap-2"
+                  className="w-full rounded-full bg-[#00A884] hover:bg-[#008069] py-3 text-[14px] font-bold text-white transition-all shadow-sm active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isAddingContact && (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   )}
                   {isAddingContact ? tCommon("saving") : t("save")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddContactPanelOpen(false)}
+                  className="w-full rounded-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 py-2.5 text-[13.5px] font-semibold text-[#667781] dark:text-[#8696A0] transition-colors cursor-pointer"
+                >
+                  Cancel
                 </button>
               </div>
             </form>
@@ -701,6 +875,7 @@ export default function ContactsPage() {
         </div>
       )}
 
+      {/* Explore Businesses Modal */}
       <ExploreBusinessesModal isOpen={isExploreOpen} onClose={() => setIsExploreOpen(false)} />
     </div>
   );
