@@ -91,7 +91,6 @@ export const useFCM = () => {
           Boolean(data.call_id || data.callId);
 
         if (isIncomingCall) {
-          playNotificationSound('call');
           window.dispatchEvent(new CustomEvent('fcm:incoming_call', { detail: data }));
           return;
         }

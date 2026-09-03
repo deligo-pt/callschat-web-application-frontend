@@ -5,6 +5,7 @@ import { Phone, PhoneOff, Video, UserPlus, Lock } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { stopRingtoneSound } from "@/utils/sounds";
 
 export const IncomingCallModal = () => {
   const { incomingCall, acceptCall, acceptEscalatedCall, rejectCall, joinGroupCall } =
@@ -83,6 +84,7 @@ export const IncomingCallModal = () => {
   const handleAccept = async () => {
     if (isAccepting) return;
     setIsAccepting(true);
+    stopRingtoneSound();
 
     try {
       if (isEscalated) {
@@ -109,6 +111,7 @@ export const IncomingCallModal = () => {
   // Decline handler – no socket emit for escalated invites
   // ------------------------------------------------------------------
   const handleDecline = () => {
+    stopRingtoneSound();
     rejectCall(
       incomingCall.callId,
       incomingCall.roomName,

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '@/components/providers/SocketProvider';
-import { playNotificationSound } from '@/utils/sounds';
+import { playNotificationSound, stopRingtoneSound } from '@/utils/sounds';
 import { CallService } from '@/services/call.service';
 import { resolveLivekitUrl } from '@/utils/livekit';
 import { toast } from 'sonner';
+import { callBroadcast } from '@/utils/callBroadcast';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -91,6 +92,7 @@ export const useCallSignaling = () => {
   const [outgoingGroupCall, setOutgoingGroupCall] = useState<OutgoingGroupCall | null>(null);
   const [activeGroupCalls, setActiveGroupCalls] = useState<string[]>([]);
   const [isCallMinimized, setIsCallMinimized] = useState<boolean>(false);
+  const [isCallPoppedOut, setIsCallPoppedOut] = useState<boolean>(false);
   /**
    * WhatsApp-style reconnection state.
    * When non-null, one of the call participants lost their network and is in
@@ -121,9 +123,12 @@ export const useCallSignaling = () => {
   const userInitiatedHangupRef = useRef<boolean>(false);
 
   const stopRingtone = useCallback(() => {
+    stopRingtoneSound();
     if (ringtoneRef.current) {
-      ringtoneRef.current.pause();
-      ringtoneRef.current.currentTime = 0;
+      try {
+        ringtoneRef.current.pause();
+        ringtoneRef.current.currentTime = 0;
+      } catch (err) {}
       ringtoneRef.current = null;
     }
   }, []);
@@ -618,11 +623,12 @@ export const useCallSignaling = () => {
     (callId: string, roomName: string, peerName?: string, peerAvatar?: string) => {
       if (!socket) return;
       console.log('[Call] Accepting call', callId);
+      stopRingtone();
       // Store peer info so call:connected handler can inject it into activeCall
       pendingPeerRef.current = { name: peerName, avatar: peerAvatar };
       socket.emit('call:accept', { callId, roomName });
     },
-    [socket],
+    [socket, stopRingtone],
   );
 
   // -------------------------------------------------------------------------
@@ -817,7 +823,7 @@ export const useCallSignaling = () => {
         }
       });
     },
-    [socket],
+    [socket, stopRingtone],
   );
 
   const rejectGroupCall = useCallback(
@@ -828,7 +834,7 @@ export const useCallSignaling = () => {
       socket.emit('group:call_reject', { groupId });
       setIncomingGroupCall(null);
     },
-    [socket],
+    [socket, stopRingtone],
   );
 
   const joinGroupCall = useCallback(
@@ -850,7 +856,7 @@ export const useCallSignaling = () => {
         }
       });
     },
-    [socket],
+    [socket, stopRingtone],
   );
 
   const leaveGroupCall = useCallback(
@@ -862,7 +868,7 @@ export const useCallSignaling = () => {
       socket.emit('group:call_leave', { callId });
       setActiveCall(null);
     },
-    [socket],
+    [socket, stopRingtone],
   );
 
   // -------------------------------------------------------------------------
@@ -910,6 +916,75 @@ export const useCallSignaling = () => {
     // has a chance to auto-reconnect.
   }, []);
 
+  // -------------------------------------------------------------------------
+  // Cross-Window Standalone Call Pop-out Synchronization
+  // -------------------------------------------------------------------------
+  const wasCallActiveRef = useRef(false);
+  useEffect(() => {
+    callBroadcast.saveActiveCall(activeCall);
+    if (activeCall) {
+      wasCallActiveRef.current = true;
+    } else if (wasCallActiveRef.current) {
+      wasCallActiveRef.current = false;
+      setIsCallPoppedOut(false);
+      callBroadcast.send({ type: "CALL_ENDED" });
+    }
+  }, [activeCall]);
+
+  useEffect(() => {
+    const unsubscribe = callBroadcast.subscribe((event) => {
+      if (event.type === "WINDOW_READY") {
+        if (activeCallRef.current) {
+          setIsCallPoppedOut(true);
+          callBroadcast.send({ type: "SYNC_ACTIVE_CALL", payload: activeCallRef.current });
+        }
+      } else if (event.type === "RETURN_TO_MAIN") {
+        setIsCallPoppedOut(false);
+      } else if (event.type === "HANGUP") {
+        if (activeCallRef.current) {
+          hangupCall(activeCallRef.current.callId);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [hangupCall]);
+
+  const popOutCallWindow = useCallback(() => {
+    if (!activeCallRef.current) return;
+    const currentCall = activeCallRef.current;
+    callBroadcast.saveActiveCall(currentCall);
+
+    const isVideo = currentCall.callType === "VIDEO";
+    // Authentic WhatsApp popup dimensions: compact (480x640) for voice, cinematic (880x720) for video
+    const width = isVideo ? 880 : 480;
+    const height = isVideo ? 720 : 640;
+    const screenW = typeof window !== "undefined" ? (window.screen.availWidth || window.screen.width) : 1280;
+    const screenH = typeof window !== "undefined" ? (window.screen.availHeight || window.screen.height) : 800;
+    
+    // Position on upper-right screen or center
+    const left = typeof window !== "undefined" ? Math.max(20, Math.round(screenW - width - 50)) : 100;
+    const top = typeof window !== "undefined" ? Math.max(40, Math.round((screenH - height) / 2)) : 100;
+
+    const popup = window.open(
+      "/call-window",
+      "CallsChatCall",
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,status=no,location=no,toolbar=no,menubar=no`
+    );
+    if (popup) {
+      popup.focus();
+    }
+
+    // Smooth handoff: switch main tab into standby capsule after popup opens
+    setTimeout(() => {
+      setIsCallPoppedOut(true);
+    }, 100);
+  }, []);
+
+  const returnCallToMain = useCallback(() => {
+    setIsCallPoppedOut(false);
+    callBroadcast.send({ type: "RETURN_TO_MAIN" });
+  }, []);
+
   return {
     incomingCall,
     activeCall,
@@ -938,6 +1013,11 @@ export const useCallSignaling = () => {
     onLiveKitDisconnected,
     isCallMinimized,
     setIsCallMinimized,
+    isCallPoppedOut,
+    setIsCallPoppedOut,
+    popOutCallWindow,
+    returnCallToMain,
   };
 };
+
 
