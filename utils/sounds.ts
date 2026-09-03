@@ -102,6 +102,23 @@ export const playReconnectingTone = (): void => {
   synthesizeTones([650], 90, 100, 0.15);
 };
 
+let activeRingtoneAudio: HTMLAudioElement | null = null;
+
+/**
+ * Stops any actively playing or looping ringtone audio across the entire application.
+ */
+export const stopRingtoneSound = (): void => {
+  if (activeRingtoneAudio) {
+    try {
+      activeRingtoneAudio.pause();
+      activeRingtoneAudio.currentTime = 0;
+    } catch (err) {
+      console.warn('Error stopping ringtone audio:', err);
+    }
+    activeRingtoneAudio = null;
+  }
+};
+
 /**
  * Primary sound player supporting audio assets and synthesized telephony tones.
  */
@@ -117,6 +134,7 @@ export const playNotificationSound = (
     }
 
     if (type === 'call_ended') {
+      stopRingtoneSound();
       playCallEndedTone();
       return { stop: () => {} };
     }
@@ -137,6 +155,7 @@ export const playNotificationSound = (
     if (type === 'message') {
       audioSrc = '/sounds/message-pop.mp3';
     } else if (type === 'call') {
+      stopRingtoneSound();
       audioSrc = '/sounds/ringtone.mp3';
       loop = true;
     }
@@ -145,6 +164,9 @@ export const playNotificationSound = (
 
     const audio = new Audio(audioSrc);
     audio.loop = loop;
+    if (type === 'call') {
+      activeRingtoneAudio = audio;
+    }
 
     audio.play().catch(err => {
       console.warn('Audio playback prevented by browser policy:', err);

@@ -29,6 +29,8 @@ import {
   ChevronDown,
   Maximize2,
   Lock,
+  ExternalLink,
+  ArrowDownLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
@@ -189,16 +191,39 @@ const ActiveSpeakerGroupAvatar = ({
   );
 };
 
-interface CustomCallLayoutProps {
+export interface CustomCallLayoutProps {
   inviteOpen: boolean;
   onOpenInvite: () => void;
   onCloseInvite: () => void;
   isSpeakerMuted: boolean;
   setIsSpeakerMuted: (muted: boolean) => void;
+  isStandaloneWindow?: boolean;
+  onReturnToMain?: () => void;
+  onEndCallOverride?: () => void;
 }
-const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMuted, setIsSpeakerMuted }: CustomCallLayoutProps) => {
-  const { activeCall, hangupCall, leaveGroupCall, onLiveKitDisconnected, isCallMinimized, setIsCallMinimized, reconnectingUserId } = useCallContext();
+
+export const CustomCallLayout = ({
+  inviteOpen,
+  onOpenInvite,
+  onCloseInvite,
+  isSpeakerMuted,
+  setIsSpeakerMuted,
+  isStandaloneWindow = false,
+  onReturnToMain,
+  onEndCallOverride,
+}: CustomCallLayoutProps) => {
+  const {
+    activeCall,
+    hangupCall,
+    leaveGroupCall,
+    onLiveKitDisconnected,
+    isCallMinimized,
+    setIsCallMinimized,
+    reconnectingUserId,
+    popOutCallWindow,
+  } = useCallContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const remoteParticipants = useRemoteParticipants();
   const { contacts } = useContacts();
 
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
@@ -295,6 +320,10 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
   };
 
   const handleEndCall = () => {
+    if (onEndCallOverride) {
+      onEndCallOverride();
+      return;
+    }
     if (activeCall?.isGroup && leaveGroupCall) {
       leaveGroupCall(activeCall.callId);
     } else if (activeCall) {
@@ -383,6 +412,35 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
         <span className="text-[11px] font-medium text-[#8696A0]">Add</span>
       </div>
 
+      {/* Pop out to Standalone Window OR Return to Tab */}
+      {!isStandaloneWindow && popOutCallWindow && (
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={popOutCallWindow}
+            className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer"
+            aria-label="Open in separate window"
+            title="Open in separate window"
+          >
+            <ExternalLink className="h-5 w-5 md:h-6 md:w-6" />
+          </button>
+          <span className="text-[11px] font-medium text-[#8696A0]">Pop out</span>
+        </div>
+      )}
+
+      {isStandaloneWindow && onReturnToMain && (
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={onReturnToMain}
+            className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#25D366] border border-white/10 transition-all duration-200 cursor-pointer"
+            aria-label="Return to tab"
+            title="Return to main tab"
+          >
+            <ArrowDownLeft className="h-5 w-5 md:h-6 md:w-6 text-[#25D366]" />
+          </button>
+          <span className="text-[11px] font-medium text-[#8696A0]">Return</span>
+        </div>
+      )}
+
       {/* End Call Button */}
       <div className="flex flex-col items-center gap-1">
         <button
@@ -399,46 +457,272 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // AUDIO CALL UI
+  // Peer info resolution
   // ─────────────────────────────────────────────────────────────────────────
-  if (activeCall?.callType === "AUDIO") {
-    const remoteParticipants = useRemoteParticipants();
-    const allParticipants = [localParticipant, ...remoteParticipants];
-    
-    const remotePeer = remoteParticipants[0];
-    
-    let singlePeerName = activeCall.peerName || "Unknown";
-    let singleAvatarUrl = activeCall.peerAvatar || "";
-    
-    if (remotePeer) {
-      const liveName = remotePeer.name || remotePeer.identity || "";
-      try {
-        const metadata = JSON.parse(remotePeer.metadata || "{}");
-        if (metadata.avatarUrl) singleAvatarUrl = metadata.avatarUrl;
-        if (metadata.firstName || metadata.lastName) {
-          singlePeerName = `${metadata.firstName || ""} ${metadata.lastName || ""}`.trim();
-        } else if (metadata.displayName) {
-          singlePeerName = metadata.displayName;
-        } else if (liveName && liveName !== remotePeer.identity && singlePeerName === "Unknown") {
-          singlePeerName = liveName;
-        }
-      } catch (e) {}
-      
-      if (!singlePeerName || singlePeerName === remotePeer.identity || singlePeerName === "Unknown") {
-        const contact = contacts.find(c => c.userId === remotePeer.identity);
-        if (contact) {
+  const remotePeer = remoteParticipants[0];
+  let singlePeerName = activeCall?.peerName || "CallsChat Call";
+  let singleAvatarUrl = activeCall?.peerAvatar || "";
+
+  if (activeCall?.isGroup) {
+    singlePeerName = "CallsChat Group Call";
+  } else if (remotePeer) {
+    const liveName = remotePeer.name || remotePeer.identity || "";
+    try {
+      const metadata = JSON.parse(remotePeer.metadata || "{}");
+      if (metadata.avatarUrl) singleAvatarUrl = metadata.avatarUrl;
+      if (metadata.firstName || metadata.lastName) {
+        singlePeerName = `${metadata.firstName || ""} ${metadata.lastName || ""}`.trim();
+      } else if (metadata.displayName) {
+        singlePeerName = metadata.displayName;
+      } else if (liveName && liveName !== remotePeer.identity && singlePeerName === "CallsChat Call") {
+        singlePeerName = liveName;
+      }
+    } catch (e) {}
+
+    if (!singleAvatarUrl || singlePeerName === "CallsChat Call" || singlePeerName === remotePeer.identity) {
+      const contact = contacts.find((c) => c.userId === remotePeer.identity);
+      if (contact) {
+        if (singlePeerName === "CallsChat Call" || singlePeerName === remotePeer.identity) {
           singlePeerName = contact.name;
-          if (!singleAvatarUrl && contact.avatarUrl) {
-            singleAvatarUrl = contact.avatarUrl;
-          }
         }
-      } else if (!singleAvatarUrl) {
-        const contact = contacts.find(c => c.userId === remotePeer.identity);
-        if (contact?.avatarUrl) singleAvatarUrl = contact.avatarUrl;
+        if (!singleAvatarUrl && contact.avatarUrl) {
+          singleAvatarUrl = contact.avatarUrl;
+        }
       }
     }
+  }
 
-    const finalSingleAvatarUrl = singleAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(singlePeerName)}&background=00A884&color=fff&size=256`;
+  const finalSingleAvatarUrl =
+    singleAvatarUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(singlePeerName)}&background=00A884&color=fff&size=256`;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MINIMIZED CALL WIDGET (Modern WhatsApp Web Picture-in-Picture & Audio Card)
+  // ─────────────────────────────────────────────────────────────────────────
+  if (isCallMinimized) {
+    const isVideo = activeCall?.callType === "VIDEO" || anyoneHasCamera;
+
+    // VIDEO MINIMIZED: High-end floating Picture-in-Picture card
+    if (isVideo) {
+      const primaryRemoteTrack =
+        tracks.find((t) => !t.participant.isLocal && t.source === Track.Source.Camera) || tracks[0];
+
+      return (
+        <div
+          onClick={() => setIsCallMinimized(false)}
+          className="relative w-72 sm:w-80 h-48 sm:h-52 rounded-[1.75rem] overflow-hidden bg-[#111B21] border-2 border-white/20 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(0,168,132,0.2)] group cursor-pointer select-none transition-all duration-300 hover:scale-[1.02] animate-in slide-in-from-bottom-5 zoom-in-95 duration-200"
+        >
+          {primaryRemoteTrack && primaryRemoteTrack.publication?.isSubscribed && !primaryRemoteTrack.publication?.isMuted ? (
+            <div className="absolute inset-0 w-full h-full bg-black">
+              <ParticipantTile trackRef={primaryRemoteTrack} groupMembers={groupMembers} />
+            </div>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-[#182229] to-[#0C1317]">
+              <img
+                src={getOptimizedImageUrl(finalSingleAvatarUrl, 64, 64)}
+                alt={singlePeerName}
+                className="h-16 w-16 rounded-full object-cover border-2 border-[#00A884] shadow-lg mb-2"
+              />
+              <span className="text-xs font-semibold text-[#E9EDEF]">{singlePeerName}</span>
+            </div>
+          )}
+
+          {/* Top Floating Glass Header */}
+          <div className="absolute top-0 left-0 right-0 p-2.5 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent z-20">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#25D366]" />
+              </span>
+              <span className="text-[11px] font-semibold text-white truncate max-w-[120px]">
+                {formatDuration(duration)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              {!isStandaloneWindow && popOutCallWindow && (
+                <button
+                  onClick={popOutCallWindow}
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 hover:bg-white/20 text-white backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                  title="Pop out to separate window"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button
+                onClick={() => setIsCallMinimized(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#00A884] hover:bg-[#02906f] text-white shadow-md transition-all active:scale-95 cursor-pointer"
+                title="Expand to Fullscreen"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Floating Controls */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#111B21]/90 backdrop-blur-xl border border-white/15 shadow-xl transition-all duration-200"
+          >
+            <button
+              onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full transition-colors cursor-pointer active:scale-95",
+                isMicrophoneEnabled ? "bg-white/10 text-white hover:bg-white/20" : "bg-red-500/80 text-white"
+              )}
+              title={isMicrophoneEnabled ? "Mute Microphone" : "Unmute Microphone"}
+            >
+              {isMicrophoneEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+            </button>
+
+            <button
+              onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full transition-colors cursor-pointer active:scale-95",
+                isCameraEnabled ? "bg-white/10 text-white hover:bg-white/20" : "bg-red-500/80 text-white"
+              )}
+              title={isCameraEnabled ? "Turn off Camera" : "Turn on Camera"}
+            >
+              {isCameraEnabled ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
+            </button>
+
+            <button
+              onClick={handleEndCall}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EA0038] hover:bg-[#d00030] text-white shadow-md transition-all cursor-pointer active:scale-95"
+              title="End Call"
+            >
+              <PhoneOff className="h-3.5 w-3.5" fill="currentColor" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // AUDIO MINIMIZED: Sleek WhatsApp Web Floating Audio Widget
+    return (
+      <div
+        onClick={() => setIsCallMinimized(false)}
+        className="relative w-[340px] sm:w-[380px] rounded-[1.75rem] bg-[#111B21]/95 backdrop-blur-2xl border border-white/15 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_25px_rgba(0,168,132,0.15)] group cursor-pointer select-none transition-all duration-300 hover:scale-[1.01] flex flex-col gap-3.5 animate-in slide-in-from-bottom-5 zoom-in-95 duration-200"
+      >
+        {/* Top: Peer Info & Controls */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="relative shrink-0">
+            <img
+              src={getOptimizedImageUrl(finalSingleAvatarUrl, 48, 48)}
+              alt={singlePeerName}
+              className="h-12 w-12 rounded-full object-cover border-2 border-[#00A884] shadow-md bg-[#202C33]"
+            />
+            <span className="absolute bottom-0 right-0 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#25D366] border-2 border-[#111B21]" />
+            </span>
+          </div>
+
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-[13.5px] font-semibold text-[#E9EDEF] truncate">
+                {singlePeerName}
+              </h3>
+              <Lock className="h-3 w-3 text-[#00A884] shrink-0" />
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[12px] font-medium text-[#25D366]">
+                {formatDuration(duration)}
+              </span>
+              <span className="text-[10px] text-[#8696A0]">·</span>
+              <span className="text-[10.5px] text-[#8696A0] truncate">
+                {activeCall?.isGroup ? "Group Audio" : "CallsChat Audio"}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {!isStandaloneWindow && popOutCallWindow && (
+              <button
+                onClick={popOutCallWindow}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 hover:bg-white/15 text-[#8696A0] hover:text-[#00A884] transition-colors cursor-pointer"
+                title="Pop out to separate window"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={() => setIsCallMinimized(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00A884] hover:bg-[#02906f] text-white shadow-[0_0_10px_rgba(0,168,132,0.3)] transition-all cursor-pointer active:scale-95"
+              title="Expand to Fullscreen"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom: Quick Actions */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center justify-between gap-2 pt-2 border-t border-white/10"
+        >
+          {/* Mic Toggle */}
+          <button
+            onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer active:scale-95",
+              isMicrophoneEnabled
+                ? "bg-white/10 hover:bg-white/20 text-[#E9EDEF]"
+                : "bg-red-500/20 text-red-400 border border-red-500/30"
+            )}
+            title={isMicrophoneEnabled ? "Mute Microphone" : "Unmute Microphone"}
+          >
+            {isMicrophoneEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5 text-red-400" />}
+            <span>{isMicrophoneEnabled ? "Mute" : "Unmuted"}</span>
+          </button>
+
+          {/* Speaker Toggle */}
+          <button
+            onClick={() => setIsSpeakerMuted(!isSpeakerMuted)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer active:scale-95",
+              !isSpeakerMuted
+                ? "bg-white/10 hover:bg-white/20 text-[#E9EDEF]"
+                : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+            )}
+            title={isSpeakerMuted ? "Unmute Speaker" : "Mute Speaker"}
+          >
+            {isSpeakerMuted ? <VolumeX className="h-3.5 w-3.5 text-amber-400" /> : <Volume2 className="h-3.5 w-3.5" />}
+            <span>{isSpeakerMuted ? "Muted" : "Speaker"}</span>
+          </button>
+
+          {/* Camera Toggle */}
+          <button
+            onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full transition-all cursor-pointer active:scale-95",
+              isCameraEnabled
+                ? "bg-[#00A884] text-white"
+                : "bg-white/10 hover:bg-white/20 text-[#8696A0] hover:text-white"
+            )}
+            title={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
+          >
+            {isCameraEnabled ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
+          </button>
+
+          {/* End Call Button */}
+          <button
+            onClick={handleEndCall}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EA0038] hover:bg-[#d00030] text-white shadow-[0_0_12px_rgba(234,0,56,0.4)] transition-all cursor-pointer active:scale-95"
+            title="End Call"
+          >
+            <PhoneOff className="h-4 w-4" fill="currentColor" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // AUDIO CALL UI (FULLSCREEN)
+  // ─────────────────────────────────────────────────────────────────────────
+  if (activeCall?.callType === "AUDIO") {
+    const allParticipants = [localParticipant, ...remoteParticipants];
 
     // If someone turned on camera, show video layout seamlessly
     if (anyoneHasCamera) {
@@ -466,13 +750,33 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsCallMinimized(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
-                  title="Minimize Call"
-                >
-                  <ChevronDown className="h-5 w-5" />
-                </button>
+                {!isStandaloneWindow && popOutCallWindow && (
+                  <button
+                    onClick={popOutCallWindow}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                    title="Pop out to separate window"
+                  >
+                    <ExternalLink className="h-5 w-5" />
+                  </button>
+                )}
+                {isStandaloneWindow && onReturnToMain && (
+                  <button
+                    onClick={onReturnToMain}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#25D366] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                    title="Return call to main window"
+                  >
+                    <ArrowDownLeft className="h-5 w-5 text-[#25D366]" />
+                  </button>
+                )}
+                {!isStandaloneWindow && (
+                  <button
+                    onClick={() => setIsCallMinimized(true)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                    title="Minimize Call"
+                  >
+                    <ChevronDown className="h-5 w-5" />
+                  </button>
+                )}
                 <button 
                   onClick={onOpenInvite} 
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
@@ -532,13 +836,33 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsCallMinimized(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
-                title="Minimize Call"
-              >
-                <ChevronDown className="h-5 w-5" />
-              </button>
+              {!isStandaloneWindow && popOutCallWindow && (
+                <button
+                  onClick={popOutCallWindow}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                  title="Pop out to separate window"
+                >
+                  <ExternalLink className="h-5 w-5" />
+                </button>
+              )}
+              {isStandaloneWindow && onReturnToMain && (
+                <button
+                  onClick={onReturnToMain}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#25D366] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                  title="Return call to main window"
+                >
+                  <ArrowDownLeft className="h-5 w-5 text-[#25D366]" />
+                </button>
+              )}
+              {!isStandaloneWindow && (
+                <button
+                  onClick={() => setIsCallMinimized(true)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+                  title="Minimize Call"
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </button>
+              )}
               <button
                 onClick={onOpenInvite}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
@@ -657,13 +981,33 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsCallMinimized(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
-            title="Minimize Call"
-          >
-            <ChevronDown className="h-5 w-5" />
-          </button>
+          {!isStandaloneWindow && popOutCallWindow && (
+            <button
+              onClick={popOutCallWindow}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+              title="Pop out to separate window"
+            >
+              <ExternalLink className="h-5 w-5" />
+            </button>
+          )}
+          {isStandaloneWindow && onReturnToMain && (
+            <button
+              onClick={onReturnToMain}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#25D366] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+              title="Return call to main window"
+            >
+              <ArrowDownLeft className="h-5 w-5 text-[#25D366]" />
+            </button>
+          )}
+          {!isStandaloneWindow && (
+            <button
+              onClick={() => setIsCallMinimized(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
+              title="Minimize Call"
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
+          )}
           <button
             onClick={onOpenInvite}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] hover:text-[#00A884] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
@@ -740,67 +1084,124 @@ const CustomCallLayout = ({ inviteOpen, onOpenInvite, onCloseInvite, isSpeakerMu
 // ---------------------------------------------------------------------------
 
 export const ActiveCallRoom = () => {
-  const { activeCall, isCallMinimized, setIsCallMinimized, onLiveKitDisconnected } = useCallContext();
+  const {
+    activeCall,
+    isCallMinimized,
+    setIsCallMinimized,
+    isCallPoppedOut,
+    returnCallToMain,
+    hangupCall,
+    onLiveKitDisconnected,
+  } = useCallContext();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
 
   if (!activeCall) return null;
 
+  // When call is popped out to a separate window, show authentic WhatsApp Web sleek top calling capsule
+  if (isCallPoppedOut) {
+    const displayName = activeCall.isGroup ? "Group Call" : (activeCall.peerName || "In call");
+    const avatarUrl = activeCall.peerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=80`;
+
+    return (
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[94vw] sm:w-auto animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto select-none">
+        <div className="flex items-center justify-between gap-3 sm:gap-5 bg-[#111B21]/95 backdrop-blur-2xl border border-white/15 px-4 py-2 sm:px-5 sm:py-2.5 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(0,168,132,0.15)]">
+          {/* Avatar & Pulsing Indicator */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative shrink-0">
+              <img
+                src={getOptimizedImageUrl(avatarUrl, 40, 40)}
+                alt={displayName}
+                className="h-9 w-9 rounded-full object-cover border-2 border-[#00A884] bg-[#202C33]"
+              />
+              <span className="absolute bottom-0 right-0 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#25D366] border-2 border-[#111B21]" />
+              </span>
+            </div>
+
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] font-semibold text-[#E9EDEF] truncate max-w-[140px] sm:max-w-[180px]">
+                  {displayName}
+                </span>
+                <span className="text-[10px] font-medium text-[#00A884] bg-[#00A884]/15 px-2 py-0.5 rounded-full border border-[#00A884]/30 shrink-0">
+                  {activeCall.callType.toLowerCase()}
+                </span>
+              </div>
+              <span className="text-[11px] text-[#8696A0] truncate">
+                Active in separate window · click to return
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-white/10">
+            <button
+              onClick={returnCallToMain}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#00A884] hover:bg-[#02906f] text-white text-xs font-semibold transition-all duration-200 shadow-[0_0_12px_rgba(0,168,132,0.35)] cursor-pointer active:scale-95"
+              title="Bring call back to this tab"
+            >
+              <ArrowDownLeft className="h-3.5 w-3.5 text-white" />
+              <span className="hidden sm:inline">Return to tab</span>
+              <span className="sm:hidden">Return</span>
+            </button>
+            <button
+              onClick={() => hangupCall(activeCall.callId)}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EA0038] hover:bg-[#d00030] text-white transition-all duration-200 shadow-[0_0_12px_rgba(234,0,56,0.35)] cursor-pointer active:scale-95"
+              title="End Call"
+            >
+              <PhoneOff className="h-4 w-4" fill="currentColor" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
       className={cn(
-        "z-[100] bg-black pointer-events-auto transition-all duration-300 overflow-hidden shadow-2xl",
+        "z-[100] transition-all duration-300 pointer-events-auto",
         isCallMinimized
-          ? "fixed bottom-6 right-6 w-56 h-80 rounded-3xl cursor-pointer hover:scale-105 active:scale-95 group border-2 border-emerald-500/40 shadow-emerald-500/10"
-          : "fixed inset-0 flex items-center justify-center"
+          ? "fixed bottom-6 right-6"
+          : "fixed inset-0 flex items-center justify-center bg-black overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200"
       )}
-      onClick={() => {
-        if (isCallMinimized) setIsCallMinimized(false);
-      }}
     >
-      {isCallMinimized && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/50 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00A884] text-white shadow-lg">
-            <Maximize2 className="h-6 w-6" />
-          </div>
-          <span className="text-white text-xs font-semibold mt-2 drop-shadow-md">Tap to Expand</span>
-        </div>
-      )}
-      
       <div className={cn(
-        "w-full h-full relative",
-        isCallMinimized && "pointer-events-none"
+        "relative",
+        isCallMinimized ? "w-auto h-auto" : "w-full h-full"
       )}>
         <LiveKitRoom
-        key={activeCall.token}
-        video={activeCall.callType === "VIDEO"}
-        audio={true}
-        token={activeCall.token}
-        serverUrl={resolveLivekitUrl(activeCall.serverUrl)}
-        connect={true}
-        onError={(error) => {
-          console.warn("[LiveKit] Room connection notice:", error);
-        }}
-        onDisconnected={onLiveKitDisconnected}
-        className="w-full h-full"
-      >
-        <CustomCallLayout 
-           inviteOpen={inviteOpen} 
-           onOpenInvite={() => setInviteOpen(true)} 
-           onCloseInvite={() => setInviteOpen(false)}
-           isSpeakerMuted={isSpeakerMuted}
-           setIsSpeakerMuted={setIsSpeakerMuted}
-        />
+          key={activeCall.token}
+          video={activeCall.callType === "VIDEO"}
+          audio={true}
+          token={activeCall.token}
+          serverUrl={resolveLivekitUrl(activeCall.serverUrl)}
+          connect={true}
+          onError={(error) => {
+            console.warn("[LiveKit] Room connection notice:", error);
+          }}
+          onDisconnected={onLiveKitDisconnected}
+          className={cn(isCallMinimized ? "w-auto h-auto" : "w-full h-full")}
+        >
+          <CustomCallLayout 
+             inviteOpen={inviteOpen} 
+             onOpenInvite={() => setInviteOpen(true)} 
+             onCloseInvite={() => setInviteOpen(false)}
+             isSpeakerMuted={isSpeakerMuted}
+             setIsSpeakerMuted={setIsSpeakerMuted}
+          />
 
-        <RoomAudioRenderer muted={isSpeakerMuted} />
+          <RoomAudioRenderer muted={isSpeakerMuted} />
 
-        <InviteParticipantModal
-          open={inviteOpen}
-          onClose={() => setInviteOpen(false)}
-          roomId={activeCall.roomName}
-          callType={activeCall.callType}
-        />
-      </LiveKitRoom>
+          <InviteParticipantModal
+            open={inviteOpen}
+            onClose={() => setInviteOpen(false)}
+            roomId={activeCall.roomName}
+            callType={activeCall.callType}
+          />
+        </LiveKitRoom>
       </div>
     </div>
   );

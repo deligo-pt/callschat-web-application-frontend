@@ -49,6 +49,13 @@ export interface CallContextType {
   isAwaitingLocalReconnect: boolean;
   isCallMinimized: boolean;
   setIsCallMinimized: (val: boolean) => void;
+  /** Tracks if the active call is currently popped out in a standalone browser window */
+  isCallPoppedOut: boolean;
+  setIsCallPoppedOut: (val: boolean) => void;
+  /** Pops out the active call into a resizable standalone popup window */
+  popOutCallWindow: () => void;
+  /** Returns the call back to the main tab from the popup window */
+  returnCallToMain: () => void;
 }
 
 
