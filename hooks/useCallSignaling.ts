@@ -112,6 +112,18 @@ export const useCallSignaling = () => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
 
+  const outgoingCallRef = useRef<OutgoingCall | null>(null);
+  useEffect(() => {
+    outgoingCallRef.current = outgoingCall;
+  }, [outgoingCall]);
+
+  const incomingCallRef = useRef<IncomingCall | null>(null);
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
+
+  const acceptedCallIdRef = useRef<string | null>(null);
+
   const pendingCancelRef = useRef<boolean>(false);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const pendingPeerRef = useRef<{ name?: string; avatar?: string }>({});
@@ -128,7 +140,9 @@ export const useCallSignaling = () => {
       try {
         ringtoneRef.current.pause();
         ringtoneRef.current.currentTime = 0;
-      } catch (err) {}
+      } catch {
+        // Audio pause error ignored
+      }
       ringtoneRef.current = null;
     }
   }, []);
@@ -195,11 +209,25 @@ export const useCallSignaling = () => {
 
     const handleCallRinging = (payload: { callId: string }) => {
       console.log('[Call] Remote device is actively ringing:', payload);
+      // WhatsApp multi-device guard: only update status if this client initiated the call
+      if (
+        !outgoingCallRef.current ||
+        (outgoingCallRef.current.callId && outgoingCallRef.current.callId !== payload.callId)
+      ) {
+        console.log('[Call] Ignored call:ringing for unrelated or remote-initiated callId:', payload.callId);
+        return;
+      }
       setOutgoingCallStatus('RINGING');
     };
 
     const handleCallBusy = (payload: { callId: string; reason?: string; message?: string }) => {
       console.log('[Call] Remote user is busy:', payload);
+      if (
+        !outgoingCallRef.current ||
+        (outgoingCallRef.current.callId && outgoingCallRef.current.callId !== payload.callId)
+      ) {
+        return;
+      }
       stopRingtone();
       playNotificationSound('busy');
       setOutgoingCallStatus('BUSY');
@@ -212,7 +240,9 @@ export const useCallSignaling = () => {
     const handleCallWaiting = (payload: CallWaitingInfo | { status?: string; message?: string }) => {
       console.log('[Call] Call waiting notification received:', payload);
       if ('status' in payload && payload.status === 'WAITING') {
-        setOutgoingCallStatus('WAITING');
+        if (outgoingCallRef.current) {
+          setOutgoingCallStatus('WAITING');
+        }
         return;
       }
       playNotificationSound('call_waiting');
@@ -221,16 +251,46 @@ export const useCallSignaling = () => {
 
     const handleCallCancelled = (payload: { callId: string }) => {
       console.log('[Call] Call cancelled by caller:', payload);
+      acceptedCallIdRef.current = null;
       stopRingtone();
       setIncomingCall(prev => (prev?.callId === payload.callId ? null : prev));
       setCallWaiting(prev => (prev?.callId === payload.callId ? null : prev));
     };
 
-    const handleCallConnected = (payload: any) => {
+    const handleCallConnected = (payload: {
+      callId: string;
+      token: string;
+      livekitUrl: string;
+      roomName: string;
+      callType: 'AUDIO' | 'VIDEO';
+    }) => {
       console.log('[Call] Call connected, joining LiveKit room:', payload);
+
+      // WhatsApp multi-device session guard:
+      // Verify that this specific client is either:
+      //  1. The initiator of this call (active outgoingCall matching callId or pending initiate)
+      //  2. The recipient that accepted this call (acceptedCallIdRef or incomingCall matching callId)
+      const isOurOutgoing = Boolean(
+        outgoingCallRef.current &&
+        (!outgoingCallRef.current.callId || outgoingCallRef.current.callId === payload.callId)
+      );
+      const isOurAcceptedIncoming = Boolean(
+        (acceptedCallIdRef.current && (acceptedCallIdRef.current === payload.callId || acceptedCallIdRef.current === payload.roomName)) ||
+        (incomingCallRef.current && incomingCallRef.current.callId === payload.callId)
+      );
+
+      if (!isOurOutgoing && !isOurAcceptedIncoming) {
+        console.log(
+          '[Call] Ignored call:connected — call was initiated or accepted on another device:',
+          payload.callId
+        );
+        return;
+      }
+
       stopRingtone();
       setIncomingCall(null);
       setOutgoingCall(null);
+      acceptedCallIdRef.current = null;
       setOutgoingCallStatus('CALLING');
       setActiveCall({
         callId: payload.callId,
@@ -257,6 +317,7 @@ export const useCallSignaling = () => {
         }
       }
 
+      acceptedCallIdRef.current = null;
       stopRingtone();
       playNotificationSound('call_ended');
       setIncomingCall(null);
@@ -276,8 +337,15 @@ export const useCallSignaling = () => {
       }
     };
 
-    const handleCallRejected = (payload?: unknown) => {
+    const handleCallRejected = (payload?: { callId?: string; reason?: string }) => {
       console.log('[Call] Call declined/rejected:', payload);
+      if (payload?.callId && outgoingCallRef.current?.callId && outgoingCallRef.current.callId !== payload.callId) {
+        return;
+      }
+      if (!outgoingCallRef.current && !activeCallRef.current) {
+        return;
+      }
+      acceptedCallIdRef.current = null;
       stopRingtone();
       playNotificationSound('call_ended');
       setOutgoingCallStatus('DECLINED');
@@ -287,8 +355,15 @@ export const useCallSignaling = () => {
       }, 2500);
     };
 
-    const handleCallTimeout = (payload?: unknown) => {
+    const handleCallTimeout = (payload?: { callId?: string; code?: string; message?: string }) => {
       console.log('[Call] Call timed out (no answer):', payload);
+      if (payload?.callId && outgoingCallRef.current?.callId && outgoingCallRef.current.callId !== payload.callId) {
+        return;
+      }
+      if (!outgoingCallRef.current && !activeCallRef.current) {
+        return;
+      }
+      acceptedCallIdRef.current = null;
       stopRingtone();
       playNotificationSound('call_ended');
       setOutgoingCallStatus('NOT_ANSWERED');
@@ -309,10 +384,10 @@ export const useCallSignaling = () => {
       }, 2500);
     };
 
-    const handleCallError = (payload: { code?: string; message?: string } | unknown) => {
+    const handleCallError = (payload: { callId?: string; code?: string; message?: string } | unknown) => {
       const errPayload =
         payload && typeof payload === 'object'
-          ? (payload as { code?: string; message?: string })
+          ? (payload as { callId?: string; code?: string; message?: string })
           : {};
       const code = errPayload.code;
       const message = errPayload.message || 'Call failed or ended';
@@ -320,7 +395,7 @@ export const useCallSignaling = () => {
       console.warn('[Call] Call signaling notice:', { code, message, payload });
 
       if (code === 'CALL_TIMEOUT') {
-        handleCallTimeout(payload);
+        handleCallTimeout(errPayload);
         return;
       }
 
@@ -403,6 +478,7 @@ export const useCallSignaling = () => {
 
     const handleAnsweredElsewhere = (payload: { callId?: string; reason?: string }) => {
       console.log('[Call] Call answered on another device:', payload);
+      acceptedCallIdRef.current = null;
       stopRingtone();
       setIncomingCall(null);
       setCallWaiting(null);
@@ -597,7 +673,10 @@ export const useCallSignaling = () => {
       setOutgoingCallStatus('CALLING');
       setOutgoingCall({ receiverId, callType, receiverName, receiverAvatar });
 
-      socket.emit('call:initiate', { receiverId, callType }, (response: any) => {
+      socket.emit(
+        'call:initiate',
+        { receiverId, callType },
+        (response: { success?: boolean; callId?: string; error?: string }) => {
         if (response?.success && response?.callId) {
           if (pendingCancelRef.current) {
             console.log(
@@ -623,6 +702,7 @@ export const useCallSignaling = () => {
     (callId: string, roomName: string, peerName?: string, peerAvatar?: string) => {
       if (!socket) return;
       console.log('[Call] Accepting call', callId);
+      acceptedCallIdRef.current = callId;
       stopRingtone();
       // Store peer info so call:connected handler can inject it into activeCall
       pendingPeerRef.current = { name: peerName, avatar: peerAvatar };
@@ -749,6 +829,7 @@ export const useCallSignaling = () => {
   // -------------------------------------------------------------------------
   const cancelOutgoingCall = useCallback(() => {
     if (!socket || !outgoingCall) return;
+    acceptedCallIdRef.current = null;
     console.log('[Call] Canceling outgoing call');
 
     // ✅ Always stop ringtone immediately when the caller cancels
@@ -773,7 +854,16 @@ export const useCallSignaling = () => {
       console.log('[Call] Starting group call for', groupId, callType);
       setOutgoingGroupCall({ groupId, callType });
 
-      socket.emit('group:call_start', { groupId, callType }, (response: any) => {
+      socket.emit(
+        'group:call_start',
+        { groupId, callType },
+        (response: {
+          success?: boolean;
+          token?: string;
+          callId?: string;
+          livekitUrl?: string;
+          roomName?: string;
+        }) => {
         if (response?.success && response?.token) {
           setOutgoingGroupCall({
             groupId,
@@ -808,14 +898,24 @@ export const useCallSignaling = () => {
       if (!socket) return;
       console.log('[Call] Accepting group call for', groupId);
       stopRingtone();
-      socket.emit('group:call_join', { groupId }, (response: any) => {
+      socket.emit(
+        'group:call_join',
+        { groupId },
+        (response: {
+          success?: boolean;
+          token?: string;
+          callId?: string;
+          livekitUrl?: string;
+          roomName?: string;
+          callType?: 'AUDIO' | 'VIDEO';
+        }) => {
         if (response?.success && response?.token) {
           setIncomingGroupCall(null);
           setActiveCall({
             callId: response.callId || groupId,
             token: response.token,
             serverUrl: resolveLivekitUrl(response.livekitUrl),
-            roomName: response.roomName,
+            roomName: response.roomName || groupId,
             callType: response.callType || 'AUDIO',
             isGroup: true,
             groupId: groupId,
@@ -842,13 +942,23 @@ export const useCallSignaling = () => {
       if (!socket) return;
       console.log('[Call] Joining group call for', groupId);
       stopRingtone();
-      socket.emit('group:call_join', { groupId }, (response: any) => {
+      socket.emit(
+        'group:call_join',
+        { groupId },
+        (response: {
+          success?: boolean;
+          token?: string;
+          callId?: string;
+          livekitUrl?: string;
+          roomName?: string;
+          callType?: 'AUDIO' | 'VIDEO';
+        }) => {
         if (response?.success && response?.token) {
           setActiveCall({
             callId: response.callId || groupId,
             token: response.token,
             serverUrl: resolveLivekitUrl(response.livekitUrl),
-            roomName: response.roomName,
+            roomName: response.roomName || groupId,
             callType: response.callType || 'AUDIO',
             isGroup: true,
             groupId: groupId,
