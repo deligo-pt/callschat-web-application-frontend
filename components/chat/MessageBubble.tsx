@@ -702,6 +702,11 @@ export function MessageBubble({
                       </button>
                     </div>
                   </div>
+                ) : (msg as any).isDecryptionPending || msg.text?.includes("Waiting for this message") ? (
+                  <div className="flex items-center gap-2 text-[13px] text-[#54656F] dark:text-[#8696A0] italic py-0.5 select-none">
+                    <Clock className="w-3.5 h-3.5 shrink-0 animate-pulse text-amber-500 dark:text-amber-400" />
+                    <span>{msg.text}</span>
+                  </div>
                 ) : (
                   <span
                     className="leading-snug whitespace-pre-wrap"

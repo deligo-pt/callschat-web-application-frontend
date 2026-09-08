@@ -53,6 +53,7 @@ import { chatService } from "@/services/chat.service";
 import { groupService } from "@/services/group.service";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { toast } from "sonner";
+import { compressImage } from "@/utils/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -365,9 +366,17 @@ export default function GroupChatPage() {
   const handleSend = async (text: string, file: File | null) => {
     if (!isReady) return;
     if (file) {
+      if (file.size > 25 * 1024 * 1024) {
+        toast.error("File size exceeds the 25MB maximum limit.");
+        return;
+      }
       setIsUploading(true);
       try {
-        const uploadRes = await groupService.uploadGroupMedia(groupId, file);
+        let finalFile = file;
+        if (file.type.startsWith("image/") && !file.type.includes("svg")) {
+          finalFile = await compressImage(file, 1920, 0.8);
+        }
+        const uploadRes = await groupService.uploadGroupMedia(groupId, finalFile);
         if (!uploadRes.success || !uploadRes.data?.mediaUrl) {
           toast.error(uploadRes.error || "Failed to upload media");
           return;
@@ -379,9 +388,15 @@ export default function GroupChatPage() {
           uploadRes.data.mediaType
         );
         setReplyingTo(null);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Upload error:", err);
-        toast.error("Failed to upload media");
+        const errMsg =
+          err?.response?.data?.error?.message ||
+          err?.response?.data?.message ||
+          (err?.response?.status === 413
+            ? "File size exceeds server upload limit."
+            : err?.message || "Failed to upload media");
+        toast.error(errMsg);
       } finally {
         setIsUploading(false);
       }

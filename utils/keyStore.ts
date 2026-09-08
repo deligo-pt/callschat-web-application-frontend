@@ -70,3 +70,73 @@ export const migrateKeysFromLocalStorage = async (userId: string): Promise<void>
     localStorage.removeItem("publicKey");
   }
 };
+
+// -----------------------------------------------------------------------------
+// X3DH Pre-Keys (IndexedDB)
+// -----------------------------------------------------------------------------
+
+export const storePreKeyPrivate = async (
+  userId: string,
+  keyId: number,
+  privateKey: string
+): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  await set(`preKey_priv_${userId}_${keyId}`, privateKey);
+};
+
+export const getPreKeyPrivate = async (
+  userId: string,
+  keyId: number
+): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+  return (await get(`preKey_priv_${userId}_${keyId}`)) || null;
+};
+
+export const storeSignedPreKeyPrivate = async (
+  userId: string,
+  keyId: number,
+  privateKey: string
+): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  await set(`signedPreKey_priv_${userId}_${keyId}`, privateKey);
+};
+
+export const getSignedPreKeyPrivate = async (
+  userId: string,
+  keyId: number
+): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+  return (await get(`signedPreKey_priv_${userId}_${keyId}`)) || null;
+};
+
+// -----------------------------------------------------------------------------
+// Durable Local Message Plaintext Cache (IndexedDB)
+// Ensures sent and decrypted messages survive page refreshes, tab restarts, and dev server restarts
+// -----------------------------------------------------------------------------
+
+export const storeDecryptedMessage = async (
+  userId: string,
+  messageId: string,
+  plaintext: string
+): Promise<void> => {
+  if (typeof window === 'undefined' || !userId || !messageId || !plaintext) return;
+  try {
+    await set(`msg_text_${userId}_${messageId}`, plaintext);
+  } catch (err) {
+    console.warn('[keyStore] Failed to cache decrypted message:', err);
+  }
+};
+
+export const getDecryptedMessage = async (
+  userId: string,
+  messageId: string
+): Promise<string | null> => {
+  if (typeof window === 'undefined' || !userId || !messageId) return null;
+  try {
+    return (await get(`msg_text_${userId}_${messageId}`)) || null;
+  } catch (err) {
+    return null;
+  }
+};
+
+
