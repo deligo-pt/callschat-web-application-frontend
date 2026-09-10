@@ -12,6 +12,7 @@ import {
   User,
   Bell,
   Shield,
+  ShieldCheck,
   Languages,
   EyeOff,
   Image as ImageIcon,
@@ -51,6 +52,7 @@ export interface ChatOptionsMenuProps {
   /** Called after successful update so the parent can re-sync state. */
   onDisappearUpdated?: (newValue: number | null) => void;
   onViewContact?: () => void;
+  onSecurityCodeClick?: () => void;
   isMuted?: boolean;
   onMuteToggle?: (newMuteState: boolean) => void;
 }
@@ -65,6 +67,7 @@ export function ChatOptionsMenu({
   disappearAfterSeconds: initialDisappear = null,
   onDisappearUpdated,
   onViewContact,
+  onSecurityCodeClick,
   isMuted = false,
   onMuteToggle,
 }: ChatOptionsMenuProps) {
@@ -149,6 +152,17 @@ export function ChatOptionsMenu({
               strokeWidth={2}
             />
             <span className="text-[14px]">{t("view_contact")}</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem 
+            className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-[#F0F2F5] dark:hover:bg-[#182229] rounded-xl focus:bg-[#F0F2F5] dark:focus:bg-[#182229]"
+            onClick={onSecurityCodeClick}
+          >
+            <ShieldCheck
+              className="h-[18px] w-[18px] text-[#00A884]"
+              strokeWidth={2}
+            />
+            <span className="text-[14px]">Verify security code</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1 bg-[#F0F2F5] dark:bg-[#2A3942]" />

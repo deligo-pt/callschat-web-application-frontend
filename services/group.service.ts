@@ -401,4 +401,37 @@ export const groupService = {
       return { success: false, error: error.response?.data?.message || 'Failed to unsend message' };
     }
   },
+
+  async distributeSenderKeys(
+    groupId: string,
+    distributions: Array<{
+      recipientId: string;
+      encryptedKey: string;
+      nonce: string;
+      iteration?: number;
+    }>
+  ): Promise<{ success: boolean; message?: string; count?: number }> {
+    try {
+      const response = await apiClient.post(`/groups/${groupId}/sender-keys`, {
+        groupId,
+        distributions,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to distribute sender keys for group ${groupId}`, error);
+      return { success: false };
+    }
+  },
+
+  async fetchSenderKeys(
+    groupId: string
+  ): Promise<{ success: boolean; data?: any[] }> {
+    try {
+      const response = await apiClient.get(`/groups/${groupId}/sender-keys`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to fetch sender keys for group ${groupId}`, error);
+      return { success: false };
+    }
+  },
 };

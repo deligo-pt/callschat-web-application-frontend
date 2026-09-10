@@ -139,4 +139,145 @@ export const getDecryptedMessage = async (
   }
 };
 
+// -----------------------------------------------------------------------------
+// Key Vault Backup Export & Restore Helpers
+// -----------------------------------------------------------------------------
 
+export interface LocalKeyBundle {
+  privateKey: string;
+  publicKey: string;
+  registrationId?: string | null;
+  deviceId?: string | null;
+  signedPreKeyPrivate?: string | null;
+  timestamp?: number;
+}
+
+export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBundle | null> => {
+  if (typeof window === 'undefined' || !userId) return null;
+
+  const privateKey = await getUserPrivateKey(userId);
+  const publicKey = await getUserPublicKey(userId);
+
+  if (!privateKey || !publicKey) return null;
+
+  const registrationId = localStorage.getItem('registrationId') || null;
+  const deviceId = localStorage.getItem('deviceId') || `web-${userId}`;
+  const signedPreKeyPrivate = await getSignedPreKeyPrivate(userId, 1);
+
+  return {
+    privateKey,
+    publicKey,
+    registrationId,
+    deviceId,
+    signedPreKeyPrivate,
+    timestamp: Date.now(),
+  };
+};
+
+export const restoreLocalKeyBundle = async (
+  userId: string,
+  bundle: LocalKeyBundle
+): Promise<boolean> => {
+  if (typeof window === 'undefined' || !userId || !bundle.privateKey || !bundle.publicKey) {
+    return false;
+  }
+
+  await storeUserKeys(userId, bundle.privateKey, bundle.publicKey);
+
+  if (bundle.registrationId) {
+    localStorage.setItem('registrationId', bundle.registrationId);
+  }
+  if (bundle.deviceId) {
+    localStorage.setItem('deviceId', bundle.deviceId);
+  }
+  if (bundle.signedPreKeyPrivate) {
+    await storeSignedPreKeyPrivate(userId, 1, bundle.signedPreKeyPrivate);
+  }
+
+  return true;
+};
+
+// -----------------------------------------------------------------------------
+// Safety Number Verification (IndexedDB)
+// -----------------------------------------------------------------------------
+
+export interface SafetyVerificationRecord {
+  safetyNumber: string;
+  verifiedAt: string;
+}
+
+export const storeSafetyNumberVerification = async (
+  myUserId: string,
+  peerUserId: string,
+  safetyNumber: string,
+  verified: boolean
+): Promise<void> => {
+  if (typeof window === 'undefined' || !myUserId || !peerUserId) return;
+  const storageKey = `safety_verified_${myUserId}_${peerUserId}`;
+  if (verified) {
+    await set(storageKey, {
+      safetyNumber,
+      verifiedAt: new Date().toISOString(),
+    });
+  } else {
+    await del(storageKey);
+  }
+};
+
+export const getSafetyNumberVerification = async (
+  myUserId: string,
+  peerUserId: string,
+  expectedSafetyNumber?: string
+): Promise<{ isVerified: boolean; verifiedAt?: string }> => {
+  if (typeof window === 'undefined' || !myUserId || !peerUserId) {
+    return { isVerified: false };
+  }
+  const storageKey = `safety_verified_${myUserId}_${peerUserId}`;
+  const record = await get<SafetyVerificationRecord>(storageKey);
+  if (!record) return { isVerified: false };
+
+  // If safety number has changed since verification (e.g. key rotated), invalidate
+  if (expectedSafetyNumber && record.safetyNumber !== expectedSafetyNumber) {
+    return { isVerified: false };
+  }
+
+  return { isVerified: true, verifiedAt: record.verifiedAt };
+};
+
+// -----------------------------------------------------------------------------
+// Signal-Grade Group Sender Keys (IndexedDB)
+// -----------------------------------------------------------------------------
+
+export interface StoredSenderKey {
+  groupId: string;
+  senderId: string;
+  chainKey: string;
+  iteration: number;
+  senderKeyId: string;
+  updatedAt: string;
+}
+
+export const storeSenderKey = async (
+  groupId: string,
+  senderId: string,
+  record: StoredSenderKey
+): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  await set(`group_sender_key_${groupId}_${senderId}`, record);
+};
+
+export const getStoredSenderKey = async (
+  groupId: string,
+  senderId: string
+): Promise<StoredSenderKey | null> => {
+  if (typeof window === 'undefined') return null;
+  return (await get<StoredSenderKey>(`group_sender_key_${groupId}_${senderId}`)) || null;
+};
+
+export const clearSenderKey = async (
+  groupId: string,
+  senderId: string
+): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  await del(`group_sender_key_${groupId}_${senderId}`);
+};

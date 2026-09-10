@@ -24,6 +24,9 @@ import {
   Mic,
   Copy,
   ChevronDown,
+  ShieldAlert,
+  Lock,
+  RotateCw,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -96,6 +99,9 @@ interface MessageBubbleProps {
       deliveredAt: string | null;
       seenAt: string | null;
     }[];
+    isSystem?: boolean;
+    systemType?: string;
+    isRetryExpired?: boolean;
   };
   isMe: boolean;
   showTail: boolean;
@@ -109,6 +115,8 @@ interface MessageBubbleProps {
   onUnsend?: (messageId: string) => void;
   onReply?: (msg: any) => void;
   onScrollToMessage?: (messageId: string) => void;
+  onOpenSecurityCode?: () => void;
+  onManualResend?: (messageId: string) => void;
   /** Per-message disappear timer in seconds, or null if not set. */
   disappearAfterSeconds?: number | null;
   currentUserId?: string;
@@ -128,9 +136,26 @@ export function MessageBubble({
   onUnsend,
   onReply,
   onScrollToMessage,
+  onOpenSecurityCode,
+  onManualResend,
   disappearAfterSeconds,
   currentUserId,
 }: MessageBubbleProps) {
+  // Render system notification bubble (e.g. WhatsApp-style Safety Number change notice)
+  if (msg.isSystem) {
+    return (
+      <div className="flex justify-center my-3 px-4 w-full">
+        <div
+          onClick={onOpenSecurityCode}
+          className="flex items-center gap-2 max-w-md px-4 py-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/50 text-amber-900 dark:text-amber-200 text-xs text-center cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/60 transition-colors shadow-2xs group"
+        >
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
+          <span className="leading-relaxed">{msg.text}</span>
+        </div>
+      </div>
+    );
+  }
+
   const { initiateCall } = useCallContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -701,6 +726,23 @@ export function MessageBubble({
                         Save
                       </button>
                     </div>
+                  </div>
+                ) : (msg as any).isRetryExpired ? (
+                  <div className="flex flex-col gap-2 py-1 select-none">
+                    <div className="flex items-center gap-2 text-[13px] text-red-600 dark:text-red-400 font-medium">
+                      <Lock className="w-3.5 h-3.5 shrink-0" />
+                      <span>Message unavailable. Decryption timed out.</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onManualResend?.(msg.id);
+                      }}
+                      className="self-start flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00A884]/15 hover:bg-[#00A884]/25 text-[#00A884] dark:text-[#25D366] text-xs font-bold transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                    >
+                      <RotateCw className="w-3 h-3" />
+                      <span>Request Resend</span>
+                    </button>
                   </div>
                 ) : (msg as any).isDecryptionPending || msg.text?.includes("Waiting for this message") ? (
                   <div className="flex items-center gap-2 text-[13px] text-[#54656F] dark:text-[#8696A0] italic py-0.5 select-none">

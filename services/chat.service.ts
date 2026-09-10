@@ -24,6 +24,15 @@ export const chatService = {
     return response.data;
   },
 
+  fetchBatchKeys: async (userIds: string[]) => {
+    try {
+      const response = await apiClient.post('/encryption/keys/batch', { userIds });
+      return response.data?.data ?? {};
+    } catch {
+      return {};
+    }
+  },
+
   uploadPreKeys: async (payload: {
     deviceId: string;
     signedPreKey?: { keyId: number; publicKey: string; signature: string };
@@ -51,6 +60,32 @@ export const chatService = {
     } catch {
       return 0;
     }
+  },
+
+  uploadKeyBackup: async (payload: {
+    encryptedVault: string;
+    nonce: string;
+    salt: string;
+    kdfAlgorithm?: string;
+    kdfIterations?: number;
+    version?: number;
+  }) => {
+    const response = await apiClient.post('/encryption/backup', payload);
+    return response.data;
+  },
+
+  fetchKeyBackup: async () => {
+    try {
+      const response = await apiClient.get('/encryption/backup');
+      return response.data?.data ?? null;
+    } catch {
+      return null;
+    }
+  },
+
+  deleteKeyBackup: async () => {
+    const response = await apiClient.delete('/encryption/backup');
+    return response.data;
   },
 
   initiateConversation: async (
