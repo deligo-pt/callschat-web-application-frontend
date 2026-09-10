@@ -29,6 +29,7 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { MediaGallery } from "@/components/chat/MediaGallery";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { ContactProfileModal } from "@/components/chat/ContactProfileModal";
+import { SecurityCodeModal } from "@/components/chat/SecurityCodeModal";
 import { Images } from "lucide-react";
 import { usePresence } from "@/context/PresenceContext";
 import { toast } from "sonner";
@@ -215,6 +216,7 @@ function ChatRoomPageContent() {
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [isContactProfileOpen, setIsContactProfileOpen] = useState(false);
+  const [isSecurityCodeOpen, setIsSecurityCodeOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isRecipientInContacts, setIsRecipientInContacts] = useState(true);
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -426,8 +428,20 @@ function ChatRoomPageContent() {
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
 
-  const { messages, sendMessage, editMessage, pinnedMessages, pinMessage, clearMessages, isReady, isUploading, unsendMessage, typingUsers, handleTyping } =
-    useChat(conversationId, currentUserId, recipientId, isBizChat);
+  const {
+    messages,
+    sendMessage,
+    editMessage,
+    pinnedMessages,
+    pinMessage,
+    clearMessages,
+    isReady,
+    isUploading,
+    unsendMessage,
+    typingUsers,
+    handleTyping,
+    requestManualResend,
+  } = useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
   // Runs every second ONLY when there are active disappearing messages so timers
@@ -675,6 +689,7 @@ function ChatRoomPageContent() {
                 disappearAfterSeconds={disappearAfterSeconds}
                 onDisappearUpdated={setDisappearAfterSeconds}
                 onViewContact={() => setIsContactProfileOpen(true)}
+                onSecurityCodeClick={() => setIsSecurityCodeOpen(true)}
                 isMuted={isMuted}
                 onMuteToggle={setIsMuted}
               />
@@ -865,6 +880,8 @@ function ChatRoomPageContent() {
                   peerId={recipientId}
                   peerName={isBizChat ? bizName : recipient?.name}
                   peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
+                  onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}
+                  onManualResend={(msgId) => requestManualResend(msgId)}
                   disappearAfterSeconds={(msg as any).disappearAfterSeconds ?? disappearAfterSeconds ?? null}
                   onEdit={(msgId, newText) => editMessage(msgId, newText)}
                   isPinned={isPinned}
@@ -963,6 +980,7 @@ function ChatRoomPageContent() {
           phone={recipient.phone}
           isBlocked={blockStatus?.isBlocked}
           isBlockedByMe={blockStatus?.isBlockedByMe}
+          onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}
           onBlockUser={async () => {
              // This leverages the logic in ChatActionModals if we wanted, but since it's separate, 
              // we'll just toggle it here, or we can use the same state.
@@ -983,6 +1001,17 @@ function ChatRoomPageContent() {
                 toast.error("Failed to update block status.");
              }
           }}
+        />
+      )}
+
+      {/* ── Security Code (Safety Number) Modal ────────────────────────────── */}
+      {!isBizChat && recipient && (
+        <SecurityCodeModal
+          isOpen={isSecurityCodeOpen}
+          onClose={() => setIsSecurityCodeOpen(false)}
+          peerId={recipient.id}
+          peerName={recipient.name}
+          peerAvatar={recipient.avatarUrl}
         />
       )}
     </div>

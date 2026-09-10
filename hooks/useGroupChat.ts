@@ -9,12 +9,21 @@ import {
   decryptGroupMessage,
   decryptMessage,
   generateAndStoreKeyPair,
+  generateSenderKey,
+  ratchetSenderKey,
+  encryptWithSenderKey,
+  decryptWithSenderKey,
+  wrapSenderKeyForMember,
+  unwrapSenderKeyFromMember,
 } from "@/utils/crypto";
 import {
   getUserPrivateKey,
   getUserPublicKey,
   storeGroupKey,
   getStoredGroupKey,
+  storeSenderKey,
+  getStoredSenderKey,
+  clearSenderKey,
 } from "@/utils/keyStore";
 
 export interface QuotedMessage {
@@ -170,6 +179,18 @@ const resolveGroupQuotedMessage = async (
   };
 };
 
+const resolveUserPublicKey = async (userId: string): Promise<string | null> => {
+  try {
+    const res = await chatService.fetchRecipientKey(userId);
+    if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+      return res.data[res.data.length - 1].publicKey;
+    }
+    return res?.data?.publicKey ?? null;
+  } catch {
+    return null;
+  }
+};
+
 export const useGroupChat = (groupId: string, currentUserId: string) => {
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -182,12 +203,19 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
   const groupKeyRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
+  const groupDetailsRef = useRef<any>(null);
   const pendingReceiptsRef = useRef<Map<string, any[]>>(new Map());
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const isRekeyingRef = useRef<boolean>(false);
+  const rekeyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
   }, [currentUserId]);
+
+  useEffect(() => {
+    groupDetailsRef.current = groupDetails;
+  }, [groupDetails]);
 
   // ── Setup: Fetch & Decrypt Symmetric Group Key (Zero Sync Issue Protocol) ───
   useEffect(() => {
@@ -349,7 +377,70 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           const decryptedTextsMap = new Map<string, string>();
           const currentKey = groupKeyRef.current;
 
+          // Fetch active sender keys for this group to decrypt sender-keyed history
+          const skMap = new Map<string, any>();
+          try {
+            const skRes = await groupService.fetchSenderKeys(groupId);
+            if (skRes.success && Array.isArray(skRes.data)) {
+              const myPriv = await getUserPrivateKey(currentUserId);
+              if (myPriv) {
+                for (const dist of skRes.data) {
+                  const senderPub = await resolveUserPublicKey(dist.senderId);
+                  if (senderPub) {
+                    try {
+                      const chainKey = unwrapSenderKeyFromMember(
+                        dist.encryptedKey,
+                        dist.nonce,
+                        senderPub,
+                        myPriv
+                      );
+                      skMap.set(dist.senderId, {
+                        groupId,
+                        senderId: dist.senderId,
+                        chainKey,
+                        iteration: dist.iteration ?? 0,
+                      });
+                      await storeSenderKey(groupId, dist.senderId, {
+                        groupId,
+                        senderId: dist.senderId,
+                        chainKey,
+                        iteration: dist.iteration ?? 0,
+                        senderKeyId: `sk_${dist.senderId}`,
+                        updatedAt: new Date().toISOString(),
+                      });
+                    } catch {}
+                  }
+                }
+              }
+            }
+          } catch {}
+
           for (const msg of historyRes.data) {
+            if (msg.ciphertext && msg.nonce && msg.senderKeyIteration != null) {
+              const sk = skMap.get(msg.senderId) || (await getStoredSenderKey(groupId, msg.senderId));
+              if (sk) {
+                try {
+                  const decResult = await decryptWithSenderKey(
+                    msg.ciphertext,
+                    msg.nonce,
+                    sk.chainKey,
+                    msg.senderKeyIteration,
+                    sk.iteration
+                  );
+                  decryptedTextsMap.set(msg.id, parseEditedText(decResult.text).text);
+                  sk.chainKey = decResult.updatedChainKey;
+                  sk.iteration = decResult.updatedIteration;
+                  await storeSenderKey(groupId, msg.senderId, {
+                    ...sk,
+                    chainKey: decResult.updatedChainKey,
+                    iteration: decResult.updatedIteration,
+                    updatedAt: new Date().toISOString(),
+                  });
+                  continue;
+                } catch {}
+              }
+            }
+
             if (msg.ciphertext && msg.nonce && currentKey) {
               try {
                 const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, currentKey);
@@ -441,6 +532,81 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     };
   }, [socket, isConnected, groupId]);
 
+  // ── Automatic Group Re-Keying Protocol (Forward Secrecy) ──────────────────
+  const performRekey = useCallback(
+    async (reason: string) => {
+      if (isRekeyingRef.current || !groupId) return;
+      isRekeyingRef.current = true;
+      try {
+        const myUid = currentUserIdRef.current;
+        const localPrivKey = await getUserPrivateKey(myUid);
+        const localPubKey = await getUserPublicKey(myUid);
+        if (!localPrivKey) {
+          console.warn("[useGroupChat] Cannot rekey: missing local private key");
+          return;
+        }
+
+        // 1. Generate fresh 256-bit symmetric group key
+        const freshGroupKey = await generateGroupKey();
+
+        // 2. Fetch current active members (removed members are excluded)
+        const membersRes = await groupService.fetchGroupMembers(groupId);
+        if (!membersRes.success || !membersRes.data?.members) {
+          console.warn("[useGroupChat] Cannot rekey: failed to fetch active members");
+          return;
+        }
+
+        const memberList = membersRes.data.members;
+        const rekeyPayload: Array<{ userId: string; encryptedGroupKey: string; keyNonce: string }> = [];
+
+        // 3. Encrypt fresh key for each active member
+        for (const m of memberList) {
+          const uId = (m as any).userId || (m as any).id;
+          if (!uId) continue;
+
+          let pubKey = "";
+          if (uId === myUid) {
+            pubKey = localPubKey || "";
+          } else {
+            const rKeyRes = await chatService.fetchRecipientKey(uId);
+            if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
+              pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+            } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
+              pubKey = rKeyRes.data.publicKey;
+            }
+          }
+
+          if (pubKey) {
+            try {
+              const enc = await encryptMessage(freshGroupKey, pubKey, localPrivKey);
+              rekeyPayload.push({
+                userId: uId,
+                encryptedGroupKey: enc.ciphertext,
+                keyNonce: enc.nonce,
+              });
+            } catch (encErr) {
+              console.warn(`[useGroupChat] Could not encrypt rotated key for member ${uId}:`, encErr);
+            }
+          }
+        }
+
+        if (rekeyPayload.length > 0) {
+          const rekeyRes = await groupService.rekeyGroup(groupId, rekeyPayload);
+          if (rekeyRes.success) {
+            groupKeyRef.current = freshGroupKey;
+            await storeGroupKey(groupId, myUid, freshGroupKey);
+            console.log(`[useGroupChat] Successfully re-keyed group ${groupId} (${reason})`);
+          }
+        }
+      } catch (err) {
+        console.error("[useGroupChat] Error during group re-keying:", err);
+      } finally {
+        isRekeyingRef.current = false;
+      }
+    },
+    [groupId]
+  );
+
   // ── Socket: Real-Time Event Handlers ───────────────────────────────────────
   useEffect(() => {
     if (!socket || !isConnected || !groupId) return;
@@ -462,14 +628,66 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
 
       let text = "";
-      if (payload.ciphertext && payload.nonce && groupKeyRef.current) {
+      if (payload.ciphertext && payload.nonce && payload.senderKeyIteration != null) {
+        try {
+          let sk = await getStoredSenderKey(groupId, senderId);
+          if (!sk) {
+            const skRes = await groupService.fetchSenderKeys(groupId);
+            if (skRes.success && Array.isArray(skRes.data)) {
+              const myDist = skRes.data.find((d: any) => d.senderId === senderId);
+              if (myDist) {
+                const myPriv = await getUserPrivateKey(currentUserIdRef.current);
+                const senderPub = await resolveUserPublicKey(senderId);
+                if (myPriv && senderPub) {
+                  const chainKey = unwrapSenderKeyFromMember(
+                    myDist.encryptedKey,
+                    myDist.nonce,
+                    senderPub,
+                    myPriv
+                  );
+                  sk = {
+                    groupId,
+                    senderId,
+                    chainKey,
+                    iteration: myDist.iteration ?? 0,
+                    senderKeyId: `sk_${senderId}`,
+                    updatedAt: new Date().toISOString(),
+                  };
+                  await storeSenderKey(groupId, senderId, sk);
+                }
+              }
+            }
+          }
+
+          if (sk) {
+            const decResult = await decryptWithSenderKey(
+              payload.ciphertext,
+              payload.nonce,
+              sk.chainKey,
+              payload.senderKeyIteration,
+              sk.iteration
+            );
+            text = parseEditedText(decResult.text).text;
+            await storeSenderKey(groupId, senderId, {
+              ...sk,
+              chainKey: decResult.updatedChainKey,
+              iteration: decResult.updatedIteration,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (skErr) {
+          console.warn("[useGroupChat] Real-time sender key decryption error, checking group key fallback:", skErr);
+        }
+      }
+
+      if (!text && payload.ciphertext && payload.nonce && groupKeyRef.current) {
         try {
           const dec = await decryptGroupMessage(payload.ciphertext, payload.nonce, groupKeyRef.current);
           text = parseEditedText(dec).text;
         } catch {
           text = "🔒 Encrypted group message";
         }
-      } else if (payload.ciphertext && !payload.nonce) {
+      } else if (!text && payload.ciphertext && !payload.nonce) {
         text = parseEditedText(payload.ciphertext).text;
       }
 
@@ -604,6 +822,143 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
     };
 
+    // Forward Secrecy: Automatic Group Key Rotation Handlers
+    const handleRequestRekey = async (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      const details = groupDetailsRef.current;
+      const myRole = details?.myRole;
+      const isOwner = myRole === "OWNER" || details?.createdBy === currentUserIdRef.current;
+      const isAdmin = myRole === "ADMIN" || isOwner;
+
+      if (!isAdmin) return;
+
+      // If current user is the one who removed the member, rotate immediately
+      if (payload.removedBy === currentUserIdRef.current) {
+        await performRekey(`member removal initiated by self (${payload.removedUserId})`);
+        return;
+      }
+
+      // Otherwise delay based on hierarchy (Owner: 1500ms, Admin: 3000ms) to avoid duplicate racing re-keys
+      const delay = isOwner ? 1500 : 3000;
+      if (rekeyTimeoutRef.current) clearTimeout(rekeyTimeoutRef.current);
+      rekeyTimeoutRef.current = setTimeout(async () => {
+        await performRekey(`member departure/removal (${payload.removedUserId})`);
+      }, delay);
+    };
+
+    const handleKeyRotated = async (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      // If we rotated it ourselves, our local ref and keystore are already up to date
+      if (payload.rotatedBy === currentUserIdRef.current) return;
+
+      // Clear pending scheduled re-key if another admin already completed it
+      if (rekeyTimeoutRef.current) {
+        clearTimeout(rekeyTimeoutRef.current);
+        rekeyTimeoutRef.current = null;
+      }
+
+      try {
+        const keyRes = await groupService.fetchGroupKey(groupId);
+        if (!keyRes.success || !keyRes.data?.encryptedGroupKey || !keyRes.data?.keyNonce) {
+          console.warn("[useGroupChat] Failed to fetch rotated group key");
+          return;
+        }
+
+        const { encryptedGroupKey, keyNonce } = keyRes.data;
+        const senderId = keyRes.data.senderId || payload.rotatedBy;
+
+        let senderPubKey = "";
+        if (senderId) {
+          const rKeyRes = await chatService.fetchRecipientKey(senderId);
+          if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
+            senderPubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+          } else if (rKeyRes?.data?.publicKey) {
+            senderPubKey = rKeyRes.data.publicKey;
+          }
+        }
+
+        const myPrivKey = await getUserPrivateKey(currentUserIdRef.current);
+        if (myPrivKey && senderPubKey) {
+          const newKey = await decryptMessage(encryptedGroupKey, keyNonce, senderPubKey, myPrivKey);
+          if (newKey) {
+            groupKeyRef.current = newKey;
+            await storeGroupKey(groupId, currentUserIdRef.current, newKey);
+            console.log(`[useGroupChat] Successfully unlocked and stored rotated group key for ${groupId}`);
+          }
+        }
+      } catch (err) {
+        console.error("[useGroupChat] Error adopting rotated group key:", err);
+      }
+    };
+
+    const handleMemberRemoved = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      if (payload.userId === currentUserIdRef.current) {
+        setError("You are no longer a member of this group.");
+      }
+      if (currentUserIdRef.current) {
+        clearSenderKey(groupId, currentUserIdRef.current).catch(() => {});
+      }
+      groupService.fetchGroupDetails(groupId).then((res) => {
+        if (res.success && res.data) {
+          setGroupDetails(res.data);
+        }
+      });
+    };
+
+    const handleMemberLeft = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      if (payload.userId === currentUserIdRef.current) {
+        setError("You have left this group.");
+      }
+      if (currentUserIdRef.current) {
+        clearSenderKey(groupId, currentUserIdRef.current).catch(() => {});
+      }
+      groupService.fetchGroupDetails(groupId).then((res) => {
+        if (res.success && res.data) {
+          setGroupDetails(res.data);
+        }
+      });
+    };
+
+    const handleMemberAdded = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      groupService.fetchGroupDetails(groupId).then((res) => {
+        if (res.success && res.data) {
+          setGroupDetails(res.data);
+        }
+      });
+    };
+
+    const handleSenderKeyReceived = async (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      if (payload.recipientId !== currentUserIdRef.current) return;
+      try {
+        const myPrivKey = await getUserPrivateKey(currentUserIdRef.current);
+        const senderPubKey = await resolveUserPublicKey(payload.senderId);
+        if (!myPrivKey || !senderPubKey) return;
+
+        const chainKey = unwrapSenderKeyFromMember(
+          payload.encryptedKey,
+          payload.nonce,
+          senderPubKey,
+          myPrivKey
+        );
+
+        await storeSenderKey(groupId, payload.senderId, {
+          groupId,
+          senderId: payload.senderId,
+          chainKey,
+          iteration: payload.iteration ?? 0,
+          senderKeyId: `sk_${payload.senderId}`,
+          updatedAt: new Date().toISOString(),
+        });
+        console.log(`[useGroupChat] Stored incoming Sender Key for member ${payload.senderId}`);
+      } catch (err) {
+        console.error("[useGroupChat] Error processing received sender key:", err);
+      }
+    };
+
     socket.on("group:receive_message", handleReceiveMessage);
     socket.on("group:message_status_update", handleStatusUpdate);
     socket.on("group:reaction_updated", handleReactionsUpdated);
@@ -613,8 +968,18 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     socket.on("group:typing_start", handleTypingStart);
     socket.on("group:typing_stop", handleTypingStop);
     socket.on("group:message_unsent", handleMessageUnsent);
+    socket.on("group:request_rekey", handleRequestRekey);
+    socket.on("group:key_rotated", handleKeyRotated);
+    socket.on("group:member_removed", handleMemberRemoved);
+    socket.on("group:member_left", handleMemberLeft);
+    socket.on("group:member_added", handleMemberAdded);
+    socket.on("group:sender_key_received", handleSenderKeyReceived);
 
     return () => {
+      if (rekeyTimeoutRef.current) {
+        clearTimeout(rekeyTimeoutRef.current);
+        rekeyTimeoutRef.current = null;
+      }
       socket.off("group:receive_message", handleReceiveMessage);
       socket.off("group:message_status_update", handleStatusUpdate);
       socket.off("group:reaction_updated", handleReactionsUpdated);
@@ -624,8 +989,14 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       socket.off("group:typing_start", handleTypingStart);
       socket.off("group:typing_stop", handleTypingStop);
       socket.off("group:message_unsent", handleMessageUnsent);
+      socket.off("group:request_rekey", handleRequestRekey);
+      socket.off("group:key_rotated", handleKeyRotated);
+      socket.off("group:member_removed", handleMemberRemoved);
+      socket.off("group:member_left", handleMemberLeft);
+      socket.off("group:member_added", handleMemberAdded);
+      socket.off("group:sender_key_received", handleSenderKeyReceived);
     };
-  }, [socket, isConnected, groupId]);
+  }, [socket, isConnected, groupId, performRekey]);
 
   // ── Mark Group Messages as Seen ────────────────────────────────────────────
   useEffect(() => {
@@ -704,21 +1075,85 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       if (!socket || !isConnected) throw new Error("Socket disconnected");
 
       const gKey = groupKeyRef.current;
+      const currentUserId = currentUserIdRef.current;
       let ciphertext: string | null = null;
       let nonce: string | null = null;
+      let senderKeyIteration: number | null = null;
 
-      if (text && gKey) {
-        const enc = await encryptGroupMessage(text, gKey);
-        ciphertext = enc.ciphertext;
-        nonce = enc.nonce;
-      } else if (text && !gKey) {
-        ciphertext = text;
+      if (text && currentUserId) {
+        // 1. Attempt Signal-Grade Group Sender Key Protocol
+        try {
+          let mySK = await getStoredSenderKey(groupId, currentUserId);
+          if (!mySK) {
+            mySK = generateSenderKey(groupId, currentUserId);
+            const membersRes = await groupService.fetchGroupMembers(groupId);
+            const membersList = (membersRes.data as any)?.members || [];
+            const otherMembers = membersList.filter((m: any) => m.userId !== currentUserId);
+
+            if (otherMembers.length > 0) {
+              const myPrivKey = await getUserPrivateKey(currentUserId);
+              if (myPrivKey) {
+                const memberUserIds = otherMembers.map((m: any) => m.userId);
+                const batchMap = await chatService.fetchBatchKeys(memberUserIds);
+                const distributions: any[] = [];
+                for (const m of otherMembers) {
+                  const pubKey = batchMap[m.userId]?.[0]?.publicKey || m.publicKey;
+                  if (pubKey) {
+                    const wrapped = wrapSenderKeyForMember(mySK.chainKey, pubKey, myPrivKey);
+                    distributions.push({
+                      recipientId: m.userId,
+                      encryptedKey: wrapped.encryptedKey,
+                      nonce: wrapped.nonce,
+                      iteration: 0,
+                    });
+                  }
+                }
+                if (distributions.length > 0) {
+                  socket.emit("group:sender_key_distribute", {
+                    groupId,
+                    distributions,
+                  });
+                  await storeSenderKey(groupId, currentUserId, mySK);
+                }
+              }
+            } else {
+              // Creator or solo group
+              await storeSenderKey(groupId, currentUserId, mySK);
+            }
+          }
+
+          if (mySK) {
+            const enc = await encryptWithSenderKey(text, mySK.chainKey, mySK.iteration);
+            ciphertext = enc.ciphertext;
+            nonce = enc.nonce;
+            senderKeyIteration = enc.iteration;
+
+            await storeSenderKey(groupId, currentUserId, {
+              ...mySK,
+              chainKey: enc.nextChainKey,
+              iteration: enc.iteration + 1,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (skErr) {
+          console.warn("[useGroupChat] Sender key encryption failed, falling back to shared group key:", skErr);
+        }
+
+        // 2. Fallback to Phase 3 shared group key if sender key protocol was not used
+        if (!ciphertext && gKey) {
+          const enc = await encryptGroupMessage(text, gKey);
+          ciphertext = enc.ciphertext;
+          nonce = enc.nonce;
+        } else if (!ciphertext && !gKey) {
+          ciphertext = text;
+        }
       }
 
       socket.emit("group:send_message", {
         groupId,
         ciphertext,
         nonce,
+        senderKeyIteration,
         mediaUrl: mediaUrl || null,
         mediaType: mediaType || null,
         replyToId: replyToId || null,
@@ -823,6 +1258,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     createPoll,
     votePoll,
     unsendMessage,
+    rekeyGroup: () => performRekey("manual rotation"),
     getGroupKey: () => groupKeyRef.current,
   };
 };

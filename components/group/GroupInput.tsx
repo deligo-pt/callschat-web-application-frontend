@@ -4,6 +4,7 @@ import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
 import dynamic from "next/dynamic";
+import { toast } from "sonner";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -125,9 +126,17 @@ export function GroupInput({
     }
   };
 
+  const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB max limit
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast.error("File size exceeds the 25MB maximum limit.");
+        if (galleryInputRef.current) galleryInputRef.current.value = "";
+        if (docInputRef.current) docInputRef.current.value = "";
+        return;
+      }
       setSelectedFile(file);
     }
     if (galleryInputRef.current) galleryInputRef.current.value = "";

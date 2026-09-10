@@ -10,16 +10,81 @@ export interface MessagePayload {
 }
 
 export const chatService = {
-  uploadPublicKey: async (deviceId: string, publicKey: string) => {
+  uploadPublicKey: async (deviceId: string, publicKey: string, registrationId?: string) => {
     const response = await apiClient.post('/encryption/keys', {
       deviceId,
-      publicKey
+      publicKey,
+      ...(registrationId ? { registrationId } : {}),
     });
     return response.data;
   },
 
   fetchRecipientKey: async (userId: string) => {
     const response = await apiClient.get(`/encryption/keys/${userId}`);
+    return response.data;
+  },
+
+  fetchBatchKeys: async (userIds: string[]) => {
+    try {
+      const response = await apiClient.post('/encryption/keys/batch', { userIds });
+      return response.data?.data ?? {};
+    } catch {
+      return {};
+    }
+  },
+
+  uploadPreKeys: async (payload: {
+    deviceId: string;
+    signedPreKey?: { keyId: number; publicKey: string; signature: string };
+    oneTimePreKeys?: Array<{ keyId: number; publicKey: string }>;
+  }) => {
+    const response = await apiClient.post('/encryption/prekeys', payload);
+    return response.data;
+  },
+
+  fetchPreKeyBundle: async (userId: string) => {
+    try {
+      const response = await apiClient.get(`/encryption/prekeys/bundle/${userId}`);
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  fetchPreKeyCount: async (deviceId?: string) => {
+    try {
+      const response = await apiClient.get('/encryption/prekeys/count', {
+        params: deviceId ? { deviceId } : {},
+      });
+      return response.data?.count ?? 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  uploadKeyBackup: async (payload: {
+    encryptedVault: string;
+    nonce: string;
+    salt: string;
+    kdfAlgorithm?: string;
+    kdfIterations?: number;
+    version?: number;
+  }) => {
+    const response = await apiClient.post('/encryption/backup', payload);
+    return response.data;
+  },
+
+  fetchKeyBackup: async () => {
+    try {
+      const response = await apiClient.get('/encryption/backup');
+      return response.data?.data ?? null;
+    } catch {
+      return null;
+    }
+  },
+
+  deleteKeyBackup: async () => {
+    const response = await apiClient.delete('/encryption/backup');
     return response.data;
   },
 

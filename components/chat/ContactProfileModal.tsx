@@ -3,7 +3,7 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
-import { Phone, Video, Ban } from "lucide-react";
+import { Phone, Video, Ban, ShieldCheck, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallContext } from "@/components/providers/CallContext";
 import { getOptimizedImageUrl } from "@/utils/image";
@@ -19,6 +19,7 @@ export interface ContactProfileModalProps {
   isBlocked?: boolean;
   isBlockedByMe?: boolean;
   onBlockUser?: () => void;
+  onOpenSecurityCode?: () => void;
 }
 
 export function ContactProfileModal({
@@ -32,6 +33,7 @@ export function ContactProfileModal({
   isBlocked,
   isBlockedByMe,
   onBlockUser,
+  onOpenSecurityCode,
 }: ContactProfileModalProps) {
   const tOptions = useTranslations("options");
   const { initiateCall } = useCallContext();
@@ -102,6 +104,31 @@ export function ContactProfileModal({
 
           {/* Additional Options */}
           <div className="w-full flex flex-col gap-2">
+            {onOpenSecurityCode && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenSecurityCode();
+                }}
+                className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-[#F4F6FC] transition-colors group text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-[#00A884]/15 group-hover:bg-[#00A884]/25 flex items-center justify-center text-[#00A884]">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-800 text-sm block">
+                      Encryption
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      Messages are end-to-end encrypted. Tap to verify.
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            )}
+
             {onBlockUser && (
               <button
                 onClick={() => {
