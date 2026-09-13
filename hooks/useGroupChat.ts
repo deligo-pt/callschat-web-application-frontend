@@ -24,6 +24,8 @@ import {
   storeSenderKey,
   getStoredSenderKey,
   clearSenderKey,
+  storeDecryptedMessage,
+  getDecryptedMessage,
 } from "@/utils/keyStore";
 
 export interface QuotedMessage {
@@ -152,6 +154,15 @@ const resolveGroupQuotedMessage = async (
     text = knownDecryptedMap.get(replyToRaw.id)!;
   }
 
+  if (!text && currentUid) {
+    if (replyToRaw.nonce) {
+      text = (await getDecryptedMessage(currentUid, `nonce_${replyToRaw.nonce}`)) || "";
+    }
+    if (!text) {
+      text = (await getDecryptedMessage(currentUid, replyToRaw.id)) || "";
+    }
+  }
+
   if (!text && replyToRaw.ciphertext && replyToRaw.nonce && gKey) {
     try {
       const dec = await decryptGroupMessage(replyToRaw.ciphertext, replyToRaw.nonce, gKey);
@@ -194,6 +205,11 @@ const resolveUserPublicKey = async (userId: string): Promise<string | null> => {
 export const useGroupChat = (groupId: string, currentUserId: string) => {
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const messagesRef = useRef<GroupMessage[]>([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const [pinnedMessages, setPinnedMessages] = useState<PinnedMessage[]>([]);
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
@@ -208,6 +224,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const isRekeyingRef = useRef<boolean>(false);
   const rekeyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sentPlaintextCacheRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
@@ -416,7 +433,25 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           } catch {}
 
           for (const msg of historyRes.data) {
-            if (msg.ciphertext && msg.nonce && msg.senderKeyIteration != null) {
+            // 1. Self-sent message hydration from memory cache or IndexedDB
+            if (msg.senderId === currentUserId) {
+              const localText =
+                (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+                (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null) ||
+                (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
+                (msg.nonce ? await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`) : null) ||
+                (msg.id ? await getDecryptedMessage(currentUserId, msg.id) : null);
+
+              if (localText) {
+                const parsed = parseEditedText(localText).text;
+                decryptedTextsMap.set(msg.id, parsed);
+                sentPlaintextCacheRef.current.set(msg.id, parsed);
+                continue;
+              }
+            }
+
+            // 2. Incoming messages from other members via Sender Key
+            if (msg.ciphertext && msg.nonce && msg.senderKeyIteration != null && msg.senderId !== currentUserId) {
               const sk = skMap.get(msg.senderId) || (await getStoredSenderKey(groupId, msg.senderId));
               if (sk) {
                 try {
@@ -441,6 +476,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               }
             }
 
+            // 3. Fallback to symmetric group key or unencrypted ciphertext
             if (msg.ciphertext && msg.nonce && currentKey) {
               try {
                 const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, currentKey);
@@ -616,7 +652,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       const senderId = payload.senderId || payload.sender?.id || "unknown";
 
       const knownMap = new Map<string, string>();
-      messages.forEach((m) => {
+      messagesRef.current.forEach((m) => {
         if (m.text) knownMap.set(m.id, m.text);
       });
 
@@ -628,7 +664,33 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
 
       let text = "";
-      if (payload.ciphertext && payload.nonce && payload.senderKeyIteration != null) {
+      const isMyMessage = senderId === currentUserIdRef.current;
+
+      if (isMyMessage) {
+        // Self-sent message: Retrieve directly from in-memory cache or IndexedDB
+        let cached =
+          (payload.nonce ? sentPlaintextCacheRef.current.get(payload.nonce) : null) ||
+          (payload.ciphertext ? sentPlaintextCacheRef.current.get(payload.ciphertext) : null) ||
+          (payload.id ? sentPlaintextCacheRef.current.get(payload.id) : null);
+
+        if (!cached && payload.nonce) {
+          cached = await getDecryptedMessage(currentUserIdRef.current, `nonce_${payload.nonce}`);
+        }
+        if (!cached && payload.id) {
+          cached = await getDecryptedMessage(currentUserIdRef.current, payload.id);
+        }
+
+        if (cached) {
+          text = parseEditedText(cached).text;
+          if (payload.id) {
+            sentPlaintextCacheRef.current.set(payload.id, text);
+            void storeDecryptedMessage(currentUserIdRef.current, payload.id, text);
+          }
+        }
+      }
+
+      // If not sender's message (or if not resolved from cache), proceed with sender key decryption
+      if (!text && payload.ciphertext && payload.nonce && payload.senderKeyIteration != null && !isMyMessage) {
         try {
           let sk = await getStoredSenderKey(groupId, senderId);
           if (!sk) {
@@ -712,6 +774,20 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
       setMessages((prev) => {
         if (prev.some((m) => m.id === newMsg.id)) return prev;
+
+        if (isMyMessage) {
+          const optIdx = prev.findIndex(
+            (m) =>
+              m.id.startsWith("optimistic-") &&
+              (m.text === text || (payload.mediaUrl && m.mediaUrl === payload.mediaUrl))
+          );
+          if (optIdx !== -1) {
+            const next = [...prev];
+            next[optIdx] = newMsg;
+            return next;
+          }
+        }
+
         return [...prev, newMsg];
       });
 
@@ -1080,6 +1156,43 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       let nonce: string | null = null;
       let senderKeyIteration: number | null = null;
 
+      // Optimistic message setup
+      const optimisticId = `optimistic-${Date.now()}`;
+      if (text && currentUserId) {
+        sentPlaintextCacheRef.current.set(optimisticId, text);
+        void storeDecryptedMessage(currentUserId, optimisticId, text);
+      }
+
+      let optimisticReplyTo: QuotedMessage | null = null;
+      if (replyToId) {
+        const quoted = messagesRef.current.find((m) => m.id === replyToId);
+        if (quoted) {
+          optimisticReplyTo = {
+            id: quoted.id,
+            senderId: quoted.senderId,
+            senderName: quoted.senderId === currentUserId ? "You" : (quoted.sender?.profile?.displayName || "Member"),
+            text: quoted.text,
+            mediaUrl: quoted.mediaUrl || null,
+            mediaType: quoted.mediaType || null,
+          };
+        }
+      }
+
+      const optimisticMsg: GroupMessage = {
+        id: optimisticId,
+        groupId,
+        senderId: currentUserId,
+        text: text || "",
+        createdAt: new Date().toISOString(),
+        mediaUrl: mediaUrl || undefined,
+        mediaType: mediaType || undefined,
+        replyToId: replyToId || null,
+        replyTo: optimisticReplyTo,
+        receipts: [],
+        reactions: [],
+      };
+      setMessages((prev) => [...prev, optimisticMsg]);
+
       if (text && currentUserId) {
         // 1. Attempt Signal-Grade Group Sender Key Protocol
         try {
@@ -1146,6 +1259,15 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           nonce = enc.nonce;
         } else if (!ciphertext && !gKey) {
           ciphertext = text;
+        }
+
+        // Register ciphertext and nonce directly into sent message cache and IndexedDB
+        if (nonce) {
+          sentPlaintextCacheRef.current.set(nonce, text);
+          void storeDecryptedMessage(currentUserId, `nonce_${nonce}`, text);
+        }
+        if (ciphertext) {
+          sentPlaintextCacheRef.current.set(ciphertext, text);
         }
       }
 
