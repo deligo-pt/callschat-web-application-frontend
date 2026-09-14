@@ -108,7 +108,7 @@ export const useGlobalNotifications = (
 
       // 2. Real-time Decryption
       const decryptedText = await decrypt1v1Notification(
-        payload,
+        { id: payload.id, ...payload },
         currentUserIdRef.current || ""
       );
 

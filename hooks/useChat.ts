@@ -631,6 +631,64 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         return;
       }
 
+      // ── FAST PATH: IndexedDB persistent cache ──────────────────────────────
+      // If this message was already decrypted in this session (or a previous
+      // one), resolve it instantly without any async crypto or network calls.
+      // This eliminates the "Waiting…" flash for every cached message.
+      if (payload.id || payload.nonce) {
+        const myId = currentUserIdRef.current;
+        let cached: string | null = null;
+        if (payload.id) {
+          cached = await getDecryptedMessage(myId, payload.id);
+        }
+        if (!cached && payload.nonce) {
+          cached = await getDecryptedMessage(myId, `nonce_${payload.nonce}`);
+        }
+        if (cached) {
+          const parsed = parseEditedText(cached);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === payload.id)) return prev;
+            const optimisticIdx = prev.map((m) => m.id).lastIndexOf(
+              prev.slice().reverse().find((m) => m.id.startsWith("optimistic-"))?.id ?? ""
+            );
+            if (optimisticIdx !== -1) {
+              const updated = [...prev];
+              const existingOpt = prev[optimisticIdx];
+              updated[optimisticIdx] = {
+                ...existingOpt,
+                id: payload.id,
+                text: parsed.text,
+                isEdited: parsed.isEdited,
+                isDecryptionPending: false,
+                createdAt: payload.createdAt || existingOpt.createdAt,
+                receipts: payload.receipts || existingOpt.receipts || [],
+              };
+              return updated;
+            }
+            const senderId = payload.senderId || payload.sender?.id;
+            return [
+              ...prev,
+              {
+                id: payload.id || Date.now().toString(),
+                conversationId: payload.conversationId,
+                senderId,
+                text: parsed.text,
+                isEdited: parsed.isEdited,
+                isDecryptionPending: false,
+                createdAt: payload.createdAt || new Date().toISOString(),
+                mediaUrl: payload.mediaUrl,
+                mediaType: payload.mediaType,
+                disappearAfterSeconds: payload.disappearAfterSeconds,
+                receipts: payload.receipts || [],
+                replyToId: payload.replyToId ?? null,
+                replyTo: null,
+              },
+            ];
+          });
+          return; // skip all crypto
+        }
+      }
+
       const currentUser = currentUserIdRef.current;
       const peerUser = activePeerIdRef.current;
       const senderId = payload.senderId || payload.sender?.id;
