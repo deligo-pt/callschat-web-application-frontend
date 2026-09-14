@@ -284,8 +284,12 @@ export default function GroupChatPage() {
         const pubKey = await generateAndStoreKeyPair(currentUserId);
         myPrivKey = await getUserPrivateKey(currentUserId);
         if (pubKey) {
+          const existingRegId = localStorage.getItem("registrationId") || undefined;
           try {
-            await chatService.uploadPublicKey(`web-${currentUserId}`, pubKey);
+            const res = await chatService.uploadPublicKey(`web-${currentUserId}`, pubKey, existingRegId);
+            if (res?.registrationId) {
+              localStorage.setItem("registrationId", res.registrationId);
+            }
           } catch (e) {
             console.warn("Failed to upload public key", e);
           }

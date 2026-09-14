@@ -189,6 +189,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const myPrivateKeyRef = useRef<string | null>(null);
   const myPublicKeyRef = useRef<string | null>(null);
   const recipientPublicKeyRef = useRef<string | null>(null);
+  const recipientRegistrationIdRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
   const activePeerIdRef = useRef<string>(activePeerId);
   const isBizChatRef = useRef<boolean>(isBizChat);
@@ -1212,11 +1213,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
       if (err?.code === 'STALE_KEY') {
         const latestKey = err?.context?.latestPublicKey;
+        const latestRegId = err?.context?.latestRegistrationId;
         if (latestKey) {
           recipientPublicKeyRef.current = latestKey;
+          setRecipientPublicKey(latestKey);
           console.log("🔄 [Socket] Updated recipient key from STALE_KEY event:", latestKey);
         }
-        toast.error("Recipient's security key has changed. Key updated, please retry.");
+        if (latestRegId) {
+          recipientRegistrationIdRef.current = latestRegId;
+          console.log("🔄 [Socket] Updated recipient registrationId from STALE_KEY event:", latestRegId);
+        }
+        // Purge any cached peer keys from session storage
+        if (activePeerIdRef.current) {
+          try {
+            sessionStorage.removeItem(`peer_bundle_${activePeerIdRef.current}`);
+            sessionStorage.removeItem(`peer_keys_${activePeerIdRef.current}`);
+          } catch {}
+        }
+        toast.error("Recipient's security key has changed. Peer keys updated, please retry.");
         return;
       }
 
@@ -1238,6 +1252,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       if (activePeerIdRef.current === payload.userId) {
         const previousKey = recipientPublicKeyRef.current;
         recipientPublicKeyRef.current = payload.publicKey;
+        setRecipientPublicKey(payload.publicKey);
+        if (payload.registrationId) {
+          recipientRegistrationIdRef.current = payload.registrationId;
+        }
 
         // If the public key rotated/changed, alert user of safety number update
         if (previousKey && previousKey !== payload.publicKey) {
@@ -1907,7 +1925,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               );
 
               if (recipientDevices.length > 0 && activeMyPriv) {
-                recipientRegId = recipientDevices[0]?.registrationId || null;
+                // If a specific registration ID was received from peer update/stale check, prioritize it
+                const matchedDevice = recipientRegistrationIdRef.current
+                  ? recipientDevices.find((d: any) => d.registrationId === recipientRegistrationIdRef.current)
+                  : null;
+                recipientRegId = matchedDevice?.registrationId || recipientRegistrationIdRef.current || recipientDevices[0]?.registrationId || null;
                 const multiEnc = await encryptMultiDeviceMessage(
                   text,
                   recipientDevices,

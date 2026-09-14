@@ -75,8 +75,9 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     socketInstance.on("disconnect", (reason) => {
       console.warn("[Socket] Disconnected:", reason);
       setIsConnected(false);
-      // If server forcibly disconnected or auth failed, try connecting again
-      if (reason === "io server disconnect") {
+      // Only attempt reconnect if auth token still exists in storage
+      const tokenExists = typeof window !== "undefined" && !!localStorage.getItem("accessToken");
+      if (reason === "io server disconnect" && tokenExists) {
         socketInstance.connect();
       }
     });
@@ -86,6 +87,23 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       // Ensure the latest token is present for the next attempt
       const latestToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       socketInstance.auth = { token: latestToken };
+    });
+
+    // Handle real-time eviction when user logs in on another browser or device
+    socketInstance.on("session:revoked", (data: { sessionId?: string; reason?: string; message?: string }) => {
+      console.warn("[Socket] Session revoked by server:", data);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("currentMode");
+        sessionStorage.removeItem("auth_account_mode");
+        // Forcibly close socket to prevent reconnection loops
+        socketInstance.disconnect();
+        const reasonMsg = encodeURIComponent(
+          data?.message || "You have been logged out because CallsChat Web was opened in another browser or window."
+        );
+        window.location.href = `/login?reason=session_revoked&message=${reasonMsg}`;
+      }
     });
 
     // Backend emits this on successful auth
