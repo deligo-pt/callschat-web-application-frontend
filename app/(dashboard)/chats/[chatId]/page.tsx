@@ -355,20 +355,26 @@ function ChatRoomPageContent() {
           const baseUrl =
             process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
           const token = localStorage.getItem("accessToken");
-          const contactsRes = await fetch(`${baseUrl}/contacts`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const contactsData = await contactsRes.json();
+          let match = null;
+          try {
+            const contactsRes = await fetch(`${baseUrl}/contacts`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (contactsRes.ok) {
+              const contactsData = await contactsRes.json();
+              const usersArray =
+                contactsData.data?.contacts ||
+                (Array.isArray(contactsData.data) ? contactsData.data : []) ||
+                (Array.isArray(contactsData) ? contactsData : []);
 
-          const usersArray =
-            contactsData.data?.contacts ||
-            (Array.isArray(contactsData.data) ? contactsData.data : []) ||
-            (Array.isArray(contactsData) ? contactsData : []);
-
-          const match = usersArray.find(
-            (u: any) =>
-              (u.addressee?.id || u.contact?.id || u.id) === finalRecipientId,
-          );
+              match = usersArray.find(
+                (u: any) =>
+                  (u.addressee?.id || u.contact?.id || u.id) === finalRecipientId,
+              );
+            }
+          } catch (contactsErr) {
+            console.warn("Could not fetch contacts for chat recipient info:", contactsErr);
+          }
 
           setIsRecipientInContacts(!!match);
 
@@ -396,8 +402,8 @@ function ChatRoomPageContent() {
           } else {
             setRecipient({
               id: finalRecipientId,
-              name: "Unknown User",
-              avatarUrl: `https://ui-avatars.com/api/?name=U&background=F4F6FC&color=3B58F5`,
+              name: "Chat",
+              avatarUrl: `https://ui-avatars.com/api/?name=C&background=F4F6FC&color=3B58F5`,
               isOnline: false,
             });
           }
