@@ -257,9 +257,13 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           localPubKey = await generateAndStoreKeyPair(currentUserId);
           localPrivKey = await getUserPrivateKey(currentUserId);
           const deviceId = `web-${currentUserId}`;
+          const existingRegId = localStorage.getItem("registrationId") || undefined;
           try {
             if (localPubKey) {
-              await chatService.uploadPublicKey(deviceId, localPubKey);
+              const res = await chatService.uploadPublicKey(deviceId, localPubKey, existingRegId);
+              if (res?.registrationId) {
+                localStorage.setItem("registrationId", res.registrationId);
+              }
             }
           } catch (e) {
             console.warn("Failed to upload public key during group setup", e);

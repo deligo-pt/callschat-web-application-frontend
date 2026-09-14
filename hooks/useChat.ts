@@ -189,6 +189,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const myPrivateKeyRef = useRef<string | null>(null);
   const myPublicKeyRef = useRef<string | null>(null);
   const recipientPublicKeyRef = useRef<string | null>(null);
+  const recipientRegistrationIdRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
   const activePeerIdRef = useRef<string>(activePeerId);
   const isBizChatRef = useRef<boolean>(isBizChat);
@@ -363,16 +364,23 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     void storeDecryptedMessage(currentUserId, msg.id, t);
                   } else if (encKeys?.selfEncryptedSessionKey && activeMyPubKey && activeMyPrivKey) {
                     try {
-                      const decKeyB64 = await decryptMessage(
+                      const decRaw = await decryptMessage(
                         encKeys.selfEncryptedSessionKey.ciphertext,
                         encKeys.selfEncryptedSessionKey.nonce,
                         activeMyPubKey,
                         activeMyPrivKey
                       );
-                      if (decKeyB64) {
-                        const sessionKey = base64ToBytes(decKeyB64);
-                        const dec = await decryptWithSessionKey(msg.ciphertext, msg.nonce, sessionKey);
-                        const t = parseEditedText(dec).text;
+                      if (decRaw) {
+                        let t: string;
+                        if (encKeys.selfEncryptedSessionKey.type === 'plaintext') {
+                          // Multi-device path: decRaw IS the plaintext
+                          t = parseEditedText(decRaw).text;
+                        } else {
+                          // X3DH path: decRaw is a base64 session key, decrypt message body
+                          const sessionKey = base64ToBytes(decRaw);
+                          const dec = await decryptWithSessionKey(msg.ciphertext, msg.nonce, sessionKey);
+                          t = parseEditedText(dec).text;
+                        }
                         decryptedTextsMap.set(msg.id, t);
                         sentPlaintextCacheRef.current.set(msg.id, t);
                         if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
@@ -752,15 +760,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             const activeMyPrivKey = privKey || myPrivateKeyRef.current;
             if (!decryptedRealtime && encKeys?.selfEncryptedSessionKey && activeMyPrivKey && activeMyPubKey) {
               try {
-                const decKeyB64 = await decryptMessage(
+                const decRaw = await decryptMessage(
                   encKeys.selfEncryptedSessionKey.ciphertext,
                   encKeys.selfEncryptedSessionKey.nonce,
                   activeMyPubKey,
                   activeMyPrivKey
                 );
-                if (decKeyB64) {
-                  const sessionKey = base64ToBytes(decKeyB64);
-                  text = await decryptWithSessionKey(payload.ciphertext, payload.nonce, sessionKey);
+                if (decRaw) {
+                  if (encKeys.selfEncryptedSessionKey.type === 'plaintext') {
+                    // Multi-device path: decRaw IS the plaintext
+                    text = parseEditedText(decRaw).text;
+                  } else {
+                    // X3DH path: decRaw is a base64 session key, decrypt message body
+                    const sessionKey = base64ToBytes(decRaw);
+                    text = await decryptWithSessionKey(payload.ciphertext, payload.nonce, sessionKey);
+                  }
                   decryptedRealtime = true;
                 }
               } catch {}
@@ -1212,11 +1226,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
       if (err?.code === 'STALE_KEY') {
         const latestKey = err?.context?.latestPublicKey;
+        const latestRegId = err?.context?.latestRegistrationId;
         if (latestKey) {
           recipientPublicKeyRef.current = latestKey;
+          setRecipientPublicKey(latestKey);
           console.log("🔄 [Socket] Updated recipient key from STALE_KEY event:", latestKey);
         }
-        toast.error("Recipient's security key has changed. Key updated, please retry.");
+        if (latestRegId) {
+          recipientRegistrationIdRef.current = latestRegId;
+          console.log("🔄 [Socket] Updated recipient registrationId from STALE_KEY event:", latestRegId);
+        }
+        // Purge any cached peer keys from session storage
+        if (activePeerIdRef.current) {
+          try {
+            sessionStorage.removeItem(`peer_bundle_${activePeerIdRef.current}`);
+            sessionStorage.removeItem(`peer_keys_${activePeerIdRef.current}`);
+          } catch {}
+        }
+        toast.error("Recipient's security key has changed. Peer keys updated, please retry.");
         return;
       }
 
@@ -1238,6 +1265,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       if (activePeerIdRef.current === payload.userId) {
         const previousKey = recipientPublicKeyRef.current;
         recipientPublicKeyRef.current = payload.publicKey;
+        setRecipientPublicKey(payload.publicKey);
+        if (payload.registrationId) {
+          recipientRegistrationIdRef.current = payload.registrationId;
+        }
 
         // If the public key rotated/changed, alert user of safety number update
         if (previousKey && previousKey !== payload.publicKey) {
@@ -1902,12 +1933,18 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               const recipientDevices = (batchKeys[activePeerId] || []).filter(
                 (d: any) => d.deviceId && d.publicKey
               );
+              // Include current device too so this browser (on reload) and new browsers
+              // (via selfEncryptedSessionKey) can always recover the message key.
               const myOtherDevices = (batchKeys[currentUserId] || []).filter(
-                (d: any) => d.deviceId && d.publicKey && d.deviceId !== myDeviceId
+                (d: any) => d.deviceId && d.publicKey
               );
 
               if (recipientDevices.length > 0 && activeMyPriv) {
-                recipientRegId = recipientDevices[0]?.registrationId || null;
+                // If a specific registration ID was received from peer update/stale check, prioritize it
+                const matchedDevice = recipientRegistrationIdRef.current
+                  ? recipientDevices.find((d: any) => d.registrationId === recipientRegistrationIdRef.current)
+                  : null;
+                recipientRegId = matchedDevice?.registrationId || recipientRegistrationIdRef.current || recipientDevices[0]?.registrationId || null;
                 const multiEnc = await encryptMultiDeviceMessage(
                   text,
                   recipientDevices,
@@ -1922,6 +1959,27 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   recipientRegistrationId: recipientRegId,
                   senderRegistrationId: myRegId,
                 };
+                // Self-encrypt the plaintext so the sender can decrypt their own sent
+                // messages on any new device/browser (new private key, empty IndexedDB).
+                let selfEncryptedSessionKey = null;
+                try {
+                  if (activeMyPub && activeMyPriv) {
+                    const selfEnc = await encryptMessage(text, activeMyPub, activeMyPriv);
+                    selfEncryptedSessionKey = {
+                      ciphertext: selfEnc.ciphertext,
+                      nonce: selfEnc.nonce,
+                      // 'plaintext' distinguishes this from the X3DH session-key variant
+                      type: 'plaintext',
+                    };
+                  }
+                } catch (selfEncErr) {
+                  console.warn("[useChat] Could not self-encrypt plaintext for sender history recovery:", selfEncErr);
+                }
+                encryptedKeysPayload = {
+                  ...encryptedKeysPayload,
+                  selfEncryptedSessionKey,
+                };
+
                 multiDeviceDone = true;
                 console.log(
                   `⚡ [useChat] Successfully initiated Multi-Device Fan-Out across ${Object.keys(multiEnc.devices).length} devices!`
