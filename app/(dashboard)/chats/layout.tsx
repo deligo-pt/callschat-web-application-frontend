@@ -12,7 +12,7 @@ import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { decryptMessage } from "@/utils/crypto";
-import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
+import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage } from "@/utils/keyStore";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { motion } from "framer-motion";
 import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles } from "lucide-react";
@@ -219,6 +219,71 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         const [moved] = updated.splice(idx, 1);
         return [moved, ...updated];
       });
+
+      // ── Inline realtime preview decryption ──────────────────────────────
+      // Immediately decrypt the incoming message text so the sidebar preview
+      // never shows "🔒 Encrypted message" — exactly like WhatsApp Web.
+      if (!payload.mediaType && payload.ciphertext) {
+        (async () => {
+          const myId = currentUserIdRef.current;
+          if (!myId) return;
+          const msgId = payload.id;
+          const msgNonce = payload.nonce;
+
+          // 1. Check IndexedDB persistent cache first (instant — no crypto)
+          let plain: string | null = null;
+          if (msgId) plain = await getDecryptedMessage(myId, msgId);
+          if (!plain && msgNonce) plain = await getDecryptedMessage(myId, `nonce_${msgNonce}`);
+
+          // 2. Use previewText if the sender attached one (fast fallback)
+          if (!plain && payload.previewText) plain = payload.previewText;
+
+          // 3. Full pairwise decryption (online, uses fetched peer key)
+          if (!plain && msgNonce) {
+            try {
+              const myPrivKey = await getUserPrivateKey(myId);
+              const myPubKey = await getUserPublicKey(myId);
+              if (myPrivKey) {
+                const senderId = payload.senderId || payload.sender?.id;
+                const targetUserId =
+                  senderId === myId ? null : senderId;
+                if (targetUserId) {
+                  const res = await chatService.fetchRecipientKey(targetUserId);
+                  let peerKeys: string[] = [];
+                  if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+                    peerKeys = res.data.map((d: { publicKey: string }) => d.publicKey).reverse();
+                  } else if (res?.success && res?.data?.publicKey) {
+                    peerKeys = [res.data.publicKey];
+                  }
+                  for (const k of peerKeys) {
+                    try {
+                      plain = await decryptMessage(payload.ciphertext, msgNonce, k, myPrivKey);
+                      if (plain) break;
+                    } catch {}
+                  }
+                  // Own-key fallback (key rotation recovery)
+                  if (!plain && myPubKey) {
+                    try {
+                      plain = await decryptMessage(payload.ciphertext, msgNonce, myPubKey, myPrivKey);
+                    } catch {}
+                  }
+                }
+              }
+            } catch {}
+          }
+
+          // 4. Persist to IndexedDB and update preview state
+          if (plain) {
+            if (msgId) void storeDecryptedMessage(myId, msgId, plain);
+            if (msgNonce) void storeDecryptedMessage(myId, `nonce_${msgNonce}`, plain);
+            setDecryptedPreviews((prev) => ({
+              ...prev,
+              ...(msgId ? { [msgId]: plain! } : {}),
+              [convId]: plain!,
+            }));
+          }
+        })();
+      }
     };
 
     const handleConversationSeen = (payload: any) => {
@@ -519,6 +584,17 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         if (!msg.ciphertext) continue;
 
         try {
+          // ── IndexedDB fast path: already decrypted in this or a prior session ──
+          let cachedText: string | null = null;
+          if (msg.id) cachedText = await getDecryptedMessage(currentUserId, msg.id);
+          if (!cachedText && msg.nonce) cachedText = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
+          if (cachedText) {
+            newPreviews[msg.id] = cachedText;
+            newPreviews[conv.id] = cachedText;
+            hasChanges = true;
+            continue; // skip network key fetch
+          }
+
           const targetUserId = msg.senderId === currentUserId ? conv.otherUserId : msg.senderId;
           if (!targetUserId) continue;
 
@@ -538,6 +614,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
           if (pubKeyToUse) {
             const text = await decryptMessage(msg.ciphertext, msg.nonce!, pubKeyToUse, myPrivateKey);
+            // Persist so next render is instant
+            void storeDecryptedMessage(currentUserId, msg.id, text);
+            if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, text);
             newPreviews[msg.id] = text;
             newPreviews[conv.id] = text;
             hasChanges = true;

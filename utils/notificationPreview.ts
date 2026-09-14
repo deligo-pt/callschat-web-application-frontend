@@ -1,5 +1,5 @@
 import { decryptMessage, decryptGroupMessage } from "@/utils/crypto";
-import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
+import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage } from "@/utils/keyStore";
 import { chatService } from "@/services/chat.service";
 import { groupService } from "@/services/group.service";
 
@@ -68,6 +68,7 @@ async function getPeerPublicKeys(peerUserId: string): Promise<string[]> {
  */
 export async function decrypt1v1Notification(
   payload: {
+    id?: string;               // message ID — used for IndexedDB cache lookup
     senderId?: string;
     ciphertext?: string | null;
     nonce?: string | null;
@@ -76,6 +77,20 @@ export async function decrypt1v1Notification(
   },
   currentUserId: string
 ): Promise<string> {
+  // ── IndexedDB persistent cache (instant — zero crypto) ──────────────────
+  // Check before any other path so already-decrypted messages are returned
+  // immediately without doing a network round-trip for keys.
+  if (currentUserId) {
+    if (payload.id) {
+      const cached = await getDecryptedMessage(currentUserId, payload.id);
+      if (cached) return cleanMessageText(cached);
+    }
+    if (payload.nonce) {
+      const cached = await getDecryptedMessage(currentUserId, `nonce_${payload.nonce}`);
+      if (cached) return cleanMessageText(cached);
+    }
+  }
+
   // If previewText was sent explicitly and ciphertext is empty
   if (!payload.ciphertext && payload.previewText) {
     return payload.previewText;
