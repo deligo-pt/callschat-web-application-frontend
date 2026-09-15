@@ -742,8 +742,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             if (targetUserId) {
               const res = await chatService.fetchRecipientKey(targetUserId);
               if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                // Keys ordered asc by createdAt — reverse so newest is tried first
-                const fetchedKeys = res.data.map((d: { publicKey: string }) => d.publicKey).reverse();
+                // Backend returns keys ordered desc by updatedAt (newest first)
+                const fetchedKeys = res.data.map((d: { publicKey: string }) => d.publicKey);
                 // Merge without duplicates
                 for (const k of fetchedKeys) {
                   if (!allPeerKeys.includes(k)) allPeerKeys.push(k);
@@ -867,7 +867,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
             // 5. If self-message was sent from another device of mine, decrypt via Multi-Device envelope
             if (!decryptedRealtime && encKeys?.devices && privKey) {
-              const myDeviceId = localStorage.getItem("deviceId");
+              const myDeviceId = localStorage.getItem("deviceId") || (currentUser ? `web-${currentUser}` : null);
               const keysToTry = activeMyPubKey ? [activeMyPubKey, ...allPeerKeys] : allPeerKeys;
               for (const senderKey of keysToTry) {
                 try {
@@ -890,7 +890,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           } else {
             // Message sent by peer: Multi-Device, X3DH receiver, or pairwise fallback
             if (!decryptedRealtime && encKeys?.devices && privKey) {
-              const myDeviceId = localStorage.getItem("deviceId");
+              const myDeviceId = localStorage.getItem("deviceId") || (currentUser ? `web-${currentUser}` : null);
               for (const senderIdentityKey of allPeerKeys) {
                 try {
                   const dec = await decryptMultiDeviceMessage(
@@ -1541,7 +1541,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       try {
         const res = await chatService.fetchRecipientKey(payload.senderId);
         if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          const fetched = res.data.map((d: { publicKey: string }) => d.publicKey).reverse();
+          const fetched = res.data.map((d: { publicKey: string }) => d.publicKey);
           for (const k of fetched) {
             if (!senderKeys.includes(k)) senderKeys.push(k);
           }
