@@ -21,6 +21,16 @@ export interface GroupItem {
   addMembersScope?: 'ALL_MEMBERS' | 'ONLY_ADMINS';
   joinApprovalMode?: 'DIRECT' | 'APPROVAL_REQUIRED';
   disappearAfterSeconds?: number | null;
+  lastMessage?: {
+    id: string;
+    senderId: string;
+    senderName?: string | null;
+    ciphertext: string | null;
+    nonce: string | null;
+    mediaType: string | null;
+    mediaUrl?: string | null;
+    createdAt: string;
+  } | null;
 }
 
 export const groupService = {

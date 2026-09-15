@@ -20,6 +20,8 @@ import {
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
+import { groupService } from "@/services/group.service";
+import { GroupChatView } from "@/components/group/GroupChatView";
 import { CustomerService } from "@/services/customer-support.service";
 import { ContactService } from "@/services/contact.service";
 import { useCallContext } from "@/components/providers/CallContext";
@@ -175,10 +177,44 @@ function BusinessChatHeader({
 // Chat Room Page
 // ---------------------------------------------------------------------------
 
+function ChatRouter() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const conversationId = params?.chatId as string;
+  const pathname = usePathname();
+  const basePath = pathname?.startsWith("/business") ? "/business/chats" : "/chats";
+  const typeParam = searchParams.get("type");
+  const recipientIdFromQuery = searchParams.get("recipientId");
+  const bizHandle = searchParams.get("bizHandle");
+
+  const [isGroup, setIsGroup] = useState<boolean>(() => typeParam === "group");
+
+  useEffect(() => {
+    if (typeParam === "group") {
+      setIsGroup(true);
+      return;
+    }
+    // Auto-detect if this ID belongs to a group when recipientId and bizHandle are absent
+    if (!recipientIdFromQuery && !bizHandle && conversationId) {
+      groupService.fetchGroupDetails(conversationId).then((res) => {
+        if (res?.success && res?.data) {
+          setIsGroup(true);
+        }
+      }).catch(() => {});
+    }
+  }, [conversationId, recipientIdFromQuery, bizHandle, typeParam]);
+
+  if (isGroup) {
+    return <GroupChatView groupId={conversationId} backUrl={basePath} />;
+  }
+
+  return <ChatRoomPageContent />;
+}
+
 export default function ChatRoomPage() {
   return (
     <React.Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-[#F8FAFC]"><Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" /></div>}>
-      <ChatRoomPageContent />
+      <ChatRouter />
     </React.Suspense>
   );
 }
