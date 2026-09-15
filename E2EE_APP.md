@@ -186,7 +186,7 @@ export interface WebQrSession {
 
 export function generateWebQrPayload(qrToken: string): WebQrSession {
   // Generate 32-byte X25519 private key for Web ephemeral session
-  const webEphPriv = x25519.utils.randomPrivateKey();
+  const webEphPriv = x25519.utils.randomSecretKey();
   const webEphPub = x25519.getPublicKey(webEphPriv);
   const webEphPubBase64 = bytesToBase64(webEphPub);
 

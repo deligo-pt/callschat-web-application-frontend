@@ -349,6 +349,17 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   } catch {}
                 }
 
+                // ── HISTORY SENDER KEY PRIORITY FIX ──────────────────────────
+                // Prepend the sender's embedded public key so historical messages
+                // encrypted with an older key are decryptable even after rotation.
+                let effectivePeerKeys = peerKeys;
+                if (encKeys?.senderPublicKey && typeof encKeys.senderPublicKey === 'string') {
+                  effectivePeerKeys = [
+                    encKeys.senderPublicKey,
+                    ...peerKeys.filter(k => k !== encKeys.senderPublicKey),
+                  ];
+                }
+
                 const activeMyPubKey = myPublicKeyRef.current || myPublicKey;
                 const activeMyPrivKey = myPrivateKeyRef.current || myPrivateKey;
 
@@ -390,7 +401,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     } catch {}
                   } else if (encKeys?.devices && myPrivateKey) {
                     const myDeviceId = localStorage.getItem("deviceId");
-                    const keysToTry = activeMyPubKey ? [activeMyPubKey, ...peerKeys] : peerKeys;
+                    // Use effectivePeerKeys (senderPublicKey first) for the sender-side multi-device case
+                    const keysToTry = activeMyPubKey ? [activeMyPubKey, ...effectivePeerKeys] : effectivePeerKeys;
                     for (const candidateKey of keysToTry) {
                       try {
                         const dec = await decryptMultiDeviceMessage(
@@ -410,11 +422,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                           if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
                           break;
                         }
-                      } catch {}
+                      } catch { console.debug('[E2EE] history self-device multi-device unwrap failed for key:', (candidateKey || '').slice(0, 8) + '…'); }
                     }
-                  } else if (peerKeys.length > 0) {
-                    // Legacy pairwise fallback
-                    for (const candidateKey of peerKeys) {
+                  } else if (effectivePeerKeys.length > 0) {
+                    // Legacy pairwise fallback — use effectivePeerKeys (senderPublicKey first)
+                    for (const candidateKey of effectivePeerKeys) {
                       try {
                         const dec = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKey);
                         const t = parseEditedText(dec).text;
@@ -424,14 +436,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                         void storeDecryptedMessage(currentUserId, msg.id, t);
                         if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
                         break;
-                      } catch {}
+                      } catch { console.debug('[E2EE] history pairwise fallback failed for key:', (candidateKey || '').slice(0, 8) + '…'); }
                     }
                   }
                 } else {
                   // Message sent by peer: Multi-Device, X3DH receiver, or pairwise fallback
-                  if (encKeys?.devices && myPrivateKey && peerKeys.length > 0) {
+                  if (encKeys?.devices && myPrivateKey && effectivePeerKeys.length > 0) {
                     const myDeviceId = localStorage.getItem("deviceId");
-                    for (const senderKey of peerKeys) {
+                    for (const senderKey of effectivePeerKeys) {
                       try {
                         const dec = await decryptMultiDeviceMessage(
                           msg.ciphertext,
@@ -450,7 +462,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                           if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
                           break;
                         }
-                      } catch {}
+                      } catch { console.debug('[E2EE] history peer multi-device unwrap failed for senderKey:', (senderKey || '').slice(0, 8) + '…'); }
                     }
                   }
 
@@ -461,7 +473,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                         ? await getPreKeyPrivate(currentUserId, encKeys.oneTimePreKeyId)
                         : null;
                       if (spkPriv) {
-                        for (const senderKey of peerKeys) {
+                        // Use effectivePeerKeys (embedded senderPublicKey first) for X3DH
+                        for (const senderKey of effectivePeerKeys) {
                           try {
                             const sessionKey = await performX3DHReceiver(
                               myPrivateKey,
@@ -482,9 +495,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     } catch {}
                   }
 
-                  // Pairwise fallback if not decrypted by X3DH
-                  if (!decryptedTextsMap.has(msg.id) && peerKeys.length > 0) {
-                    for (const candidateKey of peerKeys) {
+                  // Pairwise fallback if not decrypted by X3DH — use effectivePeerKeys
+                  if (!decryptedTextsMap.has(msg.id) && effectivePeerKeys.length > 0) {
+                    for (const candidateKey of effectivePeerKeys) {
                       try {
                         const dec = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKey);
                         const t = parseEditedText(dec).text;
@@ -492,7 +505,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                         sentPlaintextCacheRef.current.set(msg.id, t);
                         void storeDecryptedMessage(currentUserId, msg.id, t);
                         break;
-                      } catch {}
+                      } catch { console.debug('[E2EE] history X3DH pairwise fallback failed for key:', (candidateKey || '').slice(0, 8) + '…'); }
                     }
                   }
                 }
@@ -768,6 +781,20 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             } catch {}
           }
 
+          // ── KEY PRIORITY FIX ────────────────────────────────────────────────
+          // If the sender embedded their public key in encryptedKeys, prepend it
+          // to allPeerKeys so it is tried FIRST in every decryption path.
+          // This guarantees we always use the exact key that was used to encrypt
+          // the message, regardless of any subsequent key rotations by the sender.
+          if (encKeys?.senderPublicKey && typeof encKeys.senderPublicKey === 'string') {
+            if (!allPeerKeys.includes(encKeys.senderPublicKey)) {
+              allPeerKeys.unshift(encKeys.senderPublicKey);
+            } else {
+              // Move it to front so it's tried first
+              allPeerKeys = [encKeys.senderPublicKey, ...allPeerKeys.filter(k => k !== encKeys.senderPublicKey)];
+            }
+          }
+
           if (isMyMessage) {
             // 1. Recover our own sent message from local memory cache
             if (payload.id && sentPlaintextCacheRef.current.has(payload.id)) {
@@ -879,7 +906,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     decryptedRealtime = true;
                     break;
                   }
-                } catch {}
+                } catch (e) {
+                  console.debug('[E2EE] Multi-device unwrap failed for senderKey:', (senderIdentityKey || '').slice(0, 8) + '…');
+                }
               }
             }
 
@@ -1447,6 +1476,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           null;
 
         // 3. Fulfill retry silently
+        const activeMyPubForRetry = myPublicKeyRef.current || myPublicKey;
         socket.emit("e2ee:retry_fulfill", {
           retryId: payload.retryId,
           messageId: payload.messageId,
@@ -1456,6 +1486,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             ciphertext: encrypted.ciphertext,
             nonce: encrypted.nonce,
             recipientRegistrationId: payload.receiverRegistrationId,
+            // Embed sender public key so receiver can identify the exact key used
+            senderPublicKey: activeMyPubForRetry || null,
           },
           senderRegistrationId: myRegId,
         });
@@ -1488,11 +1520,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       const { ciphertext, nonce } = payload.encryptedKeys || {};
       if (!ciphertext || !nonce) return;
 
-      // Fetch sender public key(s)
+      // ── RETRY FULFILL KEY RESOLUTION ─────────────────────────────────────────
+      // Priority: 1) embedded senderPublicKey (exact key used at re-encrypt time)
+      //           2) cached recipientPublicKey
+      //           3) all keys from live API fetch
       let senderKeys: string[] = [];
-      if (recipientPublicKeyRef.current) {
+
+      // 1. Prioritize embedded key — avoids key-rotation mismatch
+      const embeddedKey = (payload.encryptedKeys as any)?.senderPublicKey;
+      if (embeddedKey && typeof embeddedKey === 'string') {
+        senderKeys.push(embeddedKey);
+      }
+
+      // 2. Cached key
+      if (recipientPublicKeyRef.current && !senderKeys.includes(recipientPublicKeyRef.current)) {
         senderKeys.push(recipientPublicKeyRef.current);
       }
+
+      // 3. Live API fetch for additional candidates
       try {
         const res = await chatService.fetchRecipientKey(payload.senderId);
         if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
@@ -1516,7 +1561,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             break;
           }
         } catch {
-          /* try next key */
+          console.debug('[E2EE] retry_fulfill: key candidate failed:', k.slice(0, 8) + '…');
         }
       }
 
@@ -2014,6 +2059,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 encryptedKeysPayload = {
                   protocol: "multi-device",
                   devices: multiEnc.devices,
+                  // ── SENDER KEY EMBEDDING ──────────────────────────────────────
+                  // Embed the sender's current public key so that receivers can
+                  // always identify the exact ECDH key used to wrap kMsg — even
+                  // after the sender rotates keys on a new device/browser.
+                  senderPublicKey: activeMyPub || null,
                   recipientRegistrationId: recipientRegId,
                   senderRegistrationId: myRegId,
                 };
@@ -2087,6 +2137,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                     signedPreKeyId: bundle.signedPreKey.keyId,
                     oneTimePreKeyId: bundle.oneTimePreKey ? bundle.oneTimePreKey.keyId : null,
                     recipientRegistrationId: recipientRegId,
+                    // Embed sender public key so receivers can locate the right key after rotation
+                    senderPublicKey: activeMyPub || null,
                     selfEncryptedSessionKey,
                   };
                   x3dhDone = true;
@@ -2127,6 +2179,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               nonce = encrypted.nonce;
               encryptedKeysPayload = {
                 recipientRegistrationId: recipientRegId,
+                // Embed sender public key so receivers can locate the right key after rotation
+                senderPublicKey: (myPublicKeyRef.current || myPublicKey) || null,
               };
             }
           }
