@@ -11,14 +11,15 @@ import { usePresence } from "@/context/PresenceContext";
 import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
+import { groupService, GroupItem } from "@/services/group.service";
 import { decryptMessage } from "@/utils/crypto";
-import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage } from "@/utils/keyStore";
+import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey } from "@/utils/keyStore";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { motion } from "framer-motion";
-import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles } from "lucide-react";
+import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState, useRef } from "react";
 
 interface Conversation {
   id: string;
@@ -27,12 +28,17 @@ interface Conversation {
   otherUserName: string;
   otherUserAvatar: string | null;
   otherUserOnline: boolean;
+  isGroup?: boolean;
+  groupName?: string | null;
+  groupAvatar?: string | null;
+  memberCount?: number;
   context?: string;
   workspaceId?: string | null;
   unreadCount?: number;
   lastMessage: {
     id: string;
     senderId: string;
+    senderName?: string | null;
     ciphertext: string | null;
     nonce: string | null;
     /** Set when the message belongs to a B2C support ticket (plaintext; no E2EE). */
@@ -56,6 +62,12 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
+  const decryptedPreviewsRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    decryptedPreviewsRef.current = decryptedPreviews;
+  }, [decryptedPreviews]);
+  const failedDecryptionsRef = useRef<Set<string>>(new Set());
+
   // Per-conversation typing state: set of conversationIds where someone is typing
   const [typingConvIds, setTypingConvIds] = useState<Set<string>>(new Set());
   // Tracks the last time the user read each conversation (persisted to localStorage)
@@ -111,11 +123,75 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       const myId = decoded?.sub || decoded?.id || "";
       setCurrentUserId(myId);
 
-      // Fetch real conversations from backend
-      const convsRes = await chatService.fetchMyConversations();
-      if (convsRes?.success && Array.isArray(convsRes?.data)) {
-        setConversations(convsRes.data);
+      // Fetch 1v1 conversations and groups in parallel for a unified WhatsApp-style inbox
+      const [convsRes, groupsRes] = await Promise.all([
+        chatService.fetchMyConversations().catch(() => ({ success: false, data: [] })),
+        groupService.fetchMyGroups().catch(() => ({ success: false, data: [] })),
+      ]);
+
+      const directConvs: Conversation[] = (convsRes?.success && Array.isArray(convsRes?.data)) ? convsRes.data : [];
+      const groupConvs: Conversation[] = (groupsRes?.success && Array.isArray(groupsRes?.data))
+        ? groupsRes.data.map((g: GroupItem) => ({
+            id: g.id,
+            updatedAt: g.updatedAt,
+            otherUserId: null,
+            otherUserName: g.name,
+            otherUserAvatar: g.avatarUrl,
+            otherUserOnline: false,
+            isGroup: true,
+            groupName: g.name,
+            groupAvatar: g.avatarUrl,
+            memberCount: g.memberCount,
+            lastMessage: g.lastMessage
+              ? {
+                  id: g.lastMessage.id,
+                  senderId: g.lastMessage.senderId,
+                  senderName: g.lastMessage.senderName,
+                  ciphertext: g.lastMessage.ciphertext,
+                  nonce: g.lastMessage.nonce,
+                  mediaType: g.lastMessage.mediaType,
+                  mediaUrl: g.lastMessage.mediaUrl,
+                  createdAt: g.lastMessage.createdAt,
+                }
+              : null,
+          }))
+        : [];
+
+      const merged = [...directConvs, ...groupConvs].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+
+      // ── IndexedDB Fast Seed for Decrypted Previews ──
+      // Before setting conversations, check IndexedDB cache for already-decrypted
+      // messages so there is ZERO flash of "Encrypted message" on initial render.
+      if (myId) {
+        const cachedMap: Record<string, string> = {};
+        for (const c of merged) {
+          const msg = c.lastMessage;
+          if (!msg) continue;
+          if (!msg.nonce && msg.ciphertext) {
+            cachedMap[c.id] = msg.ciphertext;
+            cachedMap[msg.id] = msg.ciphertext;
+          } else if (msg.id) {
+            const cached = await getDecryptedMessage(myId, msg.id);
+            if (cached) {
+              cachedMap[c.id] = cached;
+              cachedMap[msg.id] = cached;
+            } else if (msg.nonce) {
+              const cachedNonce = await getDecryptedMessage(myId, `nonce_${msg.nonce}`);
+              if (cachedNonce) {
+                cachedMap[c.id] = cachedNonce;
+                cachedMap[msg.id] = cachedNonce;
+              }
+            }
+          }
+        }
+        if (Object.keys(cachedMap).length > 0) {
+          setDecryptedPreviews((prev) => ({ ...prev, ...cachedMap }));
+        }
       }
+
+      setConversations(merged);
     } catch (error) {
       console.error("Failed to fetch chat data", error);
     } finally {
@@ -137,9 +213,10 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   }, [fetchData, currentMode]);
 
   // Load the last-read timestamps from localStorage so unread badges survive page refreshes.
-  // Re-runs when the pathname's chat segment changes (not query params) to avoid
-  // fetching on every `?recipientId=xxx` change as conversations are clicked.
-  const pathnameConvSegment = pathname.split('/chats/')[1]?.split('?')[0] ?? '';
+  const pathnameConvSegment =
+    pathname.split('/chats/')[1]?.split('?')[0] ||
+    pathname.split('/groups/')[1]?.split('?')[0] ||
+    '';
   const prevConvSegmentRef = React.useRef('');
   useEffect(() => {
     try {
@@ -148,12 +225,10 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore parse errors
     }
-    // Clear the real-time badge for the currently active conversation
+    // Clear the real-time badge for the currently active conversation/group
     if (pathnameConvSegment) {
       setRealtimeUnreadCounts((prev) => ({ ...prev, [pathnameConvSegment]: 0 }));
     }
-    // Only refetch conversations when navigating to a completely different conversation,
-    // not on every query-param change (which triggers useSearchParams re-renders).
     const prevSegment = prevConvSegmentRef.current;
     prevConvSegmentRef.current = pathnameConvSegment;
     if (pathnameConvSegment !== prevSegment) {
@@ -162,11 +237,15 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathnameConvSegment]);
 
-  // Subscribe socket to all active conversation rooms so real-time updates reach the sidebar
+  // Subscribe socket to all active conversation and group rooms so real-time updates reach the sidebar
   useEffect(() => {
     if (!socket || conversations.length === 0) return;
     conversations.forEach((conv) => {
-      socket.emit("chat:join_room", { conversationId: conv.id });
+      if (conv.isGroup) {
+        socket.emit("group:join_room", { groupId: conv.id });
+      } else {
+        socket.emit("chat:join_room", { conversationId: conv.id });
+      }
     });
   }, [socket, conversations]);
 
@@ -394,6 +473,60 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     // Also re-fetch when a message is unsent so the sidebar falls back
     const handleUnsent = () => { fetchData(); };
 
+    const handleGroupMessage = (payload: any) => {
+      const groupId = payload.groupId;
+      if (!groupId) {
+        fetchData();
+        return;
+      }
+
+      // Increment real-time unread count if not currently viewing this group
+      const activeGroupId = pathnameRef.current.split('/groups/')[1]?.split('?')[0];
+      const senderId = payload.senderId || payload.sender?.id;
+      if (senderId && senderId !== currentUserIdRef.current && activeGroupId !== groupId) {
+        setRealtimeUnreadCounts((prev) => ({
+          ...prev,
+          [groupId]: (prev[groupId] || 0) + 1,
+        }));
+      }
+
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === groupId);
+        if (idx === -1) {
+          fetchData();
+          return prev;
+        }
+        const updated = [...prev];
+        const existing = updated[idx];
+        updated[idx] = {
+          ...existing,
+          updatedAt: payload.createdAt || new Date().toISOString(),
+          lastMessage: {
+            id: payload.id || '',
+            senderId: senderId || '',
+            senderName: payload.sender?.profile?.displayName || payload.sender?.profile?.username || null,
+            ciphertext: payload.ciphertext || null,
+            nonce: payload.nonce || null,
+            mediaType: payload.mediaType || null,
+            mediaUrl: payload.mediaUrl || null,
+            isDeleted: false,
+            createdAt: payload.createdAt || new Date().toISOString(),
+          },
+        };
+        const [moved] = updated.splice(idx, 1);
+        return [moved, ...updated];
+      });
+
+      if (payload.text || payload.content || payload.message) {
+        const text = payload.text || payload.content || payload.message;
+        setDecryptedPreviews((prev) => ({
+          ...prev,
+          ...(payload.id ? { [payload.id]: text } : {}),
+          [groupId]: text,
+        }));
+      }
+    };
+
     const handleTypingStart = (payload: { conversationId: string; userId: string }) => {
       setTypingConvIds((prev) => {
         const next = new Set(prev);
@@ -411,6 +544,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     };
 
     socket.on("chat:receive_message", handleNewMessage);
+    socket.on("group:receive_message", handleGroupMessage);
     socket.on("chat:message_unsent", handleUnsent);
     socket.on("chat:message_status_update", handleStatusUpdate);
     socket.on("chat:conversation_status_update", handleConversationSeen);
@@ -419,6 +553,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
     return () => {
       socket.off("chat:receive_message", handleNewMessage);
+      socket.off("group:receive_message", handleGroupMessage);
       socket.off("chat:message_unsent", handleUnsent);
       socket.off("chat:message_status_update", handleStatusUpdate);
       socket.off("chat:conversation_status_update", handleConversationSeen);
@@ -502,14 +637,21 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       const token = localStorage.getItem("accessToken");
       if (!token) return;
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-      const res = await fetch(`${baseUrl}/conversations/${conversationId}`, {
+      const targetConv = conversations.find((c) => c.id === conversationId);
+      const isGroup = targetConv?.isGroup;
+
+      const endpoint = isGroup
+        ? `${baseUrl}/groups/${conversationId}`
+        : `${baseUrl}/conversations/${conversationId}`;
+
+      const res = await fetch(endpoint, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (data.success) {
         setConversations(prev => prev.filter(c => c.id !== conversationId));
-        if (pathname === `${basePath}/${conversationId}`) {
+        if (pathname === `${basePath}/${conversationId}` || pathname === `/groups/${conversationId}`) {
           router.push(basePath);
         }
       }
@@ -525,12 +667,12 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const decryptPreviews = async () => {
       if (!currentUserId || conversations.length === 0) return;
-      
-      let myPrivateKey = await getUserPrivateKey(currentUserId);
-      if (!myPrivateKey) return;
-      let myPublicKey = await getUserPublicKey(currentUserId);
 
-      const newPreviews = { ...decryptedPreviews };
+      const myPrivateKey = await getUserPrivateKey(currentUserId);
+      if (!myPrivateKey) return;
+      const myPublicKey = await getUserPublicKey(currentUserId);
+
+      const newPreviews = { ...decryptedPreviewsRef.current };
       let hasChanges = false;
       const pubKeyCache: Record<string, string> = {};
 
@@ -552,13 +694,44 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         }
         if (msg.mediaType) continue; // Media handled differently
 
+        // Group message decryption
+        if (conv.isGroup) {
+          let cachedText: string | null = null;
+          if (msg.id) cachedText = await getDecryptedMessage(currentUserId, msg.id);
+          if (!cachedText && msg.nonce) cachedText = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
+          if (cachedText) {
+            newPreviews[msg.id] = cachedText;
+            newPreviews[conv.id] = cachedText;
+            hasChanges = true;
+            continue;
+          }
+          if (msg.ciphertext && !msg.nonce) {
+            newPreviews[msg.id] = msg.ciphertext;
+            newPreviews[conv.id] = msg.ciphertext;
+            hasChanges = true;
+            continue;
+          }
+          // Try decrypting with stored group key if present
+          try {
+            const storedKey = await getStoredGroupKey(conv.id, currentUserId);
+            if (storedKey && msg.ciphertext && msg.nonce) {
+              const text = await decryptMessage(msg.ciphertext, msg.nonce, storedKey, myPrivateKey);
+              if (text) {
+                void storeDecryptedMessage(currentUserId, msg.id, text);
+                newPreviews[msg.id] = text;
+                newPreviews[conv.id] = text;
+                hasChanges = true;
+                continue;
+              }
+            }
+          } catch {
+            failedDecryptionsRef.current.add(msg.id);
+            failedDecryptionsRef.current.add(conv.id);
+          }
+          continue;
+        }
+
         // B2C support conversations: messages are stored as plaintext.
-        // Skip libsodium when ANY of these is true — listed from cheapest to check:
-        //   • nonce is null/absent        → plaintext stored directly
-        //   • ticketId is set             → B2C ticket message (covers most cases)
-        //   • workspaceId on conversation  → B2C context indicator
-        //   • context is BUSINESS         → explicit B2C conversation
-        //   • otherUserId is null         → no real peer; B2C threads have no peer
         const isBizConv =
           !msg.nonce ||
           msg.ticketId ||
@@ -567,12 +740,10 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
         if (isBizConv) {
           if (msg.ciphertext && !msg.nonce) {
-            // True plaintext — store full string in newPreviews, let getLastMessagePreview handle formatting & truncation
             newPreviews[msg.id] = msg.ciphertext;
             newPreviews[conv.id] = msg.ciphertext;
             hasChanges = true;
           } else if (msg.ciphertext && msg.nonce) {
-            // Old encrypted B2C message — unrecoverable, show placeholder
             newPreviews[msg.id] = "Message (legacy encrypted)";
             newPreviews[conv.id] = "Message (legacy encrypted)";
             hasChanges = true;
@@ -584,7 +755,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         if (!msg.ciphertext) continue;
 
         try {
-          // ── IndexedDB fast path: already decrypted in this or a prior session ──
+          // IndexedDB fast path
           let cachedText: string | null = null;
           if (msg.id) cachedText = await getDecryptedMessage(currentUserId, msg.id);
           if (!cachedText && msg.nonce) cachedText = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
@@ -592,7 +763,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             newPreviews[msg.id] = cachedText;
             newPreviews[conv.id] = cachedText;
             hasChanges = true;
-            continue; // skip network key fetch
+            continue;
           }
 
           const targetUserId = msg.senderId === currentUserId ? conv.otherUserId : msg.senderId;
@@ -602,7 +773,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           if (!pubKeyToUse) {
             const res = await chatService.fetchRecipientKey(targetUserId);
             if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-              // Keys are ordered asc by createdAt — last entry is the newest/active key
               pubKeyToUse = res.data[res.data.length - 1].publicKey;
             } else if (res?.success && res?.data?.publicKey) {
               pubKeyToUse = res.data.publicKey;
@@ -614,7 +784,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
           if (pubKeyToUse) {
             const text = await decryptMessage(msg.ciphertext, msg.nonce!, pubKeyToUse, myPrivateKey);
-            // Persist so next render is instant
             void storeDecryptedMessage(currentUserId, msg.id, text);
             if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, text);
             newPreviews[msg.id] = text;
@@ -622,12 +791,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             hasChanges = true;
           }
         } catch {
-          // Decryption failed — silently fall back to a placeholder.
-          // This can happen when a key has been rotated. The error is
-          // intentionally NOT logged to avoid flooding the console.
-          newPreviews[msg.id] = "🔒 Encrypted message";
-          newPreviews[conv.id] = "🔒 Encrypted message";
-          hasChanges = true;
+          // Decryption failed — mark as failed so placeholder is shown ONLY after attempting
+          failedDecryptionsRef.current.add(msg.id);
+          failedDecryptionsRef.current.add(conv.id);
         }
       }
 
@@ -637,7 +803,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     };
 
     decryptPreviews();
-  }, [conversations, currentUserId, decryptedPreviews]);
+  }, [conversations, currentUserId]);
 
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -654,10 +820,14 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     const msg = conv.lastMessage;
-    if (!msg) return "No messages yet";
+    if (!msg) return conv.isGroup ? "Group created" : "No messages yet";
 
     const isMe = msg.senderId === currentUserId;
-    const youPrefix = isMe ? "You: " : "";
+    const youPrefix = isMe
+      ? "You: "
+      : conv.isGroup && msg.senderName
+      ? `${msg.senderName.split(" ")[0]}: `
+      : "";
 
     // ── Media-type previews ──────────────────────────────────────────
     if (msg.mediaType === "image" || msg.mediaType?.startsWith("image")) return `${youPrefix}📷 Photo`;
@@ -695,10 +865,15 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     let textToPreview = "";
     if (decryptedPreviews[conv.id]) {
       textToPreview = decryptedPreviews[conv.id];
+    } else if (msg.id && decryptedPreviews[msg.id]) {
+      textToPreview = decryptedPreviews[msg.id];
     } else if (msg.ciphertext && !msg.nonce) {
       textToPreview = msg.ciphertext;
+    } else if (failedDecryptionsRef.current.has(msg.id) || failedDecryptionsRef.current.has(conv.id)) {
+      return conv.isGroup ? `${youPrefix}🔒 Group message` : "🔒 Encrypted message";
     } else {
-      return "🔒 Encrypted message";
+      // Not yet decrypted / in flight: return empty string to prevent the flash!
+      return "";
     }
 
     if (textToPreview.startsWith("__PIN_EVENT__:")) {
@@ -720,18 +895,23 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     return `${youPrefix}${truncated}`;
   };
 
-  const [chatFilter, setChatFilter] = useState<"all" | "unread" | "business">("all");
+  const [chatFilter, setChatFilter] = useState<"all" | "unread" | "groups" | "business">("all");
 
   const filteredConversations = conversations.filter((c) => {
-    const matchesSearch = c.otherUserName.toLowerCase().includes(searchQuery.toLowerCase());
+    const nameToMatch = c.isGroup ? (c.groupName || "") : c.otherUserName;
+    const matchesSearch = nameToMatch.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
     if (chatFilter === "unread") return hasUnread(c);
-    if (chatFilter === "business") return c.workspaceId || c.context === "BUSINESS" || !c.otherUserId;
+    if (chatFilter === "groups") return !!c.isGroup;
+    if (chatFilter === "business") return !c.isGroup && (c.workspaceId || c.context === "BUSINESS" || !c.otherUserId);
     return true;
   });
 
   const getPreviewStatusIcon = (conv: Conversation) => {
     if (!conv.lastMessage || conv.lastMessage.senderId !== currentUserId) return null;
+    if (conv.isGroup) {
+      return <Check className="h-3.5 w-3.5 shrink-0 text-[#8696A0] inline-block mr-1" strokeWidth={2.2} />;
+    }
     const msg = conv.lastMessage;
     if (msg.id.startsWith("optimistic-") && (!msg.receipts || msg.receipts.length === 0)) {
       return <Clock className="h-3.5 w-3.5 shrink-0 text-[#8696A0] animate-pulse inline-block mr-1" />;
@@ -842,6 +1022,19 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setChatFilter("groups")}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[12px] font-semibold transition-all shrink-0 flex items-center gap-1",
+                    chatFilter === "groups"
+                      ? "bg-[#00A884]/15 text-[#008069] dark:text-[#00A884]"
+                      : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E2E8F0] dark:hover:bg-[#2A3942]"
+                  )}
+                >
+                  <Users className="h-3 w-3" />
+                  <span>Groups</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setChatFilter("business")}
                   className={cn(
                     "rounded-full px-3 py-1 text-[12px] font-semibold transition-all shrink-0 flex items-center gap-1",
@@ -883,7 +1076,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                       <MessageSquare className="h-6 w-6" />
                     </div>
                     <h3 className="text-[15px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-1">
-                      {searchQuery ? "No conversations found" : chatFilter === "unread" ? "No unread messages" : "No conversations yet"}
+                      {searchQuery ? "No conversations found" : chatFilter === "unread" ? "No unread messages" : chatFilter === "groups" ? "No groups found" : "No conversations yet"}
                     </h3>
                     <p className="text-[12.5px] font-normal text-[#54656F] dark:text-[#8696A0] max-w-[220px] leading-relaxed mb-5">
                       {searchQuery
@@ -903,12 +1096,19 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 ) : (
                   <div className="flex flex-col divide-y divide-[#F0F2F5] dark:divide-[#202C33]">
                     {filteredConversations.map((conv, index) => {
+                      const isGroup = !!conv.isGroup;
+                      const chatHref = isGroup
+                        ? `${basePath}/${conv.id}?type=group`
+                        : `${basePath}/${conv.id}?recipientId=${conv.otherUserId}`;
                       const isActive = pathname === `${basePath}/${conv.id}`;
-                      const avatarUrl =
-                        getOptimizedImageUrl(conv.otherUserAvatar, 48, 48) ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=E0F2FE&color=0284C7&bold=true`;
 
-                      const isOnline = isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline;
+                      const displayName = isGroup ? (conv.groupName || "Group") : conv.otherUserName;
+                      const avatarUrl = isGroup
+                        ? (conv.groupAvatar ? getOptimizedImageUrl(conv.groupAvatar, 48, 48) : null)
+                        : (getOptimizedImageUrl(conv.otherUserAvatar, 48, 48) ||
+                           `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=E0F2FE&color=0284C7&bold=true`);
+
+                      const isOnline = !isGroup && (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline);
                       const isTyping = typingConvIds.has(conv.id);
 
                       return (
@@ -921,7 +1121,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                           onMouseLeave={() => setMenuOpenForId(null)}
                         >
                           <Link
-                            href={`${basePath}/${conv.id}?recipientId=${conv.otherUserId}`}
+                            href={chatHref}
                             prefetch={false}
                             className={cn(
                               "flex w-full items-center gap-3.5 px-4 py-3 transition-colors relative",
@@ -930,14 +1130,26 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                 : "hover:bg-[#F8FAFC] dark:hover:bg-[#182229]/60"
                             )}
                           >
-                            {/* Avatar with subtle online dot pip */}
+                            {/* Avatar with subtle online dot pip or Group Icon */}
                             <div className="relative shrink-0">
-                              <div className="h-12 w-12 rounded-full overflow-hidden bg-[#F0F2F5] dark:bg-[#202C33] shadow-xs">
-                                <img
-                                  src={getOptimizedImageUrl(avatarUrl)}
-                                  alt={conv.otherUserName}
-                                  className="h-full w-full object-cover"
-                                />
+                              <div className="h-12 w-12 rounded-full overflow-hidden bg-[#F0F2F5] dark:bg-[#202C33] shadow-xs flex items-center justify-center">
+                                {avatarUrl ? (
+                                  <img
+                                    src={getOptimizedImageUrl(avatarUrl)}
+                                    alt={displayName}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : isGroup ? (
+                                  <div className="h-full w-full bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                                    <Users className="h-6 w-6" />
+                                  </div>
+                                ) : (
+                                  <img
+                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=E0F2FE&color=0284C7&bold=true`}
+                                    alt={displayName}
+                                    className="h-full w-full object-cover"
+                                  />
+                                )}
                               </div>
                               {isOnline && (
                                 <span
@@ -950,14 +1162,21 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                             {/* Content */}
                             <div className="flex flex-1 flex-col items-start overflow-hidden min-w-0">
                               <div className="flex w-full items-center justify-between gap-1">
-                                <h3 className={cn(
-                                  "text-[15px] truncate leading-snug",
-                                  hasUnread(conv) && !isActive
-                                    ? "font-bold text-[#111B21] dark:text-[#E9EDEF]"
-                                    : "font-semibold text-[#111B21] dark:text-[#E9EDEF]"
-                                )}>
-                                  {conv.otherUserName}
-                                </h3>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <h3 className={cn(
+                                    "text-[15px] truncate leading-snug",
+                                    hasUnread(conv) && !isActive
+                                      ? "font-bold text-[#111B21] dark:text-[#E9EDEF]"
+                                      : "font-semibold text-[#111B21] dark:text-[#E9EDEF]"
+                                  )}>
+                                    {displayName}
+                                  </h3>
+                                  {isGroup && (
+                                    <span className="shrink-0 text-[10.5px] font-medium bg-[#00A884]/10 dark:bg-[#00A884]/20 text-[#008069] dark:text-[#00A884] px-1.5 py-0.2 rounded-full">
+                                      Group
+                                    </span>
+                                  )}
+                                </div>
                                 <span className={cn(
                                   "text-[11.5px] font-normal shrink-0",
                                   hasUnread(conv) && !isActive
@@ -1033,7 +1252,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                   className="w-full px-3.5 py-2 text-left text-[13px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 transition-colors"
                                 >
                                   <Trash2 className="h-4 w-4" />
-                                  Delete chat
+                                  {conv.isGroup ? "Leave group" : "Delete chat"}
                                 </button>
                               </div>
                             )}
@@ -1067,9 +1286,13 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
           >
-            <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">Delete Conversation</h2>
+            <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">
+              {conversations.find((c) => c.id === conversationToDelete)?.isGroup ? "Leave Group" : "Delete Conversation"}
+            </h2>
             <p className="text-[14px] font-medium text-[#8F95B2] mb-6">
-              Are you sure you want to delete this conversation? This action cannot be undone.
+              {conversations.find((c) => c.id === conversationToDelete)?.isGroup
+                ? "Are you sure you want to leave this group? You will need an invite to rejoin."
+                : "Are you sure you want to delete this conversation? This action cannot be undone."}
             </p>
             <div className="flex gap-3">
               <button
@@ -1086,7 +1309,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 {isDeleting ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 ) : (
-                  "Delete"
+                  conversations.find((c) => c.id === conversationToDelete)?.isGroup ? "Leave" : "Delete"
                 )}
               </button>
             </div>
