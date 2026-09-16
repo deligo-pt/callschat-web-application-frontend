@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useUser } from "@/context/UserContext";
+import { E2EEContext } from "@/context/E2EEContext";
 import { generateAndStoreKeyPair, generatePreKeyBatch, generateSignedPreKey } from "@/utils/crypto";
 import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
 import { chatService } from "@/services/chat.service";
@@ -9,6 +10,8 @@ import { KeyRestoreModal } from "@/components/settings/KeyRestoreModal";
 
 export function E2EEProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useUser();
+  const [keysReady, setKeysReady] = useState(false);
+  const [myPublicKey, setMyPublicKey] = useState<string | null>(null);
   const [restoreBackupData, setRestoreBackupData] = useState<any | null>(null);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
 
@@ -26,7 +29,7 @@ export function E2EEProvider({ children }: { children: React.ReactNode }) {
           if (cloudBackup && cloudBackup.encryptedVault) {
             setRestoreBackupData(cloudBackup);
             setShowRestoreModal(true);
-            return; // Wait for user to enter PIN
+            return; // Wait for user to enter PIN — keysReady stays false
           }
         } catch (backupCheckErr) {
           console.warn("⚠️ [E2EEProvider] Cloud backup check error:", backupCheckErr);
@@ -82,6 +85,12 @@ export function E2EEProvider({ children }: { children: React.ReactNode }) {
     } catch (preKeyErr) {
       console.warn("⚠️ [E2EEProvider] Prekey check/upload warning:", preKeyErr);
     }
+
+    // ── Signal keysReady LAST so consumers see a fully initialised state ──
+    const finalPubKey = await getUserPublicKey(currentUserId);
+    setMyPublicKey(finalPubKey);
+    setKeysReady(true);
+    console.log("🔓 [E2EEProvider] Keys ready — broadcasting keysReady=true");
   }, [user, isLoading]);
 
   useEffect(() => {
@@ -101,17 +110,19 @@ export function E2EEProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <>
-      {children}
-      {showRestoreModal && restoreBackupData && user?.id && (
-        <KeyRestoreModal
-          isOpen={showRestoreModal}
-          userId={user.id}
-          backupData={restoreBackupData}
-          onRestored={handleRestored}
-          onSkip={handleSkipRestore}
-        />
-      )}
-    </>
+    <E2EEContext.Provider value={{ keysReady, myPublicKey }}>
+      <>
+        {children}
+        {showRestoreModal && restoreBackupData && user?.id && (
+          <KeyRestoreModal
+            isOpen={showRestoreModal}
+            userId={user.id}
+            backupData={restoreBackupData}
+            onRestored={handleRestored}
+            onSkip={handleSkipRestore}
+          />
+        )}
+      </>
+    </E2EEContext.Provider>
   );
 }
