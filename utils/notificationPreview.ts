@@ -50,7 +50,7 @@ async function getPeerPublicKeys(peerUserId: string): Promise<string[]> {
     const res = await chatService.fetchRecipientKey(peerUserId);
     let keys: string[] = [];
     if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-      keys = res.data.map((d: { publicKey: string }) => d.publicKey).reverse();
+      keys = res.data.map((d: { publicKey: string }) => d.publicKey);
     } else if (res?.success && res?.data?.publicKey) {
       keys = [res.data.publicKey];
     }
