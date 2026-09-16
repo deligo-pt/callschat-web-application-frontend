@@ -194,7 +194,7 @@ const resolveUserPublicKey = async (userId: string): Promise<string | null> => {
   try {
     const res = await chatService.fetchRecipientKey(userId);
     if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-      return res.data[res.data.length - 1].publicKey;
+      return res.data[0].publicKey;
     }
     return res?.data?.publicKey ?? null;
   } catch {
@@ -310,7 +310,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                   const rKeyRes = await chatService.fetchRecipientKey(uId);
                   let pubKey = "";
                   if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
-                    pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+                    pubKey = rKeyRes.data[0].publicKey;
                   } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
                     pubKey = rKeyRes.data.publicKey;
                   }
@@ -354,7 +354,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               if (!sId) continue;
               const rKeyRes = await chatService.fetchRecipientKey(sId);
               if (rKeyRes?.data && Array.isArray(rKeyRes.data)) {
-                for (const k of [...rKeyRes.data].reverse()) {
+                for (const k of rKeyRes.data) {
                   if (k.publicKey && !candidatePubKeys.includes(k.publicKey)) {
                     candidatePubKeys.push(k.publicKey);
                   }
@@ -610,7 +610,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           } else {
             const rKeyRes = await chatService.fetchRecipientKey(uId);
             if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
-              pubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+              pubKey = rKeyRes.data[0].publicKey;
             } else if (rKeyRes?.success && rKeyRes?.data?.publicKey) {
               pubKey = rKeyRes.data.publicKey;
             }
@@ -951,7 +951,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (senderId) {
           const rKeyRes = await chatService.fetchRecipientKey(senderId);
           if (rKeyRes?.data && Array.isArray(rKeyRes.data) && rKeyRes.data.length > 0) {
-            senderPubKey = rKeyRes.data[rKeyRes.data.length - 1].publicKey;
+            senderPubKey = rKeyRes.data[0].publicKey;
           } else if (rKeyRes?.data?.publicKey) {
             senderPubKey = rKeyRes.data.publicKey;
           }

@@ -360,9 +360,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       try {
         const res = await chatService.fetchRecipientKey(activePeerId);
         // Guard: if backend returns empty array (no key registered), do not set any key.
-        // Keys are ordered ascending by createdAt — the LAST entry is the newest/active key.
+        // Keys are ordered descending by updatedAt — the FIRST entry (index 0) is the newest/active key.
         if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          setRecipientPublicKey(res.data[res.data.length - 1].publicKey);
+          setRecipientPublicKey(res.data[0].publicKey);
         } else if (res?.success && res?.data?.publicKey) {
           setRecipientPublicKey(res.data.publicKey);
         }
@@ -2256,7 +2256,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               try {
                 const res = await chatService.fetchRecipientKey(activePeerId);
                 if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                  const newest = res.data[res.data.length - 1];
+                  const newest = res.data[0];
                   pubKeyToUse = newest.publicKey;
                   recipientRegId = newest.registrationId || null;
                 } else if (res?.success && res?.data?.publicKey) {

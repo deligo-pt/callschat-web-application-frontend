@@ -311,7 +311,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           if (senderId) {
             const senderRes = await chatService.fetchRecipientKey(senderId);
             if (senderRes?.data && Array.isArray(senderRes.data) && senderRes.data.length > 0) {
-              senderPubKey = senderRes.data[senderRes.data.length - 1].publicKey;
+              senderPubKey = senderRes.data[0].publicKey;
             } else if (senderRes?.success && senderRes?.data?.publicKey) {
               senderPubKey = senderRes.data.publicKey;
             }
@@ -334,7 +334,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
       const resKey = await chatService.fetchRecipientKey(userId);
       let targetPubKey = "";
       if (resKey?.data && Array.isArray(resKey.data) && resKey.data.length > 0) {
-        targetPubKey = resKey.data[resKey.data.length - 1].publicKey;
+        targetPubKey = resKey.data[0].publicKey;
       } else if (resKey?.success && resKey?.data?.publicKey) {
         targetPubKey = resKey.data.publicKey;
       }
