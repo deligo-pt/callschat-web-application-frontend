@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
+import { useE2EE } from "@/context/E2EEContext";
 import { chatService } from "@/services/chat.service";
 import {
   getUserPrivateKey,
@@ -173,6 +174,8 @@ const resolveQuotedMessage = async (
 
 export const useChat = (conversationId: string, currentUserId: string, activePeerId: string, isBizChat: boolean = false) => {
   const { socket, isConnected } = useSocket();
+  // E2EE readiness signal from E2EEProvider — true once initKeys() has fully completed.
+  const { keysReady } = useE2EE();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
   const [myPrivateKey, setMyPrivateKey] = useState<string | null>(null);
@@ -201,6 +204,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const recentSentPlaintextsRef = useRef<{ text: string; nonce?: string | null; ciphertext?: string | null; timestamp: number }[]>([]);
   const retryRequestedMessagesRef = useRef<Set<string>>(new Set());
 
+  // ── Pending Decrypt Queue ───────────────────────────────────────────────────
+  // Messages that arrived via socket BEFORE the private key was ready are held
+  // here and replayed automatically once myPrivateKey / keysReady is set.
+  // Max size guard prevents unbounded growth if key never loads.
+  const pendingDecryptQueueRef = useRef<any[]>([]);
+  const MAX_PENDING_QUEUE_SIZE = 50;
+
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -228,6 +238,81 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   useEffect(() => {
     recipientPublicKeyRef.current = recipientPublicKey;
   }, [recipientPublicKey]);
+
+  // ── Drain Pending Decrypt Queue ────────────────────────────────────────────
+  // When myPrivateKey becomes available (E2EEProvider finished initKeys),
+  // replay every socket message that arrived while the key was absent.
+  // This eliminates the "⏳ Waiting for this message" flash caused by the
+  // session-clear / fresh-login timing race.
+  useEffect(() => {
+    if (!myPrivateKey || pendingDecryptQueueRef.current.length === 0) return;
+    const queue = [...pendingDecryptQueueRef.current];
+    pendingDecryptQueueRef.current = [];
+    console.log(`[E2EE] Key ready — draining ${queue.length} queued message(s)`);
+    // handleReceiveMessage is registered on the socket inside the socket useEffect.
+    // We dispatch a synthetic socket event so the existing handler picks it up,
+    // OR we call it directly since it closes over refs. We trigger re-delivery
+    // by emitting the payloads through the socket's own listener map via a small
+    // trick: push them back through the socket event system next tick so refs
+    // are already updated.
+    queue.forEach((payload) => {
+      // Re-emit to the active socket so handleReceiveMessage processes them with
+      // the now-available private key. setTimeout(0) ensures ref updates above
+      // have propagated before handling.
+      setTimeout(() => {
+        if (socket) {
+          socket.emit("__e2ee_internal_replay__", payload);
+        }
+      }, 0);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myPrivateKey]);
+
+  // ── Re-Decrypt Pending Messages ────────────────────────────────────────────
+  // If any message already in state is marked isDecryptionPending (e.g. it
+  // arrived before the queue mechanism was in place, or via the retry path),
+  // attempt decryption now that we have the key.
+  useEffect(() => {
+    if (!myPrivateKey) return;
+    const privKey = myPrivateKeyRef.current;
+    if (!privKey) return;
+
+    const pendingMsgs = messagesRef.current.filter(
+      (m) => m.isDecryptionPending && m.rawCiphertext && m.rawNonce
+    );
+    if (pendingMsgs.length === 0) return;
+
+    void (async () => {
+      const decryptedMap = new Map<string, string>();
+      for (const m of pendingMsgs) {
+        const keysToTry: string[] = [];
+        if (recipientPublicKeyRef.current) keysToTry.push(recipientPublicKeyRef.current);
+        if (myPublicKeyRef.current) keysToTry.push(myPublicKeyRef.current);
+
+        for (const key of keysToTry) {
+          try {
+            const dec = await decryptMessage(m.rawCiphertext!, m.rawNonce!, key, privKey);
+            if (dec) {
+              const t = parseEditedText(dec).text;
+              decryptedMap.set(m.id, t);
+              void storeDecryptedMessage(currentUserIdRef.current, m.id, t);
+              break;
+            }
+          } catch { /* try next key candidate */ }
+        }
+      }
+
+      if (decryptedMap.size > 0) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            const t = decryptedMap.get(m.id);
+            return t ? { ...m, text: t, isDecryptionPending: false } : m;
+          })
+        );
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myPrivateKey]);
 
   // ── Auto-Retry Dispatcher (Receiver-Side) ──────────────────────────────────
   const requestRetryForMessage = useCallback(
@@ -291,8 +376,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   }, [activePeerId, isBizChat]);
 
   // ── Load Message History ───────────────────────────────────────────────────
+  // Gated on keysReady (from E2EEContext) so we never attempt to decrypt history
+  // before E2EEProvider has finished initialising keys — prevents partial-state
+  // decryption failures on fresh-login page loads.
   useEffect(() => {
-    if (!conversationId || !myPrivateKey || (!recipientPublicKey && !isBizChat) || !currentUserId || (!activePeerId && !isBizChat)) return;
+    if (!conversationId || !keysReady || !myPrivateKey || (!recipientPublicKey && !isBizChat) || !currentUserId || (!activePeerId && !isBizChat)) return;
 
     const loadHistory = async () => {
       try {
@@ -720,7 +808,16 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
       if (!isBiz && !noPeer && !isTicket && payload.ciphertext && payload.nonce) {
         if (!privKey) {
-          console.error("⚠️ [Socket] Missing myPrivateKey — cannot decrypt");
+          // Key not yet ready (fresh login / new session). Queue the message and
+          // replay it once myPrivateKey / keysReady becomes available.
+          console.warn("⚠️ [Socket] Key not ready — queuing message for later decryption:", payload.id);
+          if (pendingDecryptQueueRef.current.length < MAX_PENDING_QUEUE_SIZE) {
+            pendingDecryptQueueRef.current.push(payload);
+          } else {
+            console.warn("[E2EE] Pending queue full — dropping oldest message to make room.");
+            pendingDecryptQueueRef.current.shift();
+            pendingDecryptQueueRef.current.push(payload);
+          }
           return;
         }
 
@@ -1828,6 +1925,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
     socket.on("chat:receive_message", handleReceiveMessage);
     socket.on("NEW_MESSAGE", handleReceiveMessage);
+    // Internal replay channel: the drain effect emits this locally when the
+    // private key becomes available, replaying queued pre-key messages.
+    socket.on("__e2ee_internal_replay__", handleReceiveMessage);
     socket.on("chat:message_edited", handleMessageEdited);
     socket.on("chat:message_unsent", handleMessageUnsent);
     socket.on("chat:message_status_update", handleStatusUpdate);
@@ -1844,6 +1944,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     return () => {
       socket.off("chat:receive_message", handleReceiveMessage);
       socket.off("NEW_MESSAGE", handleReceiveMessage);
+      socket.off("__e2ee_internal_replay__", handleReceiveMessage);
       socket.off("chat:message_edited", handleMessageEdited);
       socket.off("chat:message_unsent", handleMessageUnsent);
       socket.off("chat:message_status_update", handleStatusUpdate);

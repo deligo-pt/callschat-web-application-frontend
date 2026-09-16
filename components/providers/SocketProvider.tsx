@@ -93,6 +93,22 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     socketInstance.on("session:revoked", (data: { sessionId?: string; reason?: string; message?: string }) => {
       console.warn("[Socket] Session revoked by server:", data);
       if (typeof window !== "undefined") {
+        const token = localStorage.getItem("accessToken");
+        if (token && data?.sessionId) {
+          try {
+            const payloadBase64 = token.split(".")[1];
+            if (payloadBase64) {
+              const decoded = JSON.parse(atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/")));
+              // If this revocation event is explicitly for a DIFFERENT session, ignore it
+              if (decoded.sessionId && decoded.sessionId !== data.sessionId) {
+                return;
+              }
+            }
+          } catch {
+            // If decoding fails, proceed with revocation as a safe fallback
+          }
+        }
+
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("currentMode");

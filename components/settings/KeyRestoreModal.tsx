@@ -139,7 +139,13 @@ export function KeyRestoreModal({
         <div className="mt-5 text-center">
           <button
             type="button"
-            onClick={onSkip}
+            onClick={() => {
+              toast.warning(
+                "New encryption keys will be generated. Messages sent before this session cannot be self-recovered until the sender re-syncs.",
+                { duration: 6000 }
+              );
+              onSkip();
+            }}
             className="text-[12.5px] font-medium text-slate-400 hover:text-slate-600 transition-colors"
           >
             Skip and start as a new session
