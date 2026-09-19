@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
+import { useE2EE } from "@/context/E2EEContext";
 import { groupService, GroupItem } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
 import {
@@ -8,16 +9,20 @@ import {
   encryptGroupMessage,
   decryptGroupMessage,
   decryptMessage,
-  generateAndStoreKeyPair,
-  generateSenderKey,
-  ratchetSenderKey,
-  encryptWithSenderKey,
-  decryptWithSenderKey,
-  wrapSenderKeyForMember,
-  unwrapSenderKeyFromMember,
 } from "@/utils/crypto";
 import {
+  generateSenderKey,
+  ratchetSenderKey,
+  wrapSenderKeyForMember,
+  unwrapSenderKeyFromMember,
+  encryptGroupSenderMessage,
+  decryptGroupSenderMessage,
+  decryptSenderMessageWithChainKey,
+  advanceChainKey,
+} from "@/utils/senderKeyEngine";
+import {
   getUserPrivateKey,
+  getRawStoredUserPrivateKey,
   getUserPublicKey,
   storeGroupKey,
   getStoredGroupKey,
@@ -168,7 +173,7 @@ const resolveGroupQuotedMessage = async (
       const dec = await decryptGroupMessage(replyToRaw.ciphertext, replyToRaw.nonce, gKey);
       text = parseEditedText(dec).text;
     } catch {}
-  } else if (!text && replyToRaw.ciphertext && !replyToRaw.nonce) {
+  } else if (!text && replyToRaw.ciphertext && !replyToRaw.nonce && replyToRaw.messageType !== 7) {
     text = parseEditedText(replyToRaw.ciphertext).text;
   }
 
@@ -190,20 +195,50 @@ const resolveGroupQuotedMessage = async (
   };
 };
 
-const resolveUserPublicKey = async (userId: string): Promise<string | null> => {
+const resolveUserPublicKeys = async (userId: string): Promise<string[]> => {
+  const keys: string[] = [];
+  if (!userId) return keys;
   try {
     const res = await chatService.fetchRecipientKey(userId);
     if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-      return res.data[0].publicKey;
+      for (const d of res.data) {
+        if (d.publicKey && !keys.includes(d.publicKey)) keys.push(d.publicKey);
+      }
+    } else if (res?.data?.publicKey && !keys.includes(res.data.publicKey)) {
+      keys.push(res.data.publicKey);
     }
-    return res?.data?.publicKey ?? null;
-  } catch {
-    return null;
+  } catch {}
+
+  try {
+    const storedPub = await getUserPublicKey(userId);
+    if (storedPub && !keys.includes(storedPub)) keys.push(storedPub);
+  } catch {}
+
+  return keys;
+};
+
+const resolveUserPublicKey = async (userId: string): Promise<string | null> => {
+  const keys = await resolveUserPublicKeys(userId);
+  return keys[0] ?? null;
+};
+
+const getCandidatePrivateKeys = async (userId: string): Promise<string[]> => {
+  const keys: string[] = [];
+  if (!userId) return keys;
+  const primary = await getUserPrivateKey(userId);
+  if (primary && !keys.includes(primary)) keys.push(primary);
+  const raw = await getRawStoredUserPrivateKey(userId);
+  if (raw && !keys.includes(raw)) keys.push(raw);
+  if (typeof window !== "undefined") {
+    const lsPriv = localStorage.getItem(`privateKey_${userId}`) || localStorage.getItem("privateKey");
+    if (lsPriv && !keys.includes(lsPriv)) keys.push(lsPriv);
   }
+  return keys;
 };
 
 export const useGroupChat = (groupId: string, currentUserId: string) => {
   const { socket, isConnected } = useSocket();
+  const { keysReady } = useE2EE();
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const messagesRef = useRef<GroupMessage[]>([]);
 
@@ -236,7 +271,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
   // ── Setup: Fetch & Decrypt Symmetric Group Key (Zero Sync Issue Protocol) ───
   useEffect(() => {
-    if (!groupId || !currentUserId) return;
+    if (!groupId || !currentUserId || !keysReady) return;
 
     const setupGroupKey = async () => {
       try {
@@ -249,24 +284,16 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           groupKeyRef.current = cachedKey;
         }
 
-        // 1. Ensure local keypair exists
+        // 1. Ensure local keypair is loaded from E2EEProvider / SignalProtocolStore
         let localPrivKey = await getUserPrivateKey(currentUserId);
         let localPubKey = await getUserPublicKey(currentUserId);
 
         if (!localPrivKey || !localPubKey) {
-          localPubKey = await generateAndStoreKeyPair(currentUserId);
-          localPrivKey = await getUserPrivateKey(currentUserId);
-          const deviceId = `web-${currentUserId}`;
-          const existingRegId = localStorage.getItem("registrationId") || undefined;
-          try {
-            if (localPubKey) {
-              const res = await chatService.uploadPublicKey(deviceId, localPubKey, existingRegId);
-              if (res?.registrationId) {
-                localStorage.setItem("registrationId", res.registrationId);
-              }
-            }
-          } catch (e) {
-            console.warn("Failed to upload public key during group setup", e);
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 150));
+            localPrivKey = await getUserPrivateKey(currentUserId);
+            localPubKey = await getUserPublicKey(currentUserId);
+            if (localPrivKey && localPubKey) break;
           }
         }
 
@@ -398,96 +425,168 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           const decryptedTextsMap = new Map<string, string>();
           const currentKey = groupKeyRef.current;
 
-          // Fetch active sender keys for this group to decrypt sender-keyed history
-          const skMap = new Map<string, any>();
+          // 1. Fetch active sender keys for this group to decrypt sender-keyed history
+          const skMap = new Map<string, { chainKey: string; iteration: number }>();
           try {
             const skRes = await groupService.fetchSenderKeys(groupId);
             if (skRes.success && Array.isArray(skRes.data)) {
-              const myPriv = await getUserPrivateKey(currentUserId);
-              if (myPriv) {
+              const myPrivs = await getCandidatePrivateKeys(currentUserId);
+              if (myPrivs.length > 0) {
                 for (const dist of skRes.data) {
-                  const senderPub = await resolveUserPublicKey(dist.senderId);
-                  if (senderPub) {
+                  const senderPubs = await resolveUserPublicKeys(dist.senderId);
+                  if (senderPubs.length > 0) {
                     try {
                       const chainKey = unwrapSenderKeyFromMember(
                         dist.encryptedKey,
                         dist.nonce,
-                        senderPub,
-                        myPriv
+                        senderPubs,
+                        myPrivs
                       );
                       skMap.set(dist.senderId, {
-                        groupId,
-                        senderId: dist.senderId,
                         chainKey,
                         iteration: dist.iteration ?? 0,
                       });
-                      await storeSenderKey(groupId, dist.senderId, {
-                        groupId,
-                        senderId: dist.senderId,
-                        chainKey,
-                        iteration: dist.iteration ?? 0,
-                        senderKeyId: `sk_${dist.senderId}`,
-                        updatedAt: new Date().toISOString(),
-                      });
-                    } catch {}
+                    } catch (skErr) {
+                      console.warn(`[useGroupChat] Could not unwrap sender key for ${dist.senderId}:`, skErr);
+                    }
                   }
                 }
               }
             }
           } catch {}
 
-          for (const msg of historyRes.data) {
-            // 1. Self-sent message hydration from memory cache or IndexedDB
-            if (msg.senderId === currentUserId) {
-              const localText =
-                (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
-                (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null) ||
-                (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
-                (msg.nonce ? await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`) : null) ||
-                (msg.id ? await getDecryptedMessage(currentUserId, msg.id) : null);
+          // 2. Also load user's own sender key for self-sent history replay if available
+          try {
+            const mySK = await getStoredSenderKey(groupId, currentUserId, currentUserId);
+            if (mySK) {
+              skMap.set(currentUserId, {
+                chainKey: mySK.chainKey,
+                iteration: mySK.iteration,
+              });
+            }
+          } catch {}
 
-              if (localText) {
-                const parsed = parseEditedText(localText).text;
-                decryptedTextsMap.set(msg.id, parsed);
-                sentPlaintextCacheRef.current.set(msg.id, parsed);
-                continue;
-              }
+          // 3. Process history messages in chronological order
+          for (const msg of historyRes.data) {
+            // Check local decrypted cache first (Zero-latency, replay-immune across page reloads)
+            let text =
+              (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
+              (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+              (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
+
+            if (!text && msg.id) {
+              text = await getDecryptedMessage(currentUserId, msg.id);
+            }
+            if (!text && msg.nonce) {
+              text = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
+            }
+            if (!text && msg.ciphertext) {
+              text = await getDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`);
             }
 
-            // 2. Incoming messages from other members via Sender Key
-            if (msg.ciphertext && msg.nonce && msg.senderKeyIteration != null && msg.senderId !== currentUserId) {
-              const sk = skMap.get(msg.senderId) || (await getStoredSenderKey(groupId, msg.senderId));
-              if (sk) {
+            if (text) {
+              const parsed = parseEditedText(text).text;
+              decryptedTextsMap.set(msg.id, parsed);
+              sentPlaintextCacheRef.current.set(msg.id, parsed);
+              if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, parsed);
+              if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, parsed);
+              // Advance in-memory sender key ratchet if this message used sender key
+              const targetIter = msg.senderKeyIteration;
+              if (targetIter != null && skMap.has(msg.senderId)) {
+                const skState = skMap.get(msg.senderId)!;
+                if (skState.iteration <= targetIter) {
+                  const adv = advanceChainKey(skState.chainKey, skState.iteration, targetIter);
+                  skMap.set(msg.senderId, { chainKey: adv.nextChainKey, iteration: adv.nextIteration });
+                }
+              }
+              continue;
+            }
+
+            // Incoming or sender-keyed messages: decrypt with in-memory chain key
+            if (msg.ciphertext && msg.nonce && (msg.senderKeyIteration != null || msg.messageType === 7)) {
+              const targetIter = msg.senderKeyIteration ?? 0;
+              const skState = skMap.get(msg.senderId);
+
+              if (skState && targetIter >= skState.iteration) {
                 try {
-                  const decResult = await decryptWithSenderKey(
+                  const decResult = decryptSenderMessageWithChainKey(
+                    skState.chainKey,
+                    skState.iteration,
+                    targetIter,
+                    msg.ciphertext,
+                    msg.nonce
+                  );
+                  const t = parseEditedText(decResult.plaintext).text;
+                  decryptedTextsMap.set(msg.id, t);
+                  sentPlaintextCacheRef.current.set(msg.id, t);
+                  if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
+                  if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, t);
+                  void storeDecryptedMessage(currentUserId, msg.id, t);
+                  if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
+                  if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, t);
+                  skMap.set(msg.senderId, {
+                    chainKey: decResult.nextChainKey,
+                    iteration: decResult.nextIteration,
+                  });
+                  continue;
+                } catch (skErr) {
+                  console.warn(`[useGroupChat] skMap decryption error for message ${msg.id}:`, skErr);
+                }
+              }
+
+              // Fallback to stored sender key in IndexedDB for incoming messages
+              if (msg.senderId !== currentUserId) {
+                try {
+                  const decResult = await decryptGroupSenderMessage(
+                    groupId,
+                    msg.senderId,
                     msg.ciphertext,
                     msg.nonce,
-                    sk.chainKey,
-                    msg.senderKeyIteration,
-                    sk.iteration
+                    targetIter,
+                    currentUserId
                   );
-                  decryptedTextsMap.set(msg.id, parseEditedText(decResult.text).text);
-                  sk.chainKey = decResult.updatedChainKey;
-                  sk.iteration = decResult.updatedIteration;
-                  await storeSenderKey(groupId, msg.senderId, {
-                    ...sk,
-                    chainKey: decResult.updatedChainKey,
-                    iteration: decResult.updatedIteration,
-                    updatedAt: new Date().toISOString(),
-                  });
+                  const t = parseEditedText(decResult.plaintext).text;
+                  decryptedTextsMap.set(msg.id, t);
+                  sentPlaintextCacheRef.current.set(msg.id, t);
+                  if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
+                  if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, t);
+                  void storeDecryptedMessage(currentUserId, msg.id, t);
+                  if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
+                  if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, t);
                   continue;
                 } catch {}
               }
             }
 
-            // 3. Fallback to symmetric group key or unencrypted ciphertext
+            // Fallback to symmetric group key or unencrypted ciphertext
             if (msg.ciphertext && msg.nonce && currentKey) {
               try {
                 const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, currentKey);
-                decryptedTextsMap.set(msg.id, parseEditedText(dec).text);
+                const t = parseEditedText(dec).text;
+                decryptedTextsMap.set(msg.id, t);
+                sentPlaintextCacheRef.current.set(msg.id, t);
+                if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
+                if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, t);
+                void storeDecryptedMessage(currentUserId, msg.id, t);
+                if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
+                if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, t);
               } catch {}
             } else if (msg.ciphertext && !msg.nonce) {
               decryptedTextsMap.set(msg.id, parseEditedText(msg.ciphertext).text);
+            }
+          }
+
+          // 4. Save the final ratcheted state of skMap into IndexedDB
+          for (const [sId, skState] of skMap.entries()) {
+            if (sId !== currentUserId) {
+              await storeSenderKey(groupId, sId, {
+                groupId,
+                senderId: sId,
+                chainKey: skState.chainKey,
+                iteration: skState.iteration,
+                senderKeyId: `sk_${sId}`,
+                updatedAt: new Date().toISOString(),
+              }, currentUserId);
             }
           }
 
@@ -559,7 +658,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     };
 
     setupGroupKey();
-  }, [groupId, currentUserId]);
+  }, [groupId, currentUserId, keysReady]);
 
   // ── Socket: Room Subscription ──────────────────────────────────────────────
   useEffect(() => {
@@ -653,7 +752,13 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
     const handleReceiveMessage = async (payload: any) => {
       if (payload.groupId !== groupId) return;
+      // 1. Deduplication guard: ignore if message already exists in state
+      if (payload.id && messagesRef.current.some((m) => m.id === payload.id)) {
+        return;
+      }
+
       const senderId = payload.senderId || payload.sender?.id || "unknown";
+      const effectiveUserId = currentUserIdRef.current || currentUserId;
 
       const knownMap = new Map<string, string>();
       messagesRef.current.forEach((m) => {
@@ -662,54 +767,61 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
       const resolvedReplyTo = await resolveGroupQuotedMessage(
         payload.replyTo,
-        currentUserIdRef.current,
+        effectiveUserId,
         groupKeyRef.current,
         knownMap
       );
 
       let text = "";
-      const isMyMessage = senderId === currentUserIdRef.current;
+      const isMyMessage = senderId === effectiveUserId;
 
-      if (isMyMessage) {
-        // Self-sent message: Retrieve directly from in-memory cache or IndexedDB
-        let cached =
-          (payload.nonce ? sentPlaintextCacheRef.current.get(payload.nonce) : null) ||
-          (payload.ciphertext ? sentPlaintextCacheRef.current.get(payload.ciphertext) : null) ||
-          (payload.id ? sentPlaintextCacheRef.current.get(payload.id) : null);
+      // Check local in-memory cache and IndexedDB first (Zero-latency & prevents ratchet replay errors)
+      let cached =
+        (payload.id ? sentPlaintextCacheRef.current.get(payload.id) : null) ||
+        (payload.nonce ? sentPlaintextCacheRef.current.get(payload.nonce) : null) ||
+        (payload.ciphertext ? sentPlaintextCacheRef.current.get(payload.ciphertext) : null);
 
+      if (!cached && effectiveUserId) {
+        if (payload.id) {
+          cached = await getDecryptedMessage(effectiveUserId, payload.id);
+        }
         if (!cached && payload.nonce) {
-          cached = await getDecryptedMessage(currentUserIdRef.current, `nonce_${payload.nonce}`);
+          cached = await getDecryptedMessage(effectiveUserId, `nonce_${payload.nonce}`);
         }
-        if (!cached && payload.id) {
-          cached = await getDecryptedMessage(currentUserIdRef.current, payload.id);
+        if (!cached && payload.ciphertext) {
+          cached = await getDecryptedMessage(effectiveUserId, `cipher_${payload.ciphertext}`);
         }
+      }
 
-        if (cached) {
-          text = parseEditedText(cached).text;
-          if (payload.id) {
-            sentPlaintextCacheRef.current.set(payload.id, text);
-            void storeDecryptedMessage(currentUserIdRef.current, payload.id, text);
-          }
+      if (cached) {
+        text = parseEditedText(cached).text;
+        if (payload.id) sentPlaintextCacheRef.current.set(payload.id, text);
+        if (payload.nonce) sentPlaintextCacheRef.current.set(payload.nonce, text);
+        if (payload.ciphertext) sentPlaintextCacheRef.current.set(payload.ciphertext, text);
+        if (effectiveUserId) {
+          if (payload.id) void storeDecryptedMessage(effectiveUserId, payload.id, text);
+          if (payload.nonce) void storeDecryptedMessage(effectiveUserId, `nonce_${payload.nonce}`, text);
+          if (payload.ciphertext) void storeDecryptedMessage(effectiveUserId, `cipher_${payload.ciphertext}`, text);
         }
       }
 
       // If not sender's message (or if not resolved from cache), proceed with sender key decryption
-      if (!text && payload.ciphertext && payload.nonce && payload.senderKeyIteration != null && !isMyMessage) {
+      if (!text && payload.ciphertext && payload.nonce && (payload.senderKeyIteration != null || payload.messageType === 7) && !isMyMessage) {
         try {
-          let sk = await getStoredSenderKey(groupId, senderId);
+          let sk = await getStoredSenderKey(groupId, senderId, effectiveUserId);
           if (!sk) {
             const skRes = await groupService.fetchSenderKeys(groupId);
             if (skRes.success && Array.isArray(skRes.data)) {
               const myDist = skRes.data.find((d: any) => d.senderId === senderId);
               if (myDist) {
-                const myPriv = await getUserPrivateKey(currentUserIdRef.current);
-                const senderPub = await resolveUserPublicKey(senderId);
-                if (myPriv && senderPub) {
+                const myPrivs = await getCandidatePrivateKeys(effectiveUserId);
+                const senderPubs = await resolveUserPublicKeys(senderId);
+                if (myPrivs.length > 0 && senderPubs.length > 0) {
                   const chainKey = unwrapSenderKeyFromMember(
                     myDist.encryptedKey,
                     myDist.nonce,
-                    senderPub,
-                    myPriv
+                    senderPubs,
+                    myPrivs
                   );
                   sk = {
                     groupId,
@@ -719,27 +831,84 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                     senderKeyId: `sk_${senderId}`,
                     updatedAt: new Date().toISOString(),
                   };
-                  await storeSenderKey(groupId, senderId, sk);
+                  await storeSenderKey(groupId, senderId, sk, effectiveUserId);
                 }
               }
             }
           }
 
           if (sk) {
-            const decResult = await decryptWithSenderKey(
-              payload.ciphertext,
-              payload.nonce,
-              sk.chainKey,
-              payload.senderKeyIteration,
-              sk.iteration
-            );
-            text = parseEditedText(decResult.text).text;
-            await storeSenderKey(groupId, senderId, {
-              ...sk,
-              chainKey: decResult.updatedChainKey,
-              iteration: decResult.updatedIteration,
-              updatedAt: new Date().toISOString(),
-            });
+            try {
+              const decResult = await decryptGroupSenderMessage(
+                groupId,
+                senderId,
+                payload.ciphertext,
+                payload.nonce,
+                payload.senderKeyIteration ?? 0,
+                effectiveUserId
+              );
+              text = parseEditedText(decResult.plaintext).text;
+              if (payload.id) sentPlaintextCacheRef.current.set(payload.id, text);
+              if (payload.nonce) sentPlaintextCacheRef.current.set(payload.nonce, text);
+              if (payload.ciphertext) sentPlaintextCacheRef.current.set(payload.ciphertext, text);
+              if (effectiveUserId) {
+                if (payload.id) void storeDecryptedMessage(effectiveUserId, payload.id, text);
+                if (payload.nonce) void storeDecryptedMessage(effectiveUserId, `nonce_${payload.nonce}`, text);
+                if (payload.ciphertext) void storeDecryptedMessage(effectiveUserId, `cipher_${payload.ciphertext}`, text);
+              }
+            } catch (decErr) {
+              console.warn(`[useGroupChat] Real-time sender key decryption error:`, decErr);
+              const errStr = String(decErr);
+              const isReplay = errStr.includes("replay") || errStr.includes("expired");
+              if (!isReplay) {
+                try {
+                  const skRes = await groupService.fetchSenderKeys(groupId);
+                  if (skRes.success && Array.isArray(skRes.data)) {
+                    const myDist = skRes.data.find((d: any) => d.senderId === senderId);
+                    if (myDist) {
+                      const myPrivs = await getCandidatePrivateKeys(effectiveUserId);
+                      const senderPubs = await resolveUserPublicKeys(senderId);
+                      if (myPrivs.length > 0 && senderPubs.length > 0) {
+                        const chainKey = unwrapSenderKeyFromMember(
+                          myDist.encryptedKey,
+                          myDist.nonce,
+                          senderPubs,
+                          myPrivs
+                        );
+                        const freshSk = {
+                          groupId,
+                          senderId,
+                          chainKey,
+                          iteration: myDist.iteration ?? 0,
+                          senderKeyId: `sk_${senderId}`,
+                          updatedAt: new Date().toISOString(),
+                        };
+                        await storeSenderKey(groupId, senderId, freshSk, effectiveUserId);
+                        const decResult = await decryptGroupSenderMessage(
+                          groupId,
+                          senderId,
+                          payload.ciphertext,
+                          payload.nonce,
+                          payload.senderKeyIteration ?? 0,
+                          effectiveUserId
+                        );
+                        text = parseEditedText(decResult.plaintext).text;
+                        if (payload.id) sentPlaintextCacheRef.current.set(payload.id, text);
+                        if (payload.nonce) sentPlaintextCacheRef.current.set(payload.nonce, text);
+                        if (payload.ciphertext) sentPlaintextCacheRef.current.set(payload.ciphertext, text);
+                        if (effectiveUserId) {
+                          if (payload.id) void storeDecryptedMessage(effectiveUserId, payload.id, text);
+                          if (payload.nonce) void storeDecryptedMessage(effectiveUserId, `nonce_${payload.nonce}`, text);
+                          if (payload.ciphertext) void storeDecryptedMessage(effectiveUserId, `cipher_${payload.ciphertext}`, text);
+                        }
+                      }
+                    }
+                  }
+                } catch (retryErr) {
+                  console.warn("[useGroupChat] Retry decryption with refreshed sender key failed:", retryErr);
+                }
+              }
+            }
           }
         } catch (skErr) {
           console.warn("[useGroupChat] Real-time sender key decryption error, checking group key fallback:", skErr);
@@ -750,6 +919,14 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         try {
           const dec = await decryptGroupMessage(payload.ciphertext, payload.nonce, groupKeyRef.current);
           text = parseEditedText(dec).text;
+          if (payload.id) sentPlaintextCacheRef.current.set(payload.id, text);
+          if (payload.nonce) sentPlaintextCacheRef.current.set(payload.nonce, text);
+          if (payload.ciphertext) sentPlaintextCacheRef.current.set(payload.ciphertext, text);
+          if (effectiveUserId) {
+            if (payload.id) void storeDecryptedMessage(effectiveUserId, payload.id, text);
+            if (payload.nonce) void storeDecryptedMessage(effectiveUserId, `nonce_${payload.nonce}`, text);
+            if (payload.ciphertext) void storeDecryptedMessage(effectiveUserId, `cipher_${payload.ciphertext}`, text);
+          }
         } catch {
           text = "🔒 Encrypted group message";
         }
@@ -1012,28 +1189,33 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
     const handleSenderKeyReceived = async (payload: any) => {
       if (payload.groupId !== groupId) return;
-      if (payload.recipientId !== currentUserIdRef.current) return;
+      const effectiveUserId = currentUserIdRef.current || currentUserId;
+      if (payload.recipientId && payload.recipientId !== effectiveUserId) return;
       try {
-        const myPrivKey = await getUserPrivateKey(currentUserIdRef.current);
-        const senderPubKey = await resolveUserPublicKey(payload.senderId);
-        if (!myPrivKey || !senderPubKey) return;
+        const myPrivs = await getCandidatePrivateKeys(effectiveUserId);
+        const senderPubs = await resolveUserPublicKeys(payload.senderId);
+        if (myPrivs.length === 0 || senderPubs.length === 0) return;
 
         const chainKey = unwrapSenderKeyFromMember(
           payload.encryptedKey,
           payload.nonce,
-          senderPubKey,
-          myPrivKey
+          senderPubs,
+          myPrivs
         );
 
-        await storeSenderKey(groupId, payload.senderId, {
+        await storeSenderKey(
           groupId,
-          senderId: payload.senderId,
-          chainKey,
-          iteration: payload.iteration ?? 0,
-          senderKeyId: `sk_${payload.senderId}`,
-          updatedAt: new Date().toISOString(),
-        });
-        console.log(`[useGroupChat] Stored incoming Sender Key for member ${payload.senderId}`);
+          payload.senderId,
+          {
+            groupId,
+            senderId: payload.senderId,
+            chainKey,
+            iteration: payload.iteration ?? 0,
+            senderKeyId: `sk_${payload.senderId}`,
+            updatedAt: new Date().toISOString(),
+          },
+          effectiveUserId
+        );
       } catch (err) {
         console.error("[useGroupChat] Error processing received sender key:", err);
       }
@@ -1159,6 +1341,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       let ciphertext: string | null = null;
       let nonce: string | null = null;
       let senderKeyIteration: number | null = null;
+      let messageType: number = 7;
 
       // Optimistic message setup
       const optimisticId = `optimistic-${Date.now()}`;
@@ -1200,9 +1383,13 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       if (text && currentUserId) {
         // 1. Attempt Signal-Grade Group Sender Key Protocol
         try {
-          let mySK = await getStoredSenderKey(groupId, currentUserId);
-          if (!mySK) {
+          let mySK = await getStoredSenderKey(groupId, currentUserId, currentUserId);
+          const activeMyPubKey = await getUserPublicKey(currentUserId);
+          const needsDistribution = !mySK || (mySK as any).identityPublicKey !== activeMyPubKey;
+
+          if (needsDistribution) {
             mySK = generateSenderKey(groupId, currentUserId);
+            (mySK as any).identityPublicKey = activeMyPubKey;
             const membersRes = await groupService.fetchGroupMembers(groupId);
             const membersList = (membersRes.data as any)?.members || [];
             const otherMembers = membersList.filter((m: any) => m.userId !== currentUserId);
@@ -1230,28 +1417,17 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                     groupId,
                     distributions,
                   });
-                  await storeSenderKey(groupId, currentUserId, mySK);
                 }
               }
-            } else {
-              // Creator or solo group
-              await storeSenderKey(groupId, currentUserId, mySK);
             }
+            await storeSenderKey(groupId, currentUserId, mySK, currentUserId);
           }
 
-          if (mySK) {
-            const enc = await encryptWithSenderKey(text, mySK.chainKey, mySK.iteration);
-            ciphertext = enc.ciphertext;
-            nonce = enc.nonce;
-            senderKeyIteration = enc.iteration;
-
-            await storeSenderKey(groupId, currentUserId, {
-              ...mySK,
-              chainKey: enc.nextChainKey,
-              iteration: enc.iteration + 1,
-              updatedAt: new Date().toISOString(),
-            });
-          }
+          const enc = await encryptGroupSenderMessage(groupId, currentUserId, text, currentUserId);
+          ciphertext = enc.ciphertext;
+          nonce = enc.nonce;
+          senderKeyIteration = enc.iteration;
+          messageType = 7;
         } catch (skErr) {
           console.warn("[useGroupChat] Sender key encryption failed, falling back to shared group key:", skErr);
         }
@@ -1261,8 +1437,10 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           const enc = await encryptGroupMessage(text, gKey);
           ciphertext = enc.ciphertext;
           nonce = enc.nonce;
+          messageType = 1;
         } else if (!ciphertext && !gKey) {
           ciphertext = text;
+          messageType = 1;
         }
 
         // Register ciphertext and nonce directly into sent message cache and IndexedDB
@@ -1272,6 +1450,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
         if (ciphertext) {
           sentPlaintextCacheRef.current.set(ciphertext, text);
+          void storeDecryptedMessage(currentUserId, `cipher_${ciphertext}`, text);
         }
       }
 
@@ -1279,6 +1458,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         groupId,
         ciphertext,
         nonce,
+        messageType: messageType || 7,
         senderKeyIteration,
         mediaUrl: mediaUrl || null,
         mediaType: mediaType || null,

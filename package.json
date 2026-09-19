@@ -16,6 +16,7 @@
     "@noble/ciphers": "^2.3.0",
     "@noble/curves": "^2.3.0",
     "@noble/hashes": "^2.3.0",
+    "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
     "axios": "^1.18.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

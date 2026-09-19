@@ -187,11 +187,22 @@ function ChatRouter() {
   const recipientIdFromQuery = searchParams.get("recipientId");
   const bizHandle = searchParams.get("bizHandle");
 
-  const [isGroup, setIsGroup] = useState<boolean>(() => typeParam === "group");
+  const [isGroup, setIsGroup] = useState<boolean>(() => {
+    if (typeParam === "group") return true;
+    if (typeof window !== "undefined" && conversationId) {
+      const cached = localStorage.getItem(`is_group_${conversationId}`);
+      if (cached === "true") return true;
+      if (cached === "false") return false;
+    }
+    return false;
+  });
 
   useEffect(() => {
     if (typeParam === "group") {
       setIsGroup(true);
+      if (typeof window !== "undefined" && conversationId) {
+        localStorage.setItem(`is_group_${conversationId}`, "true");
+      }
       return;
     }
     // Auto-detect if this ID belongs to a group when recipientId and bizHandle are absent
@@ -199,6 +210,13 @@ function ChatRouter() {
       groupService.fetchGroupDetails(conversationId).then((res) => {
         if (res?.success && res?.data) {
           setIsGroup(true);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`is_group_${conversationId}`, "true");
+          }
+        } else {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`is_group_${conversationId}`, "false");
+          }
         }
       }).catch(() => {});
     }

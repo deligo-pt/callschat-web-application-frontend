@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useUser } from "@/context/UserContext";
 import { E2EEContext } from "@/context/E2EEContext";
-import { generateAndStoreKeyPair, generatePreKeyBatch, generateSignedPreKey } from "@/utils/crypto";
+import { initSignalIdentity, getOrGenerateSignedPreKey, generatePreKeyBatch, getSignalProtocolStore } from "@/utils/signalCrypto";
 import { getUserPrivateKey, getUserPublicKey } from "@/utils/keyStore";
 import { chatService } from "@/services/chat.service";
 import { KeyRestoreModal } from "@/components/settings/KeyRestoreModal";
@@ -19,8 +19,10 @@ export function E2EEProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || !user?.id || isLoading) return;
 
     const currentUserId = user.id;
-    let privKey = await getUserPrivateKey(currentUserId);
-    let pubKey = await getUserPublicKey(currentUserId);
+
+    // 1. Check for cloud key backup if fresh device/browser
+    const privKey = await getUserPrivateKey(currentUserId);
+    const pubKey = await getUserPublicKey(currentUserId);
 
     if (!privKey || !pubKey) {
       if (!skipCloudCheck) {
@@ -32,65 +34,64 @@ export function E2EEProvider({ children }: { children: React.ReactNode }) {
             return; // Wait for user to enter PIN — keysReady stays false
           }
         } catch (backupCheckErr) {
-          console.warn("⚠️ [E2EEProvider] Cloud backup check error:", backupCheckErr);
+          console.warn('[E2EEProvider] Cloud backup check warning:', backupCheckErr);
         }
       }
-
-      pubKey = await generateAndStoreKeyPair(currentUserId);
-      privKey = await getUserPrivateKey(currentUserId);
     }
+
+    // 2. Initialize official Signal Protocol Identity (33-byte DJB Identity Key + Registration ID)
+    const signalIdentity = await initSignalIdentity(currentUserId);
 
     const deviceId = `web-${currentUserId}`;
-    localStorage.setItem("deviceId", deviceId);
-    const existingRegId = localStorage.getItem("registrationId") || undefined;
-
-    try {
-      const res = await chatService.uploadPublicKey(deviceId, pubKey!, existingRegId);
-      if (res?.registrationId) {
-        localStorage.setItem("registrationId", res.registrationId);
-      }
-      console.log("✅ [E2EEProvider] Public key uploaded for user:", currentUserId);
-    } catch (e) {
-      console.error("❌ [E2EEProvider] Failed to upload public key", e);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('deviceId', deviceId);
+      localStorage.setItem('registrationId', String(signalIdentity.registrationId));
     }
 
-    // ── X3DH Pre-Key Pool Replenishment (Signal/WhatsApp Architecture) ─────
+    // 3. Register Signal Identity Key with Backend Directory
     try {
-      if (privKey) {
-        const signedPreKey = await generateSignedPreKey(currentUserId, 1, privKey);
+      const res = await chatService.uploadPublicKey(
+        deviceId,
+        signalIdentity.identityKeyBase64,
+        String(signalIdentity.registrationId)
+      );
+      if (res?.registrationId && typeof window !== 'undefined') {
+        localStorage.setItem('registrationId', String(res.registrationId));
+      }
+    } catch (e) {
+      console.error('[E2EEProvider] Failed to upload public key to directory:', e);
+    }
 
-        const preKeyCount = await chatService.fetchPreKeyCount(deviceId);
-        console.log("🔑 [E2EEProvider] Current unconsumed OPK count:", preKeyCount);
+    // 4. X3DH Pre-Key Pool Replenishment (Signal Protocol Architecture)
+    try {
+      const signedPreKey = await getOrGenerateSignedPreKey(currentUserId, 1);
+      const store = getSignalProtocolStore(currentUserId);
+      const localOpkCount = await store.getLocalPreKeyCount();
+      const serverPreKeyCount = await chatService.fetchPreKeyCount(deviceId);
 
-        if (preKeyCount < 20) {
-          console.log("⚡ [E2EEProvider] Replenishing One-Time Prekeys pool...");
-          const startId = (Date.now() % 1000000) + Math.floor(Math.random() * 1000);
-          const oneTimePreKeys = await generatePreKeyBatch(currentUserId, startId, 50);
+      // If either local store or server pool has fewer than 20 OPKs, regenerate a fresh batch of 50 OPKs
+      if (localOpkCount < 20 || serverPreKeyCount < 20) {
+        const startId = (Date.now() % 1000000) + Math.floor(Math.random() * 1000);
+        const oneTimePreKeys = await generatePreKeyBatch(currentUserId, startId, 50);
 
-          await chatService.uploadPreKeys({
-            deviceId,
-            signedPreKey,
-            oneTimePreKeys,
-          });
-          console.log("✅ [E2EEProvider] Replenished 50 OPKs & refreshed Signed PreKey!");
-        } else {
-          // Only refresh the signed pre-key (no new OPKs needed yet)
-          await chatService.uploadPreKeys({
-            deviceId,
-            signedPreKey,
-          });
-          console.log("✅ [E2EEProvider] Refreshed Signed PreKey (OPK pool sufficient).");
-        }
+        await chatService.uploadPreKeys({
+          deviceId,
+          signedPreKey,
+          oneTimePreKeys,
+        });
+      } else {
+        await chatService.uploadPreKeys({
+          deviceId,
+          signedPreKey,
+        });
       }
     } catch (preKeyErr) {
-      console.warn("⚠️ [E2EEProvider] Prekey check/upload warning:", preKeyErr);
+      console.warn('[E2EEProvider] Pre-key check/upload warning:', preKeyErr);
     }
 
-    // ── Signal keysReady LAST so consumers see a fully initialised state ──
-    const finalPubKey = await getUserPublicKey(currentUserId);
-    setMyPublicKey(finalPubKey);
+    // 5. Broadcast keysReady with Signal Identity Public Key
+    setMyPublicKey(signalIdentity.identityKeyBase64);
     setKeysReady(true);
-    console.log("🔓 [E2EEProvider] Keys ready — broadcasting keysReady=true");
   }, [user, isLoading]);
 
   useEffect(() => {

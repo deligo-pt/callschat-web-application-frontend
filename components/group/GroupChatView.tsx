@@ -82,6 +82,7 @@ import { GroupSettingsDrawer } from "@/components/group/GroupSettingsDrawer";
 import { AddMemberModal } from "@/components/group/AddMemberModal";
 import { useTranslations } from "next-intl";
 import { useGroupStore } from "@/hooks/useGroupStore";
+import { useUser } from "@/context/UserContext";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 
 function parseJwt(token: string) {
@@ -116,17 +117,24 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
 
   const { startGroupCall, joinGroupCall, activeGroupCalls } = useCallContext();
   const { socket } = useSocket();
+  const { user } = useUser();
 
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("accessToken");
       if (token) {
         const decoded = parseJwt(token);
-        return decoded?.sub || decoded?.id || "";
+        if (decoded?.sub || decoded?.id) return decoded.sub || decoded.id;
       }
     }
-    return "";
+    return user?.id || "";
   });
+
+  useEffect(() => {
+    if (user?.id && user.id !== currentUserId) {
+      setCurrentUserId(user.id);
+    }
+  }, [user?.id, currentUserId]);
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,13 +168,6 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      const decoded = parseJwt(token);
-      if (decoded?.sub) setCurrentUserId(decoded.sub);
-    }
-  }, []);
 
   const {
     messages,
