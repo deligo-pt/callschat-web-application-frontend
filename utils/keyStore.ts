@@ -208,6 +208,7 @@ export interface LocalKeyBundle {
   } | null;
   senderKeys?: Record<string, any> | null;
   groupKeys?: Record<string, string> | null;
+  decryptedMessages?: Record<string, string> | null;
   timestamp?: number;
 }
 
@@ -255,6 +256,7 @@ export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBund
 
   const senderKeys: Record<string, any> = {};
   const groupKeys: Record<string, string> = {};
+  const decryptedMessages: Record<string, string> = {};
   if (typeof window !== 'undefined') {
     try {
       const allEntries = await entries();
@@ -264,10 +266,12 @@ export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBund
           senderKeys[keyStr] = v;
         } else if (keyStr.startsWith(`groupKey_`) && keyStr.includes(`_${userId}`)) {
           groupKeys[keyStr] = String(v);
+        } else if (keyStr.startsWith(`msg_text_${userId}_`)) {
+          decryptedMessages[keyStr] = String(v);
         }
       }
     } catch (err) {
-      console.warn('[keyStore] Could not export group/sender keys from IndexedDB:', err);
+      console.warn('[keyStore] Could not export group/sender/decrypted keys from IndexedDB:', err);
     }
   }
 
@@ -286,6 +290,7 @@ export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBund
     signalIdentity,
     senderKeys: Object.keys(senderKeys).length > 0 ? senderKeys : null,
     groupKeys: Object.keys(groupKeys).length > 0 ? groupKeys : null,
+    decryptedMessages: Object.keys(decryptedMessages).length > 0 ? decryptedMessages : null,
     timestamp: Date.now(),
   };
 };
@@ -362,6 +367,14 @@ export const restoreLocalKeyBundle = async (
 
   if (bundle.groupKeys && typeof bundle.groupKeys === 'object') {
     for (const [k, v] of Object.entries(bundle.groupKeys)) {
+      try {
+        await safeSet(k, v);
+      } catch {}
+    }
+  }
+
+  if (bundle.decryptedMessages && typeof bundle.decryptedMessages === 'object') {
+    for (const [k, v] of Object.entries(bundle.decryptedMessages)) {
       try {
         await safeSet(k, v);
       } catch {}

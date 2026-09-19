@@ -954,6 +954,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
         onClose={() => setIsInviteModalOpen(false)}
         groupId={groupId}
         groupName={groupName}
+        groupAvatar={groupDetails?.avatarUrl}
         isAdmin={isAdmin}
         joinApprovalMode={groupDetails?.joinApprovalMode}
       />
