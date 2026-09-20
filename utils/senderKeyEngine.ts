@@ -49,12 +49,15 @@ export function bytesToUtf8(bytes: Uint8Array): string {
 export function generateSenderKey(groupId: string, senderId: string): StoredSenderKey {
   const chainKeyBytes = randomBytes(32);
   const senderKeyId = `sk_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const chainKey = bytesToBase64(chainKeyBytes);
   return {
     groupId,
     senderId,
-    chainKey: bytesToBase64(chainKeyBytes),
+    chainKey,
     iteration: 0,
     senderKeyId,
+    initialChainKey: chainKey,
+    distributedTo: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -78,6 +81,9 @@ export function ratchetSenderKey(
 export function normalizeCurve25519Key(bytes: Uint8Array): Uint8Array {
   if (bytes.length === 33 && bytes[0] === 0x05) {
     return bytes.slice(1);
+  }
+  if (bytes.length === 64) {
+    return bytes.slice(0, 32);
   }
   return bytes;
 }
@@ -127,6 +133,9 @@ export function unwrapSenderKeyFromMember(
       try {
         const senderPub = normalizeCurve25519Key(base64ToBytes(senderPubStr));
         const myPriv = normalizeCurve25519Key(base64ToBytes(myPrivStr));
+        if (senderPub.length !== 32 || myPriv.length !== 32) {
+          continue;
+        }
         const sharedSecret = x25519.getSharedSecret(myPriv, senderPub);
 
         // 1. Standard SHA-256 wrapping key derivation
@@ -222,6 +231,20 @@ export async function decryptGroupSenderMessage(
   }
 
   if (targetIteration < record.iteration) {
+    if (record.initialChainKey) {
+      // Replay from initialChainKey at iteration 0 for out-of-order or earlier messages
+      const dec = decryptSenderMessageWithChainKey(
+        record.initialChainKey,
+        0,
+        targetIteration,
+        ciphertextBase64,
+        nonceBase64
+      );
+      return {
+        plaintext: dec.plaintext,
+        iteration: targetIteration,
+      };
+    }
     throw new Error(
       `Received expired or replay iteration ${targetIteration} < current ${record.iteration}`
     );

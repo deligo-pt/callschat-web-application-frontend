@@ -441,6 +441,9 @@ export interface StoredSenderKey {
   chainKey: string;
   iteration: number;
   senderKeyId: string;
+  initialChainKey?: string;
+  distributedTo?: string[];
+  identityPublicKey?: string;
   updatedAt: string;
 }
 

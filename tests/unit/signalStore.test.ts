@@ -5,7 +5,7 @@ import {
   getSignalProtocolStore,
   withSessionLock,
   ensureArrayBuffer,
-} from '../../utils/signalStore.ts';
+} from '../../utils/signalStore';
 
 const require = createRequire(import.meta.url);
 const libsignal = require('@privacyresearch/libsignal-protocol-typescript');

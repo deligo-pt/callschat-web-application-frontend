@@ -9,8 +9,8 @@ import {
   decryptSenderMessageWithChainKey,
   advanceChainKey,
   bytesToBase64,
-} from '../../utils/senderKeyEngine.ts';
-import { storeSenderKey, getStoredSenderKey } from '../../utils/keyStore.ts';
+} from '../../utils/senderKeyEngine';
+import { storeSenderKey, getStoredSenderKey } from '../../utils/keyStore';
 
 async function runTests() {
   console.log('--- Running Group Sender Key Protocol Engine Unit Tests ---');

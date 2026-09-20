@@ -15,6 +15,7 @@ import {
   unwrapSenderKeyFromMember,
   encryptGroupSenderMessage,
   decryptGroupSenderMessage,
+  decryptSenderMessageWithChainKey,
 } from '../../utils/senderKeyEngine';
 import {
   exportLocalKeyBundle,
@@ -51,6 +52,8 @@ async function runIntegratedE2EETests() {
 
   // 2. 1-to-1 Messaging Flow: Alice initiates session with Bob
   const bobPreKeyBundle = {
+    userId: userBob,
+    deviceId: 1,
     identityKey: bobIdentity.identityKeyBase64,
     registrationId: bobIdentity.registrationId,
     signedPreKey: {
@@ -58,7 +61,7 @@ async function runIntegratedE2EETests() {
       publicKey: bobSPK.publicKey,
       signature: bobSPK.signature,
     },
-    preKey: {
+    oneTimePreKey: {
       keyId: bobOPKs[0]!.keyId,
       publicKey: bobOPKs[0]!.publicKey,
     },
@@ -193,7 +196,151 @@ async function runIntegratedE2EETests() {
   assert.strictEqual(charlieDec2.iteration, 1);
   console.log('✓ Charlie caught up ratchet and decrypted msg 2 out-of-order');
 
-  // 5. Key Vault Export and Restore
+  // Alice sends Message 3 before David joins
+  const gMsg3 = await encryptGroupSenderMessage(groupId, userAlice, 'Group Message 3: Scope finalized', userAlice);
+  assert.strictEqual(gMsg3.iteration, 2);
+
+  // 5. Late-Joining Member (David) History Replay & Bi-directional Group Messaging
+  const userDavid = 'user_david_' + Date.now();
+  await initSignalIdentity(userDavid);
+  const davidPub = await getUserPublicKey(userDavid);
+  const davidPriv = await getUserPrivateKey(userDavid);
+  assert.ok(davidPub && davidPriv);
+
+  // Alice checks group members, detects David is new, and distributes initialChainKey (iteration 0)
+  const storedAliceSK = await getStoredSenderKey(groupId, userAlice, userAlice);
+  assert.ok(storedAliceSK && storedAliceSK.initialChainKey);
+  const wrapDavid = wrapSenderKeyForMember(storedAliceSK.initialChainKey, davidPub, alicePriv);
+
+  // David unwraps Alice's sender key
+  const davidUnwrappedCK = unwrapSenderKeyFromMember(wrapDavid.encryptedKey, wrapDavid.nonce, alicePub, davidPriv);
+  assert.strictEqual(davidUnwrappedCK, aliceSK.initialChainKey);
+
+  // David stores Alice's sender key at iteration 0 with initialChainKey preserved
+  await storeSenderKey(
+    groupId,
+    userAlice,
+    {
+      groupId,
+      senderId: userAlice,
+      chainKey: davidUnwrappedCK,
+      iteration: 0,
+      initialChainKey: davidUnwrappedCK,
+      senderKeyId: `sk_${userAlice}`,
+      updatedAt: new Date().toISOString(),
+    },
+    userDavid
+  );
+
+  // David fetches past history and replays from iteration 0 using in-memory ratchet state
+  let davidReplayCK = davidUnwrappedCK;
+  let davidReplayIter = 0;
+
+  const historyMessages = [gMsg1, gMsg2, gMsg3];
+  const davidDecryptedHistory: string[] = [];
+
+  for (const hMsg of historyMessages) {
+    const decRes = decryptSenderMessageWithChainKey(
+      davidReplayCK,
+      davidReplayIter,
+      hMsg.iteration,
+      hMsg.ciphertext,
+      hMsg.nonce
+    );
+    davidDecryptedHistory.push(decRes.plaintext);
+    davidReplayCK = decRes.nextChainKey;
+    davidReplayIter = decRes.nextIteration;
+  }
+
+  assert.deepStrictEqual(davidDecryptedHistory, [
+    'Group Message 1: Project kickoff',
+    'Group Message 2: Architecture approved',
+    'Group Message 3: Scope finalized',
+  ]);
+  console.log('✓ Late-joining member David successfully decrypted all 3 historical messages via initialChainKey replay');
+
+  // David persists ratcheted state after history replay so live messages decrypt seamlessly
+  await storeSenderKey(
+    groupId,
+    userAlice,
+    {
+      groupId,
+      senderId: userAlice,
+      chainKey: davidReplayCK,
+      iteration: davidReplayIter,
+      initialChainKey: davidUnwrappedCK,
+      senderKeyId: `sk_${userAlice}`,
+      updatedAt: new Date().toISOString(),
+    },
+    userDavid
+  );
+
+  // David replies to the group with his own fresh Sender Key
+  const davidSK = generateSenderKey(groupId, userDavid);
+  await storeSenderKey(groupId, userDavid, davidSK, userDavid);
+  const wrapAliceFromDavid = wrapSenderKeyForMember(davidSK.chainKey, alicePub, davidPriv);
+
+  // Alice unwraps David's sender key
+  const aliceUnwrappedDavidCK = unwrapSenderKeyFromMember(
+    wrapAliceFromDavid.encryptedKey,
+    wrapAliceFromDavid.nonce,
+    davidPub,
+    alicePriv
+  );
+  await storeSenderKey(
+    groupId,
+    userDavid,
+    {
+      groupId,
+      senderId: userDavid,
+      chainKey: aliceUnwrappedDavidCK,
+      iteration: 0,
+      initialChainKey: aliceUnwrappedDavidCK,
+      senderKeyId: `sk_${userDavid}`,
+      updatedAt: new Date().toISOString(),
+    },
+    userAlice
+  );
+
+  // David encrypts and sends message
+  const gMsgDavid = await encryptGroupSenderMessage(
+    groupId,
+    userDavid,
+    'David: Thanks for adding me! I have read all past messages.',
+    userDavid
+  );
+  const aliceDecDavid = await decryptGroupSenderMessage(
+    groupId,
+    userDavid,
+    gMsgDavid.ciphertext,
+    gMsgDavid.nonce,
+    gMsgDavid.iteration,
+    userAlice
+  );
+  assert.strictEqual(aliceDecDavid.plaintext, 'David: Thanks for adding me! I have read all past messages.');
+  console.log('✓ Alice successfully decrypted late-joining member David\'s first group message');
+
+  // Alice sends live message 4, which David decrypts in real-time
+  const gMsg4 = await encryptGroupSenderMessage(
+    groupId,
+    userAlice,
+    'Group Message 4: Welcome to the team David!',
+    userAlice
+  );
+  assert.strictEqual(gMsg4.iteration, 3);
+
+  const davidDec4 = await decryptGroupSenderMessage(
+    groupId,
+    userAlice,
+    gMsg4.ciphertext,
+    gMsg4.nonce,
+    gMsg4.iteration,
+    userDavid
+  );
+  assert.strictEqual(davidDec4.plaintext, 'Group Message 4: Welcome to the team David!');
+  console.log('✓ Late-joining member David decrypted live ongoing Message 4 without ratchet errors');
+
+  // 6. Key Vault Export and Restore
   const aliceBackup = await exportLocalKeyBundle(userAlice);
   assert.ok(aliceBackup);
   assert.ok(aliceBackup.signalIdentity);

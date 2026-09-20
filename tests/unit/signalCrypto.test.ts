@@ -9,7 +9,7 @@ import {
   decrypt1to1Message,
   computeSignalFingerprint,
   hasActiveSignalSession,
-} from '../../utils/signalCrypto.ts';
+} from '../../utils/signalCrypto';
 
 async function runTests() {
   console.log('--- Running Signal 1-to-1 Crypto Engine Unit Tests ---');
