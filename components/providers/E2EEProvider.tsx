@@ -92,16 +92,22 @@ export function E2EEProvider({ children }: { children: React.ReactNode }) {
     // 5. Broadcast keysReady with Signal Identity Public Key
     setMyPublicKey(signalIdentity.identityKeyBase64);
     setKeysReady(true);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("e2ee:keys_restored"));
+    }
   }, [user, isLoading]);
 
   useEffect(() => {
     initKeys(false);
   }, [initKeys]);
 
-  const handleRestored = () => {
+  const handleRestored = async () => {
     setShowRestoreModal(false);
     setRestoreBackupData(null);
-    initKeys(true);
+    await initKeys(true);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("e2ee:keys_restored"));
+    }
   };
 
   const handleSkipRestore = () => {

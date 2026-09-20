@@ -479,3 +479,34 @@ export const clearSenderKey = async (
   }
   await safeDel(`group_sender_key_${groupId}_${senderId}`);
 };
+
+// -----------------------------------------------------------------------------
+// Vault Sync Session Credentials (IndexedDB & SessionStorage)
+// -----------------------------------------------------------------------------
+
+export const storeVaultSessionPin = async (userId: string, pin: string): Promise<void> => {
+  if (typeof window === 'undefined' || !userId) return;
+  try {
+    sessionStorage.setItem('e2ee_vault_pin_session', pin);
+    await safeSet(`vault_pin_${userId}`, pin);
+  } catch {}
+};
+
+export const getVaultSessionPin = async (userId: string): Promise<string | null> => {
+  if (typeof window === 'undefined' || !userId) return null;
+  try {
+    const session = sessionStorage.getItem('e2ee_vault_pin_session');
+    if (session) return session;
+    return await safeGet<string>(`vault_pin_${userId}`);
+  } catch {
+    return null;
+  }
+};
+
+export const clearVaultSessionPin = async (userId: string): Promise<void> => {
+  if (typeof window === 'undefined' || !userId) return;
+  try {
+    sessionStorage.removeItem('e2ee_vault_pin_session');
+    await safeDel(`vault_pin_${userId}`);
+  } catch {}
+};

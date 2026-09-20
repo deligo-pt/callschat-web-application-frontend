@@ -211,9 +211,17 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       fetchData();
     };
+    const handleKeysRestored = () => {
+      console.log("[ChatsLayout] Detected e2ee:keys_restored event, re-fetching conversation list...");
+      fetchData();
+    };
     if (typeof window !== "undefined") {
       window.addEventListener("workspaceModeChanged", handleWorkspaceChange);
-      return () => window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
+      window.addEventListener("e2ee:keys_restored", handleKeysRestored);
+      return () => {
+        window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
+        window.removeEventListener("e2ee:keys_restored", handleKeysRestored);
+      };
     }
   }, [fetchData, currentMode]);
 

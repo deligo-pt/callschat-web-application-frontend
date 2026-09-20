@@ -33,6 +33,7 @@ import {
   createSignalAddress,
 } from "@/utils/signalCrypto";
 import { compressImage } from "@/utils/image";
+import { queueVaultSync } from "@/utils/vaultSync";
 import { toast } from "sonner";
 
 export interface MessageReceipt {
@@ -211,6 +212,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const { socket, isConnected } = useSocket();
   // E2EE readiness signal from E2EEProvider â€” true once initKeys() has fully completed.
   const { keysReady } = useE2EE();
+  const [keysRestoredVersion, setKeysRestoredVersion] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
   const [myPrivateKey, setMyPrivateKey] = useState<string | null>(null);
@@ -313,25 +315,72 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     if (!privKey) return;
 
     const pendingMsgs = messagesRef.current.filter(
-      (m) => m.isDecryptionPending && m.rawCiphertext && m.rawNonce
+      (m) => m.isDecryptionPending && m.rawCiphertext
     );
     if (pendingMsgs.length === 0) return;
 
     void (async () => {
       const decryptedMap = new Map<string, string>();
       for (const m of pendingMsgs) {
-        const keysToTry: string[] = [];
-        if (recipientPublicKeyRef.current) keysToTry.push(recipientPublicKeyRef.current);
-        if (myPublicKeyRef.current) keysToTry.push(myPublicKeyRef.current);
+        // 1. Check persistent IndexedDB cache first (e.g. restored from vault by ID, nonce, or ciphertext)
+        let locallyStored = await getDecryptedMessage(currentUserIdRef.current, m.id);
+        if (!locallyStored && m.rawNonce) {
+          locallyStored = await getDecryptedMessage(currentUserIdRef.current, `nonce_${m.rawNonce}`);
+        }
+        if (!locallyStored && m.rawCiphertext) {
+          locallyStored =
+            (await getDecryptedMessage(currentUserIdRef.current, m.rawCiphertext)) ||
+            (await getDecryptedMessage(currentUserIdRef.current, `cipher_${m.rawCiphertext}`));
+        }
+        if (locallyStored) {
+          decryptedMap.set(m.id, locallyStored);
+          continue;
+        }
 
-        for (const key of keysToTry) {
+        const isSignal = m.rawMessageType === 2 || m.rawMessageType === 3 || m.rawEncryptedKeys?.protocol === 'libsignal';
+
+        // 2. If self-sent message with selfEncryptedSessionKey
+        if (m.senderId === currentUserIdRef.current && m.rawEncryptedKeys?.selfEncryptedSessionKey) {
           try {
-            const dec = await decryptMessage(m.rawCiphertext!, m.rawNonce!, key, privKey);
+            const selfEnc = m.rawEncryptedKeys.selfEncryptedSessionKey;
+            const myPub = myPublicKeyRef.current || myPublicKey;
+            if (myPub && privKey) {
+              const decSelf = await decryptMessage(selfEnc.ciphertext, selfEnc.nonce, myPub, privKey);
+              if (decSelf) {
+                const t = parseEditedText(decSelf).text;
+                decryptedMap.set(m.id, t);
+                void storeDecryptedMessage(currentUserIdRef.current, m.id, t);
+                if (m.rawNonce) void storeDecryptedMessage(currentUserIdRef.current, `nonce_${m.rawNonce}`, t);
+                if (m.rawCiphertext) {
+                  void storeDecryptedMessage(currentUserIdRef.current, m.rawCiphertext, t);
+                  void storeDecryptedMessage(currentUserIdRef.current, `cipher_${m.rawCiphertext}`, t);
+                }
+                continue;
+              }
+            }
+          } catch {}
+        }
+
+        // 3. Libsignal decryption if peer message
+        if (isSignal && m.senderId && m.senderId !== currentUserIdRef.current) {
+          try {
+            const dec = await decrypt1to1Message(
+              currentUserIdRef.current,
+              m.senderId,
+              m.rawCiphertext!,
+              m.rawMessageType ?? 2,
+              1
+            );
             if (dec) {
               const t = parseEditedText(dec).text;
               decryptedMap.set(m.id, t);
               void storeDecryptedMessage(currentUserIdRef.current, m.id, t);
-              break;
+              if (m.rawNonce) void storeDecryptedMessage(currentUserIdRef.current, `nonce_${m.rawNonce}`, t);
+              if (m.rawCiphertext) {
+                void storeDecryptedMessage(currentUserIdRef.current, m.rawCiphertext, t);
+                void storeDecryptedMessage(currentUserIdRef.current, `cipher_${m.rawCiphertext}`, t);
+              }
+              continue;
             }
           } catch { /* try next key candidate */ }
         }
@@ -349,7 +398,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myPrivateKey]);
 
-  // â”€â”€ Auto-Retry Dispatcher (Receiver-Side) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // —— Auto-Retry Dispatcher (Receiver-Side) —————————————————————————————
   const requestRetryForMessage = useCallback(
     (messageId: string, convId: string) => {
       if (!socket || !isConnected) return;
@@ -372,17 +421,31 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   );
 
   // â”€â”€ Key Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  useEffect(() => {
+  const loadKeys = useCallback(async () => {
     if (typeof window === "undefined" || !currentUserId) return;
-    const loadKeys = async () => {
-      await migrateKeysFromLocalStorage(currentUserId);
-      const privKey = await getUserPrivateKey(currentUserId);
-      const pubKey = await getUserPublicKey(currentUserId);
-      setMyPrivateKey(privKey);
-      setMyPublicKey(pubKey);
-    };
-    loadKeys();
+    await migrateKeysFromLocalStorage(currentUserId);
+    const privKey = await getUserPrivateKey(currentUserId);
+    const pubKey = await getUserPublicKey(currentUserId);
+    setMyPrivateKey(privKey);
+    setMyPublicKey(pubKey);
+    myPrivateKeyRef.current = privKey;
+    myPublicKeyRef.current = pubKey;
   }, [currentUserId]);
+
+  useEffect(() => {
+    loadKeys();
+  }, [loadKeys, keysReady, keysRestoredVersion]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleKeysRestored = () => {
+      console.log("[useChat] Detected e2ee:keys_restored event, re-loading keys and triggering re-decryption...");
+      loadKeys();
+      setKeysRestoredVersion((v) => v + 1);
+    };
+    window.addEventListener("e2ee:keys_restored", handleKeysRestored);
+    return () => window.removeEventListener("e2ee:keys_restored", handleKeysRestored);
+  }, [loadKeys]);
 
   // â”€â”€ Fetch Recipient Public Key â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
@@ -463,15 +526,28 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 continue;
               }
 
-              // Check persistent IndexedDB cache first (by message ID or nonce)
-              let locallyStored = await getDecryptedMessage(currentUserId, msg.id);
+              // Check persistent IndexedDB cache first (by message ID, nonce, or ciphertext)
+              let locallyStored =
+                (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
+                (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+                (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
+
+              if (!locallyStored && msg.id) {
+                locallyStored = await getDecryptedMessage(currentUserId, msg.id);
+              }
               if (!locallyStored && msg.nonce) {
                 locallyStored = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
+              }
+              if (!locallyStored && msg.ciphertext) {
+                locallyStored =
+                  (await getDecryptedMessage(currentUserId, msg.ciphertext)) ||
+                  (await getDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`));
               }
               if (locallyStored) {
                 decryptedTextsMap.set(msg.id, locallyStored);
                 sentPlaintextCacheRef.current.set(msg.id, locallyStored);
                 if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, locallyStored);
+                if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, locallyStored);
                 continue;
               }
 
@@ -679,19 +755,28 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   decryptedTextsMap
                 );
 
+                let msgEncKeys = msg.encryptedKeys as any;
+                if (typeof msgEncKeys === "string") {
+                  try { msgEncKeys = JSON.parse(msgEncKeys); } catch {}
+                }
+                const isSignalMsg =
+                  msg.messageType === 2 ||
+                  msg.messageType === 3 ||
+                  msgEncKeys?.protocol === 'libsignal';
+
                 const isPendingDecryption =
                   !decryptedTextsMap.has(msg.id) &&
                   !!msg.ciphertext &&
                   !isBizChat &&
                   !isTicketMessage &&
-                  !!msg.nonce;
+                  (!!msg.nonce || isSignalMsg);
 
                 const text =
                   decryptedTextsMap.get(msg.id) ??
                   (msg.ciphertext
-                    ? isBizChat || !msg.nonce
+                    ? isBizChat || (!msg.nonce && !isSignalMsg)
                       ? parseEditedText(msg.ciphertext).text
-                      : "â³ Waiting for this message. This may take a while."
+                      : "⏳ Waiting for this message. This may take a while."
                     : "");
 
                 return {
@@ -760,7 +845,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     };
 
     loadHistory();
-  }, [conversationId, myPrivateKey, myPublicKey, recipientPublicKey, currentUserId, activePeerId]);
+  }, [conversationId, myPrivateKey, myPublicKey, recipientPublicKey, currentUserId, activePeerId, keysReady, keysRestoredVersion]);
 
   // â”€â”€ Socket: Join Room â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Separate effect so room join doesn't re-fire when keys change
@@ -1005,11 +1090,23 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               }
             }
 
-            // 3. Check IndexedDB persistent store for nonce or ID
+            // 3. Check IndexedDB persistent store for nonce, ID, or ciphertext
             if (!decryptedRealtime) {
-              let stored = await getDecryptedMessage(currentUserIdRef.current, payload.id);
+              let stored =
+                (payload.id ? sentPlaintextCacheRef.current.get(payload.id) : null) ||
+                (payload.nonce ? sentPlaintextCacheRef.current.get(payload.nonce) : null) ||
+                (payload.ciphertext ? sentPlaintextCacheRef.current.get(payload.ciphertext) : null);
+
+              if (!stored && payload.id) {
+                stored = await getDecryptedMessage(currentUserIdRef.current, payload.id);
+              }
               if (!stored && payload.nonce) {
                 stored = await getDecryptedMessage(currentUserIdRef.current, `nonce_${payload.nonce}`);
+              }
+              if (!stored && payload.ciphertext) {
+                stored =
+                  (await getDecryptedMessage(currentUserIdRef.current, payload.ciphertext)) ||
+                  (await getDecryptedMessage(currentUserIdRef.current, `cipher_${payload.ciphertext}`));
               }
               if (stored) {
                 text = stored;
@@ -1205,13 +1302,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           console.log("âœ… [Socket] Decrypted message:", text);
 
           // Cache message in volatile memory and durable IndexedDB
-          if (text && payload.id) {
-            sentPlaintextCacheRef.current.set(payload.id, text);
-            void storeDecryptedMessage(currentUserIdRef.current, payload.id, text);
+          if (text) {
+            if (payload.id) {
+              sentPlaintextCacheRef.current.set(payload.id, text);
+              void storeDecryptedMessage(currentUserIdRef.current, payload.id, text);
+            }
             if (payload.nonce) {
               sentPlaintextCacheRef.current.set(payload.nonce, text);
               void storeDecryptedMessage(currentUserIdRef.current, `nonce_${payload.nonce}`, text);
             }
+            if (payload.ciphertext) {
+              sentPlaintextCacheRef.current.set(payload.ciphertext, text);
+              void storeDecryptedMessage(currentUserIdRef.current, payload.ciphertext, text);
+              void storeDecryptedMessage(currentUserIdRef.current, `cipher_${payload.ciphertext}`, text);
+            }
+            queueVaultSync(currentUserIdRef.current);
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("chat:message_decrypted", {
@@ -2560,9 +2665,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           if (ciphertext) {
             sentPlaintextCacheRef.current.set(ciphertext, text);
             void storeDecryptedMessage(currentUserId, ciphertext, text);
+            void storeDecryptedMessage(currentUserId, `cipher_${ciphertext}`, text);
           }
           sentPlaintextCacheRef.current.set(optimisticId, text);
           void storeDecryptedMessage(currentUserId, optimisticId, text);
+          queueVaultSync(currentUserId);
 
           recentSentPlaintextsRef.current.push({ text, nonce, ciphertext, timestamp: Date.now() });
           if (recentSentPlaintextsRef.current.length > 30) {
