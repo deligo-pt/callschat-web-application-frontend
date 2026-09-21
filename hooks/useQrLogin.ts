@@ -8,6 +8,9 @@ import {
   generateEphemeralKeyPair,
   decryptKeyFromMobile,
   derivePublicKeyFromPrivate,
+  normalizeCurve25519Key,
+  base64ToBytes,
+  bytesToBase64,
 } from "@/utils/crypto";
 import { chatService } from "@/services/chat.service";
 import { storeUserKeys } from "@/utils/keyStore";
@@ -201,21 +204,46 @@ export function useQrLogin() {
               try {
                 const res = await chatService.fetchRecipientKey(userId);
                 
+                // Helper: Normalize 32-byte or 33-byte Curve25519 public key (strips 0x05 prefix if present)
+                const toNormalizedBase64 = (keyStr: string): string => {
+                  try {
+                    const bytes = base64ToBytes(keyStr.trim());
+                    const normalized = normalizeCurve25519Key(bytes);
+                    return bytesToBase64(normalized);
+                  } catch {
+                    return keyStr.trim();
+                  }
+                };
+
+                const normalizedDerivedPub = toNormalizedBase64(pubKey);
+
                 let isKeyMatch = false;
 
                 // Server returns list of public keys for all devices registered to the user
                 if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                  // Check if the synced key matches any registered device public key
-                  isKeyMatch = res.data.some((device: { publicKey: string }) => device.publicKey === pubKey);
+                  // Check if the synced key matches any registered device public key in normalized form
+                  isKeyMatch = res.data.some((device: { publicKey: string }) =>
+                    toNormalizedBase64(device.publicKey) === normalizedDerivedPub
+                  );
+
+                  // Fallback: If only previous web companion keys exist (no mobile key uploaded yet),
+                  // accept the master identity key from the authenticated mobile scanner
+                  const hasRegisteredMobileDevice = res.data.some((device: { deviceId?: string }) =>
+                    device.deviceId && !device.deviceId.startsWith("web-")
+                  );
+                  if (!isKeyMatch && !hasRegisteredMobileDevice) {
+                    console.info("[QR Login] No mobile device key was previously stored on backend. Accepting synced mobile key.");
+                    isKeyMatch = true;
+                  }
                 } else if (res?.data?.publicKey) {
-                  isKeyMatch = res.data.publicKey === pubKey;
+                  isKeyMatch = toNormalizedBase64(res.data.publicKey) === normalizedDerivedPub;
                 } else if (typeof res?.data === "string") {
-                  isKeyMatch = res.data === pubKey;
+                  isKeyMatch = toNormalizedBase64(res.data) === normalizedDerivedPub;
                 } else {
                   // If no key was previously stored on the backend, this key is valid
                   isKeyMatch = true;
                 }
-                
+
                 if (!isKeyMatch) {
                   throw new Error("Key signature mismatch: derived public key does not match any registered keys.");
                 }
