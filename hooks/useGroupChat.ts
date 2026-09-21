@@ -1403,6 +1403,67 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
     };
 
+    const handlePeerKeyUpdated = async (payload: {
+      userId: string;
+      deviceId?: string;
+      registrationId?: string;
+      publicKey: string;
+    }) => {
+      console.log("🔑 [useGroupChat] Received e2ee:peer_key_updated:", payload);
+      const myId = currentUserIdRef.current;
+      if (!payload?.userId || payload.userId === myId) return;
+
+      // 1. Invalidate cached sender key received from this peer, as they've rotated
+      try {
+        await clearSenderKey(groupId, payload.userId, myId);
+      } catch (err) {
+        console.warn("[useGroupChat] Error clearing sender key for updated peer:", err);
+      }
+
+      // 2. Invalidate and re-distribute OUR sender key to this peer with their new public key
+      try {
+        const mySK = await getStoredSenderKey(groupId, myId, myId);
+        if (mySK) {
+          // Remove from distributedTo so we refresh and re-send to them
+          mySK.distributedTo = (mySK.distributedTo || []).filter((id) => id !== payload.userId);
+
+          const myPrivKey = await getUserPrivateKey(myId);
+          if (myPrivKey && payload.publicKey) {
+            const chainKey = mySK.initialChainKey || mySK.chainKey;
+            const wrapped = wrapSenderKeyForMember(chainKey, payload.publicKey, myPrivKey);
+            const dist = {
+              recipientId: payload.userId,
+              encryptedKey: wrapped.encryptedKey,
+              nonce: wrapped.nonce,
+              iteration: 0,
+            };
+
+            socket.emit("group:sender_key_distribute", {
+              groupId,
+              distributions: [dist],
+            });
+            await groupService.distributeSenderKeys(groupId, [dist]);
+
+            mySK.distributedTo.push(payload.userId);
+            await storeSenderKey(groupId, myId, mySK, myId);
+            console.log(`[useGroupChat] Re-distributed sender key to updated peer ${payload.userId}`);
+          } else {
+            await storeSenderKey(groupId, myId, mySK, myId);
+          }
+        }
+      } catch (distErr) {
+        console.warn("[useGroupChat] Error re-distributing sender key:", distErr);
+      }
+    };
+
+    const handleWindowPeerKeyUpdated = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail;
+      if (detail) {
+        handlePeerKeyUpdated(detail);
+      }
+    };
+    window.addEventListener("e2ee:peer_key_updated", handleWindowPeerKeyUpdated);
+
     socket.on("group:receive_message", handleReceiveMessage);
     socket.on("group:message_status_update", handleStatusUpdate);
     socket.on("group:reaction_updated", handleReactionsUpdated);
@@ -1420,6 +1481,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     socket.on("group:sender_key_distribute", handleSenderKeyReceived);
     socket.on("group:sender_key_received", handleSenderKeyReceived);
     socket.on("group:sender_key_requested", handleSenderKeyRequested);
+    socket.on("e2ee:peer_key_updated", handlePeerKeyUpdated);
 
     return () => {
       if (rekeyTimeoutRef.current) {
@@ -1443,6 +1505,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       socket.off("group:sender_key_distribute", handleSenderKeyReceived);
       socket.off("group:sender_key_received", handleSenderKeyReceived);
       socket.off("group:sender_key_requested", handleSenderKeyRequested);
+      socket.off("e2ee:peer_key_updated", handlePeerKeyUpdated);
+      window.removeEventListener("e2ee:peer_key_updated", handleWindowPeerKeyUpdated);
     };
   }, [socket, isConnected, groupId, performRekey]);
 

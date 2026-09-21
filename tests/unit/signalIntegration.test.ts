@@ -387,6 +387,87 @@ async function runIntegratedE2EETests() {
   assert.strictEqual(selfDecrypted, handshakeText);
   console.log('✓ Restored device decrypted past sent message history via selfEncryptedSessionKey');
 
+  // 7. Peer Key Update & Session Re-establishment Protocol
+  console.log('\n--- Testing Peer Key Update & Session Invalidation ---');
+  // Bob reinstalls the app or rotates his identity key:
+  const bobNewIdentity = await initSignalIdentity(userBob, true); // force new identity
+  assert.notStrictEqual(bobNewIdentity.identityKeyBase64, bobIdentity.identityKeyBase64);
+  const bobNewSPK = await generateSignedPreKey(userBob, 2);
+  const bobNewOPKs = await generatePreKeyBatch(userBob, 200, 5);
+
+  const bobNewBundle = {
+    userId: userBob,
+    deviceId: 1,
+    identityKey: bobNewIdentity.identityKeyBase64,
+    registrationId: bobNewIdentity.registrationId,
+    signedPreKey: {
+      keyId: bobNewSPK.keyId,
+      publicKey: bobNewSPK.publicKey,
+      signature: bobNewSPK.signature,
+    },
+    oneTimePreKey: {
+      keyId: bobNewOPKs[0]!.keyId,
+      publicKey: bobNewOPKs[0]!.publicKey,
+    },
+  };
+
+  // Alice receives peer key updated event or detects Bob's key rotation on bundle sync:
+  // buildSessionFromBundle automatically overwrites trusted identity and clears old session
+  await buildSessionFromBundle(userAlice, userBob, bobNewBundle, 1);
+  console.log('✓ Alice re-established fresh session from Bob\'s updated bundle without UntrustedIdentityException');
+
+  // Alice sends a new message to Bob (Handshake Type 3 to start new ratchet)
+  const rekeyedMsgText = 'Hello Bob, communicating with your new identity key!';
+  const rekeyedEnc = await encrypt1to1Message(userAlice, userBob, rekeyedMsgText, 1);
+  assert.strictEqual(rekeyedEnc.messageType, 3);
+
+  // Bob decrypts with his new identity key and private one-time prekey
+  const bobDecryptedRekeyed = await decrypt1to1Message(
+    userBob,
+    userAlice,
+    rekeyedEnc.ciphertext,
+    rekeyedEnc.messageType,
+    1
+  );
+  assert.strictEqual(bobDecryptedRekeyed, rekeyedMsgText);
+  console.log('✓ Bob successfully decrypted re-keyed handshake message with his new identity');
+
+  // Bob replies to Alice with ongoing ratchet (Type 2)
+  const bobNewReply = await encrypt1to1Message(userBob, userAlice, 'Hello Alice, new session active!', 1);
+  assert.strictEqual(bobNewReply.messageType, 2);
+
+  const aliceDecryptedNewReply = await decrypt1to1Message(
+    userAlice,
+    userBob,
+    bobNewReply.ciphertext,
+    bobNewReply.messageType,
+    1
+  );
+  assert.strictEqual(aliceDecryptedNewReply, 'Hello Alice, new session active!');
+  console.log('✓ Bidirectional Double Ratchet continues seamlessly across peer key rotation');
+
+  // Group Chat: Alice re-distributes sender key to Bob with his new public key
+  const aliceSenderKey = await getStoredSenderKey(groupId, userAlice, userAlice);
+  assert.ok(aliceSenderKey);
+  const alicePrivForBob = await getUserPrivateKey(userAlice);
+  assert.ok(alicePrivForBob);
+  const rewrappedSK = wrapSenderKeyForMember(
+    aliceSenderKey.initialChainKey || aliceSenderKey.chainKey,
+    bobNewIdentity.identityKeyBase64,
+    alicePrivForBob
+  );
+  // Bob unwraps with his new private key
+  const bobNewPriv = await getUserPrivateKey(userBob);
+  assert.ok(bobNewPriv);
+  const unwrappedChainKey = unwrapSenderKeyFromMember(
+    rewrappedSK.encryptedKey,
+    rewrappedSK.nonce,
+    aliceIdentity.identityKeyBase64,
+    bobNewPriv
+  );
+  assert.ok(unwrappedChainKey);
+  console.log('✓ Group Sender Key successfully re-wrapped and unwrapped for Bob\'s new public key');
+
   console.log('\n🎉 ALL INTEGRATION E2EE TESTS PASSED SUCCESSFULLY! 🎉');
 }
 

@@ -31,6 +31,7 @@ import {
   buildSessionFromBundle,
   getSignalProtocolStore,
   createSignalAddress,
+  base64ToArrayBuffer,
 } from "@/utils/signalCrypto";
 import { compressImage } from "@/utils/image";
 import { queueVaultSync } from "@/utils/vaultSync";
@@ -434,7 +435,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [socket, isConnected]
   );
 
-  // â”€â”€ Key Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // —— Key Setup ——————————————————————————————————————————————————————————
   const loadKeys = useCallback(async () => {
     if (typeof window === "undefined" || !currentUserId) return;
     await migrateKeysFromLocalStorage(currentUserId);
@@ -461,7 +462,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     return () => window.removeEventListener("e2ee:keys_restored", handleKeysRestored);
   }, [loadKeys]);
 
-  // â”€â”€ Fetch Recipient Public Key â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // —— Fetch Recipient Public Key —————————————————————————————————————————
   useEffect(() => {
     // If there is no peer (B2C thread or unresolved state) do NOT fetch a key.
     // Fetching with an empty string returns a dummy key which causes "incorrect
@@ -472,20 +473,75 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       try {
         const res = await chatService.fetchRecipientKey(activePeerId);
         // Guard: if backend returns empty array (no key registered), do not set any key.
-        // Keys are ordered descending by updatedAt â€” the FIRST entry (index 0) is the newest/active key.
+        // Keys are ordered descending by updatedAt — the FIRST entry (index 0) is the newest/active key.
+        let latestPubKey: string | null = null;
         if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          setRecipientPublicKey(res.data[0].publicKey);
+          latestPubKey = res.data[0].publicKey;
         } else if (res?.success && res?.data?.publicKey) {
-          setRecipientPublicKey(res.data.publicKey);
+          latestPubKey = res.data.publicKey;
         }
-        // Do NOT set a dummy fallback key â€” absence of key = cannot encrypt = safe
+
+        if (latestPubKey) {
+          const previousKey = recipientPublicKeyRef.current;
+          setRecipientPublicKey(latestPubKey);
+          recipientPublicKeyRef.current = latestPubKey;
+
+          // Offline sync / Stale session check:
+          // Check if Signal store's trusted identity matches the latest public key from server
+          if (currentUserId) {
+            try {
+              const store = getSignalProtocolStore(currentUserId);
+              const remoteAddress = createSignalAddress(activePeerId, 1);
+              const latestKeyBuf = base64ToArrayBuffer(latestPubKey);
+              const isTrusted = await store.isTrustedIdentity(
+                remoteAddress.toString(),
+                latestKeyBuf,
+                1 // Direction.SENDING
+              );
+
+              if (!isTrusted) {
+                console.log(`[useChat] Peer ${activePeerId} key rotated while offline. Re-establishing Signal session...`);
+                await store.removeSession(remoteAddress.toString());
+                await store.saveIdentity(remoteAddress.toString(), latestKeyBuf);
+
+                try {
+                  const bundleRes = await chatService.fetchPreKeyBundle(activePeerId);
+                  if (bundleRes?.data?.identityKey && bundleRes?.data?.signedPreKey?.publicKey) {
+                    await buildSessionFromBundle(currentUserId, activePeerId, bundleRes.data, 1);
+                  }
+                } catch (bundleErr) {
+                  console.warn("[useChat] Could not pre-build session after offline key rotation:", bundleErr);
+                }
+
+                if (previousKey && previousKey !== latestPubKey) {
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `sec-notice-${Date.now()}`,
+                      text: "Your safety number with this contact has changed. This could mean they reinstalled the app or changed devices. Tap to verify.",
+                      senderId: "system",
+                      recipientId: currentUserId,
+                      conversationId,
+                      createdAt: new Date().toISOString(),
+                      isSystem: true,
+                      systemType: "SAFETY_NUMBER_CHANGED",
+                    },
+                  ]);
+                }
+              }
+            } catch (err) {
+              console.warn("[useChat] Offline session sync check failed:", err);
+            }
+          }
+        }
+        // Do NOT set a dummy fallback key — absence of key = cannot encrypt = safe
       } catch (err) {
         console.error("Failed to fetch recipient public key", err);
       }
     };
 
     fetchRecipientKey();
-  }, [activePeerId, isBizChat]);
+  }, [activePeerId, isBizChat, currentUserId, conversationId]);
 
   // â”€â”€ Load Message History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Gated on keysReady (from E2EEContext) so we never attempt to decrypt history
@@ -1689,6 +1745,12 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           recipientRegistrationIdRef.current = payload.registrationId;
         }
 
+        // Purge any cached peer bundle/keys from session storage
+        try {
+          sessionStorage.removeItem(`peer_bundle_${payload.userId}`);
+          sessionStorage.removeItem(`peer_keys_${payload.userId}`);
+        } catch {}
+
         // If the public key rotated/changed, alert user of safety number update
         if (previousKey && previousKey !== payload.publicKey) {
           setMessages((prev) => [
@@ -2289,6 +2351,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     socket.on("e2ee:retry_expired", handleRetryExpired);
     socket.on("e2ee:manual_resend_initiated", handleManualResendInitiated);
 
+    const handleWindowPeerKeyUpdated = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail;
+      if (detail) {
+        handlePeerKeyUpdated(detail);
+      }
+    };
+    window.addEventListener("e2ee:peer_key_updated", handleWindowPeerKeyUpdated);
+
     return () => {
       socket.off("chat:receive_message", handleReceiveMessage);
       socket.off("NEW_MESSAGE", handleReceiveMessage);
@@ -2306,6 +2376,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       socket.off("e2ee:retry_fulfill", handleRetryFulfill);
       socket.off("e2ee:retry_expired", handleRetryExpired);
       socket.off("e2ee:manual_resend_initiated", handleManualResendInitiated);
+      window.removeEventListener("e2ee:peer_key_updated", handleWindowPeerKeyUpdated);
     };
   }, [socket, isConnected, conversationId]);
 

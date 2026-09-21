@@ -220,6 +220,14 @@ export async function buildSessionFromBundle(
       : undefined,
   };
 
+  const identityKeyBuf = base64ToArrayBuffer(bundle.identityKey);
+  const isTrusted = await store.isTrustedIdentity(remoteAddress.toString(), identityKeyBuf, 1);
+  if (!isTrusted) {
+    console.log(`[signalCrypto] Peer ${peerUserId} identity changed. Overwriting trusted identity.`);
+    await store.saveIdentity(remoteAddress.toString(), identityKeyBuf);
+    await store.removeSession(remoteAddress.toString());
+  }
+
   const builder = new SessionBuilder(store, remoteAddress);
   await builder.processPreKey(device);
 }
