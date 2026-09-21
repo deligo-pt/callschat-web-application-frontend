@@ -43,6 +43,19 @@ export interface MessageReceipt {
   seenAt: string | null;
 }
 
+export interface MessageReactionItem {
+  id: string;
+  emoji: string;
+  userId: string;
+  createdAt?: string;
+  user?: {
+    profile?: {
+      displayName?: string;
+      avatarUrl?: string;
+    };
+  };
+}
+
 export interface QuotedMessage {
   id: string;
   senderId: string;
@@ -65,6 +78,7 @@ export interface ChatMessage {
   /** Per-message disappear timer in seconds, stamped at send time. */
   disappearAfterSeconds?: number | null;
   receipts?: MessageReceipt[];
+  reactions?: MessageReactionItem[];
   replyToId?: string | null;
   replyTo?: QuotedMessage | null;
   isDecryptionPending?: boolean;
@@ -793,6 +807,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   replyToId: msg.replyToId ?? null,
                   replyTo,
                   receipts: msg.receipts || [],
+                  reactions: msg.reactions || [],
                   isDecryptionPending: isPendingDecryption,
                   rawCiphertext: msg.ciphertext,
                   rawNonce: msg.nonce,
@@ -915,6 +930,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 isDecryptionPending: false,
                 createdAt: payload.createdAt || existingOpt.createdAt,
                 receipts: payload.receipts || existingOpt.receipts || [],
+                reactions: payload.reactions || existingOpt.reactions || [],
               };
               return updated;
             }
@@ -933,6 +949,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
                 receipts: payload.receipts || [],
+                reactions: payload.reactions || [],
                 replyToId: payload.replyToId ?? null,
                 replyTo: null,
               },
@@ -1419,6 +1436,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
                 receipts: mergeReceipts(payload.receipts || [], existingOpt?.receipts),
+                reactions: payload.reactions || existingOpt?.reactions || [],
                 replyToId: payload.replyToId ?? null,
                 replyTo: finalReplyTo,
               };
@@ -1439,6 +1457,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
                 receipts: mergeReceipts(payload.receipts || []),
+                reactions: payload.reactions || [],
                 replyToId: payload.replyToId ?? null,
                 replyTo: resolvedReplyTo,
               },
@@ -1480,6 +1499,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   isDecryptionPending: false,
                   createdAt: payload.createdAt || opt.createdAt,
                   receipts: payload.receipts || opt.receipts,
+                  reactions: payload.reactions || opt.reactions || [],
                   replyToId: payload.replyToId ?? opt.replyToId,
                   replyTo: resolvedReplyTo ?? opt.replyTo,
                 };
@@ -1513,6 +1533,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 mediaType: payload.mediaType,
                 disappearAfterSeconds: payload.disappearAfterSeconds,
                 receipts: payload.receipts || [],
+                reactions: payload.reactions || [],
                 replyToId: payload.replyToId ?? null,
                 replyTo: resolvedReplyTo,
               },
@@ -1551,6 +1572,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               mediaType: payload.mediaType,
               disappearAfterSeconds: payload.disappearAfterSeconds,
               receipts: payload.receipts || [],
+              reactions: payload.reactions || [],
               replyToId: payload.replyToId ?? null,
               replyTo: resolvedReplyTo,
             },
@@ -1583,6 +1605,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             mediaType: payload.mediaType || "document",
             disappearAfterSeconds: payload.disappearAfterSeconds,
             receipts: payload.receipts || [],
+            reactions: payload.reactions || [],
             replyToId: payload.replyToId ?? null,
             replyTo: resolvedReplyTo,
           };
@@ -2238,6 +2261,15 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
     };
 
+    const handleReactionsUpdated = (payload: any) => {
+      if (payload.conversationId && payload.conversationId !== conversationId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === payload.messageId ? { ...m, reactions: payload.reactions || [] } : m
+        )
+      );
+    };
+
     socket.on("chat:receive_message", handleReceiveMessage);
     socket.on("NEW_MESSAGE", handleReceiveMessage);
     // Internal replay channel: the drain effect emits this locally when the
@@ -2247,6 +2279,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     socket.on("chat:message_unsent", handleMessageUnsent);
     socket.on("chat:message_status_update", handleStatusUpdate);
     socket.on("chat:conversation_status_update", handleConversationStatusUpdate);
+    socket.on("chat:reaction_updated", handleReactionsUpdated);
     socket.on("chat:typing_start", handleTypingStart);
     socket.on("chat:typing_stop", handleTypingStop);
     socket.on("chat:error", handleChatError);
@@ -2264,6 +2297,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       socket.off("chat:message_unsent", handleMessageUnsent);
       socket.off("chat:message_status_update", handleStatusUpdate);
       socket.off("chat:conversation_status_update", handleConversationStatusUpdate);
+      socket.off("chat:reaction_updated", handleReactionsUpdated);
       socket.off("chat:typing_start", handleTypingStart);
       socket.off("chat:typing_stop", handleTypingStop);
       socket.off("chat:error", handleChatError);
@@ -2388,6 +2422,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         mediaType: optimisticMediaType,
         replyToId,
         replyTo: replyToMessage,
+        reactions: [],
       };
 
       // Synchronously record optimistic message into messagesRef so immediate socket echoes match without waiting on React render cycles
@@ -2856,12 +2891,65 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [socket, conversationId]
   );
 
+  const toggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!conversationId) return;
+      const msg = messages.find((m) => m.id === messageId);
+      const currentUserId = currentUserIdRef.current;
+      const existing = msg?.reactions?.find(
+        (r) => r.userId === currentUserId && r.emoji === emoji
+      );
+
+      // Optimistic update
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const currentReactions = m.reactions || [];
+          if (existing) {
+            return {
+              ...m,
+              reactions: currentReactions.filter(
+                (r) => !(r.userId === currentUserId && r.emoji === emoji)
+              ),
+            };
+          } else {
+            const filtered = currentReactions.filter((r) => r.userId !== currentUserId);
+            return {
+              ...m,
+              reactions: [
+                ...filtered,
+                {
+                  id: `optimistic-${Date.now()}`,
+                  emoji,
+                  userId: currentUserId || "",
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            };
+          }
+        })
+      );
+
+      try {
+        if (existing) {
+          await chatService.removeReaction(conversationId, messageId);
+        } else {
+          await chatService.addReaction(conversationId, messageId, emoji);
+        }
+      } catch (err) {
+        console.error("Failed to toggle reaction", err);
+      }
+    },
+    [conversationId, messages]
+  );
+
   return {
     messages,
     setMessages,
     clearMessages: () => setMessages([]),
     sendMessage,
     editMessage,
+    toggleReaction,
     pinnedMessages,
     pinMessage,
     unsendMessage,

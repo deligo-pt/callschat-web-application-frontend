@@ -492,6 +492,7 @@ function ChatRoomPageContent() {
     messages,
     sendMessage,
     editMessage,
+    toggleReaction,
     pinnedMessages,
     pinMessage,
     clearMessages,
@@ -966,6 +967,7 @@ function ChatRoomPageContent() {
                     )
                   }
                   onUnsend={unsendMessage}
+                  onReact={(mId, emoji) => toggleReaction(mId, emoji)}
                   onReply={(m) =>
                     setReplyingTo({
                       id: m.id,

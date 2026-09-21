@@ -27,6 +27,7 @@ import {
   ShieldAlert,
   Lock,
   RotateCw,
+  Smile,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -52,6 +53,8 @@ import {
 } from "@/components/ui/context-menu";
 import { toast } from "sonner";
 import { useCallContext } from "@/components/providers/CallContext";
+
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 const formatTextWithLinks = (text: string) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -99,6 +102,18 @@ interface MessageBubbleProps {
       deliveredAt: string | null;
       seenAt: string | null;
     }[];
+    reactions?: Array<{
+      id: string;
+      emoji: string;
+      userId: string;
+      createdAt?: string;
+      user?: {
+        profile?: {
+          displayName?: string;
+          avatarUrl?: string;
+        };
+      };
+    }>;
     isSystem?: boolean;
     systemType?: string;
     isRetryExpired?: boolean;
@@ -114,6 +129,7 @@ interface MessageBubbleProps {
   onUnpin?: () => void;
   onUnsend?: (messageId: string) => void;
   onReply?: (msg: any) => void;
+  onReact?: (messageId: string, emoji: string) => void;
   onScrollToMessage?: (messageId: string) => void;
   onOpenSecurityCode?: () => void;
   onManualResend?: (messageId: string) => void;
@@ -135,6 +151,7 @@ export function MessageBubble({
   onUnpin,
   onUnsend,
   onReply,
+  onReact,
   onScrollToMessage,
   onOpenSecurityCode,
   onManualResend,
@@ -159,6 +176,28 @@ export function MessageBubble({
   const { initiateCall } = useCallContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showReactionPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (reactionPickerRef.current && !reactionPickerRef.current.contains(e.target as Node)) {
+        setShowReactionPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showReactionPicker]);
+
+  // ── Grouped Reactions Summary ─────────────────────────────────────────────
+  const reactionCounts: { [emoji: string]: number } = {};
+  (msg.reactions || []).forEach((r) => {
+    reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
+  });
+  const hasReactions = Object.keys(reactionCounts).length > 0;
+  const myReaction = (msg.reactions || []).find((r) => r.userId === currentUserId);
+
   // Live countdown in seconds remaining (null = not disappearing)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
@@ -250,10 +289,52 @@ export function MessageBubble({
           isMe ? "order-first" : "order-last"
         )}
       >
+        {/* Quick React Button */}
+        <div className="relative" ref={reactionPickerRef}>
+          <button
+            type="button"
+            onClick={() => setShowReactionPicker((p) => !p)}
+            className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-[#E9EDEF] transition-colors shadow-xs bg-white/90 dark:bg-[#202C33] border border-slate-200/80 dark:border-white/10 cursor-pointer"
+            title="React"
+            aria-label="React"
+          >
+            <Smile className="w-4 h-4" />
+          </button>
+
+          {/* Floating Reaction Bar */}
+          {showReactionPicker && (
+            <div
+              className={cn(
+                "absolute bottom-full mb-2 flex items-center gap-1 p-1 bg-white dark:bg-[#233138] rounded-full shadow-2xl border border-black/10 dark:border-white/10 z-50 animate-in zoom-in-95 duration-100",
+                isMe ? "right-0" : "left-0"
+              )}
+            >
+              {QUICK_REACTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => {
+                    onReact?.(msg.id, emoji);
+                    setShowReactionPicker(false);
+                  }}
+                  className={cn(
+                    "p-1.5 text-base hover:scale-125 transition-transform cursor-pointer rounded-full select-none",
+                    myReaction?.emoji === emoji && "bg-black/10 dark:bg-white/15"
+                  )}
+                  title={`React with ${emoji}`}
+                  aria-label={`React with ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => onReply?.(msg)}
-          className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+          className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-[#E9EDEF] transition-colors shadow-xs bg-white/90 dark:bg-[#202C33] border border-slate-200/80 dark:border-white/10 cursor-pointer"
           title="Reply"
         >
           <Reply className="w-4 h-4" />
@@ -262,7 +343,7 @@ export function MessageBubble({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shadow-xs bg-white/90 border border-slate-200/80 cursor-pointer"
+              className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-[#E9EDEF] transition-colors shadow-xs bg-white/90 dark:bg-[#202C33] border border-slate-200/80 dark:border-white/10 cursor-pointer"
               title="Message options"
             >
               <ChevronDown className="w-4 h-4" />
@@ -272,6 +353,25 @@ export function MessageBubble({
             align={isMe ? "end" : "start"}
             className="w-52 bg-white dark:bg-[#233138] p-1.5 rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 z-50 text-[#111B21] dark:text-[#E9EDEF]"
           >
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer">
+                <Smile className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>React</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="bg-white dark:bg-[#233138] rounded-full shadow-2xl border border-black/10 dark:border-white/10 p-1 flex items-center gap-1">
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onReact?.(msg.id, emoji)}
+                    className="p-1.5 text-base hover:scale-125 transition-transform cursor-pointer rounded-full select-none"
+                    title={`React with ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
               onClick={() => onReply?.(msg)}
               className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
@@ -758,9 +858,58 @@ export function MessageBubble({
                   </span>
                 )
               )}
+
+              {/* Reaction Badges */}
+              {hasReactions && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (myReaction) {
+                      onReact?.(msg.id, myReaction.emoji);
+                    } else {
+                      setShowReactionPicker((p) => !p);
+                    }
+                  }}
+                  className={cn(
+                    "absolute -bottom-2.5 flex items-center gap-0.5 bg-white dark:bg-[#202C33] px-1.5 py-0.5 rounded-full shadow-md border border-gray-200 dark:border-gray-700 text-xs cursor-pointer hover:scale-105 transition-transform z-10 select-none",
+                    isMe ? "right-2" : "left-2"
+                  )}
+                  title={myReaction ? `You reacted with ${myReaction.emoji} (Click to remove)` : "Reactions"}
+                >
+                  {Object.entries(reactionCounts).map(([emoji, count]) => (
+                    <span key={emoji} className="flex items-center gap-0.5">
+                      <span>{emoji}</span>
+                      {count > 1 && (
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                          {count}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-52 bg-white dark:bg-[#233138] p-1.5 rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 z-50 text-[#111B21] dark:text-[#E9EDEF]">
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer">
+                <Smile className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>React</span>
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="bg-white dark:bg-[#233138] rounded-full shadow-2xl border border-black/10 dark:border-white/10 p-1 flex items-center gap-1">
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onReact?.(msg.id, emoji)}
+                    className="p-1.5 text-base hover:scale-125 transition-transform cursor-pointer rounded-full select-none"
+                    title={`React with ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
             <ContextMenuItem
               onClick={() => onReply?.(msg)}
               className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"

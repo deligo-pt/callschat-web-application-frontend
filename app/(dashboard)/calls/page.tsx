@@ -10,7 +10,7 @@ import {
   Video, 
   Search, 
   Users, 
-  Star, 
+  Heart, 
   Lock, 
   X,
   Link2,
@@ -126,10 +126,11 @@ export default function CallsPage() {
               </button>
               <Link 
                 href={`${chatBasePath}/favorites`} 
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#FFB020] transition-colors"
-                title="Favorites"
+                title="Favorites" 
+                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:text-red-500 transition-colors focus:outline-none"
+                aria-label="Favorites"
               >
-                <Star className="h-5 w-5 fill-[#FFB020] text-[#FFB020]" />
+                <Heart className="h-4.5 w-4.5" />
               </Link>
               <NotificationDropdown />
             </div>

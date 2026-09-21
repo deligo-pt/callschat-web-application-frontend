@@ -29,7 +29,7 @@ import {
   Languages,
   EyeOff,
   UserCog,
-  Star,
+  Heart,
   Folder,
   Users,
   Mail,
@@ -631,7 +631,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                   onClick={handleToggleFavourite}
                   className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer"
                 >
-                  <Star className={cn("w-4 h-4", isFavourite ? "text-amber-400 fill-amber-400" : "text-gray-500")} />
+                  <Heart className={cn("w-4 h-4", isFavourite ? "text-red-500 fill-red-500" : "text-gray-500")} />
                   <span>{isFavourite ? "Remove from favourites" : "Add to favourites"}</span>
                 </DropdownMenuItem>
 

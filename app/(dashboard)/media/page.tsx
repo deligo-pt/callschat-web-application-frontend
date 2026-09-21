@@ -239,10 +239,11 @@ export default function MediaPage() {
             <div className="flex items-center gap-1">
               <Link
                 href="/chats/favorites"
-                title="Favorite Messages"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] transition-colors"
+                title="Favorites"
+                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:text-red-500 transition-colors focus:outline-none"
+                aria-label="Favorites"
               >
-                <Heart className="h-4.5 w-4.5 fill-red-500 text-red-500" />
+                <Heart className="h-4.5 w-4.5" />
               </Link>
               <NotificationDropdown />
             </div>

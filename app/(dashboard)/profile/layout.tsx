@@ -53,8 +53,13 @@ function ProfileSidebarNavigation() {
         <div className="flex items-center justify-between">
           <h1 className="text-[24px] font-bold tracking-tight text-[#2563EB]">Groups</h1>
           <div className="flex items-center gap-2">
-            <Link href="/chats/favorites" className="relative flex items-center justify-center p-2 transition-colors hover:bg-slate-50 rounded-full">
-              <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+            <Link 
+              href="/chats/favorites" 
+              title="Favorites"
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:text-red-500 transition-colors focus:outline-none"
+              aria-label="Favorites"
+            >
+              <Heart className="h-4.5 w-4.5" />
             </Link>
             <NotificationDropdown />
           </div>
