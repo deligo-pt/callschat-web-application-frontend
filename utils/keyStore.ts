@@ -45,8 +45,49 @@ async function safeDel(key: string): Promise<void> {
 // =============================================================================
 
 export const storeUserKeys = async (userId: string, privKey: string, pubKey: string): Promise<void> => {
+  if (userId && privKey) {
+    try {
+      const existingPriv = await safeGet<string>(`privateKey_${userId}`);
+      if (existingPriv && existingPriv !== privKey) {
+        const history = (await safeGet<string[]>(`user_priv_history_${userId}`)) || [];
+        if (!history.includes(existingPriv)) {
+          history.unshift(existingPriv);
+          if (history.length > 20) {
+            history.length = 20;
+          }
+          await safeSet(`user_priv_history_${userId}`, history);
+        }
+      }
+    } catch (err) {
+      console.warn('[keyStore] Failed to archive previous private key:', err);
+    }
+  }
   await safeSet(`privateKey_${userId}`, privKey);
   await safeSet(`publicKey_${userId}`, pubKey);
+};
+
+export const getUserHistoricalPrivateKeys = async (userId: string): Promise<string[]> => {
+  if (!userId) return [];
+  return (await safeGet<string[]>(`user_priv_history_${userId}`)) || [];
+};
+
+export const getUserPrivateKeyRing = async (userId: string): Promise<string[]> => {
+  if (!userId) return [];
+  const currentKey = await getUserPrivateKey(userId);
+  const rawKey = await getRawStoredUserPrivateKey(userId);
+  const history = await getUserHistoricalPrivateKeys(userId);
+
+  const ring: string[] = [];
+  const seen = new Set<string>();
+
+  for (const k of [currentKey, rawKey, ...history]) {
+    if (k && !seen.has(k)) {
+      seen.add(k);
+      ring.push(k);
+    }
+  }
+
+  return ring;
 };
 
 export const getUserPrivateKey = async (userId: string): Promise<string | null> => {
@@ -209,6 +250,7 @@ export interface LocalKeyBundle {
   senderKeys?: Record<string, any> | null;
   groupKeys?: Record<string, string> | null;
   decryptedMessages?: Record<string, string> | null;
+  historicalPrivateKeys?: string[] | null;
   timestamp?: number;
 }
 
@@ -279,6 +321,8 @@ export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBund
     (typeof window !== 'undefined' ? localStorage.getItem('registrationId') : null) ||
     (signalRegId != null ? String(signalRegId) : null);
 
+  const historicalPrivateKeys = await getUserHistoricalPrivateKeys(userId);
+
   return {
     privateKey,
     publicKey,
@@ -291,6 +335,7 @@ export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBund
     senderKeys: Object.keys(senderKeys).length > 0 ? senderKeys : null,
     groupKeys: Object.keys(groupKeys).length > 0 ? groupKeys : null,
     decryptedMessages: Object.keys(decryptedMessages).length > 0 ? decryptedMessages : null,
+    historicalPrivateKeys: historicalPrivateKeys.length > 0 ? historicalPrivateKeys : null,
     timestamp: Date.now(),
   };
 };
@@ -304,6 +349,16 @@ export const restoreLocalKeyBundle = async (
   }
 
   await storeUserKeys(userId, bundle.privateKey, bundle.publicKey);
+
+  if (bundle.historicalPrivateKeys && Array.isArray(bundle.historicalPrivateKeys)) {
+    try {
+      const existingHistory = (await safeGet<string[]>(`user_priv_history_${userId}`)) || [];
+      const merged = Array.from(new Set([...bundle.historicalPrivateKeys, ...existingHistory]));
+      await safeSet(`user_priv_history_${userId}`, merged.slice(0, 20));
+    } catch (err) {
+      console.warn('[keyStore] Could not restore historical private keys:', err);
+    }
+  }
 
   if (typeof window !== 'undefined') {
     if (bundle.registrationId) {

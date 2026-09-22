@@ -827,7 +827,7 @@ export function MessageBubble({
                       </button>
                     </div>
                   </div>
-                ) : (msg as any).isRetryExpired ? (
+                ) : !isMe && (msg as any).isRetryExpired ? (
                   <div className="flex flex-col gap-2 py-1 select-none">
                     <div className="flex items-center gap-2 text-[13px] text-red-600 dark:text-red-400 font-medium">
                       <Lock className="w-3.5 h-3.5 shrink-0" />
@@ -844,7 +844,7 @@ export function MessageBubble({
                       <span>Request Resend</span>
                     </button>
                   </div>
-                ) : (msg as any).isDecryptionPending || msg.text?.includes("Waiting for this message") ? (
+                ) : !isMe && ((msg as any).isDecryptionPending || msg.text?.includes("Waiting for this message")) ? (
                   <div className="flex items-center gap-2 text-[13px] text-[#54656F] dark:text-[#8696A0] italic py-0.5 select-none">
                     <Clock className="w-3.5 h-3.5 shrink-0 animate-pulse text-amber-500 dark:text-amber-400" />
                     <span>{msg.text}</span>
@@ -854,7 +854,9 @@ export function MessageBubble({
                     className="leading-snug whitespace-pre-wrap"
                     style={{ wordBreak: "break-word" }}
                   >
-                    {formatTextWithLinks(msg.text)}
+                    {isMe && msg.text?.includes("Waiting for this message")
+                      ? "🔒 Message sent before key update"
+                      : formatTextWithLinks(msg.text)}
                   </span>
                 )
               )}

@@ -25,8 +25,17 @@ import {
   clearSenderKey,
   getUserPrivateKey,
   getUserPublicKey,
+  storeUserKeys,
+  getUserPrivateKeyRing,
+  getUserHistoricalPrivateKeys,
 } from '../../utils/keyStore';
-import { decryptMessage, encryptMessage } from '../../utils/crypto';
+import {
+  decryptMessage,
+  encryptMessage,
+  bytesToBase64,
+  base64ToBytes,
+} from '../../utils/crypto';
+import { x25519 } from '@noble/curves/ed25519.js';
 
 async function runIntegratedE2EETests() {
   console.log('--- Running Signal Integrated E2EE Test Suite ---');
@@ -467,6 +476,117 @@ async function runIntegratedE2EETests() {
   );
   assert.ok(unwrappedChainKey);
   console.log('✓ Group Sender Key successfully re-wrapped and unwrapped for Bob\'s new public key');
+
+  // 6. Historical Private Key Ring & Sender Self-Decryption across Key Updates
+  console.log('\n--- Testing Historical Key Ring & Sender Self-Decryption across Key Updates ---');
+
+  const testSender = 'user_sender_' + Date.now();
+
+  // Generation 1: Initial key pair
+  const privGen1 = bytesToBase64(x25519.utils.randomSecretKey());
+  const pubGen1 = bytesToBase64(x25519.getPublicKey(base64ToBytes(privGen1)));
+  await storeUserKeys(testSender, privGen1, pubGen1);
+
+  // Sender encrypts a message for themselves (selfEncryptedSessionKey style) using pubGen1
+  const sentMsgGen1 = 'Historical message from sender Gen 1';
+  const encGen1 = await encryptMessage(sentMsgGen1, pubGen1, privGen1);
+
+  // Sender can decrypt it with current active key (privGen1)
+  const decActive1 = await decryptMessage(encGen1.ciphertext, encGen1.nonce, pubGen1, privGen1);
+  assert.strictEqual(decActive1, sentMsgGen1);
+  console.log('✓ Sender encrypted and self-decrypted Generation 1 message');
+
+  // Generation 2: Key rotation / update
+  const privGen2 = bytesToBase64(x25519.utils.randomSecretKey());
+  const pubGen2 = bytesToBase64(x25519.getPublicKey(base64ToBytes(privGen2)));
+  await storeUserKeys(testSender, privGen2, pubGen2);
+
+  // Verify: active key is privGen2, history contains privGen1, ring has [privGen2, privGen1]
+  const currentPriv = await getUserPrivateKey(testSender);
+  assert.strictEqual(currentPriv, privGen2);
+
+  const historyAfterGen2 = await getUserHistoricalPrivateKeys(testSender);
+  assert.deepStrictEqual(historyAfterGen2, [privGen1]);
+
+  const ringAfterGen2 = await getUserPrivateKeyRing(testSender);
+  assert.deepStrictEqual(ringAfterGen2, [privGen2, privGen1]);
+  console.log('✓ Key update archived Gen 1 private key and constructed [Gen2, Gen1] key ring');
+
+  // Verify that decrypting Gen 1 message with ONLY active key (privGen2) fails
+  let directDecryptFailed = false;
+  try {
+    await decryptMessage(encGen1.ciphertext, encGen1.nonce, pubGen1, privGen2);
+  } catch {
+    directDecryptFailed = true;
+  }
+  assert.ok(directDecryptFailed, 'Active key alone must fail to decrypt message encrypted for old key');
+
+  // Decrypt using the historical key ring (iterating candidates, as implemented in useChat.ts)
+  let recoveredTextGen1: string | null = null;
+  for (const privCandidate of ringAfterGen2) {
+    try {
+      const dec = await decryptMessage(encGen1.ciphertext, encGen1.nonce, pubGen1, privCandidate);
+      if (dec) {
+        recoveredTextGen1 = dec;
+        break;
+      }
+    } catch {}
+  }
+  assert.strictEqual(recoveredTextGen1, sentMsgGen1);
+  console.log('✓ Sender historical key ring successfully recovered and decrypted Generation 1 sent message');
+
+  // Generation 3: Another key update
+  const privGen3 = bytesToBase64(x25519.utils.randomSecretKey());
+  const pubGen3 = bytesToBase64(x25519.getPublicKey(base64ToBytes(privGen3)));
+  await storeUserKeys(testSender, privGen3, pubGen3);
+
+  const ringAfterGen3 = await getUserPrivateKeyRing(testSender);
+  assert.deepStrictEqual(ringAfterGen3, [privGen3, privGen2, privGen1]);
+
+  // Sender encrypts a Gen 2 message under pubGen2
+  const sentMsgGen2 = 'Historical message from sender Gen 2';
+  const encGen2 = await encryptMessage(sentMsgGen2, pubGen2, privGen2);
+
+  // Both Gen 1 and Gen 2 messages decrypt using ringAfterGen3
+  let recoveredGen1Again: string | null = null;
+  for (const privCand of ringAfterGen3) {
+    try {
+      const d = await decryptMessage(encGen1.ciphertext, encGen1.nonce, pubGen1, privCand);
+      if (d) { recoveredGen1Again = d; break; }
+    } catch {}
+  }
+  assert.strictEqual(recoveredGen1Again, sentMsgGen1);
+
+  let recoveredGen2: string | null = null;
+  for (const privCand of ringAfterGen3) {
+    try {
+      const d = await decryptMessage(encGen2.ciphertext, encGen2.nonce, pubGen2, privCand);
+      if (d) { recoveredGen2 = d; break; }
+    } catch {}
+  }
+  assert.strictEqual(recoveredGen2, sentMsgGen2);
+  console.log('✓ Multi-generation historical key ring successfully decrypted all sent messages');
+
+  // Vault backup and restore: preserves historicalPrivateKeys
+  const vaultBundle = await exportLocalKeyBundle(testSender);
+  assert.ok(vaultBundle.historicalPrivateKeys);
+  assert.deepStrictEqual(vaultBundle.historicalPrivateKeys, [privGen2, privGen1]);
+
+  const restoredUser = 'user_restored_' + Date.now();
+  await restoreLocalKeyBundle(restoredUser, vaultBundle);
+
+  const restoredRing = await getUserPrivateKeyRing(restoredUser);
+  assert.deepStrictEqual(restoredRing, [privGen3, privGen2, privGen1]);
+
+  let restoredDecGen1: string | null = null;
+  for (const privCand of restoredRing) {
+    try {
+      const d = await decryptMessage(encGen1.ciphertext, encGen1.nonce, pubGen1, privCand);
+      if (d) { restoredDecGen1 = d; break; }
+    } catch {}
+  }
+  assert.strictEqual(restoredDecGen1, sentMsgGen1);
+  console.log('✓ Vault export/restore preserved historical key ring and restored full history decryption');
 
   console.log('\n🎉 ALL INTEGRATION E2EE TESTS PASSED SUCCESSFULLY! 🎉');
 }
