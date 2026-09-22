@@ -22,7 +22,6 @@ import {
   restoreLocalKeyBundle,
   storeSenderKey,
   getStoredSenderKey,
-  clearSenderKey,
   getUserPrivateKey,
   getUserPublicKey,
   storeUserKeys,
@@ -48,7 +47,7 @@ async function runIntegratedE2EETests() {
   // 1. Initial Setup: Key generation for Alice, Bob, and Charlie
   const aliceIdentity = await initSignalIdentity(userAlice);
   const bobIdentity = await initSignalIdentity(userBob);
-  const charlieIdentity = await initSignalIdentity(userCharlie);
+  await initSignalIdentity(userCharlie);
 
   // Participants generate SignedPreKey and One-Time Prekeys (as done in E2EEProvider)
   await getOrGenerateSignedPreKey(userAlice, 1);
@@ -569,6 +568,7 @@ async function runIntegratedE2EETests() {
 
   // Vault backup and restore: preserves historicalPrivateKeys
   const vaultBundle = await exportLocalKeyBundle(testSender);
+  assert.ok(vaultBundle);
   assert.ok(vaultBundle.historicalPrivateKeys);
   assert.deepStrictEqual(vaultBundle.historicalPrivateKeys, [privGen2, privGen1]);
 

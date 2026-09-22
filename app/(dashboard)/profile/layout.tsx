@@ -10,7 +10,7 @@ import { NotificationDropdown } from "@/components/notifications/NotificationDro
 import {
   Star, Search, UserCircle2, Check, ShieldCheck, Building2,
   ChevronRight, AtSign, CreditCard, Globe, Send, Bell, Briefcase, Clock, LogOut
-, Heart, MonitorSmartphone, KeyRound} from "lucide-react";
+, Heart, MonitorSmartphone, KeyRound, LifeBuoy} from "lucide-react";
 import { Locale } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<Locale, string> = {
@@ -393,6 +393,38 @@ function ProfileSidebarNavigation() {
                     isRouteActive("/profile/backup") ? "text-[#2563EB]" : "text-[#0F172A]"
                   )}>E2EE Key Backup</span>
                   <span className="text-[11px] font-medium text-slate-500 mt-0.5">Protect & restore chats</span>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* SUPPORT & FEEDBACK */}
+        <div className="flex flex-col">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Support</span>
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => router.push("/profile/feedback")}
+              className={cn(
+                "flex items-center justify-between rounded-xl border p-3 transition-colors",
+                isRouteActive("/profile/feedback")
+                  ? "border-blue-200 bg-[#EEF2FF]"
+                  : "border-slate-100 bg-white hover:bg-slate-50"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] text-[#2563EB]"
+                )}>
+                  <LifeBuoy className="h-4.5 w-4.5" />
+                </div>
+                <div className="flex flex-col items-start leading-tight">
+                  <span className={cn(
+                    "text-[13px] font-bold",
+                    isRouteActive("/profile/feedback") ? "text-[#2563EB]" : "text-[#0F172A]"
+                  )}>Help & Feedback</span>
+                  <span className="text-[11px] font-medium text-slate-500 mt-0.5">Report bugs & view replies</span>
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-slate-400" />
