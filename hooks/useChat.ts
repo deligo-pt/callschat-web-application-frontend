@@ -93,6 +93,7 @@ export interface ChatMessage {
   isSystem?: boolean;
   systemType?: string;
   isRetryExpired?: boolean;
+  previewText?: string | null;
 }
 
 export interface PinnedMessage {
@@ -110,6 +111,13 @@ const parseEditedText = (rawText: string) => {
     return { text: rawText.substring("__EDITED__:".length), isEdited: true };
   }
   return { text: rawText, isEdited: false };
+};
+
+const isValidPlaintext = (text: string | null | undefined): boolean => {
+  if (!text || typeof text !== "string") return false;
+  if (text.includes("Waiting for this message")) return false;
+  if (text.includes("Message sent before key update")) return false;
+  return true;
 };
 
 const resolveQuotedMessage = async (
@@ -348,9 +356,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             (await getDecryptedMessage(currentUserIdRef.current, m.rawCiphertext)) ||
             (await getDecryptedMessage(currentUserIdRef.current, `cipher_${m.rawCiphertext}`));
         }
-        if (locallyStored) {
+        if (locallyStored && isValidPlaintext(locallyStored)) {
           decryptedMap.set(m.id, locallyStored);
           continue;
+        } else {
+          locallyStored = null;
+        }
+
+        // 1b. If self-sent message, check if previewText is available
+        if (m.senderId === currentUserIdRef.current) {
+          const preview = (m as any).previewText || m.rawEncryptedKeys?.previewText;
+          if (preview && isValidPlaintext(preview)) {
+            decryptedMap.set(m.id, preview);
+            void storeDecryptedMessage(currentUserIdRef.current, m.id, preview);
+            continue;
+          }
         }
 
         const isSignal = m.rawMessageType === 2 || m.rawMessageType === 3 || m.rawEncryptedKeys?.protocol === 'libsignal';
@@ -364,14 +384,16 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               const decSelf = await decryptMessage(selfEnc.ciphertext, selfEnc.nonce, myPub, privKey);
               if (decSelf) {
                 const t = parseEditedText(decSelf).text;
-                decryptedMap.set(m.id, t);
-                void storeDecryptedMessage(currentUserIdRef.current, m.id, t);
-                if (m.rawNonce) void storeDecryptedMessage(currentUserIdRef.current, `nonce_${m.rawNonce}`, t);
-                if (m.rawCiphertext) {
-                  void storeDecryptedMessage(currentUserIdRef.current, m.rawCiphertext, t);
-                  void storeDecryptedMessage(currentUserIdRef.current, `cipher_${m.rawCiphertext}`, t);
+                if (isValidPlaintext(t)) {
+                  decryptedMap.set(m.id, t);
+                  void storeDecryptedMessage(currentUserIdRef.current, m.id, t);
+                  if (m.rawNonce) void storeDecryptedMessage(currentUserIdRef.current, `nonce_${m.rawNonce}`, t);
+                  if (m.rawCiphertext) {
+                    void storeDecryptedMessage(currentUserIdRef.current, m.rawCiphertext, t);
+                    void storeDecryptedMessage(currentUserIdRef.current, `cipher_${m.rawCiphertext}`, t);
+                  }
+                  continue;
                 }
-                continue;
               }
             }
           } catch {}
@@ -604,6 +626,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
                 (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
 
+              if (locallyStored && !isValidPlaintext(locallyStored)) {
+                locallyStored = null;
+              }
+
               if (!locallyStored && msg.id) {
                 locallyStored = await getDecryptedMessage(currentUserId, msg.id);
               }
@@ -615,12 +641,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   (await getDecryptedMessage(currentUserId, msg.ciphertext)) ||
                   (await getDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`));
               }
-              if (locallyStored) {
+              if (locallyStored && isValidPlaintext(locallyStored)) {
                 decryptedTextsMap.set(msg.id, locallyStored);
                 sentPlaintextCacheRef.current.set(msg.id, locallyStored);
                 if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, locallyStored);
                 if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, locallyStored);
                 continue;
+              } else {
+                locallyStored = null;
               }
 
               if (myPrivateKey) {
@@ -646,14 +674,23 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 const activeMyPrivKey = myPrivateKeyRef.current || myPrivateKey;
 
                 if (msg.senderId === currentUserId) {
-                  // Message sent by self: check plaintext cache or self-encrypted session key
+                  // Message sent by self: check plaintext cache, previewText, or self-encrypted session key
                   let resolvedText: string | null = null;
-                  if (sentPlaintextCacheRef.current.has(msg.id)) {
-                    resolvedText = sentPlaintextCacheRef.current.get(msg.id)!;
-                  } else if (msg.nonce && sentPlaintextCacheRef.current.has(msg.nonce)) {
-                    resolvedText = sentPlaintextCacheRef.current.get(msg.nonce)!;
-                  } else if (msg.ciphertext && sentPlaintextCacheRef.current.has(msg.ciphertext)) {
-                    resolvedText = sentPlaintextCacheRef.current.get(msg.ciphertext)!;
+                  const cachedCandidate =
+                    (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
+                    (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+                    (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
+
+                  if (cachedCandidate && isValidPlaintext(cachedCandidate)) {
+                    resolvedText = cachedCandidate;
+                  }
+
+                  // Fast path for sender: prioritize plaintext from previewText
+                  if (!resolvedText && (msg.previewText || encKeys?.previewText)) {
+                    const preview = msg.previewText || encKeys.previewText;
+                    if (isValidPlaintext(preview)) {
+                      resolvedText = preview;
+                    }
                   }
 
                   // 1. Try decrypting selfEncryptedSessionKey using active key and historical key ring
@@ -742,12 +779,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
                   if (resolvedText) {
                     decryptedTextsMap.set(msg.id, resolvedText);
-                    sentPlaintextCacheRef.current.set(msg.id, resolvedText);
-                    if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, resolvedText);
-                    if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, resolvedText);
-                    void storeDecryptedMessage(currentUserId, msg.id, resolvedText);
-                    if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, resolvedText);
-                    if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, resolvedText);
+                    if (isValidPlaintext(resolvedText)) {
+                      sentPlaintextCacheRef.current.set(msg.id, resolvedText);
+                      if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, resolvedText);
+                      if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, resolvedText);
+                      void storeDecryptedMessage(currentUserId, msg.id, resolvedText);
+                      if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, resolvedText);
+                      if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, resolvedText);
+                    }
                   }
                 } else {
                   // Message sent by peer: Multi-Device, X3DH receiver, or pairwise fallback
@@ -873,13 +912,23 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   !isTicketMessage &&
                   (!!msg.nonce || isSignalMsg);
 
+                const mappedText = decryptedTextsMap.get(msg.id);
+                const hasValidMapped = isValidPlaintext(mappedText);
+                const previewFallback =
+                  msg.previewText ||
+                  (msgEncKeys && typeof msgEncKeys === 'object' && msgEncKeys.previewText
+                    ? msgEncKeys.previewText
+                    : null);
+
                 const text =
-                  decryptedTextsMap.get(msg.id) ??
+                  (hasValidMapped ? mappedText : null) ??
                   (msg.ciphertext
                     ? isBizChat || (!msg.nonce && !isSignalMsg)
                       ? parseEditedText(msg.ciphertext).text
                       : isMyMsg
-                        ? msg.previewText || (msgEncKeys && typeof msgEncKeys === 'object' && msgEncKeys.previewText ? msgEncKeys.previewText : null) || "🔒 Message sent before key update"
+                        ? (previewFallback && isValidPlaintext(previewFallback) ? previewFallback : null) ||
+                          mappedText ||
+                          "🔒 Message sent before key update"
                         : "⏳ Waiting for this message. This may take a while."
                     : "");
 
@@ -905,6 +954,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   rawEncryptedKeys: (msg.encryptedKeys as any) ?? null,
                   recipientRegistrationId: (msg.encryptedKeys as any)?.recipientRegistrationId ?? null,
                   senderRegistrationId: (msg.encryptedKeys as any)?.senderRegistrationId ?? null,
+                  previewText: previewFallback,
                 };
               })
             );
@@ -917,7 +967,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
             // Populate sent plaintext cache and dispatch silent retries for pending items
             decryptedHistory.forEach((m) => {
-              if (m.senderId === currentUserId && m.text && !m.isDecryptionPending) {
+              if (m.senderId === currentUserId && m.text && !m.isDecryptionPending && isValidPlaintext(m.text)) {
                 sentPlaintextCacheRef.current.set(m.id, m.text);
               }
               if (m.senderId !== currentUserId && m.isDecryptionPending) {
@@ -1002,7 +1052,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         if (!cached && payload.nonce) {
           cached = await getDecryptedMessage(myId, `nonce_${payload.nonce}`);
         }
-        if (cached) {
+        if (cached && isValidPlaintext(cached)) {
           const parsed = parseEditedText(cached);
           setMessages((prev) => {
             if (prev.some((m) => m.id === payload.id)) return prev;
@@ -1204,6 +1254,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 (payload.nonce ? sentPlaintextCacheRef.current.get(payload.nonce) : null) ||
                 (payload.ciphertext ? sentPlaintextCacheRef.current.get(payload.ciphertext) : null);
 
+              if (stored && !isValidPlaintext(stored)) {
+                stored = null;
+              }
+
               if (!stored && payload.id) {
                 stored = await getDecryptedMessage(currentUserIdRef.current, payload.id);
               }
@@ -1215,8 +1269,17 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   (await getDecryptedMessage(currentUserIdRef.current, payload.ciphertext)) ||
                   (await getDecryptedMessage(currentUserIdRef.current, `cipher_${payload.ciphertext}`));
               }
-              if (stored) {
+              if (stored && isValidPlaintext(stored)) {
                 text = stored;
+                decryptedRealtime = true;
+              }
+            }
+
+            // 3b. Prioritize previewText from payload or encKeys for sender's own message
+            if (!decryptedRealtime && (payload.previewText || encKeys?.previewText)) {
+              const preview = payload.previewText || encKeys.previewText;
+              if (isValidPlaintext(preview)) {
+                text = preview;
                 decryptedRealtime = true;
               }
             }
@@ -1432,7 +1495,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           console.log("âœ… [Socket] Decrypted message:", text);
 
           // Cache message in volatile memory and durable IndexedDB
-          if (text) {
+          if (text && isValidPlaintext(text)) {
             if (payload.id) {
               sentPlaintextCacheRef.current.set(payload.id, text);
               void storeDecryptedMessage(currentUserIdRef.current, payload.id, text);
@@ -1607,27 +1670,40 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               if (typeof rawEncKeys === "string") {
                 try { rawEncKeys = JSON.parse(rawEncKeys); } catch {}
               }
-              const recoveredText =
-                (optIdx !== -1 && prev[optIdx]?.text && !prev[optIdx].text.includes("Waiting for this message")
+              const optCandidate =
+                optIdx !== -1 && prev[optIdx]?.text && isValidPlaintext(prev[optIdx].text)
                   ? prev[optIdx].text
-                  : null) ||
+                  : null;
+              const cachedCandidate =
                 (payload.id ? sentPlaintextCacheRef.current.get(payload.id) : null) ||
                 (payload.nonce ? sentPlaintextCacheRef.current.get(payload.nonce) : null) ||
-                (payload.ciphertext ? sentPlaintextCacheRef.current.get(payload.ciphertext) : null) ||
+                (payload.ciphertext ? sentPlaintextCacheRef.current.get(payload.ciphertext) : null);
+              const validCached =
+                cachedCandidate && isValidPlaintext(cachedCandidate) ? cachedCandidate : null;
+              const previewCandidate =
                 payload.previewText ||
-                (rawEncKeys && typeof rawEncKeys === 'object' && rawEncKeys.previewText ? rawEncKeys.previewText : null) ||
+                (rawEncKeys && typeof rawEncKeys === 'object' && rawEncKeys.previewText ? rawEncKeys.previewText : null);
+              const validPreview =
+                previewCandidate && isValidPlaintext(previewCandidate) ? previewCandidate : null;
+
+              const recoveredText =
+                optCandidate ||
+                validCached ||
+                validPreview ||
                 "🔒 Message sent before key update";
 
-              sentPlaintextCacheRef.current.set(payload.id, recoveredText);
-              void storeDecryptedMessage(currentUserIdRef.current, payload.id, recoveredText);
-              if (payload.nonce) {
-                sentPlaintextCacheRef.current.set(payload.nonce, recoveredText);
-                void storeDecryptedMessage(currentUserIdRef.current, `nonce_${payload.nonce}`, recoveredText);
-              }
-              if (payload.ciphertext) {
-                sentPlaintextCacheRef.current.set(payload.ciphertext, recoveredText);
-                void storeDecryptedMessage(currentUserIdRef.current, payload.ciphertext, recoveredText);
-                void storeDecryptedMessage(currentUserIdRef.current, `cipher_${payload.ciphertext}`, recoveredText);
+              if (isValidPlaintext(recoveredText)) {
+                sentPlaintextCacheRef.current.set(payload.id, recoveredText);
+                void storeDecryptedMessage(currentUserIdRef.current, payload.id, recoveredText);
+                if (payload.nonce) {
+                  sentPlaintextCacheRef.current.set(payload.nonce, recoveredText);
+                  void storeDecryptedMessage(currentUserIdRef.current, `nonce_${payload.nonce}`, recoveredText);
+                }
+                if (payload.ciphertext) {
+                  sentPlaintextCacheRef.current.set(payload.ciphertext, recoveredText);
+                  void storeDecryptedMessage(currentUserIdRef.current, payload.ciphertext, recoveredText);
+                  void storeDecryptedMessage(currentUserIdRef.current, `cipher_${payload.ciphertext}`, recoveredText);
+                }
               }
 
               if (optIdx !== -1) {
@@ -1950,7 +2026,10 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
 
       if (!plaintext) {
-        plaintext = (await getDecryptedMessage(currentUserIdRef.current, payload.messageId)) || undefined;
+        const cached = await getDecryptedMessage(currentUserIdRef.current, payload.messageId);
+        if (cached && isValidPlaintext(cached)) {
+          plaintext = cached;
+        }
       }
 
       if (!plaintext && recentSentPlaintextsRef.current.length > 0) {

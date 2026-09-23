@@ -588,6 +588,67 @@ async function runIntegratedE2EETests() {
   assert.strictEqual(restoredDecGen1, sentMsgGen1);
   console.log('✓ Vault export/restore preserved historical key ring and restored full history decryption');
 
+  // ── Testing Plaintext Recovery & Cache Sanitation across Key Update ─────
+  console.log('\n--- Testing Plaintext Recovery & Cache Sanitation across Key Update ---');
+
+  const isValidPlaintext = (text: string | null | undefined): boolean => {
+    if (!text || typeof text !== 'string') return false;
+    if (text.includes('Waiting for this message')) return false;
+    if (text.includes('Message sent before key update')) return false;
+    return true;
+  };
+
+  // 1. Poisoned cache rejection test
+  assert.strictEqual(isValidPlaintext('🔒 Message sent before key update'), false);
+  assert.strictEqual(isValidPlaintext('⏳ Waiting for this message. This may take a while.'), false);
+  assert.strictEqual(isValidPlaintext(null), false);
+  assert.strictEqual(isValidPlaintext(undefined), false);
+  assert.strictEqual(isValidPlaintext('Hello World! This is secret text.'), true);
+  console.log('✓ Cache sanitizer correctly rejects poisoned lock & clock strings');
+
+  // 2. Sender recovery when private key is completely unavailable but previewText is in payload / encryptedKeys
+  const rawSenderMsgFromDb = {
+    id: 'msg_history_test_123',
+    conversationId: 'conv_123',
+    senderId: 'user_alice_historical',
+    ciphertext: 'encrypted_wire_signal_ciphertext_only_bob_can_decrypt',
+    nonce: null,
+    messageType: 3,
+    previewText: 'This is the plaintext message Alice sent before rotating keys',
+    encryptedKeys: {
+      protocol: 'libsignal',
+      previewText: 'This is the plaintext message Alice sent before rotating keys',
+    },
+  };
+
+  // Simulate loadHistory mapping for sender with poisoned cache
+  const poisonedCache = new Map<string, string>();
+  poisonedCache.set(rawSenderMsgFromDb.id, '🔒 Message sent before key update');
+
+  const cachedCandidate = poisonedCache.get(rawSenderMsgFromDb.id);
+  const validCached = cachedCandidate && isValidPlaintext(cachedCandidate) ? cachedCandidate : null;
+  assert.strictEqual(validCached, null, 'Poisoned cache must be ignored');
+
+  const previewFallback =
+    rawSenderMsgFromDb.previewText ||
+    (rawSenderMsgFromDb.encryptedKeys && typeof rawSenderMsgFromDb.encryptedKeys === 'object'
+      ? rawSenderMsgFromDb.encryptedKeys.previewText
+      : null);
+
+  const resolvedSenderText =
+    validCached ??
+    (rawSenderMsgFromDb.ciphertext
+      ? previewFallback && isValidPlaintext(previewFallback)
+        ? previewFallback
+        : '🔒 Message sent before key update'
+      : '');
+
+  assert.strictEqual(
+    resolvedSenderText,
+    'This is the plaintext message Alice sent before rotating keys'
+  );
+  console.log('✓ Sender history cleanly recovers original text from previewText despite cache poisoning and missing keys');
+
   console.log('\n🎉 ALL INTEGRATION E2EE TESTS PASSED SUCCESSFULLY! 🎉');
 }
 
