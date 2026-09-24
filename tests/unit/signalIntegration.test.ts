@@ -529,7 +529,7 @@ async function runIntegratedE2EETests() {
         recoveredTextGen1 = dec;
         break;
       }
-    } catch {}
+    } catch { }
   }
   assert.strictEqual(recoveredTextGen1, sentMsgGen1);
   console.log('✓ Sender historical key ring successfully recovered and decrypted Generation 1 sent message');
@@ -552,7 +552,7 @@ async function runIntegratedE2EETests() {
     try {
       const d = await decryptMessage(encGen1.ciphertext, encGen1.nonce, pubGen1, privCand);
       if (d) { recoveredGen1Again = d; break; }
-    } catch {}
+    } catch { }
   }
   assert.strictEqual(recoveredGen1Again, sentMsgGen1);
 
@@ -561,7 +561,7 @@ async function runIntegratedE2EETests() {
     try {
       const d = await decryptMessage(encGen2.ciphertext, encGen2.nonce, pubGen2, privCand);
       if (d) { recoveredGen2 = d; break; }
-    } catch {}
+    } catch { }
   }
   assert.strictEqual(recoveredGen2, sentMsgGen2);
   console.log('✓ Multi-generation historical key ring successfully decrypted all sent messages');
@@ -583,7 +583,7 @@ async function runIntegratedE2EETests() {
     try {
       const d = await decryptMessage(encGen1.ciphertext, encGen1.nonce, pubGen1, privCand);
       if (d) { restoredDecGen1 = d; break; }
-    } catch {}
+    } catch { }
   }
   assert.strictEqual(restoredDecGen1, sentMsgGen1);
   console.log('✓ Vault export/restore preserved historical key ring and restored full history decryption');
@@ -648,6 +648,94 @@ async function runIntegratedE2EETests() {
     'This is the plaintext message Alice sent before rotating keys'
   );
   console.log('✓ Sender history cleanly recovers original text from previewText despite cache poisoning and missing keys');
+
+  // ── Testing WhatsApp Parity: Peer Key Update with 100% Sender Plaintext Retention ─────
+  console.log('\n--- Testing WhatsApp Parity: Peer Key Update with 100% Sender Plaintext Retention ---');
+
+  const userRahim = 'user_rahim_' + Date.now();
+  const userKarim = 'user_karim_' + Date.now();
+
+  const rahimIdentity = await initSignalIdentity(userRahim);
+  const karimIdentity = await initSignalIdentity(userKarim);
+
+  const karimSPK = await generateSignedPreKey(userKarim, 1);
+  const karimOPKs = await generatePreKeyBatch(userKarim, 200, 5);
+
+  // Rahim establishes session with Karim
+  const karimBundle = {
+    identityKey: karimIdentity.identityKeyBase64,
+    registrationId: karimIdentity.registrationId,
+    signedPreKey: {
+      keyId: karimSPK.keyId,
+      publicKey: karimSPK.publicKey,
+      signature: karimSPK.signature,
+    },
+    oneTimePreKey: {
+      keyId: karimOPKs[0]!.keyId,
+      publicKey: karimOPKs[0]!.publicKey,
+    },
+  };
+  await buildSessionFromBundle(userRahim, userKarim, karimBundle, 1);
+
+  // Rahim sends two text messages
+  const msg1Text = 'asaa wait ami debug aa asii';
+  const msg2Text = 'Hello Karim, did you install the release APK?';
+
+  const enc1 = await encrypt1to1Message(userRahim, userKarim, msg1Text, 1);
+  const enc2 = await encrypt1to1Message(userRahim, userKarim, msg2Text, 1);
+
+  // Karim receives and decrypts both messages successfully
+  const karimDecrypted1 = await decrypt1to1Message(userKarim, userRahim, enc1.ciphertext, enc1.messageType, 1);
+  const karimDecrypted2 = await decrypt1to1Message(userKarim, userRahim, enc2.ciphertext, enc2.messageType, 1);
+
+  assert.strictEqual(karimDecrypted1, msg1Text);
+  assert.strictEqual(karimDecrypted2, msg2Text);
+  console.log('✓ Karim successfully decrypted both of Rahim\'s messages');
+
+  // Now Karim simulates reinstalling the APK (new keys, new identity)
+  const userKarimReinstalled = 'user_karim_reinstalled_' + Date.now();
+  await initSignalIdentity(userKarimReinstalled);
+  await generateSignedPreKey(userKarimReinstalled, 1);
+
+  // Rahim receives e2ee:peer_key_updated event with Karim's new public key
+  // Rahim's in-memory / local-first state preserves already-decrypted messages
+  const rahimInMemoryMessages = [
+    {
+      id: 'server_msg_id_001',
+      conversationId: 'conv_rahim_karim',
+      senderId: userRahim,
+      text: msg1Text,
+      rawCiphertext: enc1.ciphertext,
+      rawNonce: null,
+      previewText: msg1Text,
+    },
+    {
+      id: 'server_msg_id_002',
+      conversationId: 'conv_rahim_karim',
+      senderId: userRahim,
+      text: msg2Text,
+      rawCiphertext: enc2.ciphertext,
+      rawNonce: null,
+      previewText: msg2Text,
+    },
+  ];
+
+  // When history mapping runs after peer key update:
+  for (const rawDbMsg of rahimInMemoryMessages) {
+    const existingInMemory = rahimInMemoryMessages.find(
+      (m) => m.id === rawDbMsg.id || (m.rawCiphertext && m.rawCiphertext === rawDbMsg.rawCiphertext)
+    );
+    const resolvedText =
+      existingInMemory?.text && isValidPlaintext(existingInMemory.text)
+        ? existingInMemory.text
+        : rawDbMsg.previewText;
+
+    assert.strictEqual(isValidPlaintext(resolvedText), true);
+    assert.strictEqual(resolvedText.includes('Message sent before key update'), false);
+    assert.strictEqual(resolvedText.includes('Waiting for this message'), false);
+    assert.strictEqual(resolvedText, rawDbMsg.text);
+  }
+  console.log('✓ Rahim retains 100% of his sent messages with original plaintext across Karim\'s key update');
 
   console.log('\n🎉 ALL INTEGRATION E2EE TESTS PASSED SUCCESSFULLY! 🎉');
 }

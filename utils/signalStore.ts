@@ -12,23 +12,29 @@ const signalDbStore =
     ? createStore('callschat-signal-db', 'signal-protocol-store')
     : undefined;
 
-// In-memory fallback for SSR or environments where IndexedDB is unavailable
-const memoryFallback = new Map<string, any>();
+// Fast in-memory read-through cache backed by durable IndexedDB
+const memoryCache = new Map<string, any>();
 
 async function getStoredValue<T>(key: string): Promise<T | undefined> {
+  if (memoryCache.has(key)) {
+    return memoryCache.get(key);
+  }
   if (signalDbStore) {
     try {
       const val = await get<T>(key, signalDbStore);
+      if (val !== undefined) {
+        memoryCache.set(key, val);
+      }
       return val ?? undefined;
     } catch {
-      return memoryFallback.get(key);
+      return memoryCache.get(key);
     }
   }
-  return memoryFallback.get(key);
+  return memoryCache.get(key);
 }
 
 async function setStoredValue<T>(key: string, value: T): Promise<void> {
-  memoryFallback.set(key, value);
+  memoryCache.set(key, value);
   if (signalDbStore) {
     try {
       await set(key, value, signalDbStore);
@@ -39,7 +45,7 @@ async function setStoredValue<T>(key: string, value: T): Promise<void> {
 }
 
 async function deleteStoredValue(key: string): Promise<void> {
-  memoryFallback.delete(key);
+  memoryCache.delete(key);
   if (signalDbStore) {
     try {
       await del(key, signalDbStore);
@@ -164,6 +170,12 @@ export class SignalProtocolStore implements StorageType {
     return false; // Re-saved same identity
   }
 
+  async loadIdentity(encodedAddress: string): Promise<ArrayBuffer | undefined> {
+    const key = `identity_${this.userId}_${encodedAddress}`;
+    const existing = await getStoredValue<any>(key);
+    return existing ? ensureArrayBuffer(existing) : undefined;
+  }
+
   // ---------------------------------------------------------------------------
   // Pre-Keys (One-Time Prekeys)
   // ---------------------------------------------------------------------------
@@ -263,7 +275,7 @@ export class SignalProtocolStore implements StorageType {
   }
 
   async removeAllSessions(): Promise<void> {
-    memoryFallback.clear();
+    memoryCache.clear();
   }
 
   async exportSessions(): Promise<Record<string, SessionRecordType>> {
@@ -282,8 +294,8 @@ export class SignalProtocolStore implements StorageType {
         console.warn('[signalStore] Failed to read sessions from IndexedDB:', err);
       }
     }
-    // Also merge from memory fallback
-    for (const [k, v] of memoryFallback.entries()) {
+    // Also merge from memory cache
+    for (const [k, v] of memoryCache.entries()) {
       if (typeof k === 'string' && k.startsWith(prefix)) {
         const addr = k.substring(prefix.length);
         if (!result[addr]) {

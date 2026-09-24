@@ -1158,9 +1158,12 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                   <div className="flex flex-col divide-y divide-[#F0F2F5] dark:divide-[#202C33]">
                     {filteredConversations.map((conv, index) => {
                       const isGroup = !!conv.isGroup;
+                      const hasValidPeer = conv.otherUserId && conv.otherUserId !== "null" && conv.otherUserId !== "undefined";
                       const chatHref = isGroup
                         ? `${basePath}/${conv.id}?type=group`
-                        : `${basePath}/${conv.id}?recipientId=${conv.otherUserId}`;
+                        : hasValidPeer
+                        ? `${basePath}/${conv.id}?recipientId=${conv.otherUserId}`
+                        : `${basePath}/${conv.id}`;
                       const isActive = pathname === `${basePath}/${conv.id}`;
 
                       const displayName = isGroup ? (conv.groupName || "Group") : conv.otherUserName;

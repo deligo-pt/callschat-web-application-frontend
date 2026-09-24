@@ -184,7 +184,8 @@ function ChatRouter() {
   const pathname = usePathname();
   const basePath = pathname?.startsWith("/business") ? "/business/chats" : "/chats";
   const typeParam = searchParams.get("type");
-  const recipientIdFromQuery = searchParams.get("recipientId");
+  const rawRecipientId = searchParams.get("recipientId");
+  const recipientIdFromQuery = rawRecipientId && rawRecipientId !== "null" && rawRecipientId !== "undefined" ? rawRecipientId : null;
   const bizHandle = searchParams.get("bizHandle");
 
   const [isGroup, setIsGroup] = useState<boolean>(() => {
@@ -254,7 +255,10 @@ function ChatRoomPageContent() {
   // are frozen after the first render (useState init only runs once), so
   // subsequent re-renders triggered by useSearchParams() won't re-initialize
   // the component or cause cascading state changes.
-  const [recipientIdFromQuery] = useState(() => searchParams.get("recipientId") || "");
+  const [recipientIdFromQuery] = useState(() => {
+    const r = searchParams.get("recipientId");
+    return r && r !== "null" && r !== "undefined" ? r : "";
+  });
 
   // ── B2C Bridge params ──────────────────────────────────────────────────────
   // When a user clicks a business in NewMessageModal, these params are set.
@@ -403,7 +407,7 @@ function ChatRoomPageContent() {
           // fall through to fallback contact lookup if fetchMyConversations fails
         }
 
-        if (finalRecipientId) {
+        if (finalRecipientId && finalRecipientId !== "null" && finalRecipientId !== "undefined") {
           setRecipientId(finalRecipientId);
 
           const baseUrl =
