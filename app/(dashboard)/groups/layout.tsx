@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Search, Users, Plus, Loader2, MoreVertical, Trash2, Star, Heart, X } from "lucide-react";
+import { Search, Users, Plus, Loader2, MoreVertical, Trash2, Star, Heart, X, QrCode } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 import { useGroupStore } from "@/hooks/useGroupStore";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { GroupQrScannerModal } from "@/components/group/GroupQrScannerModal";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
@@ -31,6 +32,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Fetch groups logic
   useEffect(() => {
@@ -154,6 +156,14 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
           <div className="flex items-center justify-between">
             <h1 className="text-[22px] font-bold tracking-tight text-[#111B21] dark:text-[#E9EDEF]">{tNav("group")}</h1>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors cursor-pointer"
+                title="Scan QR Code to Join Group"
+              >
+                <QrCode className="h-5 w-5" />
+              </button>
               <Link 
                 href="/groups/create" 
                 className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors"
@@ -163,10 +173,11 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
               </Link>
               <Link 
                 href="/chats/favorites" 
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#FFB020] transition-colors"
-                title="Favorites"
+                title="Favorites" 
+                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:text-red-500 transition-colors focus:outline-none"
+                aria-label="Favorites"
               >
-                <Heart className="h-5 w-5 fill-[#FFB020] text-[#FFB020]" />
+                <Heart className="h-4.5 w-4.5" />
               </Link>
               <NotificationDropdown />
             </div>
@@ -317,7 +328,7 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
                             }}
                             className="w-full px-3.5 py-2 text-left text-[13px] font-medium text-[#111B21] dark:text-[#E9EDEF] hover:bg-[#F0F2F5] dark:hover:bg-[#182229] flex items-center gap-2 cursor-pointer"
                           >
-                            <Star className={cn("h-4 w-4", group.isFavourite ? "fill-[#FFB020] text-[#FFB020]" : "text-[#8696A0]")} />
+                            <Heart className={cn("h-4 w-4", group.isFavourite ? "fill-red-500 text-red-500" : "text-[#8696A0]")} />
                             <span>{group.isFavourite ? t("remove_from_favorites") : t("add_to_favorites")}</span>
                           </button>
 
@@ -388,6 +399,11 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
       )}
+      {/* Group QR Scanner Modal */}
+      <GroupQrScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+      />
     </div>
   );
 }

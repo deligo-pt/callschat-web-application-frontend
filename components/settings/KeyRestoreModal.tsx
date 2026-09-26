@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { decryptKeyVault } from "@/utils/crypto";
-import { restoreLocalKeyBundle, LocalKeyBundle } from "@/utils/keyStore";
+import { restoreLocalKeyBundle, LocalKeyBundle, storeVaultSessionPin } from "@/utils/keyStore";
 import { ShieldCheck, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -57,6 +57,10 @@ export function KeyRestoreModal({
       }
 
       await restoreLocalKeyBundle(userId, bundle);
+      await storeVaultSessionPin(userId, pin);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("e2ee:keys_restored"));
+      }
       toast.success("Encryption keys and conversations restored successfully!");
       onRestored();
     } catch (err: any) {

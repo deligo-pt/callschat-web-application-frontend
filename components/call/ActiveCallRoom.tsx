@@ -293,7 +293,7 @@ export const CustomCallLayout = ({
 
   // Auto-scaling grid algorithm
   let gridClass =
-    "grid gap-3 w-full h-full pb-28 pt-20 px-4 transition-all duration-300";
+    "grid gap-3 w-full h-full transition-all duration-300";
 
   if (tracks.length === 1) {
     gridClass += " grid-cols-1 grid-rows-1";
@@ -459,11 +459,12 @@ export const CustomCallLayout = ({
   // ─────────────────────────────────────────────────────────────────────────
   // Peer info resolution
   // ─────────────────────────────────────────────────────────────────────────
+  const isMultiParty = Boolean(activeCall?.isGroup || remoteParticipants.length >= 2);
   const remotePeer = remoteParticipants[0];
   let singlePeerName = activeCall?.peerName || "CallsChat Call";
   let singleAvatarUrl = activeCall?.peerAvatar || "";
 
-  if (activeCall?.isGroup) {
+  if (isMultiParty) {
     singlePeerName = "CallsChat Group Call";
   } else if (remotePeer) {
     const liveName = remotePeer.name || remotePeer.identity || "";
@@ -788,7 +789,7 @@ export const CustomCallLayout = ({
             </div>
 
             {/* Video grid */}
-            <div className={cn("absolute inset-0 z-0", gridClass)}>
+            <div className={cn("absolute inset-0 z-0 pt-20 pb-28 px-4", gridClass)}>
               {tracks.map((trackRef, idx) => (
                 <ParticipantTile 
                   key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} 
@@ -831,7 +832,7 @@ export const CustomCallLayout = ({
                 <span>End-to-End Encrypted</span>
               </div>
               <h2 className="text-[16px] font-semibold tracking-wide text-[#E9EDEF]">
-                {activeCall?.isGroup ? "CallsChat Group Call" : "CallsChat Call"}
+                {isMultiParty ? "CallsChat Group Call" : "CallsChat Call"}
               </h2>
             </div>
 
@@ -972,7 +973,7 @@ export const CustomCallLayout = ({
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#25D366]" />
             </span>
             <h2 className="text-[16px] font-semibold tracking-wide text-[#E9EDEF]">
-              {activeCall?.isGroup ? "Group Video Call" : "Video Call"}
+              {isMultiParty ? "Group Video Call" : "Video Call"}
             </h2>
           </div>
           <span className="text-[13px] font-semibold text-[#25D366]">
@@ -1040,9 +1041,7 @@ export const CustomCallLayout = ({
              </div>
 
              {/* Dock overlaying the bottom edge */}
-             <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
-               <ControlDock compact />
-             </div>
+             <ControlDock compact />
           </div>
         ) : (
           // Group Call or multi-party layout
@@ -1056,9 +1055,7 @@ export const CustomCallLayout = ({
                 />
               ))}
             </div>
-            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full flex justify-center z-50">
-              <ControlDock compact />
-            </div>
+            <ControlDock compact />
           </div>
         )}
       </div>

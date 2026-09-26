@@ -184,14 +184,26 @@ function ChatRouter() {
   const pathname = usePathname();
   const basePath = pathname?.startsWith("/business") ? "/business/chats" : "/chats";
   const typeParam = searchParams.get("type");
-  const recipientIdFromQuery = searchParams.get("recipientId");
+  const rawRecipientId = searchParams.get("recipientId");
+  const recipientIdFromQuery = rawRecipientId && rawRecipientId !== "null" && rawRecipientId !== "undefined" ? rawRecipientId : null;
   const bizHandle = searchParams.get("bizHandle");
 
-  const [isGroup, setIsGroup] = useState<boolean>(() => typeParam === "group");
+  const [isGroup, setIsGroup] = useState<boolean>(() => {
+    if (typeParam === "group") return true;
+    if (typeof window !== "undefined" && conversationId) {
+      const cached = localStorage.getItem(`is_group_${conversationId}`);
+      if (cached === "true") return true;
+      if (cached === "false") return false;
+    }
+    return false;
+  });
 
   useEffect(() => {
     if (typeParam === "group") {
       setIsGroup(true);
+      if (typeof window !== "undefined" && conversationId) {
+        localStorage.setItem(`is_group_${conversationId}`, "true");
+      }
       return;
     }
     // Auto-detect if this ID belongs to a group when recipientId and bizHandle are absent
@@ -199,6 +211,13 @@ function ChatRouter() {
       groupService.fetchGroupDetails(conversationId).then((res) => {
         if (res?.success && res?.data) {
           setIsGroup(true);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`is_group_${conversationId}`, "true");
+          }
+        } else {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`is_group_${conversationId}`, "false");
+          }
         }
       }).catch(() => {});
     }
@@ -236,7 +255,10 @@ function ChatRoomPageContent() {
   // are frozen after the first render (useState init only runs once), so
   // subsequent re-renders triggered by useSearchParams() won't re-initialize
   // the component or cause cascading state changes.
-  const [recipientIdFromQuery] = useState(() => searchParams.get("recipientId") || "");
+  const [recipientIdFromQuery] = useState(() => {
+    const r = searchParams.get("recipientId");
+    return r && r !== "null" && r !== "undefined" ? r : "";
+  });
 
   // ── B2C Bridge params ──────────────────────────────────────────────────────
   // When a user clicks a business in NewMessageModal, these params are set.
@@ -385,7 +407,7 @@ function ChatRoomPageContent() {
           // fall through to fallback contact lookup if fetchMyConversations fails
         }
 
-        if (finalRecipientId) {
+        if (finalRecipientId && finalRecipientId !== "null" && finalRecipientId !== "undefined") {
           setRecipientId(finalRecipientId);
 
           const baseUrl =
@@ -474,6 +496,7 @@ function ChatRoomPageContent() {
     messages,
     sendMessage,
     editMessage,
+    toggleReaction,
     pinnedMessages,
     pinMessage,
     clearMessages,
@@ -948,6 +971,7 @@ function ChatRoomPageContent() {
                     )
                   }
                   onUnsend={unsendMessage}
+                  onReact={(mId, emoji) => toggleReaction(mId, emoji)}
                   onReply={(m) =>
                     setReplyingTo({
                       id: m.id,
