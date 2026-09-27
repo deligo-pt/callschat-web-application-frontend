@@ -507,6 +507,14 @@ export const useCallSignaling = () => {
     socket.on('call:unavailable', handleCallUnavailable);
     socket.on('call:error', handleCallError);
 
+    const handleParticipantInvited = (payload: { roomId?: string; callerName?: string; targetName?: string }) => {
+      console.log('[Call] Co-participant invited someone to the call:', payload);
+      const inviter = payload.callerName || 'Someone in the call';
+      const target = payload.targetName || 'a contact';
+      toast.info(`${inviter} invited ${target} to the call`);
+    };
+    socket.on('call:participant_invited', handleParticipantInvited);
+
     const handleGroupCallActive = (payload: {
       groupId: string;
       callId: string;
@@ -642,6 +650,7 @@ export const useCallSignaling = () => {
       socket.off('call:timeout', handleCallTimeout);
       socket.off('call:unavailable', handleCallUnavailable);
       socket.off('call:error', handleCallError);
+      socket.off('call:participant_invited', handleParticipantInvited);
       socket.off('call:reconnecting', handleCallReconnecting);
       socket.off('call:reconnected', handleCallReconnected);
       socket.off('group:call_active', handleGroupCallActive);

@@ -187,5 +187,26 @@ export const chatService = {
     const response = await apiClient.delete(`/conversations/${conversationId}/messages/${messageId}/unsend`);
     return response.data;
   },
+
+  addReaction: async (conversationId: string, messageId: string, emoji: string): Promise<{ success: boolean; data?: any }> => {
+    try {
+      const response = await apiClient.post(`/conversations/${conversationId}/messages/${messageId}/reactions`, { emoji });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to add reaction to message ${messageId}`, error);
+      return { success: false };
+    }
+  },
+
+  removeReaction: async (conversationId: string, messageId: string): Promise<{ success: boolean; data?: any }> => {
+    try {
+      const response = await apiClient.delete(`/conversations/${conversationId}/messages/${messageId}/reactions`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to remove reaction from message ${messageId}`, error);
+      return { success: false };
+    }
+  },
 };
+
 

@@ -51,16 +51,20 @@ export const generateAndStoreKeyPair = async (userId: string = "") => {
   const publicKeyBase64 = bytesToBase64(publicKey);
   const privateKeyBase64 = bytesToBase64(privateKey);
   
-  if (typeof window !== "undefined") {
-    await storeUserKeys(userId, privateKeyBase64, publicKeyBase64);
-  }
-  
+  await storeUserKeys(userId, privateKeyBase64, publicKeyBase64);
   return publicKeyBase64;
 };
 
+export const normalizeCurve25519Key = (bytes: Uint8Array): Uint8Array => {
+  if (bytes.length === 33 && bytes[0] === 0x05) {
+    return bytes.slice(1);
+  }
+  return bytes;
+};
+
 export const deriveSharedSecret = (myPrivateKey: string, peerPublicKey: string): Uint8Array => {
-  const myPriv = base64ToBytes(myPrivateKey);
-  const peerPub = base64ToBytes(peerPublicKey);
+  let myPriv = normalizeCurve25519Key(base64ToBytes(myPrivateKey));
+  let peerPub = normalizeCurve25519Key(base64ToBytes(peerPublicKey));
   return x25519.getSharedSecret(myPriv, peerPub);
 };
 
@@ -156,8 +160,8 @@ export const decryptKeyFromMobile = async (
 ): Promise<string> => {
   const cipherBytes = base64ToBytes(encryptedPrivKey);
   const nonceBytes = base64ToBytes(nonce);
-  const mobilePub = base64ToBytes(mobileEphPub);
-  const webPriv = base64ToBytes(webEphPriv);
+  const mobilePub = normalizeCurve25519Key(base64ToBytes(mobileEphPub));
+  const webPriv = normalizeCurve25519Key(base64ToBytes(webEphPriv));
 
   const sharedSecret = x25519.getSharedSecret(webPriv, mobilePub);
   const cipher = xchacha20poly1305(sharedSecret, nonceBytes);
@@ -245,9 +249,9 @@ export const performX3DHInitiator = async (
   sessionKey: Uint8Array;
   ephemeralPublicKey: string;
 }> => {
-  const myIKPriv = base64ToBytes(myIdentityPrivateKey);
-  const recipientIKPub = base64ToBytes(recipientIdentityPublicKey);
-  const recipientSPKPub = base64ToBytes(recipientSignedPreKey);
+  const myIKPriv = normalizeCurve25519Key(base64ToBytes(myIdentityPrivateKey));
+  const recipientIKPub = normalizeCurve25519Key(base64ToBytes(recipientIdentityPublicKey));
+  const recipientSPKPub = normalizeCurve25519Key(base64ToBytes(recipientSignedPreKey));
 
   // Generate ephemeral keypair EK
   const ekPriv = x25519.utils.randomSecretKey();
@@ -259,7 +263,7 @@ export const performX3DHInitiator = async (
 
   let combinedDH: Uint8Array;
   if (recipientOneTimePreKey) {
-    const recipientOPKPub = base64ToBytes(recipientOneTimePreKey);
+    const recipientOPKPub = normalizeCurve25519Key(base64ToBytes(recipientOneTimePreKey));
     const dh4 = x25519.getSharedSecret(ekPriv, recipientOPKPub);
     combinedDH = new Uint8Array(dh1.length + dh2.length + dh3.length + dh4.length);
     combinedDH.set(dh1, 0);
@@ -298,10 +302,10 @@ export const performX3DHReceiver = async (
   senderIdentityPublicKey: string,
   senderEphemeralPublicKey: string,
 ): Promise<Uint8Array> => {
-  const myIKPriv = base64ToBytes(myIdentityPrivateKey);
-  const mySPKPriv = base64ToBytes(mySignedPreKeyPrivate);
-  const senderIKPub = base64ToBytes(senderIdentityPublicKey);
-  const senderEKPub = base64ToBytes(senderEphemeralPublicKey);
+  const myIKPriv = normalizeCurve25519Key(base64ToBytes(myIdentityPrivateKey));
+  const mySPKPriv = normalizeCurve25519Key(base64ToBytes(mySignedPreKeyPrivate));
+  const senderIKPub = normalizeCurve25519Key(base64ToBytes(senderIdentityPublicKey));
+  const senderEKPub = normalizeCurve25519Key(base64ToBytes(senderEphemeralPublicKey));
 
   const dh1 = x25519.getSharedSecret(mySPKPriv, senderIKPub);
   const dh2 = x25519.getSharedSecret(myIKPriv, senderEKPub);
@@ -309,7 +313,7 @@ export const performX3DHReceiver = async (
 
   let combinedDH: Uint8Array;
   if (myOneTimePreKeyPrivate) {
-    const myOPKPriv = base64ToBytes(myOneTimePreKeyPrivate);
+    const myOPKPriv = normalizeCurve25519Key(base64ToBytes(myOneTimePreKeyPrivate));
     const dh4 = x25519.getSharedSecret(myOPKPriv, senderEKPub);
     combinedDH = new Uint8Array(dh1.length + dh2.length + dh3.length + dh4.length);
     combinedDH.set(dh1, 0);
@@ -457,8 +461,9 @@ export const encryptMultiDeviceMessage = async (
 
   for (const [deviceId, dev] of allDevicesMap.entries()) {
     try {
-      const devPubBytes = base64ToBytes(dev.publicKey);
-      const sharedSecret = x25519.getSharedSecret(myPrivBytes, devPubBytes);
+      const devPubBytes = normalizeCurve25519Key(base64ToBytes(dev.publicKey));
+      const priv = normalizeCurve25519Key(myPrivBytes);
+      const sharedSecret = x25519.getSharedSecret(priv, devPubBytes);
       const wrapNonceBytes = randomBytes(24);
       const wrapCipher = xchacha20poly1305(sharedSecret, wrapNonceBytes);
       const encryptedKMsg = wrapCipher.encrypt(kMsg);
@@ -488,8 +493,8 @@ export const decryptMultiDeviceMessage = async (
   myPrivateKey: string,
   myDeviceId?: string | null,
 ): Promise<string> => {
-  const myPrivBytes = base64ToBytes(myPrivateKey);
-  const senderPubBytes = base64ToBytes(senderPublicKey);
+  const myPrivBytes = normalizeCurve25519Key(base64ToBytes(myPrivateKey));
+  const senderPubBytes = normalizeCurve25519Key(base64ToBytes(senderPublicKey));
   const sharedSecret = x25519.getSharedSecret(myPrivBytes, senderPubBytes);
 
   let unwrappedKMsg: Uint8Array | null = null;
@@ -742,8 +747,8 @@ export const wrapSenderKeyForMember = (
   memberPublicKeyBase64: string,
   myPrivateKeyBase64: string
 ): { encryptedKey: string; nonce: string } => {
-  const memberPub = base64ToBytes(memberPublicKeyBase64);
-  const myPriv = base64ToBytes(myPrivateKeyBase64);
+  const memberPub = normalizeCurve25519Key(base64ToBytes(memberPublicKeyBase64));
+  const myPriv = normalizeCurve25519Key(base64ToBytes(myPrivateKeyBase64));
   const sharedSecret = x25519.getSharedSecret(myPriv, memberPub);
   const wrappingKey = sha256(sharedSecret);
 
@@ -766,8 +771,8 @@ export const unwrapSenderKeyFromMember = (
   senderPublicKeyBase64: string,
   myPrivateKeyBase64: string
 ): string => {
-  const senderPub = base64ToBytes(senderPublicKeyBase64);
-  const myPriv = base64ToBytes(myPrivateKeyBase64);
+  const senderPub = normalizeCurve25519Key(base64ToBytes(senderPublicKeyBase64));
+  const myPriv = normalizeCurve25519Key(base64ToBytes(myPrivateKeyBase64));
   const sharedSecret = x25519.getSharedSecret(myPriv, senderPub);
   const wrappingKey = sha256(sharedSecret);
 

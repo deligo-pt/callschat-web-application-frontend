@@ -29,7 +29,7 @@ import {
   Languages,
   EyeOff,
   UserCog,
-  Star,
+  Heart,
   Folder,
   Users,
   Mail,
@@ -82,6 +82,7 @@ import { GroupSettingsDrawer } from "@/components/group/GroupSettingsDrawer";
 import { AddMemberModal } from "@/components/group/AddMemberModal";
 import { useTranslations } from "next-intl";
 import { useGroupStore } from "@/hooks/useGroupStore";
+import { useUser } from "@/context/UserContext";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 
 function parseJwt(token: string) {
@@ -116,17 +117,24 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
 
   const { startGroupCall, joinGroupCall, activeGroupCalls } = useCallContext();
   const { socket } = useSocket();
+  const { user } = useUser();
 
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("accessToken");
       if (token) {
         const decoded = parseJwt(token);
-        return decoded?.sub || decoded?.id || "";
+        if (decoded?.sub || decoded?.id) return decoded.sub || decoded.id;
       }
     }
-    return "";
+    return user?.id || "";
   });
+
+  useEffect(() => {
+    if (user?.id && user.id !== currentUserId) {
+      setCurrentUserId(user.id);
+    }
+  }, [user?.id, currentUserId]);
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,13 +168,6 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      const decoded = parseJwt(token);
-      if (decoded?.sub) setCurrentUserId(decoded.sub);
-    }
-  }, []);
 
   const {
     messages,
@@ -630,7 +631,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                   onClick={handleToggleFavourite}
                   className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer"
                 >
-                  <Star className={cn("w-4 h-4", isFavourite ? "text-amber-400 fill-amber-400" : "text-gray-500")} />
+                  <Heart className={cn("w-4 h-4", isFavourite ? "text-red-500 fill-red-500" : "text-gray-500")} />
                   <span>{isFavourite ? "Remove from favourites" : "Add to favourites"}</span>
                 </DropdownMenuItem>
 
@@ -953,6 +954,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
         onClose={() => setIsInviteModalOpen(false)}
         groupId={groupId}
         groupName={groupName}
+        groupAvatar={groupDetails?.avatarUrl}
         isAdmin={isAdmin}
         joinApprovalMode={groupDetails?.joinApprovalMode}
       />

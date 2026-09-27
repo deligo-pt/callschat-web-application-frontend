@@ -4,6 +4,7 @@
 
 export type NotificationSoundType =
   | 'message'
+  | 'message_send'
   | 'call'
   | 'busy'
   | 'call_ended'
@@ -152,11 +153,11 @@ export const playNotificationSound = (
     let audioSrc = '';
     let loop = false;
 
-    if (type === 'message') {
-      audioSrc = '/sounds/message-pop.mp3';
+    if (type === 'message' || type === 'message_send') {
+      audioSrc = '/sounds/message_send.mp3';
     } else if (type === 'call') {
       stopRingtoneSound();
-      audioSrc = '/sounds/ringtone.mp3';
+      audioSrc = '/sounds/calling_sfx.mp3';
       loop = true;
     }
 

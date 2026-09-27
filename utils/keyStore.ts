@@ -1,4 +1,43 @@
-import { get, set, del } from 'idb-keyval';
+import { get, set, del, entries } from 'idb-keyval';
+import { getSignalProtocolStore } from './signalStore';
+import { arrayBufferToBase64, base64ToArrayBuffer } from './signalCrypto';
+
+// In-memory fallback for SSR and test environments
+const memStore = new Map<string, any>();
+
+async function safeGet<T>(key: string): Promise<T | null> {
+  if (typeof window === 'undefined') {
+    return memStore.get(key) ?? null;
+  }
+  try {
+    const val = await get<T>(key);
+    return val ?? memStore.get(key) ?? null;
+  } catch {
+    return memStore.get(key) ?? null;
+  }
+}
+
+async function safeSet<T>(key: string, value: T): Promise<void> {
+  memStore.set(key, value);
+  if (typeof window !== 'undefined') {
+    try {
+      await set(key, value);
+    } catch (err) {
+      console.warn('[keyStore] IndexedDB write failed:', err);
+    }
+  }
+}
+
+async function safeDel(key: string): Promise<void> {
+  memStore.delete(key);
+  if (typeof window !== 'undefined') {
+    try {
+      await del(key);
+    } catch (err) {
+      console.warn('[keyStore] IndexedDB del failed:', err);
+    }
+  }
+}
 
 // =============================================================================
 // IndexedDB Secure KeyStore
@@ -6,25 +45,84 @@ import { get, set, del } from 'idb-keyval';
 // =============================================================================
 
 export const storeUserKeys = async (userId: string, privKey: string, pubKey: string): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  await set(`privateKey_${userId}`, privKey);
-  await set(`publicKey_${userId}`, pubKey);
+  if (userId && privKey) {
+    try {
+      const existingPriv = await safeGet<string>(`privateKey_${userId}`);
+      if (existingPriv && existingPriv !== privKey) {
+        const history = (await safeGet<string[]>(`user_priv_history_${userId}`)) || [];
+        if (!history.includes(existingPriv)) {
+          history.unshift(existingPriv);
+          if (history.length > 20) {
+            history.length = 20;
+          }
+          await safeSet(`user_priv_history_${userId}`, history);
+        }
+      }
+    } catch (err) {
+      console.warn('[keyStore] Failed to archive previous private key:', err);
+    }
+  }
+  await safeSet(`privateKey_${userId}`, privKey);
+  await safeSet(`publicKey_${userId}`, pubKey);
+};
+
+export const getUserHistoricalPrivateKeys = async (userId: string): Promise<string[]> => {
+  if (!userId) return [];
+  return (await safeGet<string[]>(`user_priv_history_${userId}`)) || [];
+};
+
+export const getUserPrivateKeyRing = async (userId: string): Promise<string[]> => {
+  if (!userId) return [];
+  const currentKey = await getUserPrivateKey(userId);
+  const rawKey = await getRawStoredUserPrivateKey(userId);
+  const history = await getUserHistoricalPrivateKeys(userId);
+
+  const ring: string[] = [];
+  const seen = new Set<string>();
+
+  for (const k of [currentKey, rawKey, ...history]) {
+    if (k && !seen.has(k)) {
+      seen.add(k);
+      ring.push(k);
+    }
+  }
+
+  return ring;
 };
 
 export const getUserPrivateKey = async (userId: string): Promise<string | null> => {
-  if (typeof window === 'undefined') return null;
-  return (await get(`privateKey_${userId}`)) || null;
+  if (userId) {
+    try {
+      const store = getSignalProtocolStore(userId);
+      const idKey = await store.getIdentityKeyPair();
+      if (idKey?.privKey) {
+        return arrayBufferToBase64(idKey.privKey);
+      }
+    } catch {}
+  }
+  return await safeGet<string>(`privateKey_${userId}`);
+};
+
+export const getRawStoredUserPrivateKey = async (userId: string): Promise<string | null> => {
+  return await safeGet<string>(`privateKey_${userId}`);
 };
 
 export const getUserPublicKey = async (userId: string): Promise<string | null> => {
-  if (typeof window === 'undefined') return null;
-  return (await get(`publicKey_${userId}`)) || null;
+  if (userId) {
+    try {
+      const store = getSignalProtocolStore(userId);
+      const idKey = await store.getIdentityKeyPair();
+      if (idKey?.pubKey) {
+        return arrayBufferToBase64(idKey.pubKey);
+      }
+    } catch {}
+  }
+  return await safeGet<string>(`publicKey_${userId}`);
 };
 
 export const clearUserKeys = async (userId: string): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  await del(`privateKey_${userId}`);
-  await del(`publicKey_${userId}`);
+  await safeDel(`privateKey_${userId}`);
+  await safeDel(`publicKey_${userId}`);
 };
 
 // -----------------------------------------------------------------------------
@@ -32,18 +130,15 @@ export const clearUserKeys = async (userId: string): Promise<void> => {
 // -----------------------------------------------------------------------------
 
 export const storeGroupKey = async (groupId: string, userId: string, groupKey: string): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  await set(`groupKey_${groupId}_${userId}`, groupKey);
+  await safeSet(`groupKey_${groupId}_${userId}`, groupKey);
 };
 
 export const getStoredGroupKey = async (groupId: string, userId: string): Promise<string | null> => {
-  if (typeof window === 'undefined') return null;
-  return (await get(`groupKey_${groupId}_${userId}`)) || null;
+  return await safeGet<string>(`groupKey_${groupId}_${userId}`);
 };
 
 export const clearGroupKey = async (groupId: string, userId: string): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  await del(`groupKey_${groupId}_${userId}`);
+  await safeDel(`groupKey_${groupId}_${userId}`);
 };
 
 export const migrateKeysFromLocalStorage = async (userId: string): Promise<void> => {
@@ -119,24 +214,16 @@ export const storeDecryptedMessage = async (
   messageId: string,
   plaintext: string
 ): Promise<void> => {
-  if (typeof window === 'undefined' || !userId || !messageId || !plaintext) return;
-  try {
-    await set(`msg_text_${userId}_${messageId}`, plaintext);
-  } catch (err) {
-    console.warn('[keyStore] Failed to cache decrypted message:', err);
-  }
+  if (!userId || !messageId || !plaintext) return;
+  await safeSet(`msg_text_${userId}_${messageId}`, plaintext);
 };
 
 export const getDecryptedMessage = async (
   userId: string,
   messageId: string
 ): Promise<string | null> => {
-  if (typeof window === 'undefined' || !userId || !messageId) return null;
-  try {
-    return (await get(`msg_text_${userId}_${messageId}`)) || null;
-  } catch (err) {
-    return null;
-  }
+  if (!userId || !messageId) return null;
+  return await safeGet<string>(`msg_text_${userId}_${messageId}`);
 };
 
 // -----------------------------------------------------------------------------
@@ -149,20 +236,92 @@ export interface LocalKeyBundle {
   registrationId?: string | null;
   deviceId?: string | null;
   signedPreKeyPrivate?: string | null;
+  signedPreKey?: {
+    keyId: number;
+    pubKey: string;
+    privKey: string;
+    signature?: string;
+  } | null;
+  sessions?: Record<string, any> | null;
+  signalIdentity?: {
+    pubKey: string;
+    privKey: string;
+  } | null;
+  senderKeys?: Record<string, any> | null;
+  groupKeys?: Record<string, string> | null;
+  decryptedMessages?: Record<string, string> | null;
+  historicalPrivateKeys?: string[] | null;
   timestamp?: number;
 }
 
 export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBundle | null> => {
-  if (typeof window === 'undefined' || !userId) return null;
+  if (!userId) return null;
 
   const privateKey = await getUserPrivateKey(userId);
   const publicKey = await getUserPublicKey(userId);
 
   if (!privateKey || !publicKey) return null;
 
-  const registrationId = localStorage.getItem('registrationId') || null;
-  const deviceId = localStorage.getItem('deviceId') || `web-${userId}`;
+  const deviceId = (typeof window !== 'undefined' ? localStorage.getItem('deviceId') : null) || `web-${userId}`;
   const signedPreKeyPrivate = await getSignedPreKeyPrivate(userId, 1);
+
+  let signalIdentity: { pubKey: string; privKey: string } | null = null;
+  let signalRegId: number | null = null;
+  let signedPreKey: { keyId: number; pubKey: string; privKey: string; signature?: string } | null = null;
+  let sessions: Record<string, any> | null = null;
+  try {
+    const store = getSignalProtocolStore(userId);
+    const keyPair = await store.getIdentityKeyPair();
+    if (keyPair) {
+      signalIdentity = {
+        pubKey: arrayBufferToBase64(keyPair.pubKey),
+        privKey: arrayBufferToBase64(keyPair.privKey),
+      };
+    }
+    const localRegId = await store.getLocalRegistrationId();
+    if (localRegId != null) {
+      signalRegId = localRegId;
+    }
+    const spk = await store.loadSignedPreKey(1);
+    if (spk) {
+      signedPreKey = {
+        keyId: 1,
+        pubKey: arrayBufferToBase64(spk.pubKey),
+        privKey: arrayBufferToBase64(spk.privKey),
+        signature: spk.signature ? arrayBufferToBase64(spk.signature) : undefined,
+      };
+    }
+    sessions = await store.exportSessions();
+  } catch (err) {
+    console.warn('[keyStore] Could not export signal identity/sessions:', err);
+  }
+
+  const senderKeys: Record<string, any> = {};
+  const groupKeys: Record<string, string> = {};
+  const decryptedMessages: Record<string, string> = {};
+  if (typeof window !== 'undefined') {
+    try {
+      const allEntries = await entries();
+      for (const [k, v] of allEntries) {
+        const keyStr = String(k);
+        if (keyStr.startsWith(`group_sender_key_${userId}_`) || keyStr.startsWith(`group_sender_key_`)) {
+          senderKeys[keyStr] = v;
+        } else if (keyStr.startsWith(`groupKey_`) && keyStr.includes(`_${userId}`)) {
+          groupKeys[keyStr] = String(v);
+        } else if (keyStr.startsWith(`msg_text_${userId}_`)) {
+          decryptedMessages[keyStr] = String(v);
+        }
+      }
+    } catch (err) {
+      console.warn('[keyStore] Could not export group/sender/decrypted keys from IndexedDB:', err);
+    }
+  }
+
+  const registrationId =
+    (typeof window !== 'undefined' ? localStorage.getItem('registrationId') : null) ||
+    (signalRegId != null ? String(signalRegId) : null);
+
+  const historicalPrivateKeys = await getUserHistoricalPrivateKeys(userId);
 
   return {
     privateKey,
@@ -170,6 +329,13 @@ export const exportLocalKeyBundle = async (userId: string): Promise<LocalKeyBund
     registrationId,
     deviceId,
     signedPreKeyPrivate,
+    signedPreKey,
+    sessions,
+    signalIdentity,
+    senderKeys: Object.keys(senderKeys).length > 0 ? senderKeys : null,
+    groupKeys: Object.keys(groupKeys).length > 0 ? groupKeys : null,
+    decryptedMessages: Object.keys(decryptedMessages).length > 0 ? decryptedMessages : null,
+    historicalPrivateKeys: historicalPrivateKeys.length > 0 ? historicalPrivateKeys : null,
     timestamp: Date.now(),
   };
 };
@@ -178,20 +344,96 @@ export const restoreLocalKeyBundle = async (
   userId: string,
   bundle: LocalKeyBundle
 ): Promise<boolean> => {
-  if (typeof window === 'undefined' || !userId || !bundle.privateKey || !bundle.publicKey) {
+  if (!userId || !bundle.privateKey || !bundle.publicKey) {
     return false;
   }
 
   await storeUserKeys(userId, bundle.privateKey, bundle.publicKey);
 
-  if (bundle.registrationId) {
-    localStorage.setItem('registrationId', bundle.registrationId);
+  if (bundle.historicalPrivateKeys && Array.isArray(bundle.historicalPrivateKeys)) {
+    try {
+      const existingHistory = (await safeGet<string[]>(`user_priv_history_${userId}`)) || [];
+      const merged = Array.from(new Set([...bundle.historicalPrivateKeys, ...existingHistory]));
+      await safeSet(`user_priv_history_${userId}`, merged.slice(0, 20));
+    } catch (err) {
+      console.warn('[keyStore] Could not restore historical private keys:', err);
+    }
   }
-  if (bundle.deviceId) {
-    localStorage.setItem('deviceId', bundle.deviceId);
+
+  if (typeof window !== 'undefined') {
+    if (bundle.registrationId) {
+      localStorage.setItem('registrationId', bundle.registrationId);
+    }
+    if (bundle.deviceId) {
+      localStorage.setItem('deviceId', bundle.deviceId);
+    }
   }
   if (bundle.signedPreKeyPrivate) {
     await storeSignedPreKeyPrivate(userId, 1, bundle.signedPreKeyPrivate);
+  }
+
+  if (bundle.signedPreKey?.pubKey && bundle.signedPreKey?.privKey) {
+    try {
+      const store = getSignalProtocolStore(userId);
+      await store.storeSignedPreKey(
+        bundle.signedPreKey.keyId || 1,
+        {
+          pubKey: base64ToArrayBuffer(bundle.signedPreKey.pubKey),
+          privKey: base64ToArrayBuffer(bundle.signedPreKey.privKey),
+        },
+        bundle.signedPreKey.signature ? base64ToArrayBuffer(bundle.signedPreKey.signature) : undefined
+      );
+    } catch (err) {
+      console.warn('[keyStore] Could not restore signed pre-key:', err);
+    }
+  }
+
+  if (bundle.sessions && typeof bundle.sessions === 'object') {
+    try {
+      const store = getSignalProtocolStore(userId);
+      await store.importSessions(bundle.sessions);
+    } catch (err) {
+      console.warn('[keyStore] Could not restore sessions:', err);
+    }
+  }
+
+  if (bundle.signalIdentity?.pubKey && bundle.signalIdentity?.privKey) {
+    try {
+      const store = getSignalProtocolStore(userId);
+      await store.storeIdentityKeyPair({
+        pubKey: base64ToArrayBuffer(bundle.signalIdentity.pubKey),
+        privKey: base64ToArrayBuffer(bundle.signalIdentity.privKey),
+      });
+      const regIdToStore = bundle.registrationId ? Number(bundle.registrationId) : Math.floor(Math.random() * 16380) + 1;
+      await store.storeLocalRegistrationId(regIdToStore);
+      await storeUserKeys(userId, bundle.signalIdentity.privKey, bundle.signalIdentity.pubKey);
+    } catch (err) {
+      console.warn('[keyStore] Could not restore signal identity:', err);
+    }
+  }
+
+  if (bundle.senderKeys && typeof bundle.senderKeys === 'object') {
+    for (const [k, v] of Object.entries(bundle.senderKeys)) {
+      try {
+        await safeSet(k, v);
+      } catch {}
+    }
+  }
+
+  if (bundle.groupKeys && typeof bundle.groupKeys === 'object') {
+    for (const [k, v] of Object.entries(bundle.groupKeys)) {
+      try {
+        await safeSet(k, v);
+      } catch {}
+    }
+  }
+
+  if (bundle.decryptedMessages && typeof bundle.decryptedMessages === 'object') {
+    for (const [k, v] of Object.entries(bundle.decryptedMessages)) {
+      try {
+        await safeSet(k, v);
+      } catch {}
+    }
   }
 
   return true;
@@ -254,30 +496,72 @@ export interface StoredSenderKey {
   chainKey: string;
   iteration: number;
   senderKeyId: string;
+  initialChainKey?: string;
+  distributedTo?: string[];
+  identityPublicKey?: string;
   updatedAt: string;
 }
 
 export const storeSenderKey = async (
   groupId: string,
   senderId: string,
-  record: StoredSenderKey
+  record: StoredSenderKey,
+  myUserId?: string
 ): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  await set(`group_sender_key_${groupId}_${senderId}`, record);
+  const prefix = myUserId ? `group_sender_key_${myUserId}_` : 'group_sender_key_';
+  await safeSet(`${prefix}${groupId}_${senderId}`, record);
 };
 
 export const getStoredSenderKey = async (
   groupId: string,
-  senderId: string
+  senderId: string,
+  myUserId?: string
 ): Promise<StoredSenderKey | null> => {
-  if (typeof window === 'undefined') return null;
-  return (await get<StoredSenderKey>(`group_sender_key_${groupId}_${senderId}`)) || null;
+  if (myUserId) {
+    const userSpecific = await safeGet<StoredSenderKey>(`group_sender_key_${myUserId}_${groupId}_${senderId}`);
+    if (userSpecific) return userSpecific;
+  }
+  return await safeGet<StoredSenderKey>(`group_sender_key_${groupId}_${senderId}`);
 };
 
 export const clearSenderKey = async (
   groupId: string,
-  senderId: string
+  senderId: string,
+  myUserId?: string
 ): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  await del(`group_sender_key_${groupId}_${senderId}`);
+  if (myUserId) {
+    await safeDel(`group_sender_key_${myUserId}_${groupId}_${senderId}`);
+  }
+  await safeDel(`group_sender_key_${groupId}_${senderId}`);
+};
+
+// -----------------------------------------------------------------------------
+// Vault Sync Session Credentials (IndexedDB & SessionStorage)
+// -----------------------------------------------------------------------------
+
+export const storeVaultSessionPin = async (userId: string, pin: string): Promise<void> => {
+  if (typeof window === 'undefined' || !userId) return;
+  try {
+    sessionStorage.setItem('e2ee_vault_pin_session', pin);
+    await safeSet(`vault_pin_${userId}`, pin);
+  } catch {}
+};
+
+export const getVaultSessionPin = async (userId: string): Promise<string | null> => {
+  if (typeof window === 'undefined' || !userId) return null;
+  try {
+    const session = sessionStorage.getItem('e2ee_vault_pin_session');
+    if (session) return session;
+    return await safeGet<string>(`vault_pin_${userId}`);
+  } catch {
+    return null;
+  }
+};
+
+export const clearVaultSessionPin = async (userId: string): Promise<void> => {
+  if (typeof window === 'undefined' || !userId) return;
+  try {
+    sessionStorage.removeItem('e2ee_vault_pin_session');
+    await safeDel(`vault_pin_${userId}`);
+  } catch {}
 };

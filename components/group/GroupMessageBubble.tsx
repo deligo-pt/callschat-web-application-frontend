@@ -690,9 +690,9 @@ export function GroupMessageBubble({
         )}
 
         {/* Message Text */}
-        {msg.text && !msg.poll && (
+        {!msg.poll && (msg.text || (!msg.mediaUrl && !isCallMessage && !msg.isSystem)) && (
           <div className="px-3.5 py-2 text-[14px] leading-relaxed break-words whitespace-pre-wrap">
-            {formatTextWithLinks(msg.text)}
+            {formatTextWithLinks(msg.text || "🔒 Encrypted group message")}
           </div>
         )}
 

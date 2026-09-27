@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useUser } from "@/context/UserContext";
 import { chatService } from "@/services/chat.service";
-import { exportLocalKeyBundle } from "@/utils/keyStore";
+import { exportLocalKeyBundle, storeVaultSessionPin, clearVaultSessionPin } from "@/utils/keyStore";
+import { populateAllConversationsCache } from "@/utils/vaultSync";
 import { encryptKeyVault } from "@/utils/crypto";
 import {
   ShieldCheck,
@@ -35,6 +36,7 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [statusText, setStatusText] = useState<string | null>(null);
   const [backupData, setBackupData] = useState<{
     updatedAt: string;
     kdfAlgorithm: string;
@@ -87,9 +89,16 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
 
     try {
       setSubmitting(true);
+      setStatusText("Scanning all conversations & message history...");
+      toast.loading("Preparing full chat history backup...", { id: "vault-backup" });
+      await populateAllConversationsCache(user.id, (msg) => {
+        setStatusText(msg);
+      });
+      setStatusText("Encrypting complete key vault bundle...");
+      toast.loading("Encrypting key vault bundle...", { id: "vault-backup" });
       const localBundle = await exportLocalKeyBundle(user.id);
       if (!localBundle || !localBundle.privateKey) {
-        toast.error("Local encryption keys not found on this device.");
+        toast.error("Local encryption keys not found on this device.", { id: "vault-backup" });
         return;
       }
 
@@ -105,15 +114,18 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
         version: 1,
       });
 
-      toast.success("E2EE key vault securely backed up!");
+      await storeVaultSessionPin(user.id, pin);
+
+      toast.success("E2EE key vault securely backed up with full conversation history!", { id: "vault-backup" });
       setPin("");
       setConfirmPin("");
       await fetchStatus();
     } catch (err: any) {
       console.error("Failed to back up key vault", err);
-      toast.error(err?.message || "Failed to create encrypted backup");
+      toast.error(err?.message || "Failed to create encrypted backup", { id: "vault-backup" });
     } finally {
       setSubmitting(false);
+      setStatusText(null);
     }
   };
 
@@ -121,6 +133,9 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
     try {
       setSubmitting(true);
       await chatService.deleteKeyBackup();
+      if (user?.id) {
+        await clearVaultSessionPin(user.id);
+      }
       toast.success("Cloud key vault backup deleted");
       setBackupData(null);
       setShowDeleteConfirm(false);
@@ -453,7 +468,7 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                   {submitting ? (
                     <>
                       <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                      <span>Encrypting & Uploading Key Vault...</span>
+                      <span>{statusText || "Encrypting & Uploading Key Vault..."}</span>
                     </>
                   ) : (
                     <>

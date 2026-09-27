@@ -18,10 +18,12 @@ const protectedRoutes = [
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Public group invite links must remain accessible without requiring prior login
+  const isPublicInvite = pathname.startsWith("/groups/invite");
+
   // Check if the requested route is one of the protected routes
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isProtectedRoute =
+    !isPublicInvite && protectedRoutes.some((route) => pathname.startsWith(route));
 
   if (isProtectedRoute) {
     // Read the accessToken from cookies

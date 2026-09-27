@@ -12,7 +12,6 @@ import {
   Heart,
   Loader2,
   X,
-  Star,
   Building2,
   Lock,
   ShieldCheck,
@@ -273,10 +272,11 @@ export default function ContactsPage() {
               </button>
               <Link
                 href="/chats/favorites"
-                title="Favorite Messages"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] transition-colors"
+                title="Favorites"
+                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:text-red-500 transition-colors focus:outline-none"
+                aria-label="Favorites"
               >
-                <Heart className="h-4.5 w-4.5 fill-red-500 text-red-500" />
+                <Heart className="h-4.5 w-4.5" />
               </Link>
               <NotificationDropdown />
             </div>
@@ -327,7 +327,7 @@ export default function ContactsPage() {
                     : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
                 )}
               >
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <Heart className={cn("h-3 w-3", filterTab === "favorites" ? "fill-white text-white" : "fill-red-500 text-red-500")} />
                 <span>Favorites</span>
                 {favoriteCount > 0 && <span className="opacity-80">({favoriteCount})</span>}
               </button>
@@ -630,7 +630,7 @@ export default function ContactsPage() {
                                   {contact.name}
                                 </h3>
                                 {contact.isFavourite && (
-                                  <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
+                                  <Heart className="h-3 w-3 fill-red-500 text-red-500 shrink-0" />
                                 )}
                               </div>
                               <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
@@ -650,13 +650,13 @@ export default function ContactsPage() {
                                     handleToggleFavourite(contact.id, contact.isFavourite);
                                   }}
                                   title={contact.isFavourite ? "Remove from Favorites" : "Add to Favorites"}
-                                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-amber-500 transition-colors cursor-pointer"
+                                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-red-500 transition-colors cursor-pointer"
                                 >
-                                  <Star
+                                  <Heart
                                     className={cn(
                                       "h-4 w-4",
                                       contact.isFavourite
-                                        ? "fill-amber-400 text-amber-400"
+                                        ? "fill-red-500 text-red-500"
                                         : "text-[#8696A0] group-hover:opacity-100 opacity-60"
                                     )}
                                   />

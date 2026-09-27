@@ -21,6 +21,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { computeSafetyNumber, type SafetyNumberResult } from "@/utils/crypto";
 import {
+  computeSignalFingerprint,
+  getSignalProtocolStore,
+  arrayBufferToBase64,
+} from "@/utils/signalCrypto";
+import {
   getUserPublicKey,
   storeSafetyNumberVerification,
   getSafetyNumberVerification,
@@ -87,8 +92,17 @@ export function SecurityCodeModal({
         }
         if (isMounted) setCurrentUserId(myUid);
 
-        // 1. Get my identity public key from IndexedDB
+        // 1. Get my identity public key from IndexedDB / Signal store
         let myKey = await getUserPublicKey(myUid);
+        if (!myKey && myUid) {
+          try {
+            const store = getSignalProtocolStore(myUid);
+            const identity = await store.getIdentityKeyPair();
+            if (identity) {
+              myKey = arrayBufferToBase64(identity.pubKey);
+            }
+          } catch {}
+        }
         if (!myKey && myUid) {
           // Fallback to local storage if not in IndexedDB
           myKey = localStorage.getItem(`publicKey_${myUid}`) || localStorage.getItem("publicKey");
@@ -114,8 +128,17 @@ export function SecurityCodeModal({
           throw new Error(`Public keys for ${peerName} are not published yet.`);
         }
 
-        // 3. Compute 60-digit safety number
-        const result = computeSafetyNumber(myKey, peerKey);
+        // 3. Compute 60-digit safety number (Signal Fingerprint v2)
+        let result: SafetyNumberResult;
+        try {
+          if (myUid && peerId) {
+            result = await computeSignalFingerprint(myUid, myKey, peerId, peerKey);
+          } else {
+            result = computeSafetyNumber(myKey, peerKey);
+          }
+        } catch {
+          result = computeSafetyNumber(myKey, peerKey);
+        }
         if (!isMounted) return;
 
         setSafetyData(result);

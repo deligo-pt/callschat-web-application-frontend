@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useFCM } from "@/hooks/useFCM";
 import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
+import { useGlobalKeySync } from "@/hooks/useGlobalKeySync";
 
 interface SocketContextType {
   socket: Socket | null;
@@ -40,6 +41,8 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   useFCM();
   // Global socket notification listener — works from any page
   useGlobalNotifications(socket, currentUserId);
+  // Global E2EE key sync listener — invalidates stale sessions and rebuilds on peer key updates
+  useGlobalKeySync(socket, currentUserId);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;

@@ -16,7 +16,7 @@ import {
   Languages,
   EyeOff,
   Image as ImageIcon,
-  Star,
+  Heart,
   Trash2,
   Ban,
   Search,
@@ -279,8 +279,8 @@ export function ChatOptionsMenu({
             onClick={handleToggleFavourites}
             disabled={isFavouriting}
           >
-            <Star
-              className={`h-[18px] w-[18px] ${isFavourite ? "fill-[#FFB020] text-[#FFB020]" : "text-[#FFB020]"}`}
+            <Heart
+              className={`h-[18px] w-[18px] ${isFavourite ? "fill-red-500 text-red-500" : "text-[#54656F] dark:text-[#8696A0]"}`}
               strokeWidth={2}
             />
             <span className="text-[14px]">{isFavouriting ? tNotif("adding") : isFavourite ? t("remove_from_favorites") : t("add_to_favorites")}</span>

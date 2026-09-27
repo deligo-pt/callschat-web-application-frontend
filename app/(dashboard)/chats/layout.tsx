@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { groupService, GroupItem } from "@/services/group.service";
 import { decryptMessage } from "@/utils/crypto";
+import { decryptGroupNotification } from "@/utils/notificationPreview";
 import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey } from "@/utils/keyStore";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { motion } from "framer-motion";
@@ -45,6 +46,9 @@ interface Conversation {
     ticketId?: string | null;
     mediaType: string | null;
     mediaUrl?: string | null;
+    previewText?: string | null;
+    messageType?: number | null;
+    encryptedKeys?: any;
     isDeleted?: boolean;
     receipts?: Array<{ id?: string; userId: string; deliveredAt?: string | null; seenAt?: string | null }>;
     createdAt: string;
@@ -169,21 +173,22 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         for (const c of merged) {
           const msg = c.lastMessage;
           if (!msg) continue;
-          if (!msg.nonce && msg.ciphertext) {
-            cachedMap[c.id] = msg.ciphertext;
-            cachedMap[msg.id] = msg.ciphertext;
-          } else if (msg.id) {
-            const cached = await getDecryptedMessage(myId, msg.id);
-            if (cached) {
-              cachedMap[c.id] = cached;
-              cachedMap[msg.id] = cached;
-            } else if (msg.nonce) {
-              const cachedNonce = await getDecryptedMessage(myId, `nonce_${msg.nonce}`);
-              if (cachedNonce) {
-                cachedMap[c.id] = cachedNonce;
-                cachedMap[msg.id] = cachedNonce;
-              }
-            }
+          let plain: string | null = null;
+          if (msg.id) {
+            plain = await getDecryptedMessage(myId, msg.id);
+          }
+          if (!plain && msg.nonce) {
+            plain = await getDecryptedMessage(myId, `nonce_${msg.nonce}`);
+          }
+          if (!plain && (msg.previewText || msg.encryptedKeys?.previewText)) {
+            plain = msg.previewText || msg.encryptedKeys?.previewText;
+          }
+          if (!plain && msg.ticketId && msg.ciphertext) {
+            plain = msg.ciphertext;
+          }
+          if (plain) {
+            cachedMap[c.id] = plain;
+            if (msg.id) cachedMap[msg.id] = plain;
           }
         }
         if (Object.keys(cachedMap).length > 0) {
@@ -206,11 +211,36 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       fetchData();
     };
+    const handleKeysRestored = () => {
+      console.log("[ChatsLayout] Detected e2ee:keys_restored event, re-fetching conversation list...");
+      fetchData();
+    };
     if (typeof window !== "undefined") {
       window.addEventListener("workspaceModeChanged", handleWorkspaceChange);
-      return () => window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
+      window.addEventListener("e2ee:keys_restored", handleKeysRestored);
+      return () => {
+        window.removeEventListener("workspaceModeChanged", handleWorkspaceChange);
+        window.removeEventListener("e2ee:keys_restored", handleKeysRestored);
+      };
     }
   }, [fetchData, currentMode]);
+
+  useEffect(() => {
+    const handleDecrypted = (e: any) => {
+      const { messageId, conversationId, text } = e.detail || {};
+      if (conversationId && text) {
+        setDecryptedPreviews((prev) => ({
+          ...prev,
+          [conversationId]: text,
+          ...(messageId ? { [messageId]: text } : {}),
+        }));
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("chat:message_decrypted", handleDecrypted);
+      return () => window.removeEventListener("chat:message_decrypted", handleDecrypted);
+    }
+  }, []);
 
   // Load the last-read timestamps from localStorage so unread badges survive page refreshes.
   const pathnameConvSegment =
@@ -289,6 +319,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             nonce: payload.nonce || null,
             mediaType: payload.mediaType || null,
             mediaUrl: payload.mediaUrl || null,
+            previewText: payload.previewText || (payload.encryptedKeys as any)?.previewText || null,
+            messageType: payload.messageType ?? 2,
+            encryptedKeys: payload.encryptedKeys || null,
             isDeleted: false,
             receipts: payload.receipts || [],
             createdAt: payload.createdAt || new Date().toISOString(),
@@ -315,7 +348,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           if (!plain && msgNonce) plain = await getDecryptedMessage(myId, `nonce_${msgNonce}`);
 
           // 2. Use previewText if the sender attached one (fast fallback)
-          if (!plain && payload.previewText) plain = payload.previewText;
+          const preview = payload.previewText || (payload.encryptedKeys as any)?.previewText;
+          if (!plain && preview) plain = preview;
 
           // 3. Full pairwise decryption (online, uses fetched peer key)
           if (!plain && msgNonce) {
@@ -524,6 +558,21 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           ...(payload.id ? { [payload.id]: text } : {}),
           [groupId]: text,
         }));
+      } else if (!payload.mediaType && payload.ciphertext) {
+        (async () => {
+          const myId = currentUserIdRef.current;
+          if (!myId) return;
+          try {
+            const plain = await decryptGroupNotification(payload, myId);
+            if (plain && !plain.startsWith("🔒")) {
+              setDecryptedPreviews((prev) => ({
+                ...prev,
+                ...(payload.id ? { [payload.id]: plain } : {}),
+                [groupId]: plain,
+              }));
+            }
+          } catch {}
+        })();
       }
     };
 
@@ -733,36 +782,43 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
         // B2C support conversations: messages are stored as plaintext.
         const isBizConv =
-          !msg.nonce ||
           msg.ticketId ||
           conv.workspaceId ||
           !conv.otherUserId;
 
         if (isBizConv) {
-          if (msg.ciphertext && !msg.nonce) {
+          if (msg.ticketId && msg.ciphertext) {
             newPreviews[msg.id] = msg.ciphertext;
             newPreviews[conv.id] = msg.ciphertext;
-            hasChanges = true;
-          } else if (msg.ciphertext && msg.nonce) {
-            newPreviews[msg.id] = "Message (legacy encrypted)";
-            newPreviews[conv.id] = "Message (legacy encrypted)";
             hasChanges = true;
           }
           continue;
         }
 
-        // Personal E2EE conversation — decrypt with libsodium.
+        // Personal E2EE conversation
         if (!msg.ciphertext) continue;
 
         try {
-          // IndexedDB fast path
+          // 1. IndexedDB fast path
           let cachedText: string | null = null;
           if (msg.id) cachedText = await getDecryptedMessage(currentUserId, msg.id);
           if (!cachedText && msg.nonce) cachedText = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
+
+          // 2. Check previewText
+          const preview = (msg as any).previewText || ((msg as any).encryptedKeys as any)?.previewText;
+          if (!cachedText && preview) {
+            cachedText = preview;
+          }
+
           if (cachedText) {
             newPreviews[msg.id] = cachedText;
             newPreviews[conv.id] = cachedText;
             hasChanges = true;
+            continue;
+          }
+
+          // Libsignal messages have no nonce — do not attempt legacy pairwise decryptMessage
+          if (!msg.nonce) {
             continue;
           }
 
@@ -863,14 +919,19 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
     // ── Text previews ────────────────────────────────────────────────
     let textToPreview = "";
+    const preview = (msg as any).previewText || ((msg as any).encryptedKeys as any)?.previewText;
     if (decryptedPreviews[conv.id]) {
       textToPreview = decryptedPreviews[conv.id];
     } else if (msg.id && decryptedPreviews[msg.id]) {
       textToPreview = decryptedPreviews[msg.id];
-    } else if (msg.ciphertext && !msg.nonce) {
+    } else if (preview) {
+      textToPreview = preview;
+    } else if (msg.ticketId && msg.ciphertext) {
       textToPreview = msg.ciphertext;
     } else if (failedDecryptionsRef.current.has(msg.id) || failedDecryptionsRef.current.has(conv.id)) {
-      return conv.isGroup ? `${youPrefix}🔒 Group message` : "🔒 Encrypted message";
+      return conv.isGroup ? `${youPrefix}🔒 Group message` : `${youPrefix}🔒 Encrypted message`;
+    } else if (msg.ciphertext) {
+      return conv.isGroup ? `${youPrefix}🔒 Group message` : `${youPrefix}🔒 Encrypted message`;
     } else {
       // Not yet decrypted / in flight: return empty string to prevent the flash!
       return "";
@@ -1097,9 +1158,12 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                   <div className="flex flex-col divide-y divide-[#F0F2F5] dark:divide-[#202C33]">
                     {filteredConversations.map((conv, index) => {
                       const isGroup = !!conv.isGroup;
+                      const hasValidPeer = conv.otherUserId && conv.otherUserId !== "null" && conv.otherUserId !== "undefined";
                       const chatHref = isGroup
                         ? `${basePath}/${conv.id}?type=group`
-                        : `${basePath}/${conv.id}?recipientId=${conv.otherUserId}`;
+                        : hasValidPeer
+                        ? `${basePath}/${conv.id}?recipientId=${conv.otherUserId}`
+                        : `${basePath}/${conv.id}`;
                       const isActive = pathname === `${basePath}/${conv.id}`;
 
                       const displayName = isGroup ? (conv.groupName || "Group") : conv.otherUserName;

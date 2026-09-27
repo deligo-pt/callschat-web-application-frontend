@@ -1,12 +1,15 @@
 "use client";
 
-import React from "react";
-import { Users, Lock, ShieldCheck, Plus } from "lucide-react";
+import React, { useState } from "react";
+import { Users, Lock, ShieldCheck, Plus, QrCode } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { GroupQrScannerModal } from "@/components/group/GroupQrScannerModal";
 
 export default function GroupsPage() {
   const t = useTranslations("options");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+
   return (
     <div className="hidden flex-1 flex-col items-center justify-center chat-canvas-bg md:flex w-full select-none p-8 relative">
       <div className="relative z-10 flex flex-col items-center max-w-[460px] text-center bg-white/80 dark:bg-[#202C33]/80 backdrop-blur-md p-8 rounded-3xl border border-white/60 dark:border-white/10 shadow-xl">
@@ -27,14 +30,25 @@ export default function GroupsPage() {
           Stay connected with friends, family, and teams. Group chats are private and protected with end-to-end encryption.
         </p>
 
-        {/* Action Button */}
-        <Link 
-          href="/groups/create"
-          className="flex items-center gap-2 bg-[#00A884] hover:bg-[#008069] text-white px-6 py-3 rounded-2xl font-semibold text-[14px] shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] mb-6 cursor-pointer"
-        >
-          <Plus className="h-4.5 w-4.5" />
-          <span>Create New Group</span>
-        </Link>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3 mb-6 w-full max-w-xs">
+          <Link 
+            href="/groups/create"
+            className="flex-1 flex items-center justify-center gap-2 bg-[#00A884] hover:bg-[#008069] text-white py-3 rounded-2xl font-semibold text-[13px] shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          >
+            <Plus className="h-4.5 w-4.5" />
+            <span>Create Group</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen(true)}
+            className="flex-1 flex items-center justify-center gap-2 bg-[#F0F2F5] hover:bg-[#E5E9EC] dark:bg-[#182229] dark:hover:bg-[#2A3942] text-gray-800 dark:text-gray-200 py-3 rounded-2xl font-semibold text-[13px] border border-gray-200 dark:border-gray-700 shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          >
+            <QrCode className="h-4.5 w-4.5 text-emerald-500" />
+            <span>Scan QR</span>
+          </button>
+        </div>
 
         {/* E2EE Guarantee Footer */}
         <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#667781] dark:text-[#8696A0] bg-[#00A884]/10 dark:bg-[#00A884]/15 px-3 py-1.5 rounded-full">
@@ -42,6 +56,11 @@ export default function GroupsPage() {
           <span>End-to-end encrypted group messages</span>
         </div>
       </div>
+
+      <GroupQrScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+      />
     </div>
   );
 }
