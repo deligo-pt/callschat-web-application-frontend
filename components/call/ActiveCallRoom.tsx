@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -31,10 +31,15 @@ import {
   Lock,
   ExternalLink,
   ArrowDownLeft,
+  ScreenShare,
+  ScreenShareOff,
+  Settings,
+  GripHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
 import { InviteParticipantModal } from "./InviteParticipantModal";
+import { DeviceSettingsModal } from "./DeviceSettingsModal";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { resolveLivekitUrl } from "@/utils/livekit";
 
@@ -96,6 +101,12 @@ const ActiveSpeaker1v1Avatar = ({
             : "border-[#00A884] shadow-[0_0_25px_rgba(0,168,132,0.35)]"
         )}
       />
+
+      {participant && !participant.isMicrophoneEnabled && (
+        <div className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#EA0038] text-white shadow-xl border-3 border-[#0C1317] z-10 animate-in zoom-in-75 duration-200">
+          <MicOff className="h-5 w-5" />
+        </div>
+      )}
     </div>
   );
 };
@@ -175,6 +186,11 @@ const ActiveSpeakerGroupAvatar = ({
               : "border-[#00A884] shadow-[0_0_15px_rgba(0,168,132,0.25)]"
           )}
         />
+        {participant && !participant.isMicrophoneEnabled && (
+          <div className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-[#EA0038] text-white shadow-md border-2 border-[#0C1317] z-10 animate-in zoom-in-75 duration-200">
+            <MicOff className="h-3.5 w-3.5" />
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-1.5">
         <h2 className="text-[16px] md:text-[18px] font-semibold text-[#E9EDEF] text-center">
@@ -195,22 +211,30 @@ export interface CustomCallLayoutProps {
   inviteOpen: boolean;
   onOpenInvite: () => void;
   onCloseInvite: () => void;
+  deviceSettingsOpen?: boolean;
+  onOpenDeviceSettings?: () => void;
+  onCloseDeviceSettings?: () => void;
   isSpeakerMuted: boolean;
   setIsSpeakerMuted: (muted: boolean) => void;
   isStandaloneWindow?: boolean;
   onReturnToMain?: () => void;
   onEndCallOverride?: () => void;
+  isDraggingRef?: React.MutableRefObject<boolean>;
 }
 
 export const CustomCallLayout = ({
   inviteOpen,
   onOpenInvite,
   onCloseInvite,
+  deviceSettingsOpen,
+  onOpenDeviceSettings,
+  onCloseDeviceSettings,
   isSpeakerMuted,
   setIsSpeakerMuted,
   isStandaloneWindow = false,
   onReturnToMain,
   onEndCallOverride,
+  isDraggingRef,
 }: CustomCallLayoutProps) => {
   const {
     activeCall,
@@ -222,7 +246,7 @@ export const CustomCallLayout = ({
     reconnectingUserId,
     popOutCallWindow,
   } = useCallContext();
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
   const { contacts } = useContacts();
 
@@ -253,11 +277,6 @@ export const CustomCallLayout = ({
       fetchGroupMembers();
     }
   }, [activeCall?.isGroup, activeCall?.groupId]);
-
-  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ 
-    kind: 'videoinput',
-    requestPermissions: activeCall?.callType === "VIDEO" || isCameraEnabled
-  });
 
   const tracks = useTracks(
     [
@@ -306,12 +325,26 @@ export const CustomCallLayout = ({
       " grid-cols-2 md:grid-cols-3 auto-rows-[minmax(200px,1fr)] overflow-y-auto";
   }
 
-  // Call duration timer
-  const [duration, setDuration] = React.useState(0);
+  // Call duration timer - synchronized with activeCall.startedAt
+  const [duration, setDuration] = React.useState<number>(() => {
+    if (activeCall?.startedAt) {
+      return Math.max(0, Math.floor((Date.now() - activeCall.startedAt) / 1000));
+    }
+    return 0;
+  });
+
   React.useEffect(() => {
-    const timer = setInterval(() => setDuration((d) => d + 1), 1000);
+    const updateTimer = () => {
+      if (activeCall?.startedAt) {
+        setDuration(Math.max(0, Math.floor((Date.now() - activeCall.startedAt) / 1000)));
+      } else {
+        setDuration((d) => d + 1);
+      }
+    };
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeCall?.startedAt]);
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -331,6 +364,16 @@ export const CustomCallLayout = ({
     }
   };
 
+  const handleBackNavigation = () => {
+    if (isStandaloneWindow && onReturnToMain) {
+      onReturnToMain();
+    } else {
+      setIsCallMinimized(true);
+    }
+  };
+
+  const screenShareTrack = tracks.find((t) => t.source === Track.Source.ScreenShare);
+  const cameraTracks = tracks.filter((t) => t.source !== Track.Source.ScreenShare);
   const anyoneHasCamera = tracks.some(
     (t) => t.source === Track.Source.Camera && t.participant.isCameraEnabled,
   );
@@ -381,6 +424,36 @@ export const CustomCallLayout = ({
         <span className="text-[11px] font-medium text-[#8696A0]">{isMicrophoneEnabled ? "Mic" : "Muted"}</span>
       </div>
 
+      {/* Screen Share Toggle */}
+      <div className="flex flex-col items-center gap-1">
+        <button
+          onClick={async () => {
+            try {
+              await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
+            } catch (err) {
+              console.warn("Screen share toggle error:", err);
+            }
+          }}
+          className={cn(
+            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
+            isScreenShareEnabled
+              ? "bg-[#00A884] text-white shadow-md hover:bg-[#008069]"
+              : "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
+          )}
+          aria-label={isScreenShareEnabled ? "Stop sharing screen" : "Share screen"}
+          title={isScreenShareEnabled ? "Stop sharing screen" : "Share screen"}
+        >
+          {isScreenShareEnabled ? (
+            <ScreenShareOff className="h-5 w-5 md:h-6 md:w-6" />
+          ) : (
+            <ScreenShare className="h-5 w-5 md:h-6 md:w-6" />
+          )}
+        </button>
+        <span className="text-[11px] font-medium text-[#8696A0]">
+          {isScreenShareEnabled ? "Sharing" : "Share"}
+        </span>
+      </div>
+
       {/* Speaker Toggle */}
       <div className="flex flex-col items-center gap-1">
         <button
@@ -411,6 +484,21 @@ export const CustomCallLayout = ({
         </button>
         <span className="text-[11px] font-medium text-[#8696A0]">Add</span>
       </div>
+
+      {/* Device Settings shortcut */}
+      {onOpenDeviceSettings && (
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={onOpenDeviceSettings}
+            className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer"
+            aria-label="Device Settings"
+            title="Audio & Video Settings"
+          >
+            <Settings className="h-5 w-5 md:h-6 md:w-6" />
+          </button>
+          <span className="text-[11px] font-medium text-[#8696A0]">Settings</span>
+        </div>
+      )}
 
       {/* Pop out to Standalone Window OR Return to Tab */}
       {!isStandaloneWindow && popOutCallWindow && (
@@ -510,8 +598,11 @@ export const CustomCallLayout = ({
 
       return (
         <div
-          onClick={() => setIsCallMinimized(false)}
-          className="relative w-72 sm:w-80 h-48 sm:h-52 rounded-[1.75rem] overflow-hidden bg-[#111B21] border-2 border-white/20 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(0,168,132,0.2)] group cursor-pointer select-none transition-all duration-300 hover:scale-[1.02] animate-in slide-in-from-bottom-5 zoom-in-95 duration-200"
+          onClick={() => {
+            if (isDraggingRef?.current) return;
+            setIsCallMinimized(false);
+          }}
+          className="relative w-72 sm:w-80 h-48 sm:h-52 rounded-[1.75rem] overflow-hidden bg-[#111B21] border-2 border-white/20 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(0,168,132,0.2)] group cursor-pointer select-none transition-all duration-300 hover:scale-[1.02] animate-in slide-in-from-top-5 zoom-in-95 duration-200"
         >
           {primaryRemoteTrack && primaryRemoteTrack.publication?.isSubscribed && !primaryRemoteTrack.publication?.isMuted ? (
             <div className="absolute inset-0 w-full h-full bg-black">
@@ -528,16 +619,20 @@ export const CustomCallLayout = ({
             </div>
           )}
 
-          {/* Top Floating Glass Header */}
+          {/* Top Floating Glass Header with Drag Handle */}
           <div className="absolute top-0 left-0 right-0 p-2.5 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent z-20">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[#25D366]" />
               </span>
-              <span className="text-[11px] font-semibold text-white truncate max-w-[120px]">
+              <span className="text-[11px] font-semibold text-white truncate max-w-[100px]">
                 {formatDuration(duration)}
               </span>
+            </div>
+
+            <div className="flex items-center justify-center text-white/50 cursor-grab active:cursor-grabbing px-2 py-0.5" title="Drag to reposition">
+              <GripHorizontal className="h-4 w-4" />
             </div>
 
             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -602,8 +697,11 @@ export const CustomCallLayout = ({
     // AUDIO MINIMIZED: Sleek WhatsApp Web Floating Audio Widget
     return (
       <div
-        onClick={() => setIsCallMinimized(false)}
-        className="relative w-[340px] sm:w-[380px] rounded-[1.75rem] bg-[#111B21]/95 backdrop-blur-2xl border border-white/15 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_25px_rgba(0,168,132,0.15)] group cursor-pointer select-none transition-all duration-300 hover:scale-[1.01] flex flex-col gap-3.5 animate-in slide-in-from-bottom-5 zoom-in-95 duration-200"
+        onClick={() => {
+          if (isDraggingRef?.current) return;
+          setIsCallMinimized(false);
+        }}
+        className="relative w-[340px] sm:w-[380px] rounded-[1.75rem] bg-[#111B21]/95 backdrop-blur-2xl border border-white/15 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_25px_rgba(0,168,132,0.15)] group cursor-pointer select-none transition-all duration-300 hover:scale-[1.01] flex flex-col gap-3.5 animate-in slide-in-from-top-5 zoom-in-95 duration-200"
       >
         {/* Top: Peer Info & Controls */}
         <div className="flex items-center justify-between gap-3">
@@ -638,6 +736,9 @@ export const CustomCallLayout = ({
           </div>
 
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-center text-white/40 mr-1 cursor-grab active:cursor-grabbing" title="Drag to reposition">
+              <GripHorizontal className="h-4 w-4" />
+            </div>
             {!isStandaloneWindow && popOutCallWindow && (
               <button
                 onClick={popOutCallWindow}
@@ -725,17 +826,18 @@ export const CustomCallLayout = ({
   if (activeCall?.callType === "AUDIO") {
     const allParticipants = [localParticipant, ...remoteParticipants];
 
-    // If someone turned on camera, show video layout seamlessly
-    if (anyoneHasCamera) {
+    // If someone turned on camera or shared screen, show video layout seamlessly
+    if (anyoneHasCamera || screenShareTrack) {
       return (
         <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#0C1317]">
           <div className="flex-1 relative h-full">
             {/* Top Navigation Header */}
             <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/70 to-transparent">
               <button 
-                onClick={handleEndCall} 
+                onClick={handleBackNavigation} 
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
-                title="End Call"
+                title={isStandaloneWindow ? "Return to tab" : "Minimize to chat"}
+                aria-label={isStandaloneWindow ? "Return to tab" : "Minimize to chat"}
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
@@ -814,10 +916,10 @@ export const CustomCallLayout = ({
           {/* Top Header */}
           <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/60 to-transparent">
             <button
-              onClick={handleEndCall}
+              onClick={handleBackNavigation}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
-              aria-label="Back / End call"
-              title="Back"
+              aria-label={isStandaloneWindow ? "Return to tab" : "Minimize to chat"}
+              title={isStandaloneWindow ? "Return to tab" : "Minimize to chat"}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -891,11 +993,17 @@ export const CustomCallLayout = ({
                   <span className="text-[18px] md:text-[20px] font-semibold text-[#25D366] text-center">
                     {formatDuration(duration)}
                   </span>
+                  {remotePeer && !remotePeer.isMicrophoneEnabled && (
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-semibold mt-1 animate-in fade-in zoom-in-95 duration-200">
+                      <MicOff className="h-3.5 w-3.5" />
+                      <span>{singlePeerName} is muted</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               // Group Audio Layout (Grid of Avatars)
-              <div className="w-full max-w-3xl grid grid-cols-2 md:grid-cols-2 gap-y-10 gap-x-8 items-center justify-items-center">
+              <div className="w-full max-w-4xl max-h-[65vh] overflow-y-auto px-4 py-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-8 gap-x-6 items-center justify-items-center">
                 {allParticipants.map((p, idx) => {
                   const isLocal = p.identity === localParticipant.identity;
                   let name = isLocal ? "You" : p.name || p.identity || "Unknown";
@@ -959,9 +1067,10 @@ export const CustomCallLayout = ({
       {/* Top Header */}
       <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/70 to-transparent">
         <button
-          onClick={handleEndCall}
+          onClick={handleBackNavigation}
           className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202C33]/80 text-white hover:bg-[#2A3942] backdrop-blur-md border border-white/10 transition-colors cursor-pointer"
-          aria-label="Back / End call"
+          aria-label={isStandaloneWindow ? "Return to tab" : "Minimize to chat"}
+          title={isStandaloneWindow ? "Return to tab" : "Minimize to chat"}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -1022,7 +1131,40 @@ export const CustomCallLayout = ({
 
       {/* Main Video Area */}
       <div className="flex-1 flex flex-col pt-20 pb-28 px-4 md:px-6">
-        {isOneOnOne && localTrack && remoteTrack ? (
+        {screenShareTrack ? (
+          // Dedicated Screen Share Hero Layout
+          <div className="relative w-full h-full flex flex-col items-center justify-between gap-3">
+            {/* Main Prominent Screen Share Viewport */}
+            <div className="relative w-full flex-1 rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10">
+              <ParticipantTile
+                key={`${screenShareTrack.participant.identity}-screen`}
+                trackRef={screenShareTrack}
+                groupMembers={groupMembers}
+                isReconnecting={screenShareTrack.participant.identity === reconnectingUserId}
+              />
+            </div>
+
+            {/* Bottom Horizontal Camera Tiles Strip */}
+            {cameraTracks.length > 0 && (
+              <div className="w-full flex items-center justify-center gap-3 py-1 overflow-x-auto z-10 shrink-0">
+                {cameraTracks.map((trackRef, idx) => (
+                  <div
+                    key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
+                    className="w-32 h-20 sm:w-44 sm:h-28 rounded-xl overflow-hidden shadow-lg border border-white/20 shrink-0 bg-[#111B21]"
+                  >
+                    <ParticipantTile
+                      trackRef={trackRef}
+                      groupMembers={groupMembers}
+                      isReconnecting={trackRef.participant.identity === reconnectingUserId}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <ControlDock compact />
+          </div>
+        ) : isOneOnOne && localTrack && remoteTrack ? (
           // 1-on-1 Picture-in-Picture Layout
           <div className="relative w-full h-full max-w-5xl mx-auto rounded-3xl overflow-visible shadow-2xl bg-[#111B21]">
              <div className="absolute inset-0 rounded-3xl overflow-hidden bg-black">
@@ -1091,18 +1233,138 @@ export const ActiveCallRoom = () => {
     onLiveKitDisconnected,
   } = useCallContext();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [deviceSettingsOpen, setDeviceSettingsOpen] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
+
+  const handleOpenInvite = useCallback(() => setInviteOpen(true), []);
+  const handleCloseInvite = useCallback(() => setInviteOpen(false), []);
+  const handleOpenDeviceSettings = useCallback(() => setDeviceSettingsOpen(true), []);
+  const handleCloseDeviceSettings = useCallback(() => setDeviceSettingsOpen(false), []);
+
+  // Draggable floating PiP positioning state
+  const [pipPosition, setPipPosition] = useState<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number }>({
+    startX: 0,
+    startY: 0,
+    initX: 0,
+    initY: 0,
+  });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!isCallMinimized) return;
+    if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("a")) return;
+
+    const currentEl = containerRef.current;
+    if (!currentEl) return;
+    const rect = currentEl.getBoundingClientRect();
+
+    isDraggingRef.current = false;
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initX: rect.left,
+      initY: rect.top,
+    };
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      const dx = moveEv.clientX - dragStartRef.current.startX;
+      const dy = moveEv.clientY - dragStartRef.current.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        isDraggingRef.current = true;
+      }
+      const cardW = rect.width || 340;
+      const cardH = rect.height || 180;
+      const maxX = Math.max(16, window.innerWidth - cardW - 16);
+      const maxY = Math.max(16, window.innerHeight - cardH - 16);
+      const newX = Math.min(Math.max(16, dragStartRef.current.initX + dx), maxX);
+      const newY = Math.min(Math.max(16, dragStartRef.current.initY + dy), maxY);
+      setPipPosition({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      setTimeout(() => {
+        isDraggingRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  };
+
+  // Draggable popped-out standby capsule positioning state
+  const [capsulePosition, setCapsulePosition] = useState<{ x: number; y: number } | null>(null);
+  const capsuleRef = useRef<HTMLDivElement | null>(null);
+  const capsuleDragStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number }>({
+    startX: 0,
+    startY: 0,
+    initX: 0,
+    initY: 0,
+  });
+
+  useEffect(() => {
+    if (!isCallPoppedOut) {
+      setCapsulePosition(null);
+    }
+  }, [isCallPoppedOut]);
+
+  const handleCapsulePointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("a")) return;
+
+    const currentEl = capsuleRef.current;
+    if (!currentEl) return;
+    const rect = currentEl.getBoundingClientRect();
+
+    capsuleDragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initX: rect.left,
+      initY: rect.top,
+    };
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      const dx = moveEv.clientX - capsuleDragStartRef.current.startX;
+      const dy = moveEv.clientY - capsuleDragStartRef.current.startY;
+      const cardW = rect.width || 380;
+      const cardH = rect.height || 56;
+      const maxX = Math.max(12, window.innerWidth - cardW - 12);
+      const maxY = Math.max(12, window.innerHeight - cardH - 12);
+      const newX = Math.min(Math.max(12, capsuleDragStartRef.current.initX + dx), maxX);
+      const newY = Math.min(Math.max(12, capsuleDragStartRef.current.initY + dy), maxY);
+      setCapsulePosition({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  };
 
   if (!activeCall) return null;
 
-  // When call is popped out to a separate window, show authentic WhatsApp Web sleek top calling capsule
+  // When call is popped out to a separate window, show authentic WhatsApp Web sleek top calling capsule (draggable)
   if (isCallPoppedOut) {
     const displayName = activeCall.isGroup ? "Group Call" : (activeCall.peerName || "In call");
     const avatarUrl = activeCall.peerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=80`;
 
     return (
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[94vw] sm:w-auto animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto select-none">
-        <div className="flex items-center justify-between gap-3 sm:gap-5 bg-[#111B21]/95 backdrop-blur-2xl border border-white/15 px-4 py-2 sm:px-5 sm:py-2.5 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(0,168,132,0.15)]">
+      <div 
+        ref={capsuleRef}
+        onPointerDown={handleCapsulePointerDown}
+        style={
+          capsulePosition
+            ? { left: `${capsulePosition.x}px`, top: `${capsulePosition.y}px`, transform: "none" }
+            : { top: "16px", left: "50%", transform: "translateX(-50%)" }
+        }
+        className="fixed z-[100] max-w-lg w-[94vw] sm:w-auto animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto select-none touch-none cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex items-center justify-between gap-3 sm:gap-5 bg-[#111B21]/95 backdrop-blur-2xl border border-white/15 px-4 py-2 sm:px-5 sm:py-2.5 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(0,168,132,0.15)] hover:border-white/25 transition-colors">
           {/* Avatar & Pulsing Indicator */}
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative shrink-0">
@@ -1127,7 +1389,7 @@ export const ActiveCallRoom = () => {
                 </span>
               </div>
               <span className="text-[11px] text-[#8696A0] truncate">
-                Active in separate window · click to return
+                Active in separate window · drag to move
               </span>
             </div>
           </div>
@@ -1158,10 +1420,19 @@ export const ActiveCallRoom = () => {
 
   return (
     <div 
-      className={cn(
-        "z-[100] transition-all duration-300 pointer-events-auto",
+      ref={containerRef}
+      onPointerDown={handlePointerDown}
+      style={
         isCallMinimized
-          ? "fixed bottom-6 right-6"
+          ? pipPosition
+            ? { left: `${pipPosition.x}px`, top: `${pipPosition.y}px`, right: "auto", bottom: "auto" }
+            : { top: "76px", right: "24px" }
+          : undefined
+      }
+      className={cn(
+        "z-[100] transition-shadow duration-300 pointer-events-auto",
+        isCallMinimized
+          ? "fixed cursor-grab active:cursor-grabbing select-none touch-none animate-in slide-in-from-top-4 duration-200 shadow-2xl"
           : "fixed inset-0 flex items-center justify-center bg-black overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200"
       )}
     >
@@ -1184,20 +1455,33 @@ export const ActiveCallRoom = () => {
         >
           <CustomCallLayout 
              inviteOpen={inviteOpen} 
-             onOpenInvite={() => setInviteOpen(true)} 
-             onCloseInvite={() => setInviteOpen(false)}
+             onOpenInvite={handleOpenInvite} 
+             onCloseInvite={handleCloseInvite}
+             deviceSettingsOpen={deviceSettingsOpen}
+             onOpenDeviceSettings={handleOpenDeviceSettings}
+             onCloseDeviceSettings={handleCloseDeviceSettings}
              isSpeakerMuted={isSpeakerMuted}
              setIsSpeakerMuted={setIsSpeakerMuted}
+             isDraggingRef={isDraggingRef}
           />
 
           <RoomAudioRenderer muted={isSpeakerMuted} />
 
-          <InviteParticipantModal
-            open={inviteOpen}
-            onClose={() => setInviteOpen(false)}
-            roomId={activeCall.roomName}
-            callType={activeCall.callType}
-          />
+          {inviteOpen && (
+            <InviteParticipantModal
+              open={inviteOpen}
+              onClose={handleCloseInvite}
+              roomId={activeCall.roomName}
+              callType={activeCall.callType}
+            />
+          )}
+
+          {deviceSettingsOpen && (
+            <DeviceSettingsModal
+              open={deviceSettingsOpen}
+              onClose={handleCloseDeviceSettings}
+            />
+          )}
         </LiveKitRoom>
       </div>
     </div>

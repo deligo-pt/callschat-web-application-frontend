@@ -8,6 +8,7 @@ import { callBroadcast } from "@/utils/callBroadcast";
 import { resolveLivekitUrl } from "@/utils/livekit";
 import { CustomCallLayout } from "@/components/call/ActiveCallRoom";
 import { InviteParticipantModal } from "@/components/call/InviteParticipantModal";
+import { DeviceSettingsModal } from "@/components/call/DeviceSettingsModal";
 import { CallContext, CallContextType } from "@/components/providers/CallContext";
 import { PhoneOff, Loader2, ArrowDownLeft, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,25 +19,36 @@ export default function CallWindowView() {
     return callBroadcast.getSavedActiveCall();
   });
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [deviceSettingsOpen, setDeviceSettingsOpen] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const isClosingIntentionallyRef = useRef(false);
 
-  // Initialize and synchronize activeCall via BroadcastChannel
+  const handleOpenInvite = useCallback(() => setInviteOpen(true), []);
+  const handleCloseInvite = useCallback(() => setInviteOpen(false), []);
+  const handleOpenDeviceSettings = useCallback(() => setDeviceSettingsOpen(true), []);
+  const handleCloseDeviceSettings = useCallback(() => setDeviceSettingsOpen(false), []);
+
+  // Initialize and synchronize activeCall via BroadcastChannel (mounts once)
   useEffect(() => {
     // 1. Check local storage again in case it updated
     const cachedCall = callBroadcast.getSavedActiveCall();
-    if (cachedCall && !activeCall) {
-      setActiveCall(cachedCall);
+    if (cachedCall) {
+      setActiveCall((prev) => prev || cachedCall);
     }
 
-    // 2. Announce that standalone window is ready
+    // 2. Announce that standalone window is ready (once on mount)
     callBroadcast.send({ type: "WINDOW_READY" });
 
     // 3. Subscribe to broadcast events from main tab
     const unsubscribe = callBroadcast.subscribe((event) => {
       if (event.type === "SYNC_ACTIVE_CALL") {
-        setActiveCall(event.payload);
+        setActiveCall((prev) => {
+          if (prev && prev.callId === event.payload.callId && prev.token === event.payload.token) {
+            return prev;
+          }
+          return event.payload;
+        });
       } else if (event.type === "CALL_ENDED") {
         isClosingIntentionallyRef.current = true;
         setIsExiting(true);
@@ -53,7 +65,7 @@ export default function CallWindowView() {
     });
 
     return unsubscribe;
-  }, [activeCall]);
+  }, []);
 
   // Update browser window title dynamically
   useEffect(() => {
@@ -243,8 +255,11 @@ export default function CallWindowView() {
         >
           <CustomCallLayout
             inviteOpen={inviteOpen}
-            onOpenInvite={() => setInviteOpen(true)}
-            onCloseInvite={() => setInviteOpen(false)}
+            onOpenInvite={handleOpenInvite}
+            onCloseInvite={handleCloseInvite}
+            deviceSettingsOpen={deviceSettingsOpen}
+            onOpenDeviceSettings={handleOpenDeviceSettings}
+            onCloseDeviceSettings={handleCloseDeviceSettings}
             isSpeakerMuted={isSpeakerMuted}
             setIsSpeakerMuted={setIsSpeakerMuted}
             isStandaloneWindow={true}
@@ -254,12 +269,21 @@ export default function CallWindowView() {
 
           <RoomAudioRenderer muted={isSpeakerMuted} />
 
-          <InviteParticipantModal
-            open={inviteOpen}
-            onClose={() => setInviteOpen(false)}
-            roomId={activeCall.roomName}
-            callType={activeCall.callType}
-          />
+          {inviteOpen && (
+            <InviteParticipantModal
+              open={inviteOpen}
+              onClose={handleCloseInvite}
+              roomId={activeCall.roomName}
+              callType={activeCall.callType}
+            />
+          )}
+
+          {deviceSettingsOpen && (
+            <DeviceSettingsModal
+              open={deviceSettingsOpen}
+              onClose={handleCloseDeviceSettings}
+            />
+          )}
         </LiveKitRoom>
       </div>
     </CallContext.Provider>

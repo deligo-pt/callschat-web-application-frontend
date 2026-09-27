@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { UserPlus, Search, Loader2, Phone, Check, X, Users, PhoneCall, Sparkles } from "lucide-react";
 import { useParticipants, useLocalParticipant } from "@livekit/components-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -70,10 +70,16 @@ export const InviteParticipantModal = ({
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // -----------------------------------------------------------------------
-  // LiveKit participant identities currently in the room
+  // LiveKit participant identities currently in the room (stably memoized)
   // -----------------------------------------------------------------------
   const participants = useParticipants();
-  const participantIdentities = new Set(participants.map((p) => p.identity));
+  const participantIdsKey = useMemo(() => {
+    return participants.map((p) => p.identity).sort().join(",");
+  }, [participants]);
+
+  const participantIdentities = useMemo(() => {
+    return new Set(participants.map((p) => p.identity));
+  }, [participantIdsKey]);
 
   // Current user's identity to exclude
   const currentUserId = localParticipant?.identity || "";
@@ -161,10 +167,14 @@ export const InviteParticipantModal = ({
   // Whenever room participants change, clear ringing states for anyone joined
   // -----------------------------------------------------------------------
   useEffect(() => {
+    if (!open) return;
     setInviteStates((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+
       let changed = false;
       const next = { ...prev };
-      for (const id of Object.keys(next)) {
+      for (const id of keys) {
         if (participantIdentities.has(id)) {
           delete next[id];
           if (errorTimeouts.current[id]) {
@@ -176,7 +186,7 @@ export const InviteParticipantModal = ({
       }
       return changed ? next : prev;
     });
-  }, [participantIdentities]);
+  }, [open, participantIdsKey, participantIdentities]);
 
   // -----------------------------------------------------------------------
   // Remote search across CallsChat when query >= 2 characters
