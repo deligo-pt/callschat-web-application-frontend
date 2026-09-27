@@ -33,6 +33,7 @@ export interface ActiveCall {
   groupId?: string;
   peerName?: string;
   peerAvatar?: string;
+  startedAt?: number;
 }
 
 export interface OutgoingCall {
@@ -300,6 +301,7 @@ export const useCallSignaling = () => {
         callType: payload.callType,
         peerName: pendingPeerRef.current.name,
         peerAvatar: pendingPeerRef.current.avatar,
+        startedAt: Date.now(),
       });
       pendingPeerRef.current = {};
     };
@@ -467,9 +469,10 @@ export const useCallSignaling = () => {
               roomName: payload.roomName!,
               // Preserve call type and group from the pending peer ref if available
               callType: 'AUDIO',
+              startedAt: Date.now(),
             };
           }
-          // Already mounted (LiveKit auto-reconnected) — just refresh the token
+          // Already mounted (LiveKit auto-reconnected) — just refresh the token and preserve startedAt
           return { ...current, token: payload.token!, callId: payload.callId, serverUrl: resolveLivekitUrl(payload.livekitUrl || current.serverUrl) };
         });
       }
@@ -540,6 +543,7 @@ export const useCallSignaling = () => {
             callType: prev.callType,
             isGroup: true,
             groupId: payload.groupId,
+            startedAt: Date.now(),
           });
           return null;
         }
@@ -751,6 +755,7 @@ export const useCallSignaling = () => {
           isGroup: true, // Mark as multi-party call so leaver doesn't terminate room
           peerName: peerName || pendingPeerRef.current.name,
           peerAvatar: peerAvatar || pendingPeerRef.current.avatar,
+          startedAt: Date.now(),
         });
       } catch (err) {
         console.error('[Call] Failed to obtain token for escalated call:', err);
@@ -786,6 +791,9 @@ export const useCallSignaling = () => {
     if (!socket || !callWaiting) return;
     console.log('[Call] Accepting call waiting:', callWaiting);
 
+    // Record accepted callId so handleCallConnected recognizes this client as the acceptor
+    acceptedCallIdRef.current = callWaiting.callId;
+
     // End current active call
     if (activeCall) {
       userInitiatedHangupRef.current = true;
@@ -820,6 +828,7 @@ export const useCallSignaling = () => {
       if (!socket) return;
       console.log('[Call] Hanging up call', callId);
       stopRingtone();
+      playNotificationSound('call_ended');
       userInitiatedHangupRef.current = true;
       if (activeCallRef.current?.isGroup) {
         socket.emit('group:call_leave', { callId });
@@ -928,6 +937,7 @@ export const useCallSignaling = () => {
             callType: response.callType || 'AUDIO',
             isGroup: true,
             groupId: groupId,
+            startedAt: Date.now(),
           });
         }
       });
@@ -971,6 +981,7 @@ export const useCallSignaling = () => {
             callType: response.callType || 'AUDIO',
             isGroup: true,
             groupId: groupId,
+            startedAt: Date.now(),
           });
         }
       });

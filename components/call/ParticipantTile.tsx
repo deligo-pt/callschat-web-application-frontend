@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { TrackReferenceOrPlaceholder, VideoTrack, useIsSpeaking } from "@livekit/components-react";
-import { Track } from "livekit-client";
-import { Mic, MicOff } from "lucide-react";
+import { TrackReferenceOrPlaceholder, VideoTrack, useIsSpeaking, useConnectionQualityIndicator } from "@livekit/components-react";
+import { Track, ConnectionQuality } from "livekit-client";
+import { Mic, MicOff, Monitor, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useContacts } from "@/hooks/useContacts";
 import { getOptimizedImageUrl } from "@/utils/image";
@@ -20,9 +20,11 @@ interface ParticipantTileProps {
 export function ParticipantTile({ trackRef, disableOverlay, hideName, className, groupMembers = [], isReconnecting }: ParticipantTileProps) {
   const { participant } = trackRef;
   const isSpeaking = useIsSpeaking(participant);
+  const { quality } = useConnectionQualityIndicator({ participant });
   const { contacts } = useContacts();
 
-  const isVideoOn = participant.isCameraEnabled && trackRef.source === Track.Source.Camera;
+  const isScreenShare = trackRef.source === Track.Source.ScreenShare;
+  const isVideoOn = (participant.isCameraEnabled && trackRef.source === Track.Source.Camera) || isScreenShare;
   const isMicrophoneEnabled = participant.isMicrophoneEnabled;
   let name = participant.name || participant.identity || "Unknown";
   let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00A884&color=fff&size=256`;
@@ -69,7 +71,7 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
     <div
       className={cn(
         "relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-[#182229] shadow-xl transition-all duration-300 border border-white/5",
-        isSpeaking ? "ring-3 ring-[#25D366] shadow-[0_0_25px_rgba(37,211,102,0.45)]" : "ring-1 ring-white/10",
+        isSpeaking && !isScreenShare ? "ring-3 ring-[#25D366] shadow-[0_0_25px_rgba(37,211,102,0.45)]" : "ring-1 ring-white/10",
         className
       )}
     >
@@ -77,7 +79,11 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
       {isVideoOn ? (
         <VideoTrack
           trackRef={trackRef as any}
-          className="h-full w-full object-cover"
+          className={cn(
+            "h-full w-full",
+            isScreenShare ? "object-contain bg-black" : "object-cover",
+            participant.isLocal && !isScreenShare && "scale-x-[-1]"
+          )}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-[#111B21]">
@@ -116,16 +122,27 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
       {/* Status Overlays */}
       {!disableOverlay && (
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
-          {/* Name Tag */}
-          {!hideName ? (
-            <div className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 backdrop-blur-md border border-white/10 shadow-xs">
-              <span className="text-[12.5px] font-medium text-[#E9EDEF] truncate max-w-[120px] md:max-w-[200px]">
-                {name} {participant.isLocal && "(You)"}
-              </span>
-            </div>
-          ) : (
-            <div />
-          )}
+          {/* Name Tag & Quality Indicator */}
+          <div className="flex items-center gap-1.5">
+            {!hideName && (
+              <div className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 backdrop-blur-md border border-white/10 shadow-xs">
+                {isScreenShare && <Monitor className="h-3.5 w-3.5 text-[#00A884]" />}
+                <span className="text-[12.5px] font-medium text-[#E9EDEF] truncate max-w-[120px] md:max-w-[200px]">
+                  {isScreenShare
+                    ? (participant.isLocal ? "Your Screen" : `${name}'s Screen`)
+                    : `${name} ${participant.isLocal ? "(You)" : ""}`}
+                </span>
+              </div>
+            )}
+
+            {/* Poor Network Warning Badge */}
+            {(quality === ConnectionQuality.Poor || quality === ConnectionQuality.Lost) && (
+              <div className="flex items-center gap-1 rounded-full bg-amber-500/25 px-2 py-1 backdrop-blur-md border border-amber-500/40 text-amber-300 shadow-xs" title="Unstable network connection">
+                <WifiOff className="h-3 w-3" />
+                <span className="text-[10px] font-semibold hidden sm:inline">Poor network</span>
+              </div>
+            )}
+          </div>
 
           {/* Mic Indicator */}
           <div className={cn(

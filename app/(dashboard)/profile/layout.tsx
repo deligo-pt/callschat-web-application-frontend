@@ -139,13 +139,13 @@ function ProfileSidebarNavigation() {
               <ChevronRight className="h-4 w-4 text-slate-400" />
             </button>
 
-            {activeMode === "BUSINESS" && (
+            {activeMode === "BUSINESS" ? (
               <>
                 <button
-                  onClick={() => router.push("/profile/verification")}
+                  onClick={() => router.push("/business/verification")}
                   className={cn(
                     "flex items-center justify-between rounded-xl border p-3 transition-all",
-                    isRouteActive("/profile/verification") ? "border-blue-200 bg-[#EEF2FF]" : "border-slate-100 bg-white hover:bg-slate-50"
+                    isRouteActive("/business/verification") ? "border-blue-200 bg-[#EEF2FF]" : "border-slate-100 bg-white hover:bg-slate-50"
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -161,6 +161,9 @@ function ProfileSidebarNavigation() {
                           </span>
                         )}
                       </div>
+                      <span className="text-[11px] font-medium text-slate-500 mt-0.5">
+                        {businessProfile?.isVerified ? "Verified organization" : "Complete business KYB"}
+                      </span>
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -204,6 +207,36 @@ function ProfileSidebarNavigation() {
                   <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
               </>
+            ) : (
+              <button
+                onClick={() => router.push("/profile/verification")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-3 transition-all",
+                  isRouteActive("/profile/verification")
+                    ? "border-indigo-200 bg-indigo-50/60"
+                    : "border-slate-100 bg-white hover:bg-slate-50"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <ShieldCheck className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="flex flex-col items-start leading-tight">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px] font-bold text-[#0F172A]">Identity Verification (KYC)</span>
+                      {(userData as any)?.isVerified && (
+                        <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xs">
+                          <Check className="h-2 w-2" strokeWidth={3} />
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-500 mt-0.5">
+                      {(userData as any)?.isVerified ? "Identity verified" : "Submit government ID"}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
             )}
           </div>
         </div>
