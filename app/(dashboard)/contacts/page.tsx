@@ -33,6 +33,7 @@ import { UserService, type SearchUserItem } from "@/services/user.service";
 import { toast } from "sonner";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { useCallContext } from "@/components/providers/CallContext";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 export default function ContactsPage() {
   const t = useTranslations("contacts");
@@ -446,6 +447,12 @@ export default function ContactsPage() {
                                 <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
                                   {user.displayName}
                                 </h3>
+                                {user.isVerified && (
+                                  <VerifiedBadge
+                                    type={user.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                                    size="xs"
+                                  />
+                                )}
                                 {user.isContact && (
                                   <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-[#00A884]/15 text-[#008069] dark:text-[#25D366]">
                                     Contact
@@ -629,6 +636,12 @@ export default function ContactsPage() {
                                 <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
                                   {contact.name}
                                 </h3>
+                                {contact.isVerified && (
+                                  <VerifiedBadge
+                                    type={contact.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                                    size="xs"
+                                  />
+                                )}
                                 {contact.isFavourite && (
                                   <Heart className="h-3 w-3 fill-red-500 text-red-500 shrink-0" />
                                 )}

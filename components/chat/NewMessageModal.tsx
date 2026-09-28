@@ -20,6 +20,7 @@ import { CustomerService } from "@/services/customer-support.service";
 import { chatService } from "@/services/chat.service";
 import { useUser } from "@/context/UserContext";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +33,8 @@ interface Contact {
   avatarUrl: string | null;
   isOnline: boolean;
   conversationId?: string;
+  isVerified?: boolean;
+  accountType?: string;
 }
 
 interface BusinessResult {
@@ -232,6 +235,8 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
           username: profile.username || "",
           avatarUrl: profile.avatarUrl || null,
           isOnline: profile.isOnline || false,
+          isVerified: c.isVerified ?? peer.isVerified ?? false,
+          accountType: c.accountType ?? peer.accountType ?? "USER",
         };
       });
       const uniqueContacts = Array.from(new Map(parsed.map((c) => [c.id, c])).values());
@@ -457,6 +462,14 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
                           }
                           primary={c.name}
                           secondary={c.username ? `@${c.username}` : undefined}
+                          badge={
+                            c.isVerified ? (
+                              <VerifiedBadge
+                                type={c.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                                size="xs"
+                              />
+                            ) : undefined
+                          }
                           onClick={() => handleSelectContact(c)}
                           loading={initiatingContactId === c.id}
                           trailing={<MessageSquare className="h-4 w-4 text-[#3B58F5]" />}
@@ -485,10 +498,10 @@ export function NewMessageModal({ isOpen, onClose }: NewMessageModalProps) {
                           secondary={b.description?.substring(0, 55) || "Official Business Workspace"}
                           badge={
                             b.isVerified ? (
-                              <span className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold border border-blue-200 shrink-0">
-                                <CheckCircle2 className="h-2.5 w-2.5 fill-blue-600 text-white" />
-                                Verified
-                              </span>
+                              <VerifiedBadge
+                                type="BUSINESS"
+                                size="xs"
+                              />
                             ) : undefined
                           }
                           onClick={() => handleSelectBusiness(b)}

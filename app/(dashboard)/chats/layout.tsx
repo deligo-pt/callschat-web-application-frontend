@@ -16,6 +16,7 @@ import { decryptMessage } from "@/utils/crypto";
 import { decryptGroupNotification } from "@/utils/notificationPreview";
 import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey } from "@/utils/keyStore";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { motion } from "framer-motion";
 import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
@@ -29,6 +30,8 @@ interface Conversation {
   otherUserName: string;
   otherUserAvatar: string | null;
   otherUserOnline: boolean;
+  isVerified?: boolean;
+  accountType?: string;
   isGroup?: boolean;
   groupName?: string | null;
   groupAvatar?: string | null;
@@ -1235,6 +1238,12 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                   )}>
                                     {displayName}
                                   </h3>
+                                  {!isGroup && conv.isVerified && (
+                                    <VerifiedBadge
+                                      type={conv.accountType === "BUSINESS" || conv.workspaceId ? "BUSINESS" : "USER"}
+                                      size="xs"
+                                    />
+                                  )}
                                   {isGroup && (
                                     <span className="shrink-0 text-[10.5px] font-medium bg-[#00A884]/10 dark:bg-[#00A884]/20 text-[#008069] dark:text-[#00A884] px-1.5 py-0.2 rounded-full">
                                       Group

@@ -11,6 +11,8 @@ export interface Contact {
   avatarUrl: string | null;
   isFavourite: boolean;
   isOnline: boolean;
+  isVerified?: boolean;
+  accountType?: string;
   isUnregistered?: boolean;
 }
 
@@ -105,7 +107,8 @@ export function useContacts() {
         const isFavourite = u.isFavourite || false;
         const isOnline = u.addressee?.profile?.isOnline || u.contact?.profile?.isOnline || u.profile?.isOnline || u.user?.profile?.isOnline || false;
 
-        console.log(`[DEBUG Contacts] id=${id}, targetUserId=${targetUserId}, name=${name}, isFavourite=${isFavourite}`);
+        const isVerified = u.isVerified ?? u.addressee?.isVerified ?? u.contact?.isVerified ?? false;
+        const accountType = u.accountType ?? u.addressee?.accountType ?? u.contact?.accountType ?? "USER";
 
         return {
           id,
@@ -114,7 +117,9 @@ export function useContacts() {
           phone,
           avatarUrl,
           isFavourite,
-          isOnline
+          isOnline,
+          isVerified,
+          accountType,
         };
       });
 

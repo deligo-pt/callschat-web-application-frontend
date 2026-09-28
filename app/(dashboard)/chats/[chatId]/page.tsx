@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { isMessageExpired } from "@/components/chat/DisappearingMessagesModal";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 function parseJwt(token: string) {
   try {
@@ -64,6 +65,8 @@ interface UserProfile {
   avatarUrl: string;
   isOnline: boolean;
   phone?: string;
+  isVerified?: boolean;
+  accountType?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,13 +115,7 @@ function BusinessChatHeader({
               {bizName}
             </h2>
             {bizVerified && (
-              <span
-                title="Verified Business"
-                className="flex items-center gap-0.5 bg-[#00A884]/15 text-[#008069] dark:text-[#00A884] px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-              >
-                <ShieldCheck className="h-2.5 w-2.5 fill-current" />
-                Verified
-              </span>
+              <VerifiedBadge type="BUSINESS" size="sm" />
             )}
           </div>
           <span className="text-[11.5px] font-medium text-[#667781] dark:text-[#8696A0]">
@@ -397,6 +394,8 @@ function ChatRoomPageContent() {
                   conv.otherUserAvatar ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName || "U")}&background=F4F6FC&color=3B58F5`,
                 isOnline: conv.otherUserOnline || false,
+                isVerified: (conv as any).isVerified,
+                accountType: (conv as any).accountType,
                 phone: undefined, // Will be updated when we fetch from /contacts below or you can just leave it since the name shows
               });
               setIsInitializing(false);
@@ -455,6 +454,8 @@ function ChatRoomPageContent() {
                 userProfile.avatarUrl ||
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=F4F6FC&color=3B58F5`,
               isOnline: userProfile.isOnline || false,
+              isVerified: match.isVerified ?? match.addressee?.isVerified ?? match.contact?.isVerified ?? false,
+              accountType: match.accountType ?? match.addressee?.accountType ?? match.contact?.accountType ?? "USER",
               phone: match.contact?.phone || match.phoneNumber || match.addressee?.phone || undefined,
             });
           } else {
@@ -687,9 +688,17 @@ function ChatRoomPageContent() {
                 )}
               </div>
               <div className="flex flex-col">
-                <h2 className="text-[16px] font-semibold text-[#111B21] dark:text-[#E9EDEF] tracking-tight group-hover:text-[#00A884] transition-colors">
-                  {recipient?.name || "Loading..."}
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-[16px] font-semibold text-[#111B21] dark:text-[#E9EDEF] tracking-tight group-hover:text-[#00A884] transition-colors">
+                    {recipient?.name || "Loading..."}
+                  </h2>
+                  {recipient?.isVerified && (
+                    <VerifiedBadge
+                      type={recipient?.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                      size="sm"
+                    />
+                  )}
+                </div>
                 {isInitializing ? (
                   <span className="text-[11.5px] font-normal text-[#667781] dark:text-[#8696A0]">
                     Connecting...

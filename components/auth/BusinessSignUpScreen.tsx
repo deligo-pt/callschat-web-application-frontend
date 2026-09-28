@@ -101,11 +101,15 @@ export default function BusinessSignUpScreen() {
         const data = await res.json();
         if (data.success) { 
           if (data.data?.devOtp) {
-            console.log("\\n==================================");
+            console.log("\n==================================");
             console.log(`🔑 DEV OTP: ${data.data.devOtp}`);
-            console.log("==================================\\n");
+            console.log("==================================\n");
+            setOtp(String(data.data.devOtp).split(""));
+            toast.success(`Code sent! (DEV OTP: ${data.data.devOtp})`);
+          } else {
+            toast.success("Code sent!");
           }
-          setSentPhone(phone); setStep("OTP"); setTimer(60); toast.success("Code sent!"); 
+          setSentPhone(phone); setStep("OTP"); setTimer(60); 
         }
         else toast.error(data.error?.message ?? data.message ?? "Failed to send OTP.");
       } catch { toast.error("Network error."); }

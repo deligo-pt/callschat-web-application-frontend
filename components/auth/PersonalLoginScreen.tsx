@@ -102,14 +102,17 @@ export default function PersonalLoginScreen() {
         const data = await res.json();
         if (data.success) {
           if (data.data?.devOtp) {
-            console.log("\\n==================================");
+            console.log("\n==================================");
             console.log(`🔑 DEV OTP: ${data.data.devOtp}`);
-            console.log("==================================\\n");
+            console.log("==================================\n");
+            setOtp(String(data.data.devOtp).split(""));
+            toast.success(`Verification code sent! (DEV OTP: ${data.data.devOtp})`);
+          } else {
+            toast.success("Verification code sent!");
           }
           setSentPhone(phone);
           setStep("OTP");
           setTimer(60);
-          toast.success("Verification code sent!");
         } else {
           toast.error(
             data.error?.message ?? data.message ?? "Failed to send OTP."
