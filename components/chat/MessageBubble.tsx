@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import {
   Phone,
   Video,
@@ -87,6 +88,22 @@ interface MessageBubbleProps {
     mediaType?: string | null;
     isEdited?: boolean;
     isDeleted?: boolean;
+    sender?: {
+      id?: string;
+      isVerified?: boolean;
+      accountType?: string;
+      profile?: {
+        displayName?: string;
+        avatarUrl?: string;
+      };
+      businessProfile?: {
+        companyName?: string;
+        isVerified?: boolean;
+      };
+    };
+    senderName?: string;
+    isVerified?: boolean;
+    accountType?: string;
     replyToId?: string | null;
     replyTo?: {
       id: string;
@@ -95,6 +112,13 @@ interface MessageBubbleProps {
       text: string;
       mediaUrl?: string | null;
       mediaType?: string | null;
+      sender?: {
+        id?: string;
+        isVerified?: boolean;
+        accountType?: string;
+      };
+      isVerified?: boolean;
+      accountType?: string;
     } | null;
     receipts?: {
       id: string;
@@ -725,6 +749,20 @@ export function MessageBubble({
                   : "bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] rounded-2xl rounded-tl-[4px] border border-gray-200/60 dark:border-[#2A3942]"
               )}
             >
+              {/* WhatsApp-Style Sender Name in Group/Multi-party Chat */}
+              {!isMe && (msg.senderName || msg.sender?.profile?.displayName) && (
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-[12.5px] font-bold text-[#008069] dark:text-[#25D366] leading-tight">
+                    {msg.sender?.profile?.displayName || msg.senderName}
+                  </span>
+                  {(msg.sender?.isVerified || msg.isVerified) && (
+                    <VerifiedBadge
+                      type={msg.sender?.accountType === "BUSINESS" || msg.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                      size="xs"
+                    />
+                  )}
+                </div>
+              )}
               {/* WhatsApp-Style In-Bubble Quoted Card */}
               {msg.replyTo && (
                 <div
@@ -752,18 +790,26 @@ export function MessageBubble({
                   />
 
                   <div className="flex flex-col min-w-0 flex-1 pl-1">
-                    <span
-                      className={cn(
-                        "text-[12.5px] font-bold tracking-tight truncate leading-tight",
-                        msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
-                          ? "text-[#2563EB]"
-                          : "text-[#008069] dark:text-[#25D366]"
+                    <div className="flex items-center gap-1">
+                      <span
+                        className={cn(
+                          "text-[12.5px] font-bold tracking-tight truncate leading-tight",
+                          msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                            ? "text-[#2563EB]"
+                            : "text-[#008069] dark:text-[#25D366]"
+                        )}
+                      >
+                        {msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
+                          ? "You"
+                          : msg.replyTo.senderName || peerName || "Contact"}
+                      </span>
+                      {((msg.replyTo as any)?.sender?.isVerified || (msg.replyTo as any)?.isVerified) && (
+                        <VerifiedBadge
+                          type={(msg.replyTo as any)?.sender?.accountType === "BUSINESS" || (msg.replyTo as any)?.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                          size="xs"
+                        />
                       )}
-                    >
-                      {msg.replyTo.senderId === currentUserId || msg.replyTo.senderName === "You"
-                        ? "You"
-                        : msg.replyTo.senderName || peerName || "Contact"}
-                    </span>
+                    </div>
                     <div className="flex items-center gap-1 text-[12px] truncate mt-0.5 leading-snug text-[#54656F] dark:text-[#8696A0]">
                       {msg.replyTo.mediaType === "image" && <Camera className="h-3.5 w-3.5 shrink-0" />}
                       {msg.replyTo.mediaType === "video" && <Video className="h-3.5 w-3.5 shrink-0" />}

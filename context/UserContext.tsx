@@ -13,6 +13,7 @@ export interface UserProfileData {
   role?: string;
   accountType?: string;
   currentMode?: 'PERSONAL' | 'BUSINESS';
+  isVerified?: boolean;
   profile?: {
     displayName: string;
     username: string;
@@ -38,6 +39,9 @@ interface UserContextType {
   refetchUser: () => Promise<void>;
   quickReplies: QuickReply[];
   refetchQuickReplies: () => Promise<void>;
+  isUserVerified: boolean;
+  isBusinessVerified: boolean;
+  isCurrentVerified: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -168,6 +172,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refetchUser: fetchUser,
         quickReplies,
         refetchQuickReplies: fetchQuickReplies,
+        isUserVerified: Boolean(user?.isVerified),
+        isBusinessVerified: Boolean(businessProfile?.isVerified || workspace?.isVerified),
+        isCurrentVerified: currentMode === 'BUSINESS'
+          ? Boolean(businessProfile?.isVerified || workspace?.isVerified)
+          : Boolean(user?.isVerified),
       }}
     >
       {children}

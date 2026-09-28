@@ -754,7 +754,7 @@ export default function WebLoginScreen() {
               {/* Log in with phone number link with slide animation */}
               <button
                 type="button"
-                onClick={() => router.push("/connect")}
+                onClick={() => router.push("/login")}
                 className="text-xs sm:text-sm font-semibold text-[#037CFD] hover:underline inline-flex items-center gap-0.5 cursor-pointer group focus:outline-none"
               >
                 <span>Log in with phone number</span>

@@ -14,6 +14,7 @@ export interface SearchUserItem {
   isOnline: boolean;
   isContact: boolean;
   relationship: 'NONE' | 'CONTACT' | 'PENDING_SENT' | 'PENDING_RECEIVED' | 'BLOCKED';
+  isVerified?: boolean;
 }
 
 export interface SearchUsersResponse {

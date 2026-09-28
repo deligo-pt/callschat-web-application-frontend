@@ -1,6 +1,6 @@
 import { useRouter } from "next/navigation";
 import { AppNotification } from "@/services/notification.service";
-import { MessageCircle, PhoneMissed, UserPlus, Users, UserMinus, Info } from "lucide-react";
+import { MessageCircle, PhoneMissed, UserPlus, Users, UserMinus, Info, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
@@ -64,6 +64,9 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
         } else {
           router.push(`/business/channels`);
         }
+        break;
+      case "VERIFICATION_UPDATE":
+        router.push(notification.routeId || "/profile/verification");
         break;
       default:
         break;
@@ -142,10 +145,17 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
         </>
       );
       break;
+    case "VERIFICATION_UPDATE":
+      Icon = ShieldCheck;
+      iconClass = "text-emerald-500";
+      textContent = (
+        <span className="font-medium text-foreground">{notification.content || "Your verification status has been updated."}</span>
+      );
+      break;
     default:
       textContent = (
         <>
-          <span className="font-semibold text-foreground">{issuerName}</span> {t("msg_event")}
+          <span className="font-semibold text-foreground">{issuerName}</span> {notification.content || t("msg_event")}
         </>
       );
       break;
