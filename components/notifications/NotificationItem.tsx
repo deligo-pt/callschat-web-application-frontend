@@ -1,5 +1,6 @@
 import { useRouter } from "next/navigation";
 import { AppNotification } from "@/services/notification.service";
+import { chatService } from "@/services/chat.service";
 import { MessageCircle, PhoneMissed, UserPlus, Users, UserMinus, Info, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,9 +48,25 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       case "GROUP_ADDED":
         if (notification.routeId) router.push(`/groups/${notification.routeId}`);
         break;
-      case "CALL_MISSED":
-        if (notification.issuerId) router.push(`/chats/${notification.issuerId}`);
+      case "CALL_MISSED": {
+        const issuerId = notification.issuerId;
+        if (issuerId) {
+          void (async () => {
+            try {
+              const res = await chatService.initiateConversation(issuerId);
+              const convId = res?.data?.conversationId ?? (res as any)?.conversationId;
+              if (convId) {
+                router.push(`/chats/${convId}?recipientId=${issuerId}`);
+              } else {
+                router.push(`/chats`);
+              }
+            } catch {
+              router.push(`/chats`);
+            }
+          })();
+        }
         break;
+      }
       case "CONTACT_ADDED":
         router.push(`/contacts`);
         break;

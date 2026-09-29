@@ -4,16 +4,29 @@ import React from "react";
 import { PhoneOff, Lock, Video, Phone } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 
 export const OutgoingCallModal = () => {
   const { outgoingCall, outgoingCallStatus, cancelOutgoingCall } = useCallContext();
+  const { getContact } = useContacts();
 
   if (!outgoingCall) return null;
 
-  // Auto-generate avatar if none provided
-  const displayName = outgoingCall.receiverName || outgoingCall.receiverId;
-  const avatarUrl = outgoingCall.receiverAvatar
-    ? getOptimizedImageUrl(outgoingCall.receiverAvatar, 80, 80)
+  const contact = getContact(outgoingCall.receiverId);
+  const resolved = resolveDisplayName(
+    {
+      userId: outgoingCall.receiverId,
+      phone: contact?.phoneNumber,
+      profileDisplayName: outgoingCall.receiverName,
+    },
+    contact
+  );
+
+  const displayName = resolved.title || outgoingCall.receiverName || outgoingCall.receiverId;
+  const rawAvatar = outgoingCall.receiverAvatar || contact?.avatarUrl;
+  const avatarUrl = rawAvatar
+    ? getOptimizedImageUrl(rawAvatar, 80, 80)
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   // Determine state labels, subtitles, and visual themes
@@ -128,6 +141,11 @@ export const OutgoingCallModal = () => {
           <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
             {displayName}
           </h2>
+          {resolved.subtitle && (
+            <p className="mt-0.5 text-[14px] font-semibold text-[#25D366]">
+              {resolved.subtitle}
+            </p>
+          )}
           <p
             className={`mt-1 text-[13.5px] ${subtitleStyle} transition-colors duration-300`}
           >
