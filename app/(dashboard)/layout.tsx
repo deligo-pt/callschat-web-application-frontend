@@ -328,22 +328,22 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <UserProvider>
-      {/* E2EEProvider MUST wrap SocketProvider so keys are initialised        */}
-      {/* before the socket connects and starts delivering encrypted messages. */}
-      {/* Reversing this order causes the "⏳ Waiting for this message" race.  */}
-      <E2EEProvider>
-        <SocketProvider>
-          <CallProvider>
-            <PresenceProvider>
-              <ContactsProvider>
+      <ContactsProvider>
+        {/* E2EEProvider MUST wrap SocketProvider so keys are initialised        */}
+        {/* before the socket connects and starts delivering encrypted messages. */}
+        {/* Reversing this order causes the "⏳ Waiting for this message" race.  */}
+        <E2EEProvider>
+          <SocketProvider>
+            <CallProvider>
+              <PresenceProvider>
                 <DashboardNavContent>
                   {children}
                 </DashboardNavContent>
-              </ContactsProvider>
-            </PresenceProvider>
-          </CallProvider>
-        </SocketProvider>
-      </E2EEProvider>
+              </PresenceProvider>
+            </CallProvider>
+          </SocketProvider>
+        </E2EEProvider>
+      </ContactsProvider>
     </UserProvider>
   );
 }
