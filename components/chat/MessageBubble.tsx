@@ -3,8 +3,6 @@ import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
-import { useContacts } from "@/context/ContactsContext";
-import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import {
   Phone,
   Video,
@@ -216,7 +214,6 @@ export function MessageBubble({
       ? "🔒 Message sent before key update"
       : msg.text;
 
-  const { getContact } = useContacts();
   const [editText, setEditText] = useState(effectiveDisplayText);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
@@ -753,29 +750,19 @@ export function MessageBubble({
               )}
             >
               {/* WhatsApp-Style Sender Name in Group/Multi-party Chat */}
-              {!isMe && (msg.senderName || msg.sender?.profile?.displayName) && (() => {
-                const resolved = resolveDisplayName(
-                  {
-                    userId: msg.senderId || (msg.sender as any)?.id,
-                    phone: (msg.sender as any)?.phone,
-                    profileDisplayName: msg.sender?.profile?.displayName || msg.senderName,
-                  },
-                  getContact
-                );
-                return (
-                  <div className="flex items-center gap-1 mb-1">
-                    <span className="text-[12.5px] font-bold text-[#008069] dark:text-[#25D366] leading-tight">
-                      {resolved.formattedName}
-                    </span>
-                    {(msg.sender?.isVerified || msg.isVerified) && (
-                      <VerifiedBadge
-                        type={msg.sender?.accountType === "BUSINESS" || msg.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
-                        size="xs"
-                      />
-                    )}
-                  </div>
-                );
-              })()}
+              {!isMe && (msg.senderName || msg.sender?.profile?.displayName) && (
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-[12.5px] font-bold text-[#008069] dark:text-[#25D366] leading-tight">
+                    {msg.sender?.profile?.displayName || msg.senderName}
+                  </span>
+                  {(msg.sender?.isVerified || msg.isVerified) && (
+                    <VerifiedBadge
+                      type={msg.sender?.accountType === "BUSINESS" || msg.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                      size="xs"
+                    />
+                  )}
+                </div>
+              )}
               {/* WhatsApp-Style In-Bubble Quoted Card */}
               {msg.replyTo && (
                 <div

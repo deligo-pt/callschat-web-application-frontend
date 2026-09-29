@@ -6,16 +6,12 @@ import { useCallContext } from "@/components/providers/CallContext";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { stopRingtoneSound } from "@/utils/sounds";
-import { useContacts } from "@/context/ContactsContext";
-import { resolveDisplayName } from "@/utils/resolveDisplayName";
 
 export const IncomingCallModal = () => {
   const { incomingCall, acceptCall, acceptEscalatedCall, rejectCall, joinGroupCall } =
     useCallContext();
-  const { getContact } = useContacts();
   const [callerName, setCallerName] = useState<string>("");
   const [callerAvatar, setCallerAvatar] = useState<string>("");
-  const [callerPhone, setCallerPhone] = useState<string>("");
   const [isAccepting, setIsAccepting] = useState(false);
 
   // Reset per-call local state whenever a new call arrives
@@ -31,24 +27,11 @@ export const IncomingCallModal = () => {
       setCallerAvatar(getOptimizedImageUrl(incomingCall.callerAvatar, 80, 80));
     }
 
-    if (!incomingCall?.callerId) return;
-
-    // Check saved contact first
-    const contact = getContact(incomingCall.callerId);
-    if (contact?.customName) {
-      setCallerName(contact.customName);
-    }
-    if (contact?.avatarUrl && !incomingCall?.callerAvatar) {
-      setCallerAvatar(getOptimizedImageUrl(contact.avatarUrl, 80, 80));
-    }
-    if (contact?.phoneNumber) {
-      setCallerPhone(contact.phoneNumber);
-    }
-
-    // If both name and avatar are provided, skip network fetch
+    // If both name and avatar are provided, skip fetch
     if (incomingCall?.callerName && incomingCall?.callerAvatar) {
       return;
     }
+    if (!incomingCall?.callerId) return;
 
     const fetchCallerProfile = async () => {
       try {
@@ -77,9 +60,6 @@ export const IncomingCallModal = () => {
             if (!incomingCall.callerAvatar && caller.profile?.avatarUrl) {
               setCallerAvatar(getOptimizedImageUrl(caller.profile.avatarUrl, 80, 80));
             }
-            if (caller.phone) {
-              setCallerPhone(caller.phone);
-            }
           }
         }
       } catch (err) {
@@ -88,22 +68,12 @@ export const IncomingCallModal = () => {
     };
 
     fetchCallerProfile();
-  }, [incomingCall?.callerId, incomingCall?.callerName, incomingCall?.callerAvatar, getContact]);
+  }, [incomingCall?.callerId, incomingCall?.callerName, incomingCall?.callerAvatar]);
 
   if (!incomingCall) return null;
 
   const isEscalated = Boolean(incomingCall.isEscalatedCall);
-
-  const resolved = resolveDisplayName(
-    {
-      userId: incomingCall.callerId,
-      phone: callerPhone,
-      profileDisplayName: callerName || incomingCall.callerName,
-    },
-    getContact
-  );
-
-  const displayName = resolved.title || incomingCall.callerId;
+  const displayName = callerName || incomingCall.callerId;
   const avatarUrl =
     callerAvatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
@@ -216,11 +186,6 @@ export const IncomingCallModal = () => {
           <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
             {displayName}
           </h2>
-          {resolved.subtitle && (
-            <p className="mt-0.5 text-[14px] font-semibold text-[#25D366]">
-              {resolved.subtitle}
-            </p>
-          )}
           <p className="mt-1 text-[13.5px] font-medium text-[#8696A0]">{subtitleLabel}</p>
         </div>
 

@@ -6,7 +6,6 @@ import { CallProvider } from "@/components/providers/CallProvider";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { E2EEProvider } from "@/components/providers/E2EEProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
-import { ContactsProvider } from "@/context/ContactsContext";
 import { UserProvider, useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/components/providers/SocketProvider";
@@ -328,22 +327,20 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <UserProvider>
-      <ContactsProvider>
-        {/* E2EEProvider MUST wrap SocketProvider so keys are initialised        */}
-        {/* before the socket connects and starts delivering encrypted messages. */}
-        {/* Reversing this order causes the "⏳ Waiting for this message" race.  */}
-        <E2EEProvider>
-          <SocketProvider>
-            <CallProvider>
-              <PresenceProvider>
-                <DashboardNavContent>
-                  {children}
-                </DashboardNavContent>
-              </PresenceProvider>
-            </CallProvider>
-          </SocketProvider>
-        </E2EEProvider>
-      </ContactsProvider>
+      {/* E2EEProvider MUST wrap SocketProvider so keys are initialised        */}
+      {/* before the socket connects and starts delivering encrypted messages. */}
+      {/* Reversing this order causes the "⏳ Waiting for this message" race.  */}
+      <E2EEProvider>
+        <SocketProvider>
+          <CallProvider>
+            <PresenceProvider>
+              <DashboardNavContent>
+                {children}
+              </DashboardNavContent>
+            </PresenceProvider>
+          </CallProvider>
+        </SocketProvider>
+      </E2EEProvider>
     </UserProvider>
   );
 }

@@ -24,8 +24,6 @@ import { groupService } from "@/services/group.service";
 import { GroupChatView } from "@/components/group/GroupChatView";
 import { CustomerService } from "@/services/customer-support.service";
 import { ContactService } from "@/services/contact.service";
-import { useContacts } from "@/context/ContactsContext";
-import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { useCallContext } from "@/components/providers/CallContext";
 import { ChatOptionsMenu } from "@/components/chat/ChatOptionsMenu";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -245,7 +243,6 @@ function ChatRoomPageContent() {
   const basePath = pathname.startsWith("/business") ? "/business/chats" : "/chats";
   const { initiateCall } = useCallContext();
   const { isUserOnline } = usePresence();
-  const { getContact, refetchContacts } = useContacts();
 
   // The route param is the CONVERSATION ID
   const conversationId = params.chatId as string;
@@ -390,31 +387,16 @@ function ChatRoomPageContent() {
             if (conv?.otherUserId) {
               finalRecipientId = conv.otherUserId;
               setRecipientId(finalRecipientId);
-
-              const contact = getContact(conv.otherUserId);
-              const resolved = resolveDisplayName(
-                {
-                  userId: conv.otherUserId,
-                  phone: contact?.phoneNumber,
-                  profileDisplayName: conv.otherUserName,
-                },
-                contact
-              );
-
-              setIsRecipientInContacts(resolved.isSaved);
-
-              const recipientName = resolved.title || conv.otherUserName || "Unknown";
               setRecipient({
                 id: conv.otherUserId,
-                name: recipientName,
+                name: conv.otherUserName || "Unknown",
                 avatarUrl:
                   conv.otherUserAvatar ||
-                  contact?.avatarUrl ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(recipientName)}&background=F4F6FC&color=3B58F5`,
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName || "U")}&background=F4F6FC&color=3B58F5`,
                 isOnline: conv.otherUserOnline || false,
                 isVerified: (conv as any).isVerified,
                 accountType: (conv as any).accountType,
-                phone: contact?.phoneNumber || undefined,
+                phone: undefined, // Will be updated when we fetch from /contacts below or you can just leave it since the name shows
               });
               setIsInitializing(false);
               return;
@@ -427,36 +409,66 @@ function ChatRoomPageContent() {
         if (finalRecipientId && finalRecipientId !== "null" && finalRecipientId !== "undefined") {
           setRecipientId(finalRecipientId);
 
-          const contact = getContact(finalRecipientId);
-          const resolved = resolveDisplayName(
-            {
-              userId: finalRecipientId,
-              phone: contact?.phoneNumber,
-              profileDisplayName: contact?.displayName,
-            },
-            contact
-          );
+          const baseUrl =
+            process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
+          const token = localStorage.getItem("accessToken");
+          let match = null;
+          try {
+            const contactsRes = await fetch(`${baseUrl}/contacts`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (contactsRes.ok) {
+              const contactsData = await contactsRes.json();
+              const usersArray =
+                contactsData.data?.contacts ||
+                (Array.isArray(contactsData.data) ? contactsData.data : []) ||
+                (Array.isArray(contactsData) ? contactsData : []);
 
-          setIsRecipientInContacts(resolved.isSaved);
+              match = usersArray.find(
+                (u: any) =>
+                  (u.addressee?.id || u.contact?.id || u.id) === finalRecipientId,
+              );
+            }
+          } catch (contactsErr) {
+            console.warn("Could not fetch contacts for chat recipient info:", contactsErr);
+          }
 
-          const displayName = resolved.title || "Chat";
-          setRecipient({
-            id: finalRecipientId,
-            name: displayName,
-            avatarUrl:
-              contact?.avatarUrl ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=F4F6FC&color=3B58F5`,
-            isOnline: false,
-            isVerified: contact?.isVerified || false,
-            accountType: "USER",
-            phone: contact?.phoneNumber || undefined,
-          });
+          setIsRecipientInContacts(!!match);
+
+          if (match) {
+            const userProfile =
+              match.addressee?.profile ||
+              match.contact?.profile ||
+              match.profile ||
+              {};
+            const displayName =
+              match.customName ||
+              userProfile.displayName ||
+              userProfile.username ||
+              "Unknown";
+
+            setRecipient({
+              id: finalRecipientId,
+              name: displayName,
+              avatarUrl:
+                userProfile.avatarUrl ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=F4F6FC&color=3B58F5`,
+              isOnline: userProfile.isOnline || false,
+              isVerified: match.isVerified ?? match.addressee?.isVerified ?? match.contact?.isVerified ?? false,
+              accountType: match.accountType ?? match.addressee?.accountType ?? match.contact?.accountType ?? "USER",
+              phone: match.contact?.phone || match.phoneNumber || match.addressee?.phone || undefined,
+            });
+          } else {
+            setRecipient({
+              id: finalRecipientId,
+              name: "Chat",
+              avatarUrl: `https://ui-avatars.com/api/?name=C&background=F4F6FC&color=3B58F5`,
+              isOnline: false,
+            });
+          }
 
           // Fetch block status
           try {
-            const baseUrl =
-              process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-            const token = localStorage.getItem("accessToken");
             const blockRes = await fetch(
               `${baseUrl}/user/block/${finalRecipientId}/status`,
               {
@@ -555,12 +567,10 @@ function ChatRoomPageContent() {
       setIsAddingContact(true);
       await ContactService.addMutualContact(recipientId);
       setIsRecipientInContacts(true);
-      void refetchContacts();
       toast.success("Added to contacts");
     } catch (err: any) {
       if (err?.response?.status === 409) {
         setIsRecipientInContacts(true);
-        void refetchContacts();
         toast.info("User is already in your contacts");
       } else {
         toast.error("Failed to add contact");
