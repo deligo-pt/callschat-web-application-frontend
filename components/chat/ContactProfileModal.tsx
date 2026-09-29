@@ -6,6 +6,8 @@ import {
 import { Phone, Video, Ban, ShieldCheck, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallContext } from "@/components/providers/CallContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export interface ContactProfileModalProps {
@@ -37,6 +39,20 @@ export function ContactProfileModal({
 }: ContactProfileModalProps) {
   const tOptions = useTranslations("options");
   const { initiateCall } = useCallContext();
+  const { getContact } = useContacts();
+
+  const contact = peerId ? getContact(peerId) : undefined;
+  const resolved = resolveDisplayName(
+    {
+      userId: peerId,
+      phone: phone || contact?.phoneNumber,
+      profileDisplayName: contact?.displayName || name,
+    },
+    contact
+  );
+
+  const displayTitle = resolved.title || name;
+  const displayAvatar = avatarUrl || contact?.avatarUrl;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -49,16 +65,16 @@ export function ContactProfileModal({
         {/* Avatar & Basic Info */}
         <div className="px-6 pb-6 relative -mt-16 flex flex-col items-center">
           <div className="relative">
-            {avatarUrl ? (
+            {displayAvatar ? (
               <img
-                src={getOptimizedImageUrl(avatarUrl)}
-                alt={name}
+                src={getOptimizedImageUrl(displayAvatar)}
+                alt={displayTitle}
                 className="h-32 w-32 rounded-full border-4 border-white object-cover shadow-lg bg-white"
               />
             ) : (
               <div className="h-32 w-32 rounded-full border-4 border-white bg-[#E6EAFA] flex items-center justify-center shadow-lg">
                 <span className="text-4xl font-bold text-[#3B58F5]">
-                  {name.charAt(0).toUpperCase()}
+                  {displayTitle.charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
@@ -67,7 +83,10 @@ export function ContactProfileModal({
             )}
           </div>
           
-          <h2 className="mt-4 text-2xl font-bold text-slate-900">{name}</h2>
+          <h2 className="mt-4 text-2xl font-bold text-slate-900">{displayTitle}</h2>
+          {resolved.subtitle && (
+            <p className="mt-0.5 text-slate-500 font-medium text-[15px]">{resolved.subtitle}</p>
+          )}
           {phone ? (
             <p className="mt-1 text-slate-500 font-medium text-[15px]">{phone}</p>
           ) : (
@@ -78,7 +97,7 @@ export function ContactProfileModal({
           <div className="flex gap-4 mt-6 w-full max-w-[280px]">
             <button
               onClick={() => {
-                initiateCall(peerId, "AUDIO", name, avatarUrl);
+                initiateCall(peerId, "AUDIO", displayTitle, displayAvatar || undefined);
                 onClose();
               }}
               disabled={isBlocked}
@@ -89,7 +108,7 @@ export function ContactProfileModal({
             </button>
             <button
               onClick={() => {
-                initiateCall(peerId, "VIDEO", name, avatarUrl);
+                initiateCall(peerId, "VIDEO", displayTitle, displayAvatar || undefined);
                 onClose();
               }}
               disabled={isBlocked}

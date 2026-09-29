@@ -6,8 +6,8 @@ import { ContactService } from "@/services/contact.service";
 export interface ContactItem {
   id: string; // Contact relationship ID
   userId: string; // Target user's account ID
-  customName: string | null; // Saved custom nickname/name
-  displayName: string | null; // Profile display name set by the user themselves
+  customName: string | null; // Saved custom nickname set by viewer
+  displayName: string | null; // Target user's profile display name
   username: string | null;
   avatarUrl: string | null;
   phoneNumber?: string | null;
@@ -25,7 +25,17 @@ interface ContactsContextType {
   getContactByPhone: (phone?: string | null) => ContactItem | undefined;
 }
 
-const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
+const defaultContactsContext: ContactsContextType = {
+  contacts: [],
+  contactsMap: new Map(),
+  contactsByPhoneMap: new Map(),
+  isLoading: false,
+  refetchContacts: async () => {},
+  getContact: () => undefined,
+  getContactByPhone: () => undefined,
+};
+
+const ContactsContext = createContext<ContactsContextType>(defaultContactsContext);
 
 export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [contacts, setContacts] = useState<ContactItem[]>([]);
@@ -43,16 +53,18 @@ export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const normalized: ContactItem[] = rawList
         .map((c: any) => {
-          const target = c.contact || c.addressee || c.user || {};
+          // Strictly resolve the other person's account ID (not the relationship ID c.id)
+          const target = c.contact || c.addressee || {};
           const profile = target.profile || c.profile || {};
-          const targetId = target.id || c.userId || c.id;
+          const targetUserId = target.id;
 
-          if (!targetId) return null;
+          if (!targetUserId) return null;
 
           return {
             id: c.id,
-            userId: targetId,
-            customName: c.customName || c.nickname || null,
+            userId: targetUserId,
+            // Only set customName if a real nickname exists
+            customName: c.customName?.trim() || null,
             displayName: profile.displayName || profile.name || null,
             username: profile.username || null,
             avatarUrl: profile.avatarUrl || null,
@@ -72,7 +84,6 @@ export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   useEffect(() => {
-    // Only attempt fetch if an auth token is present
     if (typeof window !== "undefined" && localStorage.getItem("accessToken")) {
       fetchContactsList();
     } else {
@@ -80,12 +91,16 @@ export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [fetchContactsList]);
 
-  // Fast O(1) lookups
+  // Fast O(1) lookups with duplicate prevention
   const contactsMap = useMemo(() => {
     const map = new Map<string, ContactItem>();
     for (const c of contacts) {
       if (c.userId) {
-        map.set(c.userId, c);
+        const existing = map.get(c.userId);
+        // Prioritize entry that contains custom nickname
+        if (!existing || (!existing.customName && c.customName)) {
+          map.set(c.userId, c);
+        }
       }
     }
     return map;
@@ -95,9 +110,8 @@ export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const map = new Map<string, ContactItem>();
     for (const c of contacts) {
       if (c.phoneNumber) {
-        // Strip non-digits or clean spaces for resilient phone matching
         const cleanPhone = c.phoneNumber.replace(/[^\d+]/g, "");
-        map.set(cleanPhone, c);
+        if (cleanPhone) map.set(cleanPhone, c);
         map.set(c.phoneNumber, c);
       }
     }
@@ -137,20 +151,6 @@ export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   return <ContactsContext.Provider value={value}>{children}</ContactsContext.Provider>;
 };
 
-const defaultContactsContext: ContactsContextType = {
-  contacts: [],
-  contactsMap: new Map(),
-  contactsByPhoneMap: new Map(),
-  isLoading: false,
-  refetchContacts: async () => {},
-  getContact: () => undefined,
-  getContactByPhone: () => undefined,
-};
-
 export const useContacts = (): ContactsContextType => {
-  const context = useContext(ContactsContext);
-  if (!context) {
-    return defaultContactsContext;
-  }
-  return context;
+  return useContext(ContactsContext);
 };

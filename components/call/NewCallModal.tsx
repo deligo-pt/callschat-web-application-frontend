@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Phone, Video, Loader2 } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 interface Contact {
@@ -32,55 +34,39 @@ function useDebounce<T>(value: T, delay: number): T {
 export function NewCallModal({ isOpen, onClose, callType }: NewCallModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { initiateCall } = useCallContext();
+  const { contacts: cachedContacts, isLoading: loading, refetchContacts } = useContacts();
 
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 280);
 
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchContacts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-      const res = await fetch(`${baseUrl}/contacts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      const arr =
-        data.data?.contacts ||
-        (Array.isArray(data.data) ? data.data : []) ||
-        (Array.isArray(data) ? data : []);
-
-      const parsed: Contact[] = arr.map((c: any) => {
-        const peer = c.addressee || c.contact || c;
-        const profile = peer.profile || c.profile || {};
-        return {
-          id: peer.id || c.id,
-          name: c.customName || profile.displayName || profile.username || "Unknown",
-          username: profile.username || "",
-          avatarUrl: profile.avatarUrl || null,
-          isOnline: profile.isOnline || false,
-        };
-      });
-      const uniqueContacts = Array.from(new Map(parsed.map((c) => [c.id, c])).values());
-      setContacts(uniqueContacts);
-    } catch {
-      // Non-fatal
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (isOpen) {
       setQuery("");
-      setContacts([]);
       setTimeout(() => inputRef.current?.focus(), 80);
-      fetchContacts();
+      void refetchContacts();
     }
-  }, [isOpen, fetchContacts]);
+  }, [isOpen, refetchContacts]);
+
+  const contacts = useMemo<Contact[]>(() => {
+    return cachedContacts.map((c) => {
+      const resolved = resolveDisplayName(
+        {
+          userId: c.userId,
+          phone: c.phoneNumber,
+          profileDisplayName: c.displayName,
+          username: c.username,
+        },
+        c
+      );
+      return {
+        id: c.userId,
+        name: resolved.title || "Unknown",
+        username: c.username || "",
+        avatarUrl: c.avatarUrl,
+        isOnline: false,
+      };
+    });
+  }, [cachedContacts]);
 
   const normalQ = debouncedQuery.toLowerCase();
   const filteredContacts = contacts.filter(

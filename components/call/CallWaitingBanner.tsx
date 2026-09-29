@@ -3,17 +3,30 @@
 import React from "react";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export const CallWaitingBanner = () => {
   const { callWaiting, acceptCallWaiting, declineCallWaiting } = useCallContext();
+  const { getContact } = useContacts();
 
   if (!callWaiting) return null;
 
-  const displayName = callWaiting.callerName || "Someone";
-  const avatarUrl = callWaiting.callerAvatar
-    ? getOptimizedImageUrl(callWaiting.callerAvatar, 64, 64)
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
+  const contact = callWaiting.callerId ? getContact(callWaiting.callerId) : undefined;
+  const resolved = resolveDisplayName(
+    {
+      userId: callWaiting.callerId,
+      phone: contact?.phoneNumber,
+      profileDisplayName: callWaiting.callerName,
+    },
+    contact
+  );
+
+  const displayName = resolved.title || callWaiting.callerName || "Someone";
+  const avatarUrl = callWaiting.callerAvatar ||
+    contact?.avatarUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] w-[95vw] max-w-[480px] animate-in slide-in-from-top-6 duration-300 pointer-events-auto">
@@ -49,7 +62,12 @@ export const CallWaitingBanner = () => {
             <h4 className="text-[14px] font-semibold text-[#E9EDEF] truncate">
               {displayName}
             </h4>
-            <p className="text-[12px] text-[#8696A0] truncate">
+            {resolved.subtitle && (
+              <p className="text-[11px] text-[#8696A0] truncate">
+                {resolved.subtitle}
+              </p>
+            )}
+            <p className="text-[12px] text-[#8696A0]/80 truncate">
               Incoming {callWaiting.callType.toLowerCase()} call
             </p>
           </div>

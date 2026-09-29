@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from "react";
 import { Phone, PhoneOff, Video, UserPlus, Lock } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { stopRingtoneSound } from "@/utils/sounds";
-import { useContacts } from "@/context/ContactsContext";
-import { resolveDisplayName } from "@/utils/resolveDisplayName";
 
 export const IncomingCallModal = () => {
   const { incomingCall, acceptCall, acceptEscalatedCall, rejectCall, joinGroupCall } =
@@ -15,7 +15,6 @@ export const IncomingCallModal = () => {
   const { getContact } = useContacts();
   const [callerName, setCallerName] = useState<string>("");
   const [callerAvatar, setCallerAvatar] = useState<string>("");
-  const [callerPhone, setCallerPhone] = useState<string>("");
   const [isAccepting, setIsAccepting] = useState(false);
 
   // Reset per-call local state whenever a new call arrives
@@ -31,24 +30,11 @@ export const IncomingCallModal = () => {
       setCallerAvatar(getOptimizedImageUrl(incomingCall.callerAvatar, 80, 80));
     }
 
-    if (!incomingCall?.callerId) return;
-
-    // Check saved contact first
-    const contact = getContact(incomingCall.callerId);
-    if (contact?.customName) {
-      setCallerName(contact.customName);
-    }
-    if (contact?.avatarUrl && !incomingCall?.callerAvatar) {
-      setCallerAvatar(getOptimizedImageUrl(contact.avatarUrl, 80, 80));
-    }
-    if (contact?.phoneNumber) {
-      setCallerPhone(contact.phoneNumber);
-    }
-
-    // If both name and avatar are provided, skip network fetch
+    // If both name and avatar are provided, skip fetch
     if (incomingCall?.callerName && incomingCall?.callerAvatar) {
       return;
     }
+    if (!incomingCall?.callerId) return;
 
     const fetchCallerProfile = async () => {
       try {
@@ -77,9 +63,6 @@ export const IncomingCallModal = () => {
             if (!incomingCall.callerAvatar && caller.profile?.avatarUrl) {
               setCallerAvatar(getOptimizedImageUrl(caller.profile.avatarUrl, 80, 80));
             }
-            if (caller.phone) {
-              setCallerPhone(caller.phone);
-            }
           }
         }
       } catch (err) {
@@ -88,24 +71,25 @@ export const IncomingCallModal = () => {
     };
 
     fetchCallerProfile();
-  }, [incomingCall?.callerId, incomingCall?.callerName, incomingCall?.callerAvatar, getContact]);
+  }, [incomingCall?.callerId, incomingCall?.callerName, incomingCall?.callerAvatar]);
 
   if (!incomingCall) return null;
 
   const isEscalated = Boolean(incomingCall.isEscalatedCall);
-
+  const contact = incomingCall.callerId ? getContact(incomingCall.callerId) : undefined;
   const resolved = resolveDisplayName(
     {
       userId: incomingCall.callerId,
-      phone: callerPhone,
+      phone: contact?.phoneNumber,
       profileDisplayName: callerName || incomingCall.callerName,
     },
-    getContact
+    contact
   );
 
-  const displayName = resolved.title || incomingCall.callerId;
+  const displayName = resolved.title || callerName || incomingCall.callerId;
   const avatarUrl =
     callerAvatar ||
+    contact?.avatarUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   // ------------------------------------------------------------------
@@ -122,14 +106,14 @@ export const IncomingCallModal = () => {
         await acceptEscalatedCall(
           incomingCall.roomName,
           incomingCall.callType,
-          callerName || undefined,
-          callerAvatar || undefined,
+          displayName,
+          callerAvatar || contact?.avatarUrl || undefined,
         );
       } else if (incomingCall.isGroup && incomingCall.groupId) {
         joinGroupCall(incomingCall.groupId);
         rejectCall(incomingCall.callId, incomingCall.roomName, true);
       } else {
-        acceptCall(incomingCall.callId, incomingCall.roomName, callerName || undefined, callerAvatar || undefined);
+        acceptCall(incomingCall.callId, incomingCall.roomName, displayName, callerAvatar || contact?.avatarUrl || undefined);
       }
     } finally {
       // If we are still mounted (e.g. token fetch failed), reset the spinner
@@ -217,11 +201,11 @@ export const IncomingCallModal = () => {
             {displayName}
           </h2>
           {resolved.subtitle && (
-            <p className="mt-0.5 text-[14px] font-semibold text-[#25D366]">
+            <span className="text-[13.5px] font-medium text-[#8696A0]">
               {resolved.subtitle}
-            </p>
+            </span>
           )}
-          <p className="mt-1 text-[13.5px] font-medium text-[#8696A0]">{subtitleLabel}</p>
+          <p className="mt-1 text-[13.5px] font-medium text-[#8696A0]/80">{subtitleLabel}</p>
         </div>
 
         {/* Action Bar */}

@@ -10,21 +10,21 @@ export interface ResolveNameInput {
 
 export interface ResolvedNameResult {
   /**
-   * Primary title/name to display:
+   * Primary title to display:
    * - Saved custom nickname if contact exists
    * - Formatted phone number if unsaved with phone
-   * - Push name (~ProfileName) or fallback if phone unavailable
+   * - Profile display name (~PushName) or fallback if phone unavailable
    */
   title: string;
   /**
-   * Push name with tilde (e.g. "~Rahim") when unsaved and phone is present; otherwise null
+   * Push name with tilde (e.g. "~Rahim") when unsaved with phone; otherwise null
    */
   subtitle: string | null;
   /**
-   * Ready-to-render combined string:
-   * e.g. "Bhaiya" (saved)
-   * or "+880 1712-345678 (~Rahim)" (unsaved with phone)
-   * or "~Rahim" (unsaved without phone)
+   * Combined string ready for bubble/card labels:
+   * e.g. "Rakib Bhai" (saved)
+   * or "+880 1712-345678 (~Rakibul Haque)" (unsaved with phone)
+   * or "~Rakibul Haque" (unsaved without phone)
    */
   formattedName: string;
   /**
@@ -38,16 +38,13 @@ export interface ResolvedNameResult {
 }
 
 /**
- * Formats a phone number for display
+ * Formats a phone number for clean WhatsApp-style display
  */
 export function formatPhoneNumber(phone?: string | null): string {
   if (!phone) return "";
   const cleaned = phone.trim();
-  // If already formatted, return as-is
   if (cleaned.includes(" ") || cleaned.includes("-")) return cleaned;
-  // Basic friendly formatting if standard international
   if (cleaned.startsWith("+") && cleaned.length >= 11) {
-    // Example: +8801712345678 -> +880 1712-345678
     const country = cleaned.slice(0, cleaned.length - 10);
     const part1 = cleaned.slice(cleaned.length - 10, cleaned.length - 6);
     const part2 = cleaned.slice(cleaned.length - 6);
@@ -94,7 +91,7 @@ export function resolveDisplayName(
     }
   }
 
-  // 1. Saved Contact Priority
+  // 1. Saved Contact Priority (Only if custom nickname actually exists and is non-empty)
   if (matchedContact && matchedContact.customName && matchedContact.customName.trim()) {
     const savedName = matchedContact.customName.trim();
     return {
@@ -106,7 +103,8 @@ export function resolveDisplayName(
     };
   }
 
-  const pushName = formatPushName(profileDisplayName || matchedContact?.displayName);
+  const rawPushName = profileDisplayName || matchedContact?.displayName;
+  const pushName = formatPushName(rawPushName);
   const formattedPhone = formatPhoneNumber(phone || matchedContact?.phoneNumber);
 
   // 2. Unsaved with Phone Number
@@ -120,7 +118,7 @@ export function resolveDisplayName(
     };
   }
 
-  // 3. Unsaved without Phone (e.g. Privacy protected or in groups)
+  // 3. Unsaved without Phone (e.g. in groups)
   if (pushName) {
     return {
       title: pushName,

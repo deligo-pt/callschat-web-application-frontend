@@ -3,9 +3,9 @@
 import React from "react";
 import { PhoneOff, Lock, Video, Phone } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
-import { getOptimizedImageUrl } from "@/utils/image";
 import { useContacts } from "@/context/ContactsContext";
 import { resolveDisplayName } from "@/utils/resolveDisplayName";
+import { getOptimizedImageUrl } from "@/utils/image";
 
 export const OutgoingCallModal = () => {
   const { outgoingCall, outgoingCallStatus, cancelOutgoingCall } = useCallContext();
@@ -13,7 +13,7 @@ export const OutgoingCallModal = () => {
 
   if (!outgoingCall) return null;
 
-  const contact = getContact(outgoingCall.receiverId);
+  const contact = outgoingCall.receiverId ? getContact(outgoingCall.receiverId) : undefined;
   const resolved = resolveDisplayName(
     {
       userId: outgoingCall.receiverId,
@@ -23,11 +23,11 @@ export const OutgoingCallModal = () => {
     contact
   );
 
+  // Auto-generate avatar if none provided
   const displayName = resolved.title || outgoingCall.receiverName || outgoingCall.receiverId;
-  const rawAvatar = outgoingCall.receiverAvatar || contact?.avatarUrl;
-  const avatarUrl = rawAvatar
-    ? getOptimizedImageUrl(rawAvatar, 80, 80)
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
+  const avatarUrl = outgoingCall.receiverAvatar ||
+    contact?.avatarUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   // Determine state labels, subtitles, and visual themes
   const isVideo = outgoingCall.callType === "VIDEO";
@@ -142,9 +142,9 @@ export const OutgoingCallModal = () => {
             {displayName}
           </h2>
           {resolved.subtitle && (
-            <p className="mt-0.5 text-[14px] font-semibold text-[#25D366]">
+            <span className="text-[13.5px] font-medium text-[#8696A0]">
               {resolved.subtitle}
-            </p>
+            </span>
           )}
           <p
             className={`mt-1 text-[13.5px] ${subtitleStyle} transition-colors duration-300`}
