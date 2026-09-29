@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallContext } from "@/components/providers/CallContext";
 import {
@@ -40,6 +40,8 @@ import {
   Settings,
   BarChart2,
   Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -143,6 +145,18 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   const [isMuted, setIsMuted] = useState(false);
   const [replyingTo, setReplyingTo] = useState<QuotedMessage | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [newMessagesBelow, setNewMessagesBelow] = useState(0);
+  const prevMessagesLengthRef = useRef(0);
+  const prevScrollHeightRef = useRef(0);
+  const isInitialScrollDoneRef = useRef(false);
+  const isPaginatingRef = useRef(false);
+
+  // In-chat search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
   // Modals state
   const [messageInfoMsg, setMessageInfoMsg] = useState<any | null>(null);
@@ -188,6 +202,9 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     createPoll,
     unsendMessage,
     groupDetails: hookGroupDetails,
+    loadMoreMessages,
+    hasMoreMessages,
+    isLoadingMore,
   } = useGroupChat(groupId, currentUserId);
 
   useEffect(() => {
@@ -364,9 +381,115 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     }
   };
 
+  // In-chat search matches
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return messages
+      .filter((m) => m.text && !m.isSystem && m.text.toLowerCase().includes(q))
+      .map((m) => m.id);
+  }, [messages, searchQuery]);
+
+  const goToNextMatch = () => {
+    if (searchMatches.length === 0) return;
+    const nextIdx = (currentMatchIndex + 1) % searchMatches.length;
+    setCurrentMatchIndex(nextIdx);
+    scrollToMessage(searchMatches[nextIdx]);
+  };
+
+  const goToPrevMatch = () => {
+    if (searchMatches.length === 0) return;
+    const prevIdx = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    setCurrentMatchIndex(prevIdx);
+    scrollToMessage(searchMatches[prevIdx]);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      if (e.shiftKey) {
+        goToPrevMatch();
+      } else {
+        goToNextMatch();
+      }
+    } else if (e.key === "Escape") {
+      setIsSearchOpen(false);
+      setSearchQuery("");
+    }
+  };
+
   useEffect(() => {
+    if (searchMatches.length > 0) {
+      setCurrentMatchIndex(0);
+      scrollToMessage(searchMatches[0]);
+    }
+  }, [searchQuery]);
+
+  // Smart scrolling & scroll position preservation
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+
+    if (!isInitialScrollDoneRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      isInitialScrollDoneRef.current = true;
+      prevMessagesLengthRef.current = messages.length;
+      return;
+    }
+
+    if (isPaginatingRef.current) {
+      if (timelineRef.current && prevScrollHeightRef.current > 0) {
+        const heightDiff = timelineRef.current.scrollHeight - prevScrollHeightRef.current;
+        timelineRef.current.scrollTop = heightDiff;
+        prevScrollHeightRef.current = 0;
+      }
+      isPaginatingRef.current = false;
+      prevMessagesLengthRef.current = messages.length;
+      return;
+    }
+
+    if (messages.length > prevMessagesLengthRef.current) {
+      const lastMsg = messages[messages.length - 1];
+      const isMe = lastMsg?.senderId === currentUserId;
+      const el = timelineRef.current;
+      const isNearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 150 : true;
+
+      if (isMe || isNearBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        setNewMessagesBelow(0);
+      } else {
+        const countAdded = messages.length - prevMessagesLengthRef.current;
+        setNewMessagesBelow((prev) => prev + countAdded);
+      }
+    }
+
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages, currentUserId]);
+
+  const handleTimelineScroll = () => {
+    const el = timelineRef.current;
+    if (!el) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isNearBottom = distanceFromBottom < 120;
+    setIsScrolledUp(!isNearBottom);
+    if (isNearBottom) {
+      setNewMessagesBelow(0);
+    }
+
+    // Cursor pagination trigger when user scrolls up
+    if (el.scrollTop < 60 && hasMoreMessages && !isLoadingMore && !isPaginatingRef.current) {
+      isPaginatingRef.current = true;
+      prevScrollHeightRef.current = el.scrollHeight;
+      loadMoreMessages().finally(() => {
+        isPaginatingRef.current = false;
+      });
+    }
+  };
+
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    setNewMessagesBelow(0);
+    setIsScrolledUp(false);
+  };
 
   const handleSend = async (text: string, file: File | null) => {
     if (!isReady) return;
@@ -559,6 +682,18 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
             ) : (
               <>
                 <button
+                  onClick={() => setIsSearchOpen((prev) => !prev)}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full transition-colors cursor-pointer",
+                    isSearchOpen
+                      ? "bg-[#00A884]/15 text-[#00A884]"
+                      : "text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884]"
+                  )}
+                  title="Search messages"
+                >
+                  <Search className="h-[18px] w-[18px]" strokeWidth={2} />
+                </button>
+                <button
                   onClick={() => startGroupCall(groupId, "AUDIO")}
                   className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors cursor-pointer"
                   title="Group Audio Call"
@@ -680,40 +815,171 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           </div>
         )}
 
-        {/* Message Timeline */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-[#efeae2] dark:bg-[#0b141a]">
-          {messages.map((msg, index) => {
-            const isMe = msg.senderId === currentUserId;
-            const prevMsg = messages[index - 1];
-            const nextMsg = messages[index + 1];
-            const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
-            const isNextSameSender = nextMsg?.senderId === msg.senderId;
-
-            return (
-              <GroupMessageBubble
-                key={msg.id}
-                msg={msg}
-                isMe={isMe}
-                isAdmin={isAdmin}
-                showAvatar={!isMe && isFirstFromSender}
-                isFirstFromSender={isFirstFromSender}
-                isNextSameSender={isNextSameSender}
-                groupId={groupId}
-                currentUserId={currentUserId}
-                groupMembersCount={memberCount}
-                isPinned={pinnedMessages.some((p) => p.groupMessageId === msg.id)}
-                onPin={(duration) => pinMessage(msg.id, duration)}
-                onUnpin={() => unpinMessage(msg.id)}
-                onReply={(m) => setReplyingTo(m)}
-                onScrollToMessage={scrollToMessage}
-                onShowMessageInfo={(m) => setMessageInfoMsg(m)}
-                onReact={(mId, emoji) => toggleReaction(mId, emoji)}
-                onVotePoll={(optId, allowMulti) => votePoll(optId, allowMulti)}
-                onUnsend={(mId) => unsendMessage(mId)}
+        {/* In-Chat Search Bar */}
+        {isSearchOpen && (
+          <div className="flex items-center justify-between bg-white dark:bg-[#1f2c34] px-4 py-2 border-b border-[#E2E8F0] dark:border-[#222D34] text-sm shadow-xs transition-all animate-in slide-in-from-top duration-200">
+            <div className="flex items-center gap-2 flex-1 max-w-md bg-gray-100 dark:bg-[#111b21] rounded-lg px-3 py-1.5 border border-transparent focus-within:border-[#00A884]">
+              <Search className="h-4 w-4 text-gray-400 shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search in chat..."
+                className="bg-transparent text-sm w-full outline-hidden text-[#111B21] dark:text-[#E9EDEF] placeholder-gray-400"
               />
-            );
-          })}
-          <div ref={messagesEndRef} />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 pl-3">
+              {searchQuery && (
+                <span>
+                  {searchMatches.length > 0
+                    ? `${currentMatchIndex + 1} of ${searchMatches.length}`
+                    : "No matches"}
+                </span>
+              )}
+              <button
+                type="button"
+                disabled={searchMatches.length === 0}
+                onClick={goToPrevMatch}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 cursor-pointer"
+                title="Previous match (Shift+Enter)"
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={searchMatches.length === 0}
+                onClick={goToNextMatch}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 cursor-pointer"
+                title="Next match (Enter)"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  setSearchQuery("");
+                }}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 cursor-pointer ml-1"
+                title="Close search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Message Timeline */}
+        <div className="relative flex-1 min-h-0 flex flex-col">
+          <div
+            ref={timelineRef}
+            onScroll={handleTimelineScroll}
+            className="flex-1 overflow-y-auto p-4 space-y-1 bg-[#efeae2] dark:bg-[#0b141a]"
+          >
+            {isLoadingMore && (
+              <div className="flex justify-center py-2">
+                <Loader2 className="h-5 w-5 animate-spin text-[#00A884]" />
+              </div>
+            )}
+            {messages.map((msg, index) => {
+              if (msg.isSystem || msg.systemEventType) {
+                return (
+                  <GroupMessageBubble
+                    key={msg.id}
+                    msg={msg}
+                    isMe={false}
+                    showAvatar={false}
+                    isFirstFromSender={false}
+                    isNextSameSender={false}
+                    groupId={groupId}
+                    currentUserId={currentUserId}
+                  />
+                );
+              }
+
+              const isMe = msg.senderId === currentUserId;
+
+              // Find previous non-system chat message
+              let prevMsg: any = null;
+              for (let i = index - 1; i >= 0; i--) {
+                if (!messages[i].isSystem && !messages[i].systemEventType) {
+                  prevMsg = messages[i];
+                  break;
+                }
+              }
+
+              // Find next non-system chat message
+              let nextMsg: any = null;
+              for (let i = index + 1; i < messages.length; i++) {
+                if (!messages[i].isSystem && !messages[i].systemEventType) {
+                  nextMsg = messages[i];
+                  break;
+                }
+              }
+
+              const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
+              const isNextSameSender = nextMsg?.senderId === msg.senderId;
+
+              return (
+                <GroupMessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  isMe={isMe}
+                  isAdmin={isAdmin}
+                  showAvatar={!isMe && isFirstFromSender}
+                  isFirstFromSender={isFirstFromSender}
+                  isNextSameSender={isNextSameSender}
+                  members={groupMembers}
+                  groupId={groupId}
+                  currentUserId={currentUserId}
+                  groupMembersCount={memberCount}
+                  isPinned={pinnedMessages.some((p) => p.groupMessageId === msg.id)}
+                  onPin={(duration) => pinMessage(msg.id, duration)}
+                  onUnpin={() => unpinMessage(msg.id)}
+                  onReply={(m) => setReplyingTo(m)}
+                  onScrollToMessage={scrollToMessage}
+                  onShowMessageInfo={(m) => setMessageInfoMsg(m)}
+                  onReact={(mId, emoji) => toggleReaction(mId, emoji)}
+                  onVotePoll={(optId, allowMulti) => votePoll(optId, allowMulti)}
+                  onUnsend={(mId) => unsendMessage(mId)}
+                />
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Floating New Messages / Scroll-to-bottom Pill */}
+          {newMessagesBelow > 0 ? (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="absolute bottom-4 right-6 z-20 flex items-center gap-1.5 px-3.5 py-1.5 bg-[#00A884] hover:bg-[#029070] text-white text-xs font-semibold rounded-full shadow-lg transition-transform transform active:scale-95 animate-bounce cursor-pointer"
+            >
+              <ChevronDown className="h-4 w-4" />
+              <span>{newMessagesBelow} new message{newMessagesBelow > 1 ? "s" : ""}</span>
+            </button>
+          ) : isScrolledUp ? (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="absolute bottom-4 right-6 z-20 p-2.5 bg-white dark:bg-[#202c33] text-gray-600 dark:text-gray-300 hover:text-emerald-500 rounded-full shadow-md border border-black/5 dark:border-white/10 transition-transform active:scale-95 cursor-pointer"
+              title="Scroll to bottom"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
 
         {/* Input Bar */}
@@ -727,6 +993,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           onOpenCreatePoll={() => setIsCreatePollOpen(true)}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
+          members={groupMembers}
         />
       </div>
 

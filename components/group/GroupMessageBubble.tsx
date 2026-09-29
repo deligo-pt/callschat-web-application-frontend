@@ -76,7 +76,7 @@ const formatTextWithLinks = (text: string) => {
     if (part.match(urlRegex)) {
       return (
         <a
-          key={i}
+          key={`url-${i}`}
           href={part}
           target="_blank"
           rel="noopener noreferrer"
@@ -87,7 +87,24 @@ const formatTextWithLinks = (text: string) => {
         </a>
       );
     }
-    return part;
+    const mentionRegex = /(@[a-zA-Z0-9_.-]+)/g;
+    return part.split(mentionRegex).map((subPart, j) => {
+      if (subPart.match(mentionRegex)) {
+        return (
+          <span
+            key={`mention-${i}-${j}`}
+            className="font-medium text-[#00A884] dark:text-[#25D366] bg-[#00A884]/10 dark:bg-[#25D366]/15 px-1 py-0.5 rounded inline-block cursor-pointer hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              toast.info(`Mentioned: ${subPart.slice(1)}`);
+            }}
+          >
+            {subPart}
+          </span>
+        );
+      }
+      return subPart;
+    });
   });
 };
 
@@ -158,6 +175,7 @@ interface GroupMessageBubbleProps {
   onVotePoll?: (optionId: string, allowMultiple: boolean) => void;
   groupMembersCount?: number;
   currentUserId?: string;
+  members?: any[];
 }
 
 export function GroupMessageBubble({
@@ -181,6 +199,7 @@ export function GroupMessageBubble({
   onVotePoll,
   groupMembersCount = 0,
   currentUserId,
+  members = [],
 }: GroupMessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -188,11 +207,15 @@ export function GroupMessageBubble({
   const { startGroupCall } = useCallContext();
   const { getContact } = useContacts();
 
+  const member = (members || []).find((m: any) => m.userId === msg.senderId);
+  const senderProfile = msg.sender?.profile || member?.profile || member?.user?.profile;
+  const avatarUrl = senderProfile?.avatarUrl;
+
   const resolvedSender = resolveDisplayName(
     {
       userId: msg.senderId,
-      phone: (msg.sender as any)?.phone,
-      profileDisplayName: msg.sender?.profile?.displayName,
+      phone: (msg.sender as any)?.phone || member?.user?.phone || member?.phone,
+      profileDisplayName: senderProfile?.displayName || member?.displayName || member?.name,
       fallback: "Member",
     },
     getContact
@@ -242,6 +265,15 @@ export function GroupMessageBubble({
     } else if (msg.systemEventType === "MEMBER_REMOVED" || msg.systemEventType === "MEMBER_LEFT") {
       icon = <UserMinus className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
       text = text || "A participant left the group.";
+    } else if (msg.systemEventType === "ADMIN_PROMOTED") {
+      icon = <Shield className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+      text = text || "A participant was promoted to admin.";
+    } else if (msg.systemEventType === "ADMIN_DEMOTED") {
+      icon = <Shield className="w-3.5 h-3.5 text-gray-500 shrink-0" />;
+      text = text || "An admin was demoted to member.";
+    } else if (msg.systemEventType === "INFO_UPDATED") {
+      icon = <Info className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
+      text = text || "Group info was updated.";
     } else if (msg.systemEventType === "SETTINGS_UPDATED") {
       icon = <Settings className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
       text = text || "Group permissions or settings were updated.";
@@ -558,17 +590,17 @@ export function GroupMessageBubble({
     >
       {/* Left Avatar */}
       {!isMe && (
-        <div className="w-7 h-7 mr-2 shrink-0 self-end mb-1">
+        <div className="w-7 h-7 mr-2 shrink-0 self-start mt-0.5">
           {showAvatar ? (
-            <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-[#2A3942] overflow-hidden flex items-center justify-center text-xs font-semibold">
-              {msg.sender?.profile?.avatarUrl ? (
+            <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-[#2A3942] overflow-hidden flex items-center justify-center text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs">
+              {avatarUrl ? (
                 <img
-                  src={getOptimizedImageUrl(msg.sender.profile.avatarUrl)}
+                  src={getOptimizedImageUrl(avatarUrl)}
                   alt=""
                   className="w-full h-full object-cover"
                 />
               ) : (
-                senderName[0]?.toUpperCase()
+                senderName[0]?.toUpperCase() || "M"
               )}
             </div>
           ) : (

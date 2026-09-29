@@ -12,9 +12,11 @@ import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { groupService, GroupItem } from "@/services/group.service";
-import { decryptMessage } from "@/utils/crypto";
+import { useGroupStore } from "@/hooks/useGroupStore";
+import { decryptMessage, decryptGroupMessage } from "@/utils/crypto";
 import { decryptGroupNotification } from "@/utils/notificationPreview";
-import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey } from "@/utils/keyStore";
+import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey, getStoredSenderKey, storeSenderKey } from "@/utils/keyStore";
+import { wrapSenderKeyForMember } from "@/utils/senderKeyEngine";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { motion } from "framer-motion";
@@ -517,15 +519,28 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Increment real-time unread count if not currently viewing this group
+      // Increment real-time unread count if not currently viewing this group AND not from self-device
       const activeGroupId = pathnameRef.current.split('/groups/')[1]?.split('?')[0];
       const senderId = payload.senderId || payload.sender?.id;
-      if (senderId && senderId !== currentUserIdRef.current && activeGroupId !== groupId) {
+      const isSelfDevice = payload.isSelfDevice || senderId === currentUserIdRef.current;
+      if (!isSelfDevice && activeGroupId !== groupId) {
         setRealtimeUnreadCounts((prev) => ({
           ...prev,
           [groupId]: (prev[groupId] || 0) + 1,
         }));
       }
+
+      const lastMsgObj = {
+        id: payload.id || '',
+        senderId: senderId || '',
+        senderName: payload.sender?.profile?.displayName || payload.sender?.profile?.username || null,
+        ciphertext: payload.ciphertext || null,
+        nonce: payload.nonce || null,
+        mediaType: payload.mediaType || null,
+        mediaUrl: payload.mediaUrl || null,
+        isDeleted: false,
+        createdAt: payload.createdAt || new Date().toISOString(),
+      };
 
       setConversations((prev) => {
         const idx = prev.findIndex((c) => c.id === groupId);
@@ -538,21 +553,18 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         updated[idx] = {
           ...existing,
           updatedAt: payload.createdAt || new Date().toISOString(),
-          lastMessage: {
-            id: payload.id || '',
-            senderId: senderId || '',
-            senderName: payload.sender?.profile?.displayName || payload.sender?.profile?.username || null,
-            ciphertext: payload.ciphertext || null,
-            nonce: payload.nonce || null,
-            mediaType: payload.mediaType || null,
-            mediaUrl: payload.mediaUrl || null,
-            isDeleted: false,
-            createdAt: payload.createdAt || new Date().toISOString(),
-          },
+          lastMessage: lastMsgObj,
         };
         const [moved] = updated.splice(idx, 1);
         return [moved, ...updated];
       });
+
+      // Synchronize useGroupStore so other group views stay up to date
+      useGroupStore.getState().updateGroupMessageTimestamp(
+        groupId,
+        payload.text || payload.content || payload.message,
+        lastMsgObj
+      );
 
       if (payload.text || payload.content || payload.message) {
         const text = payload.text || payload.content || payload.message;
@@ -630,6 +642,97 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       socket.off("chat:conversation_auto_deleted", handleAutoDeleted);
     };
   }, [socket]);
+
+  // Global background responder for sender key requests and member additions across any group the user belongs to
+  useEffect(() => {
+    if (!socket || !currentUserId) return;
+
+    const handleGlobalSenderKeyRequested = async (data: any) => {
+      const { groupId, requesterId } = data || {};
+      if (!groupId || !requesterId || requesterId === currentUserId) return;
+
+      try {
+        const mySK = await getStoredSenderKey(groupId, currentUserId, currentUserId);
+        if (!mySK) return;
+
+        const myPrivKey = await getUserPrivateKey(currentUserId);
+        const myPubKey = await getUserPublicKey(currentUserId);
+        if (!myPrivKey) return;
+
+        const batchMap = await chatService.fetchBatchKeys([requesterId]);
+        const requesterPub = batchMap[requesterId]?.[0]?.publicKey;
+        if (!requesterPub) return;
+
+        const chainKey = mySK.initialChainKey || mySK.chainKey;
+        const wrapped = wrapSenderKeyForMember(chainKey, requesterPub, myPrivKey);
+        const dist = {
+          recipientId: requesterId,
+          encryptedKey: wrapped.encryptedKey,
+          nonce: wrapped.nonce,
+          iteration: 0,
+          senderPublicKey: myPubKey,
+          distributorId: currentUserId,
+        };
+
+        socket.emit("group:sender_key_distribute", {
+          groupId,
+          distributions: [dist],
+        });
+        await groupService.distributeSenderKeys(groupId, [dist]);
+        mySK.distributedTo = [...(mySK.distributedTo || []), requesterId];
+        await storeSenderKey(groupId, currentUserId, mySK, currentUserId);
+      } catch (err) {
+        // ignore background key response failure
+      }
+    };
+
+    const handleGlobalMemberAdded = async (data: any) => {
+      const { groupId, userId } = data || {};
+      if (!groupId || !userId || userId === currentUserId) return;
+
+      try {
+        const mySK = await getStoredSenderKey(groupId, currentUserId, currentUserId);
+        if (!mySK) return;
+
+        const myPrivKey = await getUserPrivateKey(currentUserId);
+        const myPubKey = await getUserPublicKey(currentUserId);
+        if (!myPrivKey) return;
+
+        const batchMap = await chatService.fetchBatchKeys([userId]);
+        const targetPub = batchMap[userId]?.[0]?.publicKey;
+        if (!targetPub) return;
+
+        const chainKey = mySK.initialChainKey || mySK.chainKey;
+        const wrapped = wrapSenderKeyForMember(chainKey, targetPub, myPrivKey);
+        const dist = {
+          recipientId: userId,
+          encryptedKey: wrapped.encryptedKey,
+          nonce: wrapped.nonce,
+          iteration: 0,
+          senderPublicKey: myPubKey,
+          distributorId: currentUserId,
+        };
+
+        socket.emit("group:sender_key_distribute", {
+          groupId,
+          distributions: [dist],
+        });
+        await groupService.distributeSenderKeys(groupId, [dist]);
+        mySK.distributedTo = [...(mySK.distributedTo || []), userId];
+        await storeSenderKey(groupId, currentUserId, mySK, currentUserId);
+      } catch (err) {
+        // ignore background key response failure
+      }
+    };
+
+    socket.on("group:sender_key_requested", handleGlobalSenderKeyRequested);
+    socket.on("group:member_added", handleGlobalMemberAdded);
+
+    return () => {
+      socket.off("group:sender_key_requested", handleGlobalSenderKeyRequested);
+      socket.off("group:member_added", handleGlobalMemberAdded);
+    };
+  }, [socket, currentUserId]);
 
   /**
    * Returns the unread count for a conversation.
@@ -763,12 +866,21 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             hasChanges = true;
             continue;
           }
-          // Try decrypting with stored group key if present
+          // Try decrypting with stored group key if present, or decryptGroupNotification
           try {
             const storedKey = await getStoredGroupKey(conv.id, currentUserId);
             if (storedKey && msg.ciphertext && msg.nonce) {
-              const text = await decryptMessage(msg.ciphertext, msg.nonce, storedKey, myPrivateKey);
+              const text = await decryptGroupMessage(msg.ciphertext, msg.nonce, storedKey);
               if (text) {
+                void storeDecryptedMessage(currentUserId, msg.id, text);
+                newPreviews[msg.id] = text;
+                newPreviews[conv.id] = text;
+                hasChanges = true;
+                continue;
+              }
+            } else if (msg.ciphertext) {
+              const text = await decryptGroupNotification({ ...msg, groupId: conv.id }, currentUserId);
+              if (text && !text.startsWith("🔒")) {
                 void storeDecryptedMessage(currentUserId, msg.id, text);
                 newPreviews[msg.id] = text;
                 newPreviews[conv.id] = text;
