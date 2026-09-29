@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Phone, PhoneOff, Video, UserPlus, Lock } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { stopRingtoneSound } from "@/utils/sounds";
@@ -10,6 +12,7 @@ import { stopRingtoneSound } from "@/utils/sounds";
 export const IncomingCallModal = () => {
   const { incomingCall, acceptCall, acceptEscalatedCall, rejectCall, joinGroupCall } =
     useCallContext();
+  const { getContact } = useContacts();
   const [callerName, setCallerName] = useState<string>("");
   const [callerAvatar, setCallerAvatar] = useState<string>("");
   const [isAccepting, setIsAccepting] = useState(false);
@@ -73,9 +76,20 @@ export const IncomingCallModal = () => {
   if (!incomingCall) return null;
 
   const isEscalated = Boolean(incomingCall.isEscalatedCall);
-  const displayName = callerName || incomingCall.callerId;
+  const contact = incomingCall.callerId ? getContact(incomingCall.callerId) : undefined;
+  const resolved = resolveDisplayName(
+    {
+      userId: incomingCall.callerId,
+      phone: contact?.phoneNumber,
+      profileDisplayName: callerName || incomingCall.callerName,
+    },
+    contact
+  );
+
+  const displayName = resolved.title || callerName || incomingCall.callerId;
   const avatarUrl =
     callerAvatar ||
+    contact?.avatarUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   // ------------------------------------------------------------------
@@ -92,14 +106,14 @@ export const IncomingCallModal = () => {
         await acceptEscalatedCall(
           incomingCall.roomName,
           incomingCall.callType,
-          callerName || undefined,
-          callerAvatar || undefined,
+          displayName,
+          callerAvatar || contact?.avatarUrl || undefined,
         );
       } else if (incomingCall.isGroup && incomingCall.groupId) {
         joinGroupCall(incomingCall.groupId);
         rejectCall(incomingCall.callId, incomingCall.roomName, true);
       } else {
-        acceptCall(incomingCall.callId, incomingCall.roomName, callerName || undefined, callerAvatar || undefined);
+        acceptCall(incomingCall.callId, incomingCall.roomName, displayName, callerAvatar || contact?.avatarUrl || undefined);
       }
     } finally {
       // If we are still mounted (e.g. token fetch failed), reset the spinner
@@ -186,7 +200,12 @@ export const IncomingCallModal = () => {
           <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
             {displayName}
           </h2>
-          <p className="mt-1 text-[13.5px] font-medium text-[#8696A0]">{subtitleLabel}</p>
+          {resolved.subtitle && (
+            <span className="text-[13.5px] font-medium text-[#8696A0]">
+              {resolved.subtitle}
+            </span>
+          )}
+          <p className="mt-1 text-[13.5px] font-medium text-[#8696A0]/80">{subtitleLabel}</p>
         </div>
 
         {/* Action Bar */}

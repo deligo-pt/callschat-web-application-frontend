@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import {
   Phone,
   Video,
@@ -184,8 +186,18 @@ export function GroupMessageBubble({
   const [editText, setEditText] = useState(msg.text);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const { startGroupCall } = useCallContext();
+  const { getContact } = useContacts();
 
-  const senderName = isMe ? "You" : (msg.sender?.profile?.displayName || "Member");
+  const resolvedSender = resolveDisplayName(
+    {
+      userId: msg.senderId,
+      phone: (msg.sender as any)?.phone,
+      profileDisplayName: msg.sender?.profile?.displayName,
+      fallback: "Member",
+    },
+    getContact
+  );
+  const senderName = isMe ? "You" : resolvedSender.formattedName;
   const senderColorClass = getSenderColor(msg.senderId);
 
   const getMessageStatus = () => {

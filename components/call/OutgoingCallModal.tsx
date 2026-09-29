@@ -3,18 +3,31 @@
 import React from "react";
 import { PhoneOff, Lock, Video, Phone } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export const OutgoingCallModal = () => {
   const { outgoingCall, outgoingCallStatus, cancelOutgoingCall } = useCallContext();
+  const { getContact } = useContacts();
 
   if (!outgoingCall) return null;
 
+  const contact = outgoingCall.receiverId ? getContact(outgoingCall.receiverId) : undefined;
+  const resolved = resolveDisplayName(
+    {
+      userId: outgoingCall.receiverId,
+      phone: contact?.phoneNumber,
+      profileDisplayName: outgoingCall.receiverName,
+    },
+    contact
+  );
+
   // Auto-generate avatar if none provided
-  const displayName = outgoingCall.receiverName || outgoingCall.receiverId;
-  const avatarUrl = outgoingCall.receiverAvatar
-    ? getOptimizedImageUrl(outgoingCall.receiverAvatar, 80, 80)
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
+  const displayName = resolved.title || outgoingCall.receiverName || outgoingCall.receiverId;
+  const avatarUrl = outgoingCall.receiverAvatar ||
+    contact?.avatarUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
 
   // Determine state labels, subtitles, and visual themes
   const isVideo = outgoingCall.callType === "VIDEO";
@@ -128,6 +141,11 @@ export const OutgoingCallModal = () => {
           <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
             {displayName}
           </h2>
+          {resolved.subtitle && (
+            <span className="text-[13.5px] font-medium text-[#8696A0]">
+              {resolved.subtitle}
+            </span>
+          )}
           <p
             className={`mt-1 text-[13.5px] ${subtitleStyle} transition-colors duration-300`}
           >

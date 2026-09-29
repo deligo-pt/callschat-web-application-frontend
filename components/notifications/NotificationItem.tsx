@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 
 interface NotificationItemProps {
   notification: AppNotification;
@@ -90,8 +92,21 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
     }
   };
 
-  const issuerName = notification.issuer?.profile?.displayName || "Someone";
-  const avatarUrl = getOptimizedImageUrl(notification.issuer?.profile?.avatarUrl, 48, 48);
+  const { getContact } = useContacts();
+  const issuerId = notification.issuerId || notification.issuer?.id;
+  const contact = issuerId ? getContact(issuerId) : undefined;
+  const resolvedIssuer = resolveDisplayName(
+    {
+      userId: issuerId,
+      phone: contact?.phoneNumber,
+      profileDisplayName: notification.issuer?.profile?.displayName,
+      username: notification.issuer?.profile?.username,
+      fallback: "Someone",
+    },
+    contact
+  );
+  const issuerName = resolvedIssuer.title;
+  const avatarUrl = getOptimizedImageUrl(contact?.avatarUrl || notification.issuer?.profile?.avatarUrl, 48, 48);
 
   let Icon = Info;
   let iconClass = "text-gray-500";

@@ -3,10 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { Phone, PhoneOff, Video, Lock } from "lucide-react";
 import { useCallContext } from "@/components/providers/CallContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export const GroupIncomingModal = () => {
   const { incomingGroupCall, acceptGroupCall, rejectGroupCall } = useCallContext();
+  const { getContact } = useContacts();
   const [groupName, setGroupName] = useState<string>("Group Call");
   const [groupAvatar, setGroupAvatar] = useState<string>("");
   const [members, setMembers] = useState<{ id: string; name: string; avatarUrl: string | null }[]>([]);
@@ -38,11 +41,23 @@ export const GroupIncomingModal = () => {
         }
 
         if (membersData.success && membersData.data && Array.isArray(membersData.data.members)) {
-          setMembers(membersData.data.members.slice(0, 4).map((m: any) => ({
-            id: m.userId || m.id,
-            name: m.user?.name || m.name || m.profile?.name || "Unknown",
-            avatarUrl: m.user?.avatarUrl || m.avatarUrl || m.profile?.avatarUrl || null
-          })));
+          setMembers(membersData.data.members.slice(0, 4).map((m: any) => {
+            const memberId = m.userId || m.id;
+            const contact = getContact(memberId);
+            const resolved = resolveDisplayName(
+              {
+                userId: memberId,
+                phone: m.user?.phone || m.phone || contact?.phoneNumber,
+                profileDisplayName: m.user?.name || m.name || m.profile?.name,
+              },
+              contact
+            );
+            return {
+              id: memberId,
+              name: resolved.title || "Unknown",
+              avatarUrl: m.user?.avatarUrl || m.avatarUrl || m.profile?.avatarUrl || contact?.avatarUrl || null
+            };
+          }));
         }
       } catch (err) {
         console.error("Failed to fetch group profile or members", err);
@@ -50,13 +65,23 @@ export const GroupIncomingModal = () => {
     };
 
     fetchGroupProfile();
-  }, [incomingGroupCall?.groupId]);
+  }, [incomingGroupCall?.groupId, getContact]);
 
   if (!incomingGroupCall) return null;
 
   const displayName = groupName;
   const avatarUrl = groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;
-  const initiatorName = incomingGroupCall.initiatorName || "A member";
+  const initiatorContact = (incomingGroupCall as any).initiatorId
+    ? getContact((incomingGroupCall as any).initiatorId)
+    : undefined;
+  const resolvedInitiator = resolveDisplayName(
+    {
+      userId: (incomingGroupCall as any).initiatorId,
+      profileDisplayName: incomingGroupCall.initiatorName,
+    },
+    initiatorContact
+  );
+  const initiatorName = resolvedInitiator.title || incomingGroupCall.initiatorName || "A member";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
