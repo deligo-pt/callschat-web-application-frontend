@@ -137,10 +137,20 @@ export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   return <ContactsContext.Provider value={value}>{children}</ContactsContext.Provider>;
 };
 
+const defaultContactsContext: ContactsContextType = {
+  contacts: [],
+  contactsMap: new Map(),
+  contactsByPhoneMap: new Map(),
+  isLoading: false,
+  refetchContacts: async () => {},
+  getContact: () => undefined,
+  getContactByPhone: () => undefined,
+};
+
 export const useContacts = (): ContactsContextType => {
   const context = useContext(ContactsContext);
   if (!context) {
-    throw new Error("useContacts must be used within a ContactsProvider");
+    return defaultContactsContext;
   }
   return context;
 };
