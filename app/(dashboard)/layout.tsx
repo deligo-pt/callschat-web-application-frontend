@@ -6,6 +6,7 @@ import { CallProvider } from "@/components/providers/CallProvider";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { E2EEProvider } from "@/components/providers/E2EEProvider";
 import { PresenceProvider } from "@/context/PresenceContext";
+import { ContactsProvider } from "@/context/ContactsContext";
 import { UserProvider, useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/components/providers/SocketProvider";
@@ -334,9 +335,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SocketProvider>
           <CallProvider>
             <PresenceProvider>
-              <DashboardNavContent>
-                {children}
-              </DashboardNavContent>
+              <ContactsProvider>
+                <DashboardNavContent>
+                  {children}
+                </DashboardNavContent>
+              </ContactsProvider>
             </PresenceProvider>
           </CallProvider>
         </SocketProvider>
