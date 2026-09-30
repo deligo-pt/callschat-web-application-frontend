@@ -10,7 +10,7 @@ interface GroupStoreState {
   updateGroupInStore: (groupId: string, data: Partial<GroupItem>) => void;
   removeGroupFromStore: (groupId: string) => void;
   toggleFavouriteInStore: (groupId: string, status: boolean) => void;
-  updateGroupMessageTimestamp: (groupId: string, lastMessageText?: string) => void;
+  updateGroupMessageTimestamp: (groupId: string, lastMessageText?: string, lastMessageData?: any) => void;
 }
 
 export const useGroupStore = create<GroupStoreState>((set, get) => ({
@@ -68,7 +68,7 @@ export const useGroupStore = create<GroupStoreState>((set, get) => ({
     }));
   },
 
-  updateGroupMessageTimestamp: (groupId: string, lastMessageText?: string) => {
+  updateGroupMessageTimestamp: (groupId: string, lastMessageText?: string, lastMessageData?: any) => {
     set((state) => {
       const target = state.groups.find((g) => g.id === groupId);
       if (!target) return state;
@@ -77,6 +77,7 @@ export const useGroupStore = create<GroupStoreState>((set, get) => ({
         ...target,
         updatedAt: new Date().toISOString(),
         description: lastMessageText !== undefined ? lastMessageText : target.description,
+        lastMessage: lastMessageData !== undefined ? lastMessageData : target.lastMessage,
       };
 
       const rest = state.groups.filter((g) => g.id !== groupId);

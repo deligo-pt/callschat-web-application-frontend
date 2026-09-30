@@ -31,6 +31,7 @@ import {
   clearSenderKey,
   storeDecryptedMessage,
   getDecryptedMessage,
+  getUserPrivateKeyRing,
   StoredSenderKey,
 } from "@/utils/keyStore";
 import { getSignalProtocolStore, arrayBufferToBase64 } from "@/utils/signalCrypto";
@@ -201,8 +202,9 @@ const resolveGroupQuotedMessage = async (
   };
 };
 
-const resolveUserPublicKeys = async (userId: string): Promise<string[]> => {
+const resolveUserPublicKeys = async (userId: string, hintKey?: string | null): Promise<string[]> => {
   const keys: string[] = [];
+  if (hintKey && !keys.includes(hintKey)) keys.push(hintKey);
   if (!userId) return keys;
   try {
     const res = await chatService.fetchRecipientKey(userId);
@@ -236,6 +238,12 @@ const getCandidatePrivateKeys = async (userId: string): Promise<string[]> => {
   const raw = await getRawStoredUserPrivateKey(userId);
   if (raw && !keys.includes(raw)) keys.push(raw);
   try {
+    const ring = await getUserPrivateKeyRing(userId);
+    for (const k of ring) {
+      if (k && !keys.includes(k)) keys.push(k);
+    }
+  } catch {}
+  try {
     const store = getSignalProtocolStore(userId);
     const kp = await store.getIdentityKeyPair();
     if (kp?.privKey) {
@@ -265,6 +273,9 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(true);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const markedDeliveredSetRef = useRef<Set<string>>(new Set());
 
   const groupKeyRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
@@ -447,7 +458,10 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               const myPrivs = await getCandidatePrivateKeys(currentUserId);
               if (myPrivs.length > 0) {
                 for (const dist of skRes.data) {
-                  const senderPubs = await resolveUserPublicKeys(dist.senderId);
+                  const senderPubs = await resolveUserPublicKeys(
+                    dist.distributorId || dist.senderId,
+                    dist.senderPublicKey
+                  );
                   if (senderPubs.length > 0) {
                     try {
                       const chainKey = unwrapSenderKeyFromMember(
@@ -460,6 +474,20 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                         chainKey,
                         iteration: dist.iteration ?? 0,
                       });
+                      await storeSenderKey(
+                        groupId,
+                        dist.senderId,
+                        {
+                          groupId,
+                          senderId: dist.senderId,
+                          chainKey,
+                          iteration: dist.iteration ?? 0,
+                          initialChainKey: chainKey,
+                          senderKeyId: `sk_${dist.senderId}`,
+                          updatedAt: new Date().toISOString(),
+                        },
+                        currentUserId
+                      );
                     } catch (skErr) {
                       console.warn(`[useGroupChat] Could not unwrap sender key for ${dist.senderId}:`, skErr);
                     }
@@ -495,6 +523,27 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               }
             }
           } catch {}
+
+          // On-demand sender key recovery for any history message senders whose keys are missing
+          if (socket) {
+            const missingSenders = new Set<string>();
+            for (const msg of historyRes.data) {
+              if (
+                msg.senderId &&
+                msg.senderId !== currentUserId &&
+                !skMap.has(msg.senderId) &&
+                (msg.senderKeyIteration != null || msg.messageType === 7)
+              ) {
+                missingSenders.add(msg.senderId);
+              }
+            }
+            for (const mId of missingSenders) {
+              socket.emit("group:request_sender_key", {
+                groupId,
+                senderId: mId,
+              });
+            }
+          }
 
           // 3. Process history messages in chronological order
           for (const msg of historyRes.data) {
@@ -842,8 +891,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
-      // If not sender's message (or if not resolved from cache), proceed with sender key decryption
-      if (!text && payload.ciphertext && payload.nonce && !isMyMessage) {
+      // If not resolved from cache, proceed with sender key or group key decryption
+      if (!text && payload.ciphertext && payload.nonce) {
         try {
           let sk = await getStoredSenderKey(groupId, senderId, effectiveUserId);
           if (!sk) {
@@ -1071,6 +1120,37 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
     };
 
+    const handleBatchStatusUpdate = (payload: any) => {
+      if (payload.groupId !== groupId || !payload.messageIds?.length) return;
+      const targetIds = new Set(payload.messageIds);
+      const isSeen = payload.status === "SEEN";
+      const isDelivered = payload.status === "DELIVERED";
+
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (targetIds.has(msg.id)) {
+            const receipts = [...(msg.receipts || [])];
+            const idx = receipts.findIndex((r: any) => r.userId === payload.userId);
+            const existing = idx !== -1 ? receipts[idx] : null;
+
+            const entry = {
+              id: existing?.id || Math.random().toString(),
+              userId: payload.userId,
+              deliveredAt: isDelivered ? payload.timestamp : (existing?.deliveredAt || payload.timestamp),
+              seenAt: isSeen ? payload.timestamp : existing?.seenAt,
+            };
+            if (idx !== -1) {
+              receipts[idx] = entry;
+            } else {
+              receipts.push(entry);
+            }
+            return { ...msg, receipts };
+          }
+          return msg;
+        })
+      );
+    };
+
     const handleReactionsUpdated = (payload: any) => {
       if (payload.groupId !== groupId) return;
       setMessages((prev) =>
@@ -1258,6 +1338,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (!mySK) return;
 
         const myPrivKey = await getUserPrivateKey(myId);
+        const myPubKey = await getUserPublicKey(myId);
         if (!myPrivKey) return;
 
         const batchMap = await chatService.fetchBatchKeys([newUserId]);
@@ -1271,6 +1352,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           encryptedKey: wrapped.encryptedKey,
           nonce: wrapped.nonce,
           iteration: 0,
+          senderPublicKey: myPubKey,
+          distributorId: myId,
         };
 
         socket.emit("group:sender_key_distribute", {
@@ -1297,6 +1380,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (!mySK) return;
 
         const myPrivKey = await getUserPrivateKey(myId);
+        const myPubKey = await getUserPublicKey(myId);
         if (!myPrivKey) return;
 
         const batchMap = await chatService.fetchBatchKeys([requesterId]);
@@ -1310,6 +1394,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           encryptedKey: wrapped.encryptedKey,
           nonce: wrapped.nonce,
           iteration: 0,
+          senderPublicKey: myPubKey,
+          distributorId: myId,
         };
 
         socket.emit("group:sender_key_distribute", {
@@ -1331,15 +1417,24 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       if (payload.recipientId && payload.recipientId !== effectiveUserId) return;
       try {
         const myPrivs = await getCandidatePrivateKeys(effectiveUserId);
-        const senderPubs = await resolveUserPublicKeys(payload.senderId);
+        const senderPubs = await resolveUserPublicKeys(
+          payload.distributorId || payload.senderId,
+          payload.senderPublicKey
+        );
         if (myPrivs.length === 0 || senderPubs.length === 0) return;
 
-        const chainKey = unwrapSenderKeyFromMember(
-          payload.encryptedKey,
-          payload.nonce,
-          senderPubs,
-          myPrivs
-        );
+        let chainKey: string;
+        try {
+          chainKey = unwrapSenderKeyFromMember(
+            payload.encryptedKey,
+            payload.nonce,
+            senderPubs,
+            myPrivs
+          );
+        } catch (unwrapErr) {
+          console.warn("[useGroupChat] Could not unwrap sender key:", unwrapErr);
+          return;
+        }
 
         const existingSk = await getStoredSenderKey(groupId, payload.senderId, effectiveUserId);
         await storeSenderKey(
@@ -1358,6 +1453,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         );
 
         // Re-decrypt any currently locked or blank messages in state from this sender
+        const baseKey = existingSk?.initialChainKey || chainKey;
         setMessages((prev) => {
           let hasPending = false;
           for (const m of prev) {
@@ -1381,15 +1477,22 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             if (m.senderId === payload.senderId && isPending && cText && nonce) {
               try {
                 const dec = decryptSenderMessageWithChainKey(
-                  chainKey,
-                  payload.iteration ?? 0,
+                  baseKey,
+                  0,
                   targetIter,
                   cText,
                   nonce
                 );
-                const t = parseEditedText(dec.plaintext).text;
-                void storeDecryptedMessage(effectiveUserId, m.id, t);
-                return { ...m, text: t, ciphertext: cText, nonce };
+                const plain = parseEditedText(dec.plaintext).text;
+                if (m.id) sentPlaintextCacheRef.current.set(m.id, plain);
+                if (nonce) sentPlaintextCacheRef.current.set(nonce, plain);
+                if (cText) sentPlaintextCacheRef.current.set(cText, plain);
+                if (effectiveUserId) {
+                  if (m.id) void storeDecryptedMessage(effectiveUserId, m.id, plain);
+                  if (nonce) void storeDecryptedMessage(effectiveUserId, `nonce_${nonce}`, plain);
+                  if (cText) void storeDecryptedMessage(effectiveUserId, `cipher_${cText}`, plain);
+                }
+                return { ...m, text: plain, ciphertext: cText, nonce };
               } catch (err) {
                 console.warn("[useGroupChat] Re-decryption on sender key received failed:", err);
                 return m;
@@ -1466,6 +1569,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
     socket.on("group:receive_message", handleReceiveMessage);
     socket.on("group:message_status_update", handleStatusUpdate);
+    socket.on("group:batch_status_update", handleBatchStatusUpdate);
     socket.on("group:reaction_updated", handleReactionsUpdated);
     socket.on("group:pin_updated", handlePinUpdated);
     socket.on("group:poll_updated", handlePollUpdated);
@@ -1490,6 +1594,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
       socket.off("group:receive_message", handleReceiveMessage);
       socket.off("group:message_status_update", handleStatusUpdate);
+      socket.off("group:batch_status_update", handleBatchStatusUpdate);
       socket.off("group:reaction_updated", handleReactionsUpdated);
       socket.off("group:pin_updated", handlePinUpdated);
       socket.off("group:poll_updated", handlePollUpdated);
@@ -1522,7 +1627,14 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
 
       const unseen = messages.filter((m) => {
-        if (m.senderId === currentUser || m.id.startsWith("optimistic-")) return false;
+        if (
+          m.senderId === currentUser ||
+          m.id.startsWith("optimistic-") ||
+          m.id.startsWith("sys-") ||
+          m.id.startsWith("temp-") ||
+          m.isSystem ||
+          m.systemEventType
+        ) return false;
         const myReceipt = m.receipts?.find((r) => r.userId === currentUser);
         return !myReceipt?.seenAt;
       });
@@ -1550,7 +1662,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     };
   }, [socket, isConnected, groupId, messages]);
 
-  // ── Reactive Group Delivery Receipt Catch-Up ───────────────────────────────
+  // ── Reactive Group Delivery Receipt Catch-Up (Batched & Deduplicated) ────
   useEffect(() => {
     if (!socket || !isConnected || !groupId || !messages.length) return;
 
@@ -1559,6 +1671,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       (m) =>
         m.senderId !== currentUser &&
         !m.id.startsWith("optimistic-") &&
+        !m.id.startsWith("sys-") &&
+        !m.id.startsWith("temp-") &&
+        !m.isSystem &&
+        !m.systemEventType &&
+        !markedDeliveredSetRef.current.has(m.id) &&
         (!m.receipts ||
           !m.receipts.some(
             (r: any) => r.userId === currentUser && r.deliveredAt
@@ -1566,11 +1683,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     );
 
     if (undelivered.length > 0) {
-      undelivered.forEach((m) => {
-        socket.emit("group:mark_delivered", {
-          groupId,
-          messageId: m.id,
-        });
+      const ids = undelivered.map((m) => m.id);
+      ids.forEach((id) => markedDeliveredSetRef.current.add(id));
+      socket.emit("group:mark_delivered_batch", {
+        groupId,
+        messageIds: ids,
       });
     }
   }, [socket, isConnected, groupId, messages]);
@@ -1660,6 +1777,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               const distributions: any[] = [];
               const chainKeyToDistribute = mySK!.initialChainKey || mySK!.chainKey;
 
+              const myPubKey = await getUserPublicKey(currentUserId);
               for (const m of missingMembers) {
                 const pubKey = batchMap[m.userId]?.[0]?.publicKey || m.publicKey;
                 if (pubKey) {
@@ -1669,6 +1787,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                     encryptedKey: wrapped.encryptedKey,
                     nonce: wrapped.nonce,
                     iteration: 0,
+                    senderPublicKey: myPubKey,
+                    distributorId: currentUserId,
                   });
                 }
               }
@@ -1800,6 +1920,102 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     [groupId]
   );
 
+  const loadMoreMessages = useCallback(async () => {
+    if (isLoadingMore || !hasMoreMessages || !groupId) return;
+    const oldest = messagesRef.current.find((m) => !m.id.startsWith("optimistic-"));
+    if (!oldest) return;
+
+    setIsLoadingMore(true);
+    try {
+      const res = await groupService.fetchGroupMessages(groupId, oldest.id, 40);
+      if (res.success && Array.isArray(res.data)) {
+        if (res.data.length < 40) {
+          setHasMoreMessages(false);
+        }
+        if (res.data.length === 0) return;
+
+        const effectiveUserId = currentUserIdRef.current;
+        const currentKey = groupKeyRef.current;
+        const decryptedBatch: GroupMessage[] = [];
+
+        for (const msg of res.data) {
+          let text =
+            (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
+            (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+            (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
+
+          if (!text && effectiveUserId) {
+            if (msg.id) text = await getDecryptedMessage(effectiveUserId, msg.id);
+            if (!text && msg.nonce) text = await getDecryptedMessage(effectiveUserId, `nonce_${msg.nonce}`);
+            if (!text && msg.ciphertext) text = await getDecryptedMessage(effectiveUserId, `cipher_${msg.ciphertext}`);
+          }
+
+          if (text) {
+            const parsed = parseEditedText(text).text;
+            sentPlaintextCacheRef.current.set(msg.id, parsed);
+            text = parsed;
+          } else if (msg.ciphertext && msg.nonce && currentKey) {
+            try {
+              const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, currentKey);
+              text = parseEditedText(dec).text;
+              sentPlaintextCacheRef.current.set(msg.id, text);
+              if (effectiveUserId) void storeDecryptedMessage(effectiveUserId, msg.id, text);
+            } catch {
+              text = "🔒 Encrypted group message";
+            }
+          } else if (msg.ciphertext && !msg.nonce) {
+            text = parseEditedText(msg.ciphertext).text;
+          }
+
+          decryptedBatch.push({
+            id: msg.id,
+            groupId: msg.groupId,
+            senderId: msg.senderId,
+            text: text || (msg.ciphertext ? "🔒 Encrypted group message" : ""),
+            isEdited: msg.isEdited ?? false,
+            createdAt: msg.createdAt,
+            mediaUrl: msg.mediaUrl,
+            mediaType: msg.mediaType,
+            sender: msg.sender,
+            isDeleted: msg.isDeleted,
+            deletedByAdmin: msg.deletedByAdmin,
+            isSystem: msg.isSystem,
+            systemEventType: msg.systemEventType,
+            systemMetadata: msg.systemMetadata,
+            replyToId: msg.replyToId ?? null,
+            replyTo: msg.replyTo ? {
+              id: msg.replyTo.id,
+              senderId: msg.replyTo.senderId,
+              senderName: msg.replyTo.sender?.profile?.displayName || "Member",
+              text: msg.replyTo.text || "",
+              mediaUrl: msg.replyTo.mediaUrl,
+              mediaType: msg.replyTo.mediaType,
+            } : null,
+            receipts: msg.receipts || [],
+            reactions: msg.reactions || [],
+            poll: msg.poll || null,
+          });
+        }
+
+        decryptedBatch.sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newUnique = decryptedBatch.filter((m) => !existingIds.has(m.id));
+          return [...newUnique, ...prev];
+        });
+      } else {
+        setHasMoreMessages(false);
+      }
+    } catch (err) {
+      console.error("[useGroupChat] Error loading more messages:", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [groupId, isLoadingMore, hasMoreMessages]);
+
   const typingText = useMemo(() => {
     const names = Array.from(typingUsers.values());
     if (names.length === 0) return "";
@@ -1826,6 +2042,9 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     error,
     isUploading,
     setIsUploading,
+    hasMoreMessages,
+    isLoadingMore,
+    loadMoreMessages,
     sendMessage,
     startTyping,
     stopTyping,
