@@ -1,15 +1,16 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, Smile, Video, FileText, BarChart2, Lock } from "lucide-react";
+import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, Smile, Video, FileText, BarChart2, Lock, Users } from "lucide-react";
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
+import { useContacts } from "@/context/ContactsContext";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 interface GroupInputProps {
-  onSend: (text: string, file: File | null) => void;
+  onSend: (text: string, file: File | null, mentions?: string[]) => void;
   isReady: boolean;
   isUploading: boolean;
   isAnnouncementOnly?: boolean;
@@ -24,19 +25,8 @@ interface GroupInputProps {
     mediaUrl?: string | null;
   } | null;
   onCancelReply?: () => void;
-  members?: Array<{
-    userId?: string;
-    user?: {
-      id?: string;
-      name?: string;
-      email?: string;
-      profile?: {
-        displayName?: string;
-        avatarUrl?: string | null;
-      } | null;
-    };
-    role?: string;
-  }>;
+  members?: Array<any>;
+  currentUserId?: string;
   onMediaSelect?: (file: File, initialCaption?: string) => void;
 }
 
@@ -57,6 +47,7 @@ export function GroupInput({
   replyingTo,
   onCancelReply,
   members = [],
+  currentUserId,
   onMediaSelect,
 }: GroupInputProps) {
   const [inputText, setInputText] = useState("");
@@ -108,25 +99,125 @@ export function GroupInput({
     capturePhoto,
   } = useMediaCapture();
 
-  const matchingMembers = React.useMemo(() => {
-    if (mentionQuery === null || !members) return [];
-    return members
-      .map((m) => {
-        const name =
-          m.user?.profile?.displayName ||
-          m.user?.name ||
-          (m.user?.email ? m.user.email.split("@")[0] : "Member");
-        const avatar = m.user?.profile?.avatarUrl;
-        const id = m.userId || m.user?.id || "";
-        return { id, name, avatar, role: m.role };
-      })
-      .filter((m) => m.name.toLowerCase().includes(mentionQuery))
-      .slice(0, 6);
-  }, [mentionQuery, members]);
+  const { getContact } = useContacts();
 
-  const insertMention = (memberName: string) => {
+  const mentionItems = React.useMemo(() => {
+    if (mentionQuery === null) return [];
+    const items: Array<{
+      id: string;
+      name: string;
+      username?: string | null;
+      avatar?: string | null;
+      subtitle?: string;
+      role?: string;
+      isMe?: boolean;
+      isAll?: boolean;
+    }> = [];
+
+    // Show @all if query matches "all", "everyone", or if query is empty
+    if (!mentionQuery || "all".includes(mentionQuery) || "everyone".includes(mentionQuery)) {
+      items.push({
+        id: "ALL",
+        name: "all",
+        subtitle: "Notify all members",
+        isAll: true,
+      });
+    }
+
+    if (members && members.length > 0) {
+      const filtered = members
+        .map((m) => {
+          const id = m.userId || m.user?.id || m.id || "";
+          const contact = getContact?.(id);
+          const savedCustomName = contact?.customName?.trim();
+
+          const realName =
+            savedCustomName ||
+            m.profile?.displayName?.trim() ||
+            m.profile?.name?.trim() ||
+            m.displayName?.trim() ||
+            m.name?.trim() ||
+            m.user?.profile?.displayName?.trim() ||
+            m.user?.displayName?.trim() ||
+            m.user?.name?.trim() ||
+            contact?.displayName?.trim() ||
+            (m.profile?.username ? `@${m.profile.username.replace(/^@/, "")}` : null) ||
+            (m.username ? `@${m.username.replace(/^@/, "")}` : null) ||
+            (m.user?.profile?.username ? `@${m.user.profile.username.replace(/^@/, "")}` : null) ||
+            (m.user?.username ? `@${m.user.username.replace(/^@/, "")}` : null) ||
+            (contact?.username ? `@${contact.username.replace(/^@/, "")}` : null) ||
+            (m.user?.email ? m.user.email.split("@")[0] : null) ||
+            "Member";
+
+          const username =
+            m.profile?.username?.trim() ||
+            m.user?.profile?.username?.trim() ||
+            m.username?.trim() ||
+            m.user?.username?.trim() ||
+            contact?.username?.trim() ||
+            null;
+
+          const avatar =
+            m.profile?.avatarUrl ||
+            m.user?.profile?.avatarUrl ||
+            m.avatarUrl ||
+            contact?.avatarUrl;
+
+          const isMe = !!currentUserId && id === currentUserId;
+
+          // Subtitle: display @username or Role
+          let subtitle = "";
+          if (username) {
+            const cleanUser = `@${username.replace(/^@/, "")}`;
+            if (m.role === "OWNER") {
+              subtitle = `${cleanUser} · Owner`;
+            } else if (m.role === "ADMIN") {
+              subtitle = `${cleanUser} · Admin`;
+            } else {
+              subtitle = cleanUser;
+            }
+          } else if (m.role === "OWNER") {
+            subtitle = "Owner";
+          } else if (m.role === "ADMIN") {
+            subtitle = "Admin";
+          } else {
+            subtitle = "Member";
+          }
+
+          return {
+            id,
+            name: realName,
+            username,
+            avatar,
+            subtitle,
+            role: m.role,
+            isMe,
+            isAll: false,
+          };
+        })
+        .filter((m) => {
+          if (!mentionQuery) return true;
+          const q = mentionQuery.toLowerCase();
+          return (
+            m.name.toLowerCase().includes(q) ||
+            (m.username && m.username.toLowerCase().includes(q))
+          );
+        })
+        .slice(0, 8);
+      items.push(...filtered);
+    }
+
+    return items;
+  }, [mentionQuery, members, getContact, currentUserId]);
+
+  const insertMention = (item: { id: string; name: string; username?: string | null; isAll?: boolean }) => {
     if (!textareaRef.current) return;
-    const cleanName = memberName.replace(/\s+/g, "_");
+    const cleanName = item.isAll
+      ? "all"
+      : item.username
+      ? item.username.replace(/^@/, "")
+      : item.name.replace(/\s+/g, "_");
+
     const beforeMention = inputText.slice(0, mentionCursorIndex);
     const afterCursor = inputText.slice(textareaRef.current.selectionStart || inputText.length);
     const newText = `${beforeMention}@${cleanName} ${afterCursor}`;
@@ -142,6 +233,49 @@ export function GroupInput({
     });
   };
 
+  const extractMentions = (text: string): string[] => {
+    const mentions: string[] = [];
+    if (/@(all|everyone)\b/i.test(text)) {
+      mentions.push("ALL");
+    }
+    if (members && members.length > 0) {
+      members.forEach((m) => {
+        const id = m.userId || m.user?.id || m.id;
+        if (!id) return;
+        const contact = getContact?.(id);
+        const nameCandidates = [
+          contact?.customName,
+          m.profile?.name,
+          m.profile?.displayName,
+          m.name,
+          m.displayName,
+          m.user?.profile?.displayName,
+          m.user?.name,
+          contact?.displayName,
+          m.profile?.username,
+          m.user?.profile?.username,
+          m.username,
+          contact?.username,
+        ].filter(Boolean) as string[];
+
+        for (const rawName of nameCandidates) {
+          const clean1 = rawName.trim();
+          const clean2 = rawName.replace(/\s+/g, "_");
+          const esc1 = clean1.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const esc2 = clean2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const regex = new RegExp(`@(${esc1}|${esc2})\\b`, "i");
+          if (regex.test(text)) {
+            if (!mentions.includes(id)) {
+              mentions.push(id);
+            }
+            break;
+          }
+        }
+      });
+    }
+    return mentions;
+  };
+
   const handleSend = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!isReady || isUploading || isAnnouncementOnly) return;
@@ -150,7 +284,8 @@ export function GroupInput({
     if (onStopTyping) onStopTyping();
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
 
-    onSend(inputText, selectedFile);
+    const mentions = extractMentions(inputText);
+    onSend(inputText, selectedFile, mentions.length > 0 ? mentions : undefined);
     setInputText("");
     setSelectedFile(null);
     setMentionQuery(null);
@@ -186,20 +321,20 @@ export function GroupInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (mentionQuery !== null && matchingMembers.length > 0) {
+    if (mentionQuery !== null && mentionItems.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedMentionIndex((prev) => (prev + 1) % matchingMembers.length);
+        setSelectedMentionIndex((prev) => (prev + 1) % mentionItems.length);
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedMentionIndex((prev) => (prev - 1 + matchingMembers.length) % matchingMembers.length);
+        setSelectedMentionIndex((prev) => (prev - 1 + mentionItems.length) % mentionItems.length);
         return;
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        insertMention(matchingMembers[selectedMentionIndex].name);
+        insertMention(mentionItems[selectedMentionIndex]);
         return;
       }
       if (e.key === "Escape") {
@@ -294,20 +429,20 @@ export function GroupInput({
   return (
     <div className="relative bg-[#f0f2f5] dark:bg-[#202c33] px-3 py-2 border-t border-[#e9edef] dark:border-[#222d34]">
       {/* Mentions Autocomplete Dropdown */}
-      {mentionQuery !== null && matchingMembers.length > 0 && (
+      {mentionQuery !== null && mentionItems.length > 0 && (
         <div
           ref={mentionDropdownRef}
-          className="absolute bottom-full left-12 mb-2 z-50 w-64 bg-white dark:bg-[#233138] rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150"
+          className="absolute bottom-full left-12 mb-2 z-50 w-72 bg-white dark:bg-[#233138] rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150"
         >
           <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-white/5">
-            Group Members
+            Mentions
           </div>
           <div className="max-h-48 overflow-y-auto p-1">
-            {matchingMembers.map((member, idx) => (
+            {mentionItems.map((item, idx) => (
               <button
-                key={member.id || idx}
+                key={item.id || idx}
                 type="button"
-                onClick={() => insertMention(member.name)}
+                onClick={() => insertMention(item)}
                 className={cn(
                   "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs",
                   idx === selectedMentionIndex
@@ -315,18 +450,38 @@ export function GroupInput({
                     : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5"
                 )}
               >
-                <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center shrink-0 overflow-hidden text-[10px] font-bold text-[#00A884]">
-                  {member.avatar ? (
-                    <img src={getOptimizedImageUrl(member.avatar)} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    member.name.charAt(0).toUpperCase()
-                  )}
-                </div>
+                {item.isAll ? (
+                  <div className="w-7 h-7 rounded-full bg-[#00A884]/20 flex items-center justify-center shrink-0 text-[#00A884] dark:text-[#25D366]">
+                    <Users className="w-4 h-4" />
+                  </div>
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center shrink-0 overflow-hidden text-[10px] font-bold text-[#00A884]">
+                    {item.avatar ? (
+                      <img src={getOptimizedImageUrl(item.avatar)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      item.name.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                )}
                 <div className="flex flex-col truncate flex-1">
-                  <span className="truncate">{member.name}</span>
-                  {member.role === "ADMIN" && (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Admin</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate font-medium text-gray-900 dark:text-gray-100">
+                      {item.isAll ? "@all" : item.name}
+                    </span>
+                    {item.isAll && (
+                      <span className="text-[9px] bg-[#00A884]/20 text-[#00A884] dark:text-[#25D366] px-1.5 py-0.2 rounded-full font-semibold">
+                        Group
+                      </span>
+                    )}
+                    {item.isMe && (
+                      <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.2 rounded font-medium">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                    {item.subtitle}
+                  </span>
                 </div>
               </button>
             ))}

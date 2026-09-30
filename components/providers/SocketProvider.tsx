@@ -86,7 +86,12 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     socketInstance.on("connect_error", (err) => {
-      console.error("[Socket] Connection error:", err.message);
+      // Differentiate transient transport handshakes/reconnections from fatal auth errors
+      if (err.message === "websocket error" || err.message === "xhr poll error") {
+        console.warn("[Socket] Transient connection retry:", err.message);
+      } else {
+        console.error("[Socket] Connection error:", err.message);
+      }
       // Ensure the latest token is present for the next attempt
       const latestToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       socketInstance.auth = { token: latestToken };

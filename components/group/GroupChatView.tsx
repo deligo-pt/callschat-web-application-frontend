@@ -526,8 +526,30 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     setIsScrolledUp(false);
   };
 
-  const handleSend = async (text: string, file: File | null) => {
+  const handleSend = async (text: string, file: File | null, mentions?: string[]) => {
     if (!isReady) return;
+
+    let targetMentions = mentions;
+    if (!targetMentions && text && groupMembers.length > 0) {
+      const extracted: string[] = [];
+      if (/@(all|everyone)\b/i.test(text)) {
+        extracted.push("ALL");
+      }
+      groupMembers.forEach((m) => {
+        const name = m.name || m.user?.profile?.displayName || m.user?.username || "";
+        if (name) {
+          const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const regex = new RegExp(`@${escaped}\\b`, "i");
+          if (regex.test(text)) {
+            extracted.push(m.userId);
+          }
+        }
+      });
+      if (extracted.length > 0) {
+        targetMentions = Array.from(new Set(extracted));
+      }
+    }
+
     if (file) {
       if (file.size > 25 * 1024 * 1024) {
         toast.error("File size exceeds the 25MB maximum limit.");
@@ -559,7 +581,8 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           text.trim(),
           replyingTo?.id,
           uploadRes.data.mediaUrl,
-          mediaType
+          mediaType,
+          targetMentions
         );
         setReplyingTo(null);
       } catch (err: any) {
@@ -570,7 +593,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
       }
     } else {
       if (!text.trim()) return;
-      await sendMessage(text.trim(), replyingTo?.id);
+      await sendMessage(text.trim(), replyingTo?.id, null, null, targetMentions);
       setReplyingTo(null);
     }
   };
@@ -1123,6 +1146,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
           members={groupMembers}
+          currentUserId={currentUserId}
           onMediaSelect={handleMediaSelectFromInput}
         />
       </div>

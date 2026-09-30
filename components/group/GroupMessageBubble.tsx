@@ -34,6 +34,7 @@ import {
   UserPlus,
   UserMinus,
   Settings,
+  Users,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -70,7 +71,7 @@ function getSenderColor(id: string) {
   return SENDER_COLORS[index];
 }
 
-const formatTextWithLinks = (text: string) => {
+const formatTextWithLinks = (text: string, currentUserId?: string, members?: any[]) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   return text.split(urlRegex).map((part, i) => {
     if (part.match(urlRegex)) {
@@ -90,10 +91,57 @@ const formatTextWithLinks = (text: string) => {
     const mentionRegex = /(@[a-zA-Z0-9_.-]+)/g;
     return part.split(mentionRegex).map((subPart, j) => {
       if (subPart.match(mentionRegex)) {
+        const lower = subPart.toLowerCase();
+        const isAll = lower === "@all" || lower === "@everyone";
+
+        if (isAll) {
+          return (
+            <span
+              key={`mention-all-${i}-${j}`}
+              className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/25 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 cursor-pointer hover:bg-emerald-500/25 border border-emerald-500/20 text-[13px]"
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.info("Mentioned everyone in this group");
+              }}
+            >
+              <Users className="w-3.5 h-3.5 inline-block shrink-0" />
+              {subPart}
+            </span>
+          );
+        }
+
+        const mentionHandle = subPart.slice(1).toLowerCase();
+        const myMember = members?.find((m: any) => (m.userId || m.user?.id || m.id) === currentUserId);
+        const myCandidates = [
+          myMember?.name,
+          myMember?.displayName,
+          myMember?.profile?.displayName,
+          myMember?.profile?.name,
+          myMember?.user?.profile?.displayName,
+          myMember?.username,
+          myMember?.profile?.username,
+          myMember?.user?.profile?.username,
+        ].filter(Boolean) as string[];
+
+        const isMeMentioned = myCandidates.some((c) => {
+          const cl = c.toLowerCase();
+          return (
+            cl === mentionHandle ||
+            cl.replace(/\s+/g, "_") === mentionHandle ||
+            cl.replace(/\s+/g, "") === mentionHandle ||
+            cl.startsWith(mentionHandle)
+          );
+        });
+
         return (
           <span
             key={`mention-${i}-${j}`}
-            className="font-medium text-[#00A884] dark:text-[#25D366] bg-[#00A884]/10 dark:bg-[#25D366]/15 px-1 py-0.5 rounded inline-block cursor-pointer hover:underline"
+            className={cn(
+              "font-medium px-1.5 py-0.5 rounded-md inline-block cursor-pointer hover:underline transition-colors",
+              isMeMentioned
+                ? "text-emerald-700 dark:text-emerald-300 bg-emerald-500/20 dark:bg-emerald-500/30 font-semibold ring-1 ring-emerald-500/30"
+                : "text-[#00A884] dark:text-[#25D366] bg-[#00A884]/10 dark:bg-[#25D366]/15"
+            )}
             onClick={(e) => {
               e.stopPropagation();
               toast.info(`Mentioned: ${subPart.slice(1)}`);
@@ -736,7 +784,7 @@ export function GroupMessageBubble({
         {/* Message Text */}
         {!msg.poll && (msg.text || (!msg.mediaUrl && !isCallMessage && !msg.isSystem)) && (
           <div className="px-3.5 py-2 text-[14px] leading-relaxed break-words whitespace-pre-wrap">
-            {formatTextWithLinks(msg.text || "🔒 Encrypted group message")}
+            {formatTextWithLinks(msg.text || "🔒 Encrypted group message", currentUserId, members)}
           </div>
         )}
 

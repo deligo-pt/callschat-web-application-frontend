@@ -117,6 +117,7 @@ export interface GroupMessage {
   }[];
   reactions?: GroupMessageReactionItem[];
   poll?: GroupPollData | null;
+  mentions?: string[];
 }
 
 export interface PinnedMessage {
@@ -710,6 +711,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 receipts: msg.receipts || [],
                 reactions: msg.reactions || [],
                 poll: msg.poll || null,
+                mentions: msg.mentions || [],
               };
             })
           );
@@ -1194,6 +1196,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         systemMetadata: payload.systemMetadata,
         replyToId: payload.replyToId ?? null,
         replyTo: resolvedReplyTo,
+        mentions: payload.mentions || [],
       };
 
       setMessages((prev) => {
@@ -1831,7 +1834,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       text: string,
       replyToId?: string | null,
       mediaUrl?: string | null,
-      mediaType?: string | null
+      mediaType?: string | null,
+      mentions?: string[] | null
     ) => {
       if (!socket || !isConnected) throw new Error("Socket disconnected");
 
@@ -1876,6 +1880,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         replyTo: optimisticReplyTo,
         receipts: [],
         reactions: [],
+        mentions: mentions || [],
       };
       setMessages((prev) => [...prev, optimisticMsg]);
 
@@ -1988,6 +1993,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           mediaUrl: mediaUrl || null,
           mediaType: mediaType || null,
           replyToId: replyToId || null,
+          mentions: mentions || [],
         },
         (ack: any) => {
           if (ack?.success && ack?.messageId) {
@@ -2144,6 +2150,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             receipts: msg.receipts || [],
             reactions: msg.reactions || [],
             poll: msg.poll || null,
+            mentions: msg.mentions || [],
           });
         }
 
