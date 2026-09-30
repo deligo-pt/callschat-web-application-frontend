@@ -22,9 +22,10 @@ interface ChatInputProps {
     mediaUrl?: string | null;
   } | null;
   onCancelReply?: () => void;
+  onMediaSelect?: (file: File, initialCaption?: string) => void;
 }
 
-export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, onCancelReply }: ChatInputProps) {
+export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, onCancelReply, onMediaSelect }: ChatInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -109,11 +110,43 @@ export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, 
         if (docInputRef.current) docInputRef.current.value = "";
         return;
       }
-      setSelectedFile(file);
+      if (onMediaSelect) {
+        const captionToSend = inputText;
+        setInputText("");
+        onMediaSelect(file, captionToSend);
+      } else {
+        setSelectedFile(file);
+      }
     }
     // Reset both inputs so the same file can be selected again if needed
     if (galleryInputRef.current) galleryInputRef.current.value = "";
     if (docInputRef.current) docInputRef.current.value = "";
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          if (file.size > MAX_FILE_SIZE_BYTES) {
+            toast.error("File size exceeds the 25MB maximum limit.");
+            return;
+          }
+          if (onMediaSelect) {
+            const captionToSend = inputText;
+            setInputText("");
+            onMediaSelect(file, captionToSend);
+          } else {
+            setSelectedFile(file);
+          }
+          return;
+        }
+      }
+    }
   };
 
   const handleToggleRecording = async () => {
@@ -334,6 +367,7 @@ export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, 
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
               }}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               disabled={!isReady || isUploading}
               placeholder={isReady ? "Type a message" : "Setting up encryption..."}
               className="flex-1 bg-transparent text-[14.5px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:outline-none resize-none overflow-y-auto min-h-[22px] py-1 disabled:opacity-70"

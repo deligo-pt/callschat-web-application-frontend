@@ -2,8 +2,11 @@ import { decryptMessage, decryptGroupMessage } from "@/utils/crypto";
 import {
   getUserPrivateKey,
   getUserPublicKey,
+  getUserPrivateKeyRing,
   getDecryptedMessage,
   getStoredSenderKey,
+  getStoredGroupKey,
+  storeGroupKey,
   storeSenderKey,
 } from "@/utils/keyStore";
 import { decryptGroupSenderMessage, unwrapSenderKeyFromMember } from "@/utils/senderKeyEngine";
@@ -247,35 +250,64 @@ export async function decryptGroupNotification(
     }
   }
 
-  // 2. Check cached group key
+  // 2. Check IndexedDB cached group key first (avoids network round-trip)
   let gKey = groupKeyCache.get(groupId);
-  if (!gKey) {
+  if (!gKey && currentUserId) {
+    const cached = await getStoredGroupKey(groupId, currentUserId);
+    if (cached) {
+      gKey = cached;
+      groupKeyCache.set(groupId, cached);
+    }
+  }
+
+  // 3. If still not in cache, fetch envelope from server and decrypt using key ring
+  if (!gKey && currentUserId) {
     try {
       const keyRes = await groupService.fetchGroupKey(groupId);
       const encKey = keyRes.data?.encryptedGroupKey;
       const keyNonce = keyRes.data?.keyNonce;
-      if (encKey && keyNonce && currentUserId) {
-        const myPrivKey = await getUserPrivateKey(currentUserId);
-        const myPubKey = await getUserPublicKey(currentUserId);
-        if (myPrivKey && myPubKey) {
+      const senderId = keyRes.data?.senderId;
+      if (encKey && keyNonce) {
+        // Collect candidate sender public keys
+        const candidateSenderIds = [senderId, payload.senderId].filter(Boolean) as string[];
+        const candidatePubKeys: string[] = [];
+        for (const sId of candidateSenderIds) {
           try {
-            gKey = await decryptMessage(encKey, keyNonce, myPubKey, myPrivKey);
-          } catch {
-            const senderKeys = payload.senderId ? await getPeerPublicKeys(payload.senderId) : [];
-            for (const k of senderKeys) {
-              try {
-                gKey = await decryptMessage(encKey, keyNonce, k, myPrivKey);
-                break;
-              } catch {}
+            const res = await chatService.fetchRecipientKey(sId);
+            if (res?.data && Array.isArray(res.data)) {
+              for (const k of res.data) {
+                if (k.publicKey && !candidatePubKeys.includes(k.publicKey)) {
+                  candidatePubKeys.push(k.publicKey);
+                }
+              }
+            } else if (res?.data?.publicKey && !candidatePubKeys.includes(res.data.publicKey)) {
+              candidatePubKeys.push(res.data.publicKey);
             }
-          }
-          if (gKey) {
-            groupKeyCache.set(groupId, gKey);
+          } catch {}
+        }
+        // Also try own public key as a fallback (self-encrypted key path)
+        const myPubKey = await getUserPublicKey(currentUserId);
+        if (myPubKey && !candidatePubKeys.includes(myPubKey)) {
+          candidatePubKeys.push(myPubKey);
+        }
+
+        // Use full key ring to handle any key-format mismatch
+        const privKeyRing = await getUserPrivateKeyRing(currentUserId);
+        outer: for (const privKey of privKeyRing) {
+          for (const pubKey of candidatePubKeys) {
+            try {
+              gKey = await decryptMessage(encKey, keyNonce, pubKey, privKey);
+              if (gKey) {
+                groupKeyCache.set(groupId, gKey);
+                await storeGroupKey(groupId, currentUserId, gKey);
+                break outer;
+              }
+            } catch {}
           }
         }
       }
     } catch {
-      // ignore
+      // ignore network errors
     }
   }
 

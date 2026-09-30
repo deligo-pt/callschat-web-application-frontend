@@ -37,6 +37,7 @@ interface GroupInputProps {
     };
     role?: string;
   }>;
+  onMediaSelect?: (file: File, initialCaption?: string) => void;
 }
 
 const formatDuration = (seconds: number) => {
@@ -56,6 +57,7 @@ export function GroupInput({
   replyingTo,
   onCancelReply,
   members = [],
+  onMediaSelect,
 }: GroupInputProps) {
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -229,10 +231,42 @@ export function GroupInput({
         if (docInputRef.current) docInputRef.current.value = "";
         return;
       }
-      setSelectedFile(file);
+      if (onMediaSelect) {
+        const captionToSend = inputText;
+        setInputText("");
+        onMediaSelect(file, captionToSend);
+      } else {
+        setSelectedFile(file);
+      }
     }
     if (galleryInputRef.current) galleryInputRef.current.value = "";
     if (docInputRef.current) docInputRef.current.value = "";
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          if (file.size > MAX_FILE_SIZE_BYTES) {
+            toast.error("File size exceeds the 25MB maximum limit.");
+            return;
+          }
+          if (onMediaSelect) {
+            const captionToSend = inputText;
+            setInputText("");
+            onMediaSelect(file, captionToSend);
+          } else {
+            setSelectedFile(file);
+          }
+          return;
+        }
+      }
+    }
   };
 
   const handleToggleRecording = async () => {
@@ -450,6 +484,7 @@ export function GroupInput({
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               disabled={!isReady || isUploading}
               placeholder={isReady ? "Type a group message" : "Unlocking group keys..."}
               className="flex-1 bg-transparent text-[14.5px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:outline-none resize-none overflow-y-auto min-h-[22px] py-1 disabled:opacity-70"
