@@ -50,7 +50,7 @@ import apiClient from "@/services/api.client";
 import { useGroupChat, QuotedMessage, GroupMessage } from "@/hooks/useGroupChat";
 import { useContacts, Contact } from "@/hooks/useContacts";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
-import { getUserPrivateKey, getStoredGroupKey } from "@/utils/keyStore";
+import { getUserPrivateKey, getUserPrivateKeyRing, getStoredGroupKey, storeGroupKey } from "@/utils/keyStore";
 import { chatService } from "@/services/chat.service";
 import { groupService } from "@/services/group.service";
 import { useSocket } from "@/components/providers/SocketProvider";
@@ -82,6 +82,7 @@ import { CreatePollModal } from "@/components/group/CreatePollModal";
 import { InviteLinkModal } from "@/components/group/InviteLinkModal";
 import { GroupSettingsDrawer } from "@/components/group/GroupSettingsDrawer";
 import { AddMemberModal } from "@/components/group/AddMemberModal";
+import { GroupMediaPreviewModal } from "@/components/group/GroupMediaPreviewModal";
 import { useTranslations } from "next-intl";
 import { useGroupStore } from "@/hooks/useGroupStore";
 import { useUser } from "@/context/UserContext";
@@ -181,6 +182,12 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
 
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Clipboard Paste & Drag-and-Drop Media states
+  const [pastedMediaFile, setPastedMediaFile] = useState<File | null>(null);
+  const [pastedMediaCaption, setPastedMediaCaption] = useState<string>("");
+  const [isMediaPreviewOpen, setIsMediaPreviewOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
 
   const {
@@ -314,41 +321,68 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   const handleAddMember = async (userId: string) => {
     setIsAddingMember(true);
     try {
-      const myPrivKey = await getUserPrivateKey(currentUserId);
-      if (!myPrivKey) {
+      // Use the full private key ring (current + historical + raw stored) to handle
+      // key format mismatches between SignalProtocolStore and raw X25519 keys
+      const privKeyRing = await getUserPrivateKeyRing(currentUserId);
+      if (privKeyRing.length === 0) {
         throw new Error("Private key not found. Please refresh the page.");
       }
+      // Use the first (current) key for encryption
+      const myPrivKey = privKeyRing[0];
 
+      // 1. Try cached group key first
       let gKey = await getStoredGroupKey(groupId, currentUserId);
 
+      // 2. Fetch and decrypt the group key envelope using all key ring candidates
       if (!gKey) {
         const keyRes = await groupService.fetchGroupKey(groupId);
         if (keyRes.success && keyRes.data) {
           const { encryptedGroupKey, keyNonce, senderId } = keyRes.data;
-          let senderPubKey = "";
-          if (senderId) {
-            const senderRes = await chatService.fetchRecipientKey(senderId);
-            if (senderRes?.data && Array.isArray(senderRes.data) && senderRes.data.length > 0) {
-              senderPubKey = senderRes.data[0].publicKey;
-            } else if (senderRes?.success && senderRes?.data?.publicKey) {
-              senderPubKey = senderRes.data.publicKey;
-            }
+
+          // Collect all candidate sender public keys (original sender + creator + self)
+          const candidateSenderIds = [
+            senderId,
+            groupDetails?.createdBy,
+            currentUserId,
+          ].filter((id): id is string => !!id);
+
+          const candidatePubKeys: string[] = [];
+          for (const sId of candidateSenderIds) {
+            try {
+              const res = await chatService.fetchRecipientKey(sId);
+              if (res?.data && Array.isArray(res.data)) {
+                for (const k of res.data) {
+                  if (k.publicKey && !candidatePubKeys.includes(k.publicKey)) {
+                    candidatePubKeys.push(k.publicKey);
+                  }
+                }
+              } else if (res?.data?.publicKey && !candidatePubKeys.includes(res.data.publicKey)) {
+                candidatePubKeys.push(res.data.publicKey);
+              }
+            } catch {}
           }
 
-          if (senderPubKey) {
-            try {
-              gKey = await decryptMessage(encryptedGroupKey, keyNonce, senderPubKey, myPrivKey);
-            } catch (err) {
-              console.warn("Failed to decrypt group key envelope", err);
+          // Try every combination of (private key, sender public key)
+          outer: for (const privKey of privKeyRing) {
+            for (const pubKey of candidatePubKeys) {
+              try {
+                gKey = await decryptMessage(encryptedGroupKey, keyNonce, pubKey, privKey);
+                if (gKey) {
+                  // Cache the unlocked key so we don't repeat this work
+                  await storeGroupKey(groupId, currentUserId, gKey);
+                  break outer;
+                }
+              } catch {}
             }
           }
         }
       }
 
       if (!gKey) {
-        throw new Error("Group symmetric key is not unlocked yet. Please refresh the page.");
+        throw new Error("Group symmetric key is not unlocked. Please open the group chat first to sync keys.");
       }
 
+      // 3. Fetch target member's public key
       const resKey = await chatService.fetchRecipientKey(userId);
       let targetPubKey = "";
       if (resKey?.data && Array.isArray(resKey.data) && resKey.data.length > 0) {
@@ -361,6 +395,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
         throw new Error("Could not find public encryption key for this user.");
       }
 
+      // 4. Encrypt group key for new member and submit
       const { ciphertext, nonce } = await encryptMessage(gKey, targetPubKey, myPrivKey);
       const res = await groupService.addMember(groupId, userId, ciphertext, nonce);
 
@@ -491,8 +526,30 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     setIsScrolledUp(false);
   };
 
-  const handleSend = async (text: string, file: File | null) => {
+  const handleSend = async (text: string, file: File | null, mentions?: string[]) => {
     if (!isReady) return;
+
+    let targetMentions = mentions;
+    if (!targetMentions && text && groupMembers.length > 0) {
+      const extracted: string[] = [];
+      if (/@(all|everyone)\b/i.test(text)) {
+        extracted.push("ALL");
+      }
+      groupMembers.forEach((m) => {
+        const name = m.name || m.user?.profile?.displayName || m.user?.username || "";
+        if (name) {
+          const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const regex = new RegExp(`@${escaped}\\b`, "i");
+          if (regex.test(text)) {
+            extracted.push(m.userId);
+          }
+        }
+      });
+      if (extracted.length > 0) {
+        targetMentions = Array.from(new Set(extracted));
+      }
+    }
+
     if (file) {
       if (file.size > 25 * 1024 * 1024) {
         toast.error("File size exceeds the 25MB maximum limit.");
@@ -524,7 +581,8 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           text.trim(),
           replyingTo?.id,
           uploadRes.data.mediaUrl,
-          mediaType
+          mediaType,
+          targetMentions
         );
         setReplyingTo(null);
       } catch (err: any) {
@@ -535,8 +593,84 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
       }
     } else {
       if (!text.trim()) return;
-      await sendMessage(text.trim(), replyingTo?.id);
+      await sendMessage(text.trim(), replyingTo?.id, null, null, targetMentions);
       setReplyingTo(null);
+    }
+  };
+
+  // Handle global paste for media (e.g. screenshots, copied photos, files)
+  useEffect(() => {
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      // Don't intercept if user is typing in another modal/search dialog
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.closest("[role='dialog']") ||
+          (activeEl.tagName === "INPUT" && (activeEl as HTMLInputElement).type === "text")) &&
+        !isMediaPreviewOpen
+      ) {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            if (file.size > 25 * 1024 * 1024) {
+              toast.error("File size exceeds the 25MB maximum limit.");
+              return;
+            }
+            setPastedMediaFile(file);
+            setPastedMediaCaption("");
+            setIsMediaPreviewOpen(true);
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handleWindowPaste);
+    return () => window.removeEventListener("paste", handleWindowPaste);
+  }, [isMediaPreviewOpen]);
+
+  const handleMediaSelectFromInput = (file: File, initialCaption?: string) => {
+    setPastedMediaFile(file);
+    setPastedMediaCaption(initialCaption || "");
+    setIsMediaPreviewOpen(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingFile) setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+      if (file.size > 25 * 1024 * 1024) {
+        toast.error("File size exceeds the 25MB maximum limit.");
+        return;
+      }
+      setPastedMediaFile(file);
+      setPastedMediaCaption("");
+      setIsMediaPreviewOpen(true);
     }
   };
 
@@ -618,7 +752,25 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   const activePinned = pinnedMessages && pinnedMessages.length > 0 ? pinnedMessages[0] : null;
 
   return (
-    <div className="flex h-full w-full relative overflow-hidden">
+    <div
+      className="flex h-full w-full relative overflow-hidden"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag & drop overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 z-50 bg-[#00A884]/20 backdrop-blur-xs flex flex-col items-center justify-center border-2 border-dashed border-[#00A884] rounded-2xl pointer-events-none transition-all">
+          <div className="bg-white dark:bg-[#111b21] p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-3 animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-[#00A884]">
+              <ImageIcon className="w-7 h-7" />
+            </div>
+            <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Drop file to send to group</p>
+            <p className="text-xs text-gray-500">Photos, videos, or documents</p>
+          </div>
+        </div>
+      )}
+
       {/* Main Chat Area */}
       <div
         className={cn(
@@ -994,6 +1146,8 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
           members={groupMembers}
+          currentUserId={currentUserId}
+          onMediaSelect={handleMediaSelectFromInput}
         />
       </div>
 
@@ -1199,6 +1353,26 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
         existingMemberUserIds={groupMembers.map((m) => m.userId || m.user?.id || m.id)}
         isAddingMember={isAddingMember}
         onSelectUser={handleAddMember}
+      />
+
+      {/* WhatsApp-style Media Preview Modal for Pasted or Attached Media */}
+      <GroupMediaPreviewModal
+        isOpen={isMediaPreviewOpen}
+        file={pastedMediaFile}
+        initialCaption={pastedMediaCaption}
+        isUploading={isUploading}
+        replyingTo={replyingTo}
+        onClose={() => {
+          setIsMediaPreviewOpen(false);
+          setPastedMediaFile(null);
+          setPastedMediaCaption("");
+        }}
+        onSend={async (file, caption) => {
+          await handleSend(caption, file);
+          setIsMediaPreviewOpen(false);
+          setPastedMediaFile(null);
+          setPastedMediaCaption("");
+        }}
       />
 
       <MessageInfoModal

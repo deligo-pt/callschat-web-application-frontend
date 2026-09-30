@@ -61,6 +61,13 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
     const handleGroupMessage = (data: any) => {
       if (data && data.groupId) {
         updateGroupMessageTimestamp(data.groupId, data.content || data.message || "New message");
+        const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+        if (socket && data.id && data.senderId && data.senderId !== currentUserId) {
+          socket.emit("group:mark_delivered", {
+            groupId: data.groupId,
+            messageId: data.id,
+          });
+        }
       } else {
         fetchGroups(true);
       }

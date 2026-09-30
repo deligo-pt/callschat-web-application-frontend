@@ -566,6 +566,14 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         lastMsgObj
       );
 
+      // Proactively mark delivered in background so sender receives double ticks
+      if (socket && payload.id && payload.senderId && payload.senderId !== currentUserIdRef.current) {
+        socket.emit("group:mark_delivered", {
+          groupId,
+          messageId: payload.id,
+        });
+      }
+
       if (payload.text || payload.content || payload.message) {
         const text = payload.text || payload.content || payload.message;
         setDecryptedPreviews((prev) => ({

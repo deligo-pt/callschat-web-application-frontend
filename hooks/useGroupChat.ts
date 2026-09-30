@@ -117,6 +117,7 @@ export interface GroupMessage {
   }[];
   reactions?: GroupMessageReactionItem[];
   poll?: GroupPollData | null;
+  mentions?: string[];
 }
 
 export interface PinnedMessage {
@@ -710,6 +711,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 receipts: msg.receipts || [],
                 reactions: msg.reactions || [],
                 poll: msg.poll || null,
+                mentions: msg.mentions || [],
               };
             })
           );
@@ -746,16 +748,148 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     setupGroupKey();
   }, [groupId, currentUserId, keysReady]);
 
-  // ── Socket: Room Subscription ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!socket || !isConnected || !groupId) return;
+  // ── Catch-Up Synchronization (Missed Messages Recovery) ───────────────────
+  const syncMissedMessages = useCallback(async () => {
+    if (!groupId) return;
+    const myId = currentUserIdRef.current || currentUserId;
+    if (!myId) return;
 
-    socket.emit("group:join_room", { groupId });
+    try {
+      const historyRes = await groupService.fetchGroupMessages(groupId);
+      if (!historyRes.success || !Array.isArray(historyRes.data) || historyRes.data.length === 0) {
+        return;
+      }
+
+      const existingIds = new Set(messagesRef.current.map((m) => m.id));
+      const missingRaw = historyRes.data.filter((m: any) => m.id && !existingIds.has(m.id));
+      if (missingRaw.length === 0) return;
+
+      const currentKey = groupKeyRef.current;
+      const newDecryptedMessages: GroupMessage[] = [];
+
+      for (const msg of missingRaw) {
+        let text =
+          (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
+          (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+          (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
+
+        if (!text && msg.id) text = await getDecryptedMessage(myId, msg.id);
+        if (!text && msg.nonce) text = await getDecryptedMessage(myId, `nonce_${msg.nonce}`);
+        if (!text && msg.ciphertext) text = await getDecryptedMessage(myId, `cipher_${msg.ciphertext}`);
+
+        if (!text && msg.ciphertext && msg.nonce) {
+          try {
+            const targetIter = msg.senderKeyIteration ?? 0;
+            const decResult = await decryptGroupSenderMessage(
+              groupId,
+              msg.senderId,
+              msg.ciphertext,
+              msg.nonce,
+              targetIter,
+              myId
+            );
+            text = parseEditedText(decResult.plaintext).text;
+          } catch {
+            if (currentKey) {
+              try {
+                const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, currentKey);
+                text = parseEditedText(dec).text;
+              } catch {}
+            }
+          }
+        }
+
+        if (text) {
+          sentPlaintextCacheRef.current.set(msg.id, text);
+          if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, text);
+          if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, text);
+          void storeDecryptedMessage(myId, msg.id, text);
+        }
+
+        const replyTo = await resolveGroupQuotedMessage(
+          msg.replyTo,
+          myId,
+          currentKey,
+          new Map()
+        );
+
+        newDecryptedMessages.push({
+          id: msg.id,
+          groupId: msg.groupId,
+          senderId: msg.senderId,
+          text: text || (msg.ciphertext && !msg.mediaUrl ? "🔒 Encrypted message" : ""),
+          isEdited: msg.isEdited ?? false,
+          createdAt: msg.createdAt,
+          mediaUrl: msg.mediaUrl,
+          mediaType: msg.mediaType,
+          sender: msg.sender,
+          isDeleted: msg.isDeleted,
+          deletedByAdmin: msg.deletedByAdmin,
+          isSystem: msg.isSystem,
+          systemEventType: msg.systemEventType,
+          systemMetadata: msg.systemMetadata,
+          replyToId: msg.replyToId ?? null,
+          replyTo,
+          receipts: msg.receipts || [],
+          reactions: msg.reactions || [],
+          poll: msg.poll || null,
+        });
+
+        // Automatically stamp delivery for caught-up messages
+        if (socket && msg.senderId !== myId) {
+          socket.emit("group:mark_delivered", { groupId, messageId: msg.id });
+        }
+      }
+
+      setMessages((prev) => {
+        const idSet = new Set(prev.map((m) => m.id));
+        const toAdd = newDecryptedMessages.filter((m) => !idSet.has(m.id));
+        if (toAdd.length === 0) return prev;
+        const merged = [...prev, ...toAdd];
+        merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        return merged;
+      });
+    } catch (catchupErr) {
+      console.warn("[useGroupChat] Missed message catch-up error:", catchupErr);
+    }
+  }, [groupId, socket, currentUserId]);
+
+  // ── Socket: Room Subscription & Reconnect Catch-Up ─────────────────────────
+  useEffect(() => {
+    if (!socket || !groupId) return;
+
+    if (isConnected) {
+      socket.emit("group:join_room", { groupId });
+      void syncMissedMessages();
+    }
+
+    const handleConnect = () => {
+      socket.emit("group:join_room", { groupId });
+      void syncMissedMessages();
+    };
+
+    const handleWindowFocus = () => {
+      if (document.visibilityState === "visible") {
+        if (socket.connected) {
+          socket.emit("group:join_room", { groupId });
+        }
+        void syncMissedMessages();
+      }
+    };
+
+    socket.on("connect", handleConnect);
+    document.addEventListener("visibilitychange", handleWindowFocus);
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("online", handleWindowFocus);
 
     return () => {
+      socket.off("connect", handleConnect);
+      document.removeEventListener("visibilitychange", handleWindowFocus);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("online", handleWindowFocus);
       socket.emit("group:leave_room", { groupId });
     };
-  }, [socket, isConnected, groupId]);
+  }, [socket, isConnected, groupId, syncMissedMessages]);
 
   // ── Automatic Group Re-Keying Protocol (Forward Secrecy) ──────────────────
   const performRekey = useCallback(
@@ -1062,6 +1196,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         systemMetadata: payload.systemMetadata,
         replyToId: payload.replyToId ?? null,
         replyTo: resolvedReplyTo,
+        mentions: payload.mentions || [],
       };
 
       setMessages((prev) => {
@@ -1699,7 +1834,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       text: string,
       replyToId?: string | null,
       mediaUrl?: string | null,
-      mediaType?: string | null
+      mediaType?: string | null,
+      mentions?: string[] | null
     ) => {
       if (!socket || !isConnected) throw new Error("Socket disconnected");
 
@@ -1744,6 +1880,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         replyTo: optimisticReplyTo,
         receipts: [],
         reactions: [],
+        mentions: mentions || [],
       };
       setMessages((prev) => [...prev, optimisticMsg]);
 
@@ -1845,18 +1982,37 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
-      socket.emit("group:send_message", {
-        groupId,
-        ciphertext,
-        nonce,
-        messageType: messageType || 7,
-        senderKeyIteration,
-        mediaUrl: mediaUrl || null,
-        mediaType: mediaType || null,
-        replyToId: replyToId || null,
-      });
+      socket.emit(
+        "group:send_message",
+        {
+          groupId,
+          ciphertext,
+          nonce,
+          messageType: messageType || 7,
+          senderKeyIteration,
+          mediaUrl: mediaUrl || null,
+          mediaType: mediaType || null,
+          replyToId: replyToId || null,
+          mentions: mentions || [],
+        },
+        (ack: any) => {
+          if (ack?.success && ack?.messageId) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === optimisticId
+                  ? { ...m, id: ack.messageId, createdAt: ack.createdAt || m.createdAt }
+                  : m
+              )
+            );
+            if (text && currentUserId) {
+              sentPlaintextCacheRef.current.set(ack.messageId, text);
+              void storeDecryptedMessage(currentUserId, ack.messageId, text);
+            }
+          }
+        }
+      );
     },
-    [socket, isConnected, groupId]
+    [socket, isConnected, groupId, currentUserId]
   );
 
   const startTyping = useCallback(() => {
@@ -1994,6 +2150,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             receipts: msg.receipts || [],
             reactions: msg.reactions || [],
             poll: msg.poll || null,
+            mentions: msg.mentions || [],
           });
         }
 

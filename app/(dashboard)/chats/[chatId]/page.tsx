@@ -31,6 +31,7 @@ import { ChatOptionsMenu } from "@/components/chat/ChatOptionsMenu";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MediaGallery } from "@/components/chat/MediaGallery";
+import { MediaPreviewModal } from "@/components/chat/MediaPreviewModal";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { ContactProfileModal } from "@/components/chat/ContactProfileModal";
 import { SecurityCodeModal } from "@/components/chat/SecurityCodeModal";
@@ -306,6 +307,12 @@ function ChatRoomPageContent() {
 
   const [isMuted, setIsMuted] = useState(false);
   const [replyingTo, setReplyingTo] = useState<QuotedMessage | null>(null);
+
+  // Clipboard Paste & Drag-and-Drop Media states
+  const [pastedMediaFile, setPastedMediaFile] = useState<File | null>(null);
+  const [pastedMediaCaption, setPastedMediaCaption] = useState<string>("");
+  const [isMediaPreviewOpen, setIsMediaPreviewOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -620,6 +627,82 @@ function ChatRoomPageContent() {
     sendMessage(text, currentUserId, file, false, currentReply);
   };
 
+  // Handle global paste for media (e.g. screenshots, copied photos, files)
+  useEffect(() => {
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      // Don't intercept if user is typing in another modal/search dialog
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.closest("[role='dialog']") ||
+          (activeEl.tagName === "INPUT" && (activeEl as HTMLInputElement).type === "text")) &&
+        !isMediaPreviewOpen
+      ) {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            if (file.size > 25 * 1024 * 1024) {
+              toast.error("File size exceeds the 25MB maximum limit.");
+              return;
+            }
+            setPastedMediaFile(file);
+            setPastedMediaCaption("");
+            setIsMediaPreviewOpen(true);
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handleWindowPaste);
+    return () => window.removeEventListener("paste", handleWindowPaste);
+  }, [isMediaPreviewOpen]);
+
+  const handleMediaSelectFromInput = (file: File, initialCaption?: string) => {
+    setPastedMediaFile(file);
+    setPastedMediaCaption(initialCaption || "");
+    setIsMediaPreviewOpen(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingFile) setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+      if (file.size > 25 * 1024 * 1024) {
+        toast.error("File size exceeds the 25MB maximum limit.");
+        return;
+      }
+      setPastedMediaFile(file);
+      setPastedMediaCaption("");
+      setIsMediaPreviewOpen(true);
+    }
+  };
+
   if (!conversationId) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#F8FAFC]">
@@ -629,7 +712,25 @@ function ChatRoomPageContent() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col bg-[#F8FAFC]">
+    <div
+      className="flex h-full w-full flex-col bg-[#F8FAFC] relative overflow-hidden"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag & drop overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 z-50 bg-[#00A884]/20 backdrop-blur-xs flex flex-col items-center justify-center border-2 border-dashed border-[#00A884] rounded-2xl pointer-events-none transition-all">
+          <div className="bg-white dark:bg-[#111b21] p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-3 animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-[#00A884]">
+              <Images className="w-7 h-7" />
+            </div>
+            <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Drop file to send to chat</p>
+            <p className="text-xs text-gray-500">Photos, videos, or documents</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ──────────────────────────────────────────────────────── */}
       {isBizChat ? (
         <BusinessChatHeader
@@ -1021,8 +1122,29 @@ function ChatRoomPageContent() {
           onTyping={handleTyping}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
+          onMediaSelect={handleMediaSelectFromInput}
         />
       )}
+
+      {/* WhatsApp-style Media Preview Modal for Pasted or Attached Media */}
+      <MediaPreviewModal
+        isOpen={isMediaPreviewOpen}
+        file={pastedMediaFile}
+        initialCaption={pastedMediaCaption}
+        isUploading={isUploading || isSendingFirstBizMessage}
+        replyingTo={replyingTo}
+        onClose={() => {
+          setIsMediaPreviewOpen(false);
+          setPastedMediaFile(null);
+          setPastedMediaCaption("");
+        }}
+        onSend={async (file, caption) => {
+          await handleSend(caption, file);
+          setIsMediaPreviewOpen(false);
+          setPastedMediaFile(null);
+          setPastedMediaCaption("");
+        }}
+      />
 
       {/* ── Media Gallery ─────────────────────────────────────────────────── */}
       {!isBizChat && (

@@ -197,16 +197,25 @@ export const useGlobalNotifications = (
         return;
       }
 
-      // Check if group is locally muted
-      try {
-        const mutedRaw = localStorage.getItem(`muted_group_${groupId}`);
-        if (mutedRaw) {
-          const mutedData = JSON.parse(mutedRaw);
-          if (mutedData.isMuted && (!mutedData.until || new Date(mutedData.until) > new Date())) {
-            return;
+      const mentions: string[] = payload.mentions || [];
+      const currentUserId = currentUserIdRef.current || "";
+      const isMentioned =
+        mentions.includes(currentUserId) ||
+        mentions.includes("ALL") ||
+        mentions.includes("all");
+
+      // Check if group is locally muted (bypassed if user is specifically mentioned or @all)
+      if (!isMentioned) {
+        try {
+          const mutedRaw = localStorage.getItem(`muted_group_${groupId}`);
+          if (mutedRaw) {
+            const mutedData = JSON.parse(mutedRaw);
+            if (mutedData.isMuted && (!mutedData.until || new Date(mutedData.until) > new Date())) {
+              return;
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
 
       // Play WhatsApp notification chime
       playNotificationSound("message");
@@ -247,7 +256,11 @@ export const useGlobalNotifications = (
         Notification.permission === "granted"
       ) {
         try {
-          const nativeNotif = new Notification(`${groupName} (${senderName})`, {
+          const notifHeader = isMentioned
+            ? `@ Mentioned in ${groupName} (${senderName})`
+            : `${groupName} (${senderName})`;
+
+          const nativeNotif = new Notification(notifHeader, {
             body: preview.displayText,
             icon: groupAvatar || senderAvatar || "/call_chats_logo.png",
             tag: `group-${groupId}`,
@@ -265,7 +278,7 @@ export const useGlobalNotifications = (
       toast.custom(
         (t) => (
           <WhatsAppNotificationCard
-            title={groupName}
+            title={isMentioned ? `@ Mentioned in ${groupName}` : groupName}
             senderName={senderName}
             isGroup={true}
             displayText={preview.displayText}
