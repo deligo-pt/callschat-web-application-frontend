@@ -18,6 +18,7 @@ import { decryptGroupNotification } from "@/utils/notificationPreview";
 import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey, getStoredSenderKey, storeSenderKey } from "@/utils/keyStore";
 import { wrapSenderKeyForMember } from "@/utils/senderKeyEngine";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { formatGroupPreviewText } from "@/lib/group-preview";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { motion } from "framer-motion";
 import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
@@ -51,6 +52,10 @@ interface Conversation {
     ticketId?: string | null;
     mediaType: string | null;
     mediaUrl?: string | null;
+    isSystem?: boolean;
+    systemEventType?: string | null;
+    systemMetadata?: any;
+    pollQuestion?: string | null;
     previewText?: string | null;
     messageType?: number | null;
     encryptedKeys?: any;
@@ -160,6 +165,11 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                   nonce: g.lastMessage.nonce,
                   mediaType: g.lastMessage.mediaType,
                   mediaUrl: g.lastMessage.mediaUrl,
+                  isSystem: g.lastMessage.isSystem,
+                  systemEventType: g.lastMessage.systemEventType,
+                  systemMetadata: g.lastMessage.systemMetadata,
+                  pollQuestion: g.lastMessage.pollQuestion,
+                  receipts: g.lastMessage.receipts,
                   createdAt: g.lastMessage.createdAt,
                 }
               : null,
@@ -1001,12 +1011,17 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     const msg = conv.lastMessage;
     if (!msg) return conv.isGroup ? "Group created" : "No messages yet";
 
+    // ── Groups use WhatsApp-standard formatter ───────────────────────
+    if (conv.isGroup) {
+      const cached = decryptedPreviews[conv.id] || (msg.id ? decryptedPreviews[msg.id] : null) || (msg as any).previewText;
+      const formatted = formatGroupPreviewText(msg, currentUserId, cached);
+      return formatted.isSystemEvent
+        ? formatted.previewText
+        : `${formatted.senderPrefix}${formatted.previewText}`;
+    }
+
     const isMe = msg.senderId === currentUserId;
-    const youPrefix = isMe
-      ? "You: "
-      : conv.isGroup && msg.senderName
-      ? `${msg.senderName.split(" ")[0]}: `
-      : "";
+    const youPrefix = isMe ? "You: " : "";
 
     // ── Media-type previews ──────────────────────────────────────────
     if (msg.mediaType === "image" || msg.mediaType?.startsWith("image")) return `${youPrefix}📷 Photo`;
@@ -1052,9 +1067,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     } else if (msg.ticketId && msg.ciphertext) {
       textToPreview = msg.ciphertext;
     } else if (failedDecryptionsRef.current.has(msg.id) || failedDecryptionsRef.current.has(conv.id)) {
-      return conv.isGroup ? `${youPrefix}🔒 Group message` : `${youPrefix}🔒 Encrypted message`;
+      return `${youPrefix}🔒 Encrypted message`;
     } else if (msg.ciphertext) {
-      return conv.isGroup ? `${youPrefix}🔒 Group message` : `${youPrefix}🔒 Encrypted message`;
+      return `${youPrefix}🔒 Encrypted message`;
     } else {
       // Not yet decrypted / in flight: return empty string to prevent the flash!
       return "";
@@ -1093,10 +1108,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
   const getPreviewStatusIcon = (conv: Conversation) => {
     if (!conv.lastMessage || conv.lastMessage.senderId !== currentUserId) return null;
-    if (conv.isGroup) {
-      return <Check className="h-3.5 w-3.5 shrink-0 text-[#8696A0] inline-block mr-1" strokeWidth={2.2} />;
-    }
     const msg = conv.lastMessage;
+    if (msg.isSystem || msg.systemEventType) return null;
+
     if (msg.id.startsWith("optimistic-") && (!msg.receipts || msg.receipts.length === 0)) {
       return <Clock className="h-3.5 w-3.5 shrink-0 text-[#8696A0] animate-pulse inline-block mr-1" />;
     }
