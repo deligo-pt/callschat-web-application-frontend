@@ -29,6 +29,11 @@ export interface GroupItem {
     nonce: string | null;
     mediaType: string | null;
     mediaUrl?: string | null;
+    isSystem?: boolean;
+    systemEventType?: string | null;
+    systemMetadata?: any;
+    pollQuestion?: string | null;
+    receipts?: Array<{ userId: string; deliveredAt?: string | null; seenAt?: string | null }>;
     createdAt: string;
   } | null;
 }
