@@ -42,6 +42,7 @@ import { InviteParticipantModal } from "./InviteParticipantModal";
 import { DeviceSettingsModal } from "./DeviceSettingsModal";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { resolveLivekitUrl } from "@/utils/livekit";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Inner layout — must be a child of <LiveKitRoom> so LiveKit hooks work
@@ -348,12 +349,16 @@ export const CustomCallLayout = ({
   }, [activeCall?.startedAt]);
 
   const formatDuration = (seconds: number) => {
-    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
+    if (h > 0) {
+      return `${h}:${m}:${s}`;
+    }
     return `${m}:${s}`;
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = React.useCallback(() => {
     if (onEndCallOverride) {
       onEndCallOverride();
       return;
@@ -363,7 +368,54 @@ export const CustomCallLayout = ({
     } else if (activeCall) {
       hangupCall(activeCall.callId);
     }
-  };
+  }, [onEndCallOverride, activeCall, leaveGroupCall, hangupCall]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // WhatsApp-style Alone-in-Group-Call Auto-Hangup
+  // If everyone else has left an active group call, display a countdown banner
+  // and automatically end the call after 45 seconds if no one rejoins.
+  // ─────────────────────────────────────────────────────────────────────────
+  const hadRemoteParticipantsRef = React.useRef(false);
+  const [aloneCountdown, setAloneCountdown] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!activeCall?.isGroup) return;
+
+    if (remoteParticipants.length > 0) {
+      hadRemoteParticipantsRef.current = true;
+      if (aloneCountdown !== null) {
+        setAloneCountdown(null);
+      }
+      return;
+    }
+
+    // Trigger auto-countdown if previously had remote participants and now 0 remain,
+    // OR if alone for over 60 seconds from call start without anyone joining.
+    if (
+      (hadRemoteParticipantsRef.current && remoteParticipants.length === 0) ||
+      (!hadRemoteParticipantsRef.current && duration >= 60 && remoteParticipants.length === 0)
+    ) {
+      if (aloneCountdown === null) {
+        setAloneCountdown(45);
+      }
+    }
+  }, [activeCall?.isGroup, remoteParticipants.length, duration, aloneCountdown]);
+
+  React.useEffect(() => {
+    if (aloneCountdown === null) return;
+
+    if (aloneCountdown <= 0) {
+      toast.info("Group call ended because everyone left.");
+      handleEndCall();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setAloneCountdown((c) => (c !== null ? c - 1 : null));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [aloneCountdown, handleEndCall]);
 
   const handleBackNavigation = () => {
     if (isStandaloneWindow && onReturnToMain) {
@@ -554,7 +606,7 @@ export const CustomCallLayout = ({
   let singleAvatarUrl = activeCall?.peerAvatar || "";
 
   if (isMultiParty) {
-    singlePeerName = "CallsChat Group Call";
+    singlePeerName = activeCall?.peerName || "CallsChat Group Call";
   } else if (remotePeer) {
     const liveName = remotePeer.name || remotePeer.identity || "";
     try {
@@ -935,8 +987,13 @@ export const CustomCallLayout = ({
                 <span>End-to-End Encrypted</span>
               </div>
               <h2 className="text-[16px] font-semibold tracking-wide text-[#E9EDEF]">
-                {isMultiParty ? "CallsChat Group Call" : "CallsChat Call"}
+                {isMultiParty ? (activeCall?.peerName || "CallsChat Group Call") : "CallsChat Call"}
               </h2>
+              {isMultiParty && (
+                <span className="text-[13px] md:text-[14px] font-semibold text-[#25D366] tracking-wider font-mono">
+                  {formatDuration(duration)}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1051,6 +1108,25 @@ export const CustomCallLayout = ({
             )}
           </div>
     
+          {/* WhatsApp-Style Alone-in-Group-Call Countdown Banner */}
+          {aloneCountdown !== null && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 rounded-full bg-[#182229]/95 border border-amber-500/40 px-4 py-1.5 text-white text-xs font-semibold shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+              <span className="relative flex h-2 w-2 items-center justify-center">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+              </span>
+              <span className="text-[#E9EDEF]">
+                {hadRemoteParticipantsRef.current ? "Everyone left the call" : "Waiting for others to join"} · Ending in <span className="font-mono text-amber-400 font-bold">{aloneCountdown}s</span>
+              </span>
+              <button
+                onClick={handleEndCall}
+                className="ml-1.5 px-2 py-0.5 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 text-[11px] font-bold transition-colors cursor-pointer"
+              >
+                Leave
+              </button>
+            </div>
+          )}
+
           {/* WhatsApp-Style Speech-While-Muted Notification */}
           {isLocalSpeaking && !isMicrophoneEnabled && (
             <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-[#EA0038]/90 px-4 py-1.5 text-white text-xs font-semibold shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-none">
@@ -1210,6 +1286,25 @@ export const CustomCallLayout = ({
           </div>
         )}
       </div>
+
+      {/* WhatsApp-Style Alone-in-Group-Call Countdown Banner */}
+      {aloneCountdown !== null && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 rounded-full bg-[#182229]/95 border border-amber-500/40 px-4 py-1.5 text-white text-xs font-semibold shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+          <span className="relative flex h-2 w-2 items-center justify-center">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+          </span>
+          <span className="text-[#E9EDEF]">
+            {hadRemoteParticipantsRef.current ? "Everyone left the call" : "Waiting for others to join"} · Ending in <span className="font-mono text-amber-400 font-bold">{aloneCountdown}s</span>
+          </span>
+          <button
+            onClick={handleEndCall}
+            className="ml-1.5 px-2 py-0.5 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 text-[11px] font-bold transition-colors cursor-pointer"
+          >
+            Leave
+          </button>
+        </div>
+      )}
 
       {/* WhatsApp-Style Speech-While-Muted Notification */}
       {isLocalSpeaking && !isMicrophoneEnabled && (
