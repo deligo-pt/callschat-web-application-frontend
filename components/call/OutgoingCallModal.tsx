@@ -8,10 +8,10 @@ import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export const OutgoingCallModal = () => {
-  const { outgoingCall, outgoingCallStatus, cancelOutgoingCall } = useCallContext();
+  const { outgoingCall, activeCall, isCallPoppedOut, outgoingCallStatus, cancelOutgoingCall } = useCallContext();
   const { getContact } = useContacts();
 
-  if (!outgoingCall) return null;
+  if (!outgoingCall || activeCall || isCallPoppedOut) return null;
 
   const contact = outgoingCall.receiverId ? getContact(outgoingCall.receiverId) : undefined;
   const resolved = resolveDisplayName(

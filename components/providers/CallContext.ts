@@ -32,8 +32,9 @@ export interface CallContextType {
   cancelGroupCall: (groupId: string) => void;
   acceptGroupCall: (groupId: string) => void;
   rejectGroupCall: (groupId: string) => void;
-  joinGroupCall: (groupId: string) => void;
+  joinGroupCall: (groupId: string, callType?: 'AUDIO' | 'VIDEO') => void;
   leaveGroupCall: (callId: string) => void;
+  clearActiveGroupCall: (groupId: string) => void;
   /**
    * Pass this as `onDisconnected` to `<LiveKitRoom>`.
    * Guards against the DataChannel error → onDisconnected → double-hangup cascade.

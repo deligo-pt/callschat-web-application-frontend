@@ -6,7 +6,7 @@ import { useCallContext } from "@/components/providers/CallContext";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export const GroupOutgoingModal = () => {
-  const { outgoingGroupCall, cancelGroupCall } = useCallContext();
+  const { outgoingGroupCall, activeCall, isCallPoppedOut, cancelGroupCall } = useCallContext();
   const [groupName, setGroupName] = useState<string>("Group Call");
   const [groupAvatar, setGroupAvatar] = useState<string>("");
   const [members, setMembers] = useState<{ id: string; name: string; avatarUrl: string | null }[]>([]);
@@ -53,7 +53,7 @@ export const GroupOutgoingModal = () => {
     fetchGroupProfile();
   }, [outgoingGroupCall?.groupId]);
 
-  if (!outgoingGroupCall) return null;
+  if (!outgoingGroupCall || activeCall || isCallPoppedOut) return null;
 
   const displayName = groupName;
   const avatarUrl = groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;

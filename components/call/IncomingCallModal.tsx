@@ -10,8 +10,16 @@ import { getOptimizedImageUrl } from "@/utils/image";
 import { stopRingtoneSound } from "@/utils/sounds";
 
 export const IncomingCallModal = () => {
-  const { incomingCall, acceptCall, acceptEscalatedCall, rejectCall, joinGroupCall } =
-    useCallContext();
+  const {
+    incomingCall,
+    activeCall,
+    isCallPoppedOut,
+    acceptCall,
+    acceptEscalatedCall,
+    rejectCall,
+    joinGroupCall,
+    rejectGroupCall,
+  } = useCallContext();
   const { getContact } = useContacts();
   const [callerName, setCallerName] = useState<string>("");
   const [callerAvatar, setCallerAvatar] = useState<string>("");
@@ -28,52 +36,14 @@ export const IncomingCallModal = () => {
     }
     if (incomingCall?.callerAvatar) {
       setCallerAvatar(getOptimizedImageUrl(incomingCall.callerAvatar, 80, 80));
+    } else {
+      setCallerAvatar("");
     }
-
-    // If both name and avatar are provided, skip fetch
-    if (incomingCall?.callerName && incomingCall?.callerAvatar) {
-      return;
-    }
-    if (!incomingCall?.callerId) return;
-
-    const fetchCallerProfile = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-        const baseUrl =
-          process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000/api/v1";
-
-        const res = await fetch(`${baseUrl}/user/all`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-
-        if (data.success && Array.isArray(data.data)) {
-          const caller = data.data.find((u: any) => u.id === incomingCall.callerId);
-          if (caller) {
-            const fullName = `${caller.profile?.firstName || ""} ${caller.profile?.lastName || ""}`.trim();
-            const displayName =
-              fullName ||
-              caller.profile?.displayName ||
-              caller.username ||
-              "Anonymous";
-            if (!incomingCall.callerName) {
-              setCallerName(displayName);
-            }
-            if (!incomingCall.callerAvatar && caller.profile?.avatarUrl) {
-              setCallerAvatar(getOptimizedImageUrl(caller.profile.avatarUrl, 80, 80));
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch caller profile", err);
-      }
-    };
-
-    fetchCallerProfile();
   }, [incomingCall?.callerId, incomingCall?.callerName, incomingCall?.callerAvatar]);
 
-  if (!incomingCall) return null;
+  // Guard: Never show incoming call modal if activeCall is already ongoing, or if call is popped out,
+  // or if the incoming call matches the currently active call session.
+  if (!incomingCall || activeCall || isCallPoppedOut) return null;
 
   const isEscalated = Boolean(incomingCall.isEscalatedCall);
   const contact = incomingCall.callerId ? getContact(incomingCall.callerId) : undefined;
@@ -126,6 +96,9 @@ export const IncomingCallModal = () => {
   // ------------------------------------------------------------------
   const handleDecline = () => {
     stopRingtoneSound();
+    if (incomingCall.isGroup && incomingCall.groupId) {
+      rejectGroupCall(incomingCall.groupId);
+    }
     rejectCall(
       incomingCall.callId,
       incomingCall.roomName,

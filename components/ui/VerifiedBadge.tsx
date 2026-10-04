@@ -46,7 +46,7 @@ export function VerifiedBadge({
     <span
       className={cn(
         "relative inline-flex items-center justify-center shrink-0 align-middle select-none",
-        showTooltip && "group cursor-help",
+        showTooltip && "group/verified cursor-help",
         badge,
         className
       )}
@@ -61,7 +61,7 @@ export function VerifiedBadge({
           xmlns="http://www.w3.org/2000/svg"
           className={cn(
             svg,
-            "drop-shadow-[0_1px_2px_rgba(16,185,129,0.35)] transition-transform duration-200 group-hover:scale-110"
+            "drop-shadow-[0_1px_2px_rgba(16,185,129,0.35)] transition-transform duration-200 group-hover/verified:scale-110"
           )}
         >
           <path
@@ -84,7 +84,7 @@ export function VerifiedBadge({
           xmlns="http://www.w3.org/2000/svg"
           className={cn(
             svg,
-            "drop-shadow-[0_1px_2px_rgba(37,99,235,0.35)] transition-transform duration-200 group-hover:scale-110"
+            "drop-shadow-[0_1px_2px_rgba(37,99,235,0.35)] transition-transform duration-200 group-hover/verified:scale-110"
           )}
         >
           <path
@@ -103,7 +103,7 @@ export function VerifiedBadge({
 
       {/* Floating Tooltip */}
       {showTooltip && (
-        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-max max-w-[220px] rounded-lg bg-[#0F172A] px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight text-white shadow-xl opacity-0 transition-opacity duration-150 group-hover:block group-hover:opacity-100 z-50">
+        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-max max-w-[220px] rounded-lg bg-[#0F172A] px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight text-white shadow-xl opacity-0 transition-opacity duration-150 group-hover/verified:block group-hover/verified:opacity-100 z-50">
           <span className="font-bold block mb-0.5 text-white flex items-center justify-center gap-1">
             <span
               className={cn(

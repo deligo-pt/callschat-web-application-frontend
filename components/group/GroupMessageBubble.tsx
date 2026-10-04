@@ -22,6 +22,7 @@ import {
   Check,
   CheckCheck,
   Reply,
+  X,
   Camera,
   Mic,
   Copy,
@@ -567,6 +568,19 @@ export function GroupMessageBubble({
               <span>Reply</span>
             </DropdownMenuItem>
 
+            {isMe && onEdit && !msg.isDeleted && !msg.poll && msg.mediaType !== "call" && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setEditText(msg.text);
+                  setIsEditing(true);
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-[#111B21] dark:text-[#E9EDEF] rounded-lg hover:bg-[#F5F6F6] dark:hover:bg-[#182229] cursor-pointer"
+              >
+                <Edit2 className="w-4 h-4 text-[#54656F] dark:text-[#8696A0]" />
+                <span>Edit</span>
+              </DropdownMenuItem>
+            )}
+
             {!isMe && onReplyPrivately && (
               <DropdownMenuItem
                 onClick={() => onReplyPrivately(msg.senderId, msg)}
@@ -781,10 +795,60 @@ export function GroupMessageBubble({
           </div>
         )}
 
-        {/* Message Text */}
+        {/* Message Text or Inline Edit Form */}
         {!msg.poll && (msg.text || (!msg.mediaUrl && !isCallMessage && !msg.isSystem)) && (
           <div className="px-3.5 py-2 text-[14px] leading-relaxed break-words whitespace-pre-wrap">
-            {formatTextWithLinks(msg.text || "🔒 Encrypted group message", currentUserId, members)}
+            {isEditing ? (
+              <div className="space-y-2 py-1 min-w-[200px]">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (editText.trim() && editText !== msg.text) {
+                        onEdit?.(msg.id, editText.trim());
+                      }
+                      setIsEditing(false);
+                    } else if (e.key === "Escape") {
+                      setIsEditing(false);
+                      setEditText(msg.text);
+                    }
+                  }}
+                  className="w-full min-h-[55px] p-2 text-[13.5px] rounded-lg border border-emerald-500/50 bg-white/90 dark:bg-black/30 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none text-[#111B21] dark:text-[#E9EDEF]"
+                  autoFocus
+                />
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditText(msg.text);
+                    }}
+                    className="p-1 rounded-md text-gray-500 hover:bg-black/5 dark:hover:bg-white/10 text-xs cursor-pointer"
+                    title="Cancel (Esc)"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editText.trim() && editText !== msg.text) {
+                        onEdit?.(msg.id, editText.trim());
+                      }
+                      setIsEditing(false);
+                    }}
+                    disabled={!editText.trim() || editText === msg.text}
+                    className="p-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs disabled:opacity-40 cursor-pointer"
+                    title="Save (Enter)"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              formatTextWithLinks(msg.text || "🔒 Encrypted group message", currentUserId, members)
+            )}
           </div>
         )}
 

@@ -72,21 +72,21 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0 flex flex-col bg-white">
-        <SheetHeader className="px-6 py-4 border-b">
-          <SheetTitle className="text-xl font-bold text-[#111928]">Media, Files and Voice</SheetTitle>
+      <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0 flex flex-col bg-white dark:bg-[#111B21] border-l border-gray-200 dark:border-[#2A3942] text-[#111928] dark:text-[#E9EDEF]">
+        <SheetHeader className="px-6 py-4 border-b border-gray-200 dark:border-[#2A3942]">
+          <SheetTitle className="text-xl font-bold text-[#111928] dark:text-[#E9EDEF]">Media, Files and Voice</SheetTitle>
         </SheetHeader>
         
         <Tabs defaultValue="media" className="flex-1 flex flex-col h-full overflow-hidden">
-          <div className="px-6 pt-4 pb-2 border-b">
-            <TabsList className="w-full grid grid-cols-3 bg-[#F3F4F6] p-1 rounded-xl">
-              <TabsTrigger value="media" className="rounded-lg font-medium text-[14px] data-[state=active]:bg-white data-[state=active]:text-[#3B58F5] data-[state=active]:shadow-sm transition-all">
+          <div className="px-6 pt-4 pb-2 border-b border-gray-200 dark:border-[#2A3942]">
+            <TabsList className="w-full grid grid-cols-3 bg-[#F3F4F6] dark:bg-[#202C33] p-1 rounded-xl">
+              <TabsTrigger value="media" className="rounded-lg font-medium text-[14px] text-gray-600 dark:text-[#8696A0] data-[state=active]:bg-white dark:data-[state=active]:bg-[#111B21] data-[state=active]:text-[#3B58F5] dark:data-[state=active]:text-[#00A884] data-[state=active]:shadow-sm transition-all">
                 Media
               </TabsTrigger>
-              <TabsTrigger value="files" className="rounded-lg font-medium text-[14px] data-[state=active]:bg-white data-[state=active]:text-[#3B58F5] data-[state=active]:shadow-sm transition-all">
+              <TabsTrigger value="files" className="rounded-lg font-medium text-[14px] text-gray-600 dark:text-[#8696A0] data-[state=active]:bg-white dark:data-[state=active]:bg-[#111B21] data-[state=active]:text-[#3B58F5] dark:data-[state=active]:text-[#00A884] data-[state=active]:shadow-sm transition-all">
                 Files
               </TabsTrigger>
-              <TabsTrigger value="links" className="rounded-lg font-medium text-[14px] data-[state=active]:bg-white data-[state=active]:text-[#3B58F5] data-[state=active]:shadow-sm transition-all">
+              <TabsTrigger value="links" className="rounded-lg font-medium text-[14px] text-gray-600 dark:text-[#8696A0] data-[state=active]:bg-white dark:data-[state=active]:bg-[#111B21] data-[state=active]:text-[#3B58F5] dark:data-[state=active]:text-[#00A884] data-[state=active]:shadow-sm transition-all">
                 Links
               </TabsTrigger>
             </TabsList>
@@ -96,10 +96,10 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
             <TabsContent value="media" className="p-6 m-0 border-none outline-none">
               {loading && page === 1 ? (
                 <div className="flex justify-center p-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                  <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5] dark:text-[#00A884]" />
                 </div>
               ) : imagesAndVideos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center p-12 text-[#6B7280]">
+                <div className="flex flex-col items-center justify-center text-center p-12 text-[#6B7280] dark:text-[#8696A0]">
                   <ImageIcon className="w-12 h-12 mb-4 opacity-20" />
                   <p>No media shared yet</p>
                 </div>
@@ -111,7 +111,7 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                       href={getRawMediaUrl(item.mediaUrl)} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="relative aspect-square rounded-xl overflow-hidden group bg-[#F3F4F6]"
+                      className="relative aspect-square rounded-xl overflow-hidden group bg-[#F3F4F6] dark:bg-[#202C33]"
                     >
                       {item.mediaType.includes('video') ? (
                         <>
@@ -138,14 +138,14 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                   {hasMore && !loading && (
                     <button 
                       onClick={() => setPage(p => p + 1)}
-                      className="aspect-square rounded-xl flex flex-col items-center justify-center bg-[#F3F4F6] hover:bg-[#E5E7EB] text-[#3B58F5] transition-colors"
+                      className="aspect-square rounded-xl flex flex-col items-center justify-center bg-[#F3F4F6] dark:bg-[#202C33] hover:bg-[#E5E7EB] dark:hover:bg-[#2A3942] text-[#3B58F5] dark:text-[#00A884] transition-colors"
                     >
                       <span className="text-sm font-medium">Load more</span>
                     </button>
                   )}
                   {loading && page > 1 && (
                     <div className="aspect-square flex items-center justify-center">
-                      <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                      <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5] dark:text-[#00A884]" />
                     </div>
                   )}
                 </div>
@@ -155,29 +155,29 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
             <TabsContent value="files" className="p-6 m-0 border-none outline-none">
               {loading && page === 1 ? (
                 <div className="flex justify-center p-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                  <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5] dark:text-[#00A884]" />
                 </div>
               ) : filesAndVoice.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center p-12 text-[#6B7280]">
+                <div className="flex flex-col items-center justify-center text-center p-12 text-[#6B7280] dark:text-[#8696A0]">
                   <Music className="w-12 h-12 mb-4 opacity-20" />
                   <p>No files or voice notes shared yet</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
                   {filesAndVoice.map((item) => (
-                    <div key={item.id} className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-[#E5E7EB]/50 transition-shadow hover:shadow-md">
+                    <div key={item.id} className="flex items-center gap-4 bg-white dark:bg-[#202C33] p-4 rounded-2xl shadow-sm border border-[#E5E7EB]/50 dark:border-[#2A3942] transition-shadow hover:shadow-md">
                       {item.mediaType.includes('audio') || item.mediaType === 'audio' ? (
                         <div className="flex-1 min-w-0 flex items-center gap-3">
-                          <div className="w-10 h-10 shrink-0 rounded-full bg-[#3B58F5]/10 flex items-center justify-center">
-                            <Music className="w-5 h-5 text-[#3B58F5]" />
+                          <div className="w-10 h-10 shrink-0 rounded-full bg-[#3B58F5]/10 dark:bg-[#00A884]/20 flex items-center justify-center">
+                            <Music className="w-5 h-5 text-[#3B58F5] dark:text-[#00A884]" />
                           </div>
                           <div className="flex-1 overflow-hidden">
-                            <p className="text-sm font-medium text-[#111928] truncate mb-2">
+                            <p className="text-sm font-medium text-[#111928] dark:text-[#E9EDEF] truncate mb-2">
                               Voice Note
                             </p>
                             <VoiceMessagePlayer src={item.mediaUrl} messageId={item.id} isMe={false} />
                           </div>
-                          <div className="text-xs text-[#6B7280] whitespace-nowrap self-start pt-1">
+                          <div className="text-xs text-[#6B7280] dark:text-[#8696A0] whitespace-nowrap self-start pt-1">
                             {new Date(item.createdAt).toLocaleDateString()}
                           </div>
                         </div>
@@ -188,14 +188,14 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                           rel="noopener noreferrer"
                           className="flex-1 min-w-0 flex items-center gap-3 group"
                         >
-                          <div className="w-10 h-10 shrink-0 rounded-xl bg-[#F3F4F6] group-hover:bg-[#3B58F5]/10 flex items-center justify-center transition-colors">
-                            <FileIcon className="w-5 h-5 text-[#6B7280] group-hover:text-[#3B58F5] transition-colors" />
+                          <div className="w-10 h-10 shrink-0 rounded-xl bg-[#F3F4F6] dark:bg-[#111B21] group-hover:bg-[#3B58F5]/10 dark:group-hover:bg-[#00A884]/20 flex items-center justify-center transition-colors">
+                            <FileIcon className="w-5 h-5 text-[#6B7280] dark:text-[#8696A0] group-hover:text-[#3B58F5] dark:group-hover:text-[#00A884] transition-colors" />
                           </div>
                           <div className="flex-1 overflow-hidden">
-                            <p className="text-sm font-medium text-[#111928] truncate group-hover:text-[#3B58F5] transition-colors">
+                            <p className="text-sm font-medium text-[#111928] dark:text-[#E9EDEF] truncate group-hover:text-[#3B58F5] dark:group-hover:text-[#00A884] transition-colors">
                               {item.mediaUrl.split('/').pop() || "Document"}
                             </p>
-                            <p className="text-xs text-[#6B7280]">
+                            <p className="text-xs text-[#6B7280] dark:text-[#8696A0]">
                               {new Date(item.createdAt).toLocaleString()}
                             </p>
                           </div>
@@ -206,14 +206,14 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                   {hasMore && !loading && (
                     <button 
                       onClick={() => setPage(p => p + 1)}
-                      className="w-full py-3 rounded-xl bg-[#F3F4F6] hover:bg-[#E5E7EB] text-[#3B58F5] font-medium transition-colors mt-2"
+                      className="w-full py-3 rounded-xl bg-[#F3F4F6] dark:bg-[#202C33] hover:bg-[#E5E7EB] dark:hover:bg-[#2A3942] text-[#3B58F5] dark:text-[#00A884] font-medium transition-colors mt-2"
                     >
                       Load more
                     </button>
                   )}
                   {loading && page > 1 && (
                     <div className="flex justify-center p-4">
-                      <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                      <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5] dark:text-[#00A884]" />
                     </div>
                   )}
                 </div>
@@ -223,10 +223,10 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
             <TabsContent value="links" className="p-6 m-0 border-none outline-none">
               {loading && page === 1 ? (
                 <div className="flex justify-center p-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                  <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5] dark:text-[#00A884]" />
                 </div>
               ) : links.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center p-12 text-[#6B7280]">
+                <div className="flex flex-col items-center justify-center text-center p-12 text-[#6B7280] dark:text-[#8696A0]">
                   <LinkIcon className="w-12 h-12 mb-4 opacity-20" />
                   <p>No links shared yet</p>
                 </div>
@@ -234,20 +234,20 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                 <div className="flex flex-col gap-4">
                   {links.map((item) => (
                     <a 
-                      key={item.id}
-                      href={getRawMediaUrl(item.mediaUrl)}
-                      target="_blank"
+                      key={item.id} 
+                      href={getRawMediaUrl(item.mediaUrl)} 
+                      target="_blank" 
                       rel="noopener noreferrer"
-                      className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-[#E5E7EB]/50 transition-all hover:shadow-md hover:border-[#3B58F5]/30 group"
+                      className="flex items-center gap-4 bg-white dark:bg-[#202C33] p-4 rounded-xl shadow-sm border border-[#E5E7EB]/50 dark:border-[#2A3942] transition-all hover:shadow-md hover:border-[#3B58F5]/30 dark:hover:border-[#00A884]/50 group"
                     >
-                      <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-50 group-hover:bg-[#3B58F5] flex items-center justify-center transition-colors">
-                        <LinkIcon className="w-5 h-5 text-[#3B58F5] group-hover:text-white transition-colors" />
+                      <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-50 dark:bg-[#111B21] group-hover:bg-[#3B58F5] dark:group-hover:bg-[#00A884] flex items-center justify-center transition-colors">
+                        <LinkIcon className="w-5 h-5 text-[#3B58F5] group-hover:text-white dark:text-[#00A884] transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-semibold text-[#111928] truncate group-hover:text-[#3B58F5] transition-colors">
+                        <p className="text-[14px] font-semibold text-[#111928] dark:text-[#E9EDEF] truncate group-hover:text-[#3B58F5] dark:group-hover:text-[#00A884] transition-colors">
                           {item.mediaUrl}
                         </p>
-                        <p className="text-[12px] text-[#6B7280]">
+                        <p className="text-[12px] text-[#6B7280] dark:text-[#8696A0]">
                           {new Date(item.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -256,14 +256,14 @@ export function MediaGallery({ conversationId, open, onOpenChange, isGroup }: Me
                   {hasMore && !loading && (
                     <button 
                       onClick={() => setPage(p => p + 1)}
-                      className="w-full py-3 rounded-xl bg-[#F3F4F6] hover:bg-[#E5E7EB] text-[#3B58F5] font-medium transition-colors mt-2"
+                      className="w-full py-3 rounded-xl bg-[#F3F4F6] dark:bg-[#202C33] hover:bg-[#E5E7EB] dark:hover:bg-[#2A3942] text-[#3B58F5] dark:text-[#00A884] font-medium transition-colors mt-2"
                     >
                       Load more
                     </button>
                   )}
                   {loading && page > 1 && (
                     <div className="flex justify-center p-4">
-                      <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5]" />
+                      <Loader2 className="w-6 h-6 animate-spin text-[#3B58F5] dark:text-[#00A884]" />
                     </div>
                   )}
                 </div>

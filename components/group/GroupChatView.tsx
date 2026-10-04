@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallContext } from "@/components/providers/CallContext";
 import {
@@ -42,6 +42,9 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Edit2,
+  Check,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -64,6 +67,14 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,7 +129,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   const router = useRouter();
   const groupId = propGroupId || (params?.groupId as string);
 
-  const { startGroupCall, joinGroupCall, activeGroupCalls } = useCallContext();
+  const { startGroupCall, joinGroupCall, activeGroupCalls, clearActiveGroupCall } = useCallContext();
   const { socket } = useSocket();
   const { user } = useUser();
 
@@ -183,11 +194,26 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
 
+  // Edit Group Name & Description state
+  const [isEditGroupDetailsOpen, setIsEditGroupDetailsOpen] = useState(false);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupDesc, setEditGroupDesc] = useState("");
+  const [isUpdatingGroupDetails, setIsUpdatingGroupDetails] = useState(false);
+
+  // Updating role state for optimistic feedback
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+
   // Clipboard Paste & Drag-and-Drop Media states
   const [pastedMediaFile, setPastedMediaFile] = useState<File | null>(null);
   const [pastedMediaCaption, setPastedMediaCaption] = useState<string>("");
   const [isMediaPreviewOpen, setIsMediaPreviewOpen] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [isJoiningCall, setIsJoiningCall] = useState(false);
+
+  // Pending Join Requests state
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [isLoadingJoinRequests, setIsLoadingJoinRequests] = useState(false);
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
 
 
   const {
@@ -208,18 +234,190 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     votePoll,
     createPoll,
     unsendMessage,
+    editMessage,
     groupDetails: hookGroupDetails,
     loadMoreMessages,
     hasMoreMessages,
     isLoadingMore,
   } = useGroupChat(groupId, currentUserId);
 
+  const canEditGroupInfo = isAdmin || groupDetails?.editGroupInfoScope !== "ONLY_ADMINS";
+  const isOwner = groupDetails?.createdBy === currentUserId;
+
+  const handleOpenEditGroupDetails = () => {
+    setEditGroupName(groupDetails?.name || "");
+    setEditGroupDesc(groupDetails?.description || "");
+    setIsEditGroupDetailsOpen(true);
+  };
+
+  const handleSaveGroupDetails = async () => {
+    if (!editGroupName.trim()) {
+      toast.error("Group name cannot be empty");
+      return;
+    }
+    setIsUpdatingGroupDetails(true);
+    try {
+      const res = await groupService.updateGroup(groupId, {
+        name: editGroupName.trim(),
+        description: editGroupDesc.trim() || null,
+      });
+      if (res.success) {
+        toast.success("Group details updated successfully");
+        setGroupDetails((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                name: editGroupName.trim(),
+                description: editGroupDesc.trim() || null,
+              }
+            : prev
+        );
+        useGroupStore.getState().updateGroupInStore(groupId, {
+          name: editGroupName.trim(),
+          description: editGroupDesc.trim() || null,
+        });
+        setIsEditGroupDetailsOpen(false);
+      } else {
+        toast.error(res.error || "Failed to update group details");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update group details");
+    } finally {
+      setIsUpdatingGroupDetails(false);
+    }
+  };
+
+  const handleUpdateMemberRole = async (memberId: string, currentRole: string, memberName: string) => {
+    const nextRole: "ADMIN" | "MEMBER" = currentRole === "ADMIN" ? "MEMBER" : "ADMIN";
+    setUpdatingMemberId(memberId);
+    try {
+      const res = await groupService.updateMemberRole(groupId, memberId, nextRole);
+      if (res.success || res.data) {
+        toast.success(
+          nextRole === "ADMIN"
+            ? `${memberName} is now a group admin`
+            : `${memberName} is no longer an admin`
+        );
+        setGroupMembers((prev) =>
+          prev.map((m) => {
+            const mId = m.userId || m.user?.id || m.id;
+            return mId === memberId ? { ...m, role: nextRole } : m;
+          })
+        );
+      } else {
+        toast.error(res.error || "Failed to update member role");
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Error updating member role");
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
   useEffect(() => {
     if (hookGroupDetails) {
+      setGroupDetails(hookGroupDetails);
       setIsFavourite(!!hookGroupDetails.isFavourite);
       setIsMuted(!!hookGroupDetails.isMuted);
     }
   }, [hookGroupDetails]);
+
+  const refreshMembers = useCallback(async () => {
+    try {
+      const membersRes = await groupService.fetchGroupMembers(groupId);
+      if (membersRes.success && membersRes.data?.members) {
+        setGroupMembers(membersRes.data.members);
+      }
+    } catch (e) {
+      console.warn("Could not refresh group members", e);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    const handleMembersRefresh = (e: any) => {
+      if (e.detail?.groupId === groupId) {
+        refreshMembers();
+      }
+    };
+    window.addEventListener("group:members_refresh", handleMembersRefresh);
+    return () => window.removeEventListener("group:members_refresh", handleMembersRefresh);
+  }, [groupId, refreshMembers]);
+
+  useEffect(() => {
+    if (!socket || !groupId) return;
+    const handleMemberChange = (payload: any) => {
+      if (payload?.groupId === groupId) {
+        refreshMembers();
+      }
+    };
+    socket.on("group:member_added", handleMemberChange);
+    socket.on("group:member_removed", handleMemberChange);
+    socket.on("group:member_left", handleMemberChange);
+    socket.on("group:role_updated", handleMemberChange);
+    return () => {
+      socket.off("group:member_added", handleMemberChange);
+      socket.off("group:member_removed", handleMemberChange);
+      socket.off("group:member_left", handleMemberChange);
+      socket.off("group:role_updated", handleMemberChange);
+    };
+  }, [socket, groupId, refreshMembers]);
+
+  const loadJoinRequests = useCallback(async () => {
+    if (!isAdmin || groupDetails?.joinApprovalMode !== "APPROVAL_REQUIRED") return;
+    setIsLoadingJoinRequests(true);
+    try {
+      const res = await groupService.fetchJoinRequests(groupId);
+      if (res.success && res.data) {
+        setPendingRequests(res.data);
+      }
+    } catch (err) {
+      console.warn("Failed to load join requests", err);
+    } finally {
+      setIsLoadingJoinRequests(false);
+    }
+  }, [groupId, isAdmin, groupDetails?.joinApprovalMode]);
+
+  useEffect(() => {
+    if (showGroupInfo && isAdmin && groupDetails?.joinApprovalMode === "APPROVAL_REQUIRED") {
+      loadJoinRequests();
+    }
+  }, [showGroupInfo, isAdmin, groupDetails?.joinApprovalMode, loadJoinRequests]);
+
+  const handleReviewJoinRequest = async (requestId: string, action: "APPROVE" | "REJECT") => {
+    setReviewingRequestId(requestId);
+    try {
+      const res = await groupService.reviewJoinRequest(groupId, requestId, action);
+      if (res.success) {
+        toast.success(action === "APPROVE" ? "Participant approved and added" : "Request rejected");
+        setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+        if (action === "APPROVE") {
+          refreshMembers();
+        }
+      } else {
+        toast.error((res as any).error || "Failed to process request");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process request");
+    } finally {
+      setReviewingRequestId(null);
+    }
+  };
+
+  const handleRemoveGroupAvatar = async () => {
+    if (!canEditGroupInfo) return;
+    try {
+      const updateRes = await groupService.updateGroup(groupId, { avatarUrl: null });
+      if (updateRes.success) {
+        toast.success("Group photo removed");
+        setGroupDetails((prev: any) => (prev ? { ...prev, avatarUrl: null } : prev));
+        useGroupStore.getState().updateGroupInStore(groupId, { avatarUrl: null });
+      } else {
+        toast.error(updateRes.error || "Failed to remove photo");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove photo");
+    }
+  };
 
   const scrollToMessage = (messageId: string) => {
     const el = document.getElementById(`msg-${messageId}`);
@@ -235,6 +433,10 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   };
 
   const handleGroupAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canEditGroupInfo) {
+      toast.error("Only group administrators can change the group photo");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -290,6 +492,19 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           setRecentMedia(mediaRes.data.media);
           setTotalMedia(mediaRes.data.total || mediaRes.data.media.length);
         }
+
+        // WhatsApp-style: Synchronize active call state with backend
+        try {
+          const callRes = await apiClient.get(`/calls/group/${groupId}/active`);
+          const activeCallData = callRes.data?.data;
+          if (!activeCallData || activeCallData.status !== "ONGOING") {
+            // No ongoing call exists in backend, ensure local stale state is cleared
+            clearActiveGroupCall(groupId);
+          }
+        } catch (callErr) {
+          // If 404 or inactive, clear stale state
+          clearActiveGroupCall(groupId);
+        }
       } catch (e) {
         console.error("Failed to load group details", e);
       } finally {
@@ -300,7 +515,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     if (groupId) {
       fetchGroupData();
     }
-  }, [groupId]);
+  }, [groupId, clearActiveGroupCall]);
 
   // Update last-read timestamp when opening this group
   useEffect(() => {
@@ -801,7 +1016,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                 />
               </div>
               <div className="flex flex-col min-w-0">
-                <h2 className="text-[15.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] leading-tight truncate flex items-center gap-1.5">
+                <h2 className="text-base font-semibold text-[#111B21] dark:text-[#E9EDEF] leading-tight truncate flex items-center gap-1.5">
                   <span>{groupName}</span>
                   {groupDetails?.sendMessagesScope === "ONLY_ADMINS" && (
                     <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded font-normal">
@@ -825,11 +1040,25 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             {isCallActive ? (
               <button
-                onClick={() => joinGroupCall(groupId)}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-semibold text-[13px] transition-colors shadow-xs animate-pulse mr-1 cursor-pointer"
+                onClick={async () => {
+                  if (isJoiningCall) return;
+                  setIsJoiningCall(true);
+                  try {
+                    await joinGroupCall(groupId);
+                  } finally {
+                    // Small timeout to allow transition or dismissal
+                    setTimeout(() => setIsJoiningCall(false), 1200);
+                  }
+                }}
+                disabled={isJoiningCall}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-semibold text-[13px] transition-colors shadow-xs animate-pulse mr-1 cursor-pointer disabled:opacity-80"
               >
-                <Video className="h-4 w-4 fill-currentColor" />
-                <span>Join Call</span>
+                {isJoiningCall ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                ) : (
+                  <Video className="h-4 w-4 fill-currentColor" />
+                )}
+                <span>{isJoiningCall ? "Joining..." : "Join Call"}</span>
               </button>
             ) : (
               <>
@@ -1106,6 +1335,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                   onReact={(mId, emoji) => toggleReaction(mId, emoji)}
                   onVotePoll={(optId, allowMulti) => votePoll(optId, allowMulti)}
                   onUnsend={(mId) => unsendMessage(mId)}
+                  onEdit={(mId, newText) => editMessage(mId, newText)}
                 />
               );
             })}
@@ -1180,16 +1410,45 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                 accept="image/*"
                 onChange={handleGroupAvatarChange}
               />
+              {canEditGroupInfo && (
+                <button
+                  type="button"
+                  onClick={() => groupAvatarInputRef.current?.click()}
+                  className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  title="Change group photo"
+                >
+                  <Camera className="w-6 h-6 mb-1" />
+                  <span className="text-[10px] uppercase font-semibold">Change photo</span>
+                </button>
+              )}
+            </div>
+            {canEditGroupInfo && groupDetails?.avatarUrl && (
               <button
                 type="button"
-                onClick={() => groupAvatarInputRef.current?.click()}
-                className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleRemoveGroupAvatar}
+                className="mt-1 text-[11.5px] font-medium text-red-500 hover:text-red-600 hover:underline cursor-pointer"
               >
-                <Camera className="w-6 h-6 mb-1" />
-                <span className="text-[10px] uppercase font-semibold">Change photo</span>
+                Remove photo
               </button>
+            )}
+            <div className="flex items-center justify-center gap-2 mt-3 max-w-full px-2">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 truncate">{groupName}</h2>
+              {canEditGroupInfo && (
+                <button
+                  type="button"
+                  onClick={handleOpenEditGroupDetails}
+                  className="p-1 rounded-full text-gray-400 hover:text-emerald-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0 cursor-pointer"
+                  title="Edit group subject & description"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <h2 className="text-lg font-bold mt-3 text-gray-900 dark:text-gray-100">{groupName}</h2>
+            {groupDetails?.description && (
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-[300px] break-words text-center line-clamp-3">
+                {groupDetails.description}
+              </p>
+            )}
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               Group · {memberCount} participants
             </p>
@@ -1197,6 +1456,24 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
 
           {/* Settings & Invite Actions */}
           <div className="p-4 space-y-1 border-b border-gray-100 dark:border-gray-800">
+            {/* Media Gallery Navigation Button */}
+            <button
+              type="button"
+              onClick={() => setGalleryOpen(true)}
+              className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-[#182229] transition-colors text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <Folder className="w-5 h-5 text-emerald-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Media, links and docs</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {totalMedia} {totalMedia === 1 ? "item" : "items"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </button>
+
             <button
               type="button"
               onClick={() => setIsInviteModalOpen(true)}
@@ -1243,6 +1520,72 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
               <Switch checked={isMuted} onCheckedChange={handleToggleMute} />
             </div>
           </div>
+
+          {/* Pending Member Requests (WhatsApp Parity) */}
+          {isAdmin && groupDetails?.joinApprovalMode === "APPROVAL_REQUIRED" && pendingRequests.length > 0 && (
+            <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 border-b border-emerald-100 dark:border-emerald-900/30">
+              <div className="flex items-center gap-2 mb-2.5">
+                <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                  Pending Member Requests ({pendingRequests.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                {pendingRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="flex items-center justify-between bg-white dark:bg-[#182229] p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                        {req.user?.profile?.avatarUrl ? (
+                          <img
+                            src={getOptimizedImageUrl(req.user.profile.avatarUrl)}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          (req.user?.profile?.name || req.user?.displayName || "U")[0].toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">
+                          {req.user?.profile?.name || req.user?.displayName || "Participant"}
+                        </p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                          {req.user?.phone || (req.user?.username ? `@${req.user.username}` : "Requested to join")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={reviewingRequestId === req.id}
+                        onClick={() => handleReviewJoinRequest(req.id, "APPROVE")}
+                        className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer"
+                        title="Approve participant"
+                      >
+                        {reviewingRequestId === req.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={reviewingRequestId === req.id}
+                        onClick={() => handleReviewJoinRequest(req.id, "REJECT")}
+                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 text-gray-500 dark:text-gray-400 transition-colors cursor-pointer"
+                        title="Reject request"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Members List */}
           <div className="p-4 flex-1">
@@ -1304,20 +1647,27 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                       </div>
                     </div>
 
-                    {isAdmin && !isMemberMe && mRole !== "OWNER" && (
+                    {isAdmin && !isMemberMe && mRole !== "OWNER" && (isOwner || mRole !== "ADMIN") && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
-                            <MoreVertical className="w-4 h-4" />
+                          <button
+                            disabled={updatingMemberId === memberId}
+                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer disabled:opacity-50"
+                          >
+                            {updatingMemberId === memberId ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                            ) : (
+                              <MoreVertical className="w-4 h-4" />
+                            )}
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44 bg-white dark:bg-[#233138] p-1 rounded-xl shadow-xl">
                           <DropdownMenuItem
                             onClick={() =>
-                              groupService.updateMemberRole(
-                                groupId,
+                              handleUpdateMemberRole(
                                 memberId,
-                                mRole === "ADMIN" ? "MEMBER" : "ADMIN"
+                                mRole,
+                                m.profile?.name || m.user?.displayName || "Member"
                               )
                             }
                             className="text-xs cursor-pointer"
@@ -1326,12 +1676,12 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => {
-                              setMemberToRemove({ id: memberId, name: m.profile?.name || "Member" });
+                              setMemberToRemove({ id: memberId, name: m.profile?.name || m.user?.displayName || "Member" });
                               setIsRemoveMemberDialogOpen(true);
                             }}
-                            className="text-xs text-red-600 cursor-pointer"
+                            className="text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
                           >
-                            Remove {m.profile?.name || "member"}
+                            Remove {m.profile?.name || m.user?.displayName || "member"}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1340,6 +1690,18 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                 );
               })}
             </div>
+          </div>
+
+          {/* Danger Zone: Exit Group (WhatsApp Parity) */}
+          <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+            <button
+              type="button"
+              onClick={() => setIsLeaveGroupDialogOpen(true)}
+              className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 font-semibold text-sm transition-colors cursor-pointer border border-red-200/50 dark:border-red-900/30"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Exit group</span>
+            </button>
           </div>
         </div>
       )}
@@ -1461,6 +1823,78 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Media, Links & Docs Gallery Sheet */}
+      <MediaGallery
+        conversationId={groupId}
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        isGroup={true}
+      />
+
+      {/* Edit Group Name & Description Dialog */}
+      <Dialog
+        open={isEditGroupDetailsOpen}
+        onOpenChange={(open) => !open && !isUpdatingGroupDetails && setIsEditGroupDetailsOpen(false)}
+      >
+        <DialogContent className="sm:max-w-[440px] bg-white dark:bg-[#111b21] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b border-gray-100 dark:border-gray-800">
+            <DialogTitle className="text-base font-semibold flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+              <Edit2 className="w-4 h-4" />
+              <span>Edit Group Info</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="p-4 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Group Name
+              </label>
+              <Input
+                value={editGroupName}
+                onChange={(e) => setEditGroupName(e.target.value)}
+                placeholder="Enter group subject"
+                maxLength={100}
+                className="bg-gray-50 dark:bg-[#202c33] border-gray-200 dark:border-gray-700 text-sm focus-visible:ring-emerald-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Group Description (Optional)
+              </label>
+              <textarea
+                value={editGroupDesc}
+                onChange={(e) => setEditGroupDesc(e.target.value)}
+                placeholder="Add group description..."
+                maxLength={500}
+                rows={3}
+                className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#202c33] px-3 py-2 text-sm text-[#111B21] dark:text-[#E9EDEF] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500 placeholder:text-gray-400"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 bg-gray-50 dark:bg-[#182229] border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={isUpdatingGroupDetails}
+              onClick={() => setIsEditGroupDetailsOpen(false)}
+              className="px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isUpdatingGroupDetails}
+              onClick={handleSaveGroupDetails}
+              className="px-4 py-2 text-xs font-semibold text-white bg-[#00A884] hover:bg-[#029070] rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              {isUpdatingGroupDetails ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              <span>Save</span>
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

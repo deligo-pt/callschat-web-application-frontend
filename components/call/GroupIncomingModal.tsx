@@ -8,7 +8,7 @@ import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export const GroupIncomingModal = () => {
-  const { incomingGroupCall, acceptGroupCall, rejectGroupCall } = useCallContext();
+  const { incomingGroupCall, activeCall, isCallPoppedOut, acceptGroupCall, rejectGroupCall } = useCallContext();
   const { getContact } = useContacts();
   const [groupName, setGroupName] = useState<string>("Group Call");
   const [groupAvatar, setGroupAvatar] = useState<string>("");
@@ -67,7 +67,7 @@ export const GroupIncomingModal = () => {
     fetchGroupProfile();
   }, [incomingGroupCall?.groupId, getContact]);
 
-  if (!incomingGroupCall) return null;
+  if (!incomingGroupCall || activeCall || isCallPoppedOut) return null;
 
   const displayName = groupName;
   const avatarUrl = groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00A884&color=fff&size=128`;

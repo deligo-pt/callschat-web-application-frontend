@@ -118,12 +118,25 @@ export const useCallSignaling = () => {
     outgoingCallRef.current = outgoingCall;
   }, [outgoingCall]);
 
+  const outgoingGroupCallRef = useRef<OutgoingGroupCall | null>(null);
+  useEffect(() => {
+    outgoingGroupCallRef.current = outgoingGroupCall;
+  }, [outgoingGroupCall]);
+
   const incomingCallRef = useRef<IncomingCall | null>(null);
   useEffect(() => {
     incomingCallRef.current = incomingCall;
   }, [incomingCall]);
 
+  const incomingGroupCallRef = useRef<IncomingGroupCall | null>(null);
+  useEffect(() => {
+    incomingGroupCallRef.current = incomingGroupCall;
+  }, [incomingGroupCall]);
+
+  const joinGroupCallRef = useRef<((groupId: string, callType?: 'AUDIO' | 'VIDEO') => void) | null>(null);
+
   const acceptedCallIdRef = useRef<string | null>(null);
+  const currentCallIdRef = useRef<string | null>(null);
 
   const pendingCancelRef = useRef<boolean>(false);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
@@ -238,11 +251,16 @@ export const useCallSignaling = () => {
       }, 2500);
     };
 
-    const handleCallWaiting = (payload: CallWaitingInfo | { status?: string; message?: string }) => {
+    const handleCallWaiting = (payload: CallWaitingInfo | { status?: string; message?: string; callId?: string }) => {
       console.log('[Call] Call waiting notification received:', payload);
+      if (payload.callId) {
+        currentCallIdRef.current = payload.callId;
+        setOutgoingCall(prev => (prev ? { ...prev, callId: payload.callId } : null));
+      }
       if ('status' in payload && payload.status === 'WAITING') {
         if (outgoingCallRef.current) {
           setOutgoingCallStatus('WAITING');
+          playNotificationSound('call_waiting');
         }
         return;
       }
@@ -411,6 +429,7 @@ export const useCallSignaling = () => {
       stopRingtone();
       setOutgoingCall(null);
       setIncomingCall(null);
+      currentCallIdRef.current = null;
       if (code === 'INITIATE_FAILED' || code === 'ACCEPT_FAILED') {
         setActiveCall(null);
       }
@@ -534,17 +553,21 @@ export const useCallSignaling = () => {
       setOutgoingGroupCall(prev => {
         if (prev && prev.groupId === payload.groupId) {
           stopRingtone(); // Stop any outgoing ringtone if applicable
-          // Transition to active call
-          setActiveCall({
-            callId: prev.callId || payload.callId,
-            token: prev.token!,
-            serverUrl: prev.livekitUrl!,
-            roomName: prev.roomName!,
-            callType: prev.callType,
-            isGroup: true,
-            groupId: payload.groupId,
-            startedAt: Date.now(),
-          });
+          if (prev.token && prev.livekitUrl && prev.roomName) {
+            // Transition to active call
+            setActiveCall({
+              callId: prev.callId || payload.callId,
+              token: prev.token,
+              serverUrl: resolveLivekitUrl(prev.livekitUrl),
+              roomName: prev.roomName,
+              callType: prev.callType,
+              isGroup: true,
+              groupId: payload.groupId,
+              startedAt: Date.now(),
+            });
+          } else {
+            joinGroupCallRef.current?.(payload.groupId, prev.callType);
+          }
           return null;
         }
         return prev;
@@ -562,12 +585,33 @@ export const useCallSignaling = () => {
       stopRingtone();
       setIncomingGroupCall(prev => (prev?.groupId === payload.groupId ? null : prev));
       setOutgoingGroupCall(prev => (prev?.groupId === payload.groupId ? null : prev));
+      setIncomingCall(prev =>
+        prev?.groupId === payload.groupId || (prev?.isGroup && prev?.groupId === payload.groupId)
+          ? null
+          : prev,
+      );
     };
 
     const handleGroupCallEnded = (payload: { groupId: string }) => {
       console.log('[Call] Group call ended in:', payload.groupId);
       stopRingtone();
       setActiveGroupCalls(prev => prev.filter(id => id !== payload.groupId));
+      setIncomingGroupCall(prev => (prev?.groupId === payload.groupId ? null : prev));
+      setOutgoingGroupCall(prev => (prev?.groupId === payload.groupId ? null : prev));
+      setIncomingCall(prev =>
+        prev?.groupId === payload.groupId || (prev?.isGroup && prev?.groupId === payload.groupId)
+          ? null
+          : prev,
+      );
+    };
+
+    const handleGroupCallError = (payload: { code: string; message: string }) => {
+      console.warn('[Call] Received group:call_error:', payload);
+      stopRingtone();
+      setOutgoingGroupCall(null);
+      if (payload?.message) {
+        toast.error(payload.message);
+      }
     };
 
     socket.on('group:call_active', handleGroupCallActive);
@@ -576,6 +620,9 @@ export const useCallSignaling = () => {
     socket.on('group:call_terminated', handleGroupCallTerminated);
     socket.on('group:call_ended', handleGroupCallEnded);
     socket.on('group:call_answered_elsewhere', handleGroupAnsweredElsewhere);
+    socket.on('group:call_cancel', handleGroupCallTerminated);
+    socket.on('group:call_cancelled', handleGroupCallTerminated);
+    socket.on('group:call_error', handleGroupCallError);
 
     // FCM Fallback Handler
     const handleFCMCall = (e: Event) => {
@@ -598,9 +645,33 @@ export const useCallSignaling = () => {
       const roomName = data.roomName || data.room_name || resolvedCallId;
       const isGroup =
         data.isGroup === 'true' ||
+        data.isGroup === true ||
         data.type === 'GROUP_CALL' ||
-        data.type === 'group_call';
+        data.type === 'group_call' ||
+        data.type === 'incoming_group_call' ||
+        Boolean(data.groupId || data.group_id);
       const groupId = data.groupId || data.group_id || (isGroup ? data.routeId : undefined);
+
+      if (isGroup && groupId) {
+        if (activeCallRef.current) {
+          playNotificationSound('call_waiting');
+          return;
+        }
+
+        // Route to incomingGroupCall for proper GroupIncomingModal display
+        setIncomingGroupCall(prev => {
+          if (prev && (prev.callId === resolvedCallId || prev.groupId === groupId)) return prev;
+          playRingtone();
+          return {
+            callId: resolvedCallId,
+            groupId,
+            callType: isVideo ? 'VIDEO' : 'AUDIO',
+            initiatorName: callerName || 'A group member',
+            roomName,
+          };
+        });
+        return;
+      }
 
       pendingPeerRef.current = {
         name: callerName,
@@ -632,8 +703,7 @@ export const useCallSignaling = () => {
           callerAvatar,
           callType: isVideo ? 'VIDEO' : 'AUDIO',
           roomName,
-          isGroup,
-          groupId,
+          isGroup: false,
         };
       });
     };
@@ -663,6 +733,9 @@ export const useCallSignaling = () => {
       socket.off('group:call_terminated', handleGroupCallTerminated);
       socket.off('group:call_ended', handleGroupCallEnded);
       socket.off('group:call_answered_elsewhere', handleGroupAnsweredElsewhere);
+      socket.off('group:call_cancel', handleGroupCallTerminated);
+      socket.off('group:call_cancelled', handleGroupCallTerminated);
+      socket.off('group:call_error', handleGroupCallError);
       window.removeEventListener('fcm:incoming_call', handleFCMCall);
     };
   }, [socket]);
@@ -680,6 +753,7 @@ export const useCallSignaling = () => {
       if (!socket) return;
       console.log('[Call] Initiating call to', receiverId, callType);
       pendingCancelRef.current = false;
+      currentCallIdRef.current = null;
       playRingtone();
       pendingPeerRef.current = { name: receiverName, avatar: receiverAvatar };
       // Set tentative outgoing state with CALLING status
@@ -690,6 +764,9 @@ export const useCallSignaling = () => {
         'call:initiate',
         { receiverId, callType },
         (response: { success?: boolean; callId?: string; error?: string }) => {
+        if (response?.callId) {
+          currentCallIdRef.current = response.callId;
+        }
         if (response?.success && response?.callId) {
           if (pendingCancelRef.current) {
             console.log(
@@ -699,9 +776,14 @@ export const useCallSignaling = () => {
             socket.emit('call:hangup', { callId: response.callId });
             pendingCancelRef.current = false;
             setOutgoingCall(null);
+            currentCallIdRef.current = null;
           } else {
             setOutgoingCall(prev => (prev ? { ...prev, callId: response.callId } : null));
           }
+        } else if (!response?.success) {
+          stopRingtone();
+          setOutgoingCall(null);
+          currentCallIdRef.current = null;
         }
       });
     },
@@ -831,6 +913,10 @@ export const useCallSignaling = () => {
       playNotificationSound('call_ended');
       userInitiatedHangupRef.current = true;
       if (activeCallRef.current?.isGroup) {
+        const gid = activeCallRef.current.groupId;
+        if (gid) {
+          setActiveGroupCalls(prev => prev.filter(id => id !== gid));
+        }
         socket.emit('group:call_leave', { callId });
       } else {
         socket.emit('call:hangup', { callId });
@@ -846,26 +932,79 @@ export const useCallSignaling = () => {
   // cancelOutgoingCall
   // -------------------------------------------------------------------------
   const cancelOutgoingCall = useCallback(() => {
-    if (!socket || !outgoingCall) return;
+    if (!socket) return;
     acceptedCallIdRef.current = null;
     console.log('[Call] Canceling outgoing call');
 
     // ✅ Always stop ringtone immediately when the caller cancels
     stopRingtone();
 
-    if (outgoingCall.callId) {
-      socket.emit('call:hangup', { callId: outgoingCall.callId });
+    const callIdToCancel =
+      outgoingCallRef.current?.callId ||
+      outgoingCall?.callId ||
+      currentCallIdRef.current;
+
+    if (callIdToCancel) {
+      console.log('[Call] Emitting call:hangup with callId:', callIdToCancel);
+      socket.emit('call:hangup', { callId: callIdToCancel });
     } else {
       console.warn('[Call] Canceled before callId was received. Queuing hangup.');
       pendingCancelRef.current = true;
     }
 
     setOutgoingCall(null);
+    currentCallIdRef.current = null;
   }, [socket, outgoingCall, stopRingtone]);
 
   // -------------------------------------------------------------------------
   // Group call actions
   // -------------------------------------------------------------------------
+  const joinGroupCall = useCallback(
+    (groupId: string, callType?: 'AUDIO' | 'VIDEO') => {
+      if (!socket) return;
+      console.log('[Call] Joining group call for', groupId, callType);
+      stopRingtone();
+      socket.emit(
+        'group:call_join',
+        { groupId, callType },
+        (response: {
+          success?: boolean;
+          token?: string;
+          callId?: string;
+          livekitUrl?: string;
+          roomName?: string;
+          callType?: 'AUDIO' | 'VIDEO';
+          error?: string;
+        }) => {
+          if (response?.success && response?.token) {
+            setIncomingCall(null);
+            setIncomingGroupCall(null);
+            setOutgoingGroupCall(null);
+            setActiveCall({
+              callId: response.callId || groupId,
+              token: response.token,
+              serverUrl: resolveLivekitUrl(response.livekitUrl),
+              roomName: response.roomName || groupId,
+              callType: response.callType || callType || 'AUDIO',
+              isGroup: true,
+              groupId: groupId,
+              startedAt: Date.now(),
+            });
+          } else {
+            console.warn('[Call] Failed to join group call:', response?.error || 'Call not available');
+            // WhatsApp-style: If call is no longer active, immediately clear button and notify user
+            setActiveGroupCalls(prev => prev.filter(id => id !== groupId));
+            setOutgoingGroupCall(null);
+            toast.info(response?.error || 'This group call has already ended.');
+          }
+        },
+      );
+    },
+    [socket, stopRingtone],
+  );
+
+  joinGroupCallRef.current = joinGroupCall;
+
   const startGroupCall = useCallback(
     (groupId: string, callType: 'AUDIO' | 'VIDEO') => {
       if (!socket) return;
@@ -881,22 +1020,27 @@ export const useCallSignaling = () => {
           callId?: string;
           livekitUrl?: string;
           roomName?: string;
+          error?: string;
         }) => {
-        if (response?.success && response?.token) {
-          setOutgoingGroupCall({
-            groupId,
-            callType,
-            callId: response.callId || groupId,
-            token: response.token,
-            livekitUrl: response.livekitUrl,
-            roomName: response.roomName,
-          });
-        } else {
-          setOutgoingGroupCall(null);
-        }
-      });
+          if (response?.success && response?.token) {
+            setOutgoingGroupCall({
+              groupId,
+              callType,
+              callId: response.callId || groupId,
+              token: response.token,
+              livekitUrl: response.livekitUrl,
+              roomName: response.roomName,
+            });
+          } else {
+            setOutgoingGroupCall(null);
+            if (response?.error) {
+              toast.error(response.error);
+            }
+          }
+        },
+      );
     },
-    [socket],
+    [socket, joinGroupCall],
   );
 
   const cancelGroupCall = useCallback(
@@ -907,6 +1051,10 @@ export const useCallSignaling = () => {
       stopRingtone();
       socket.emit('group:call_cancel', { groupId });
       setOutgoingGroupCall(null);
+      setIncomingGroupCall(prev => (prev?.groupId === groupId ? null : prev));
+      setIncomingCall(prev =>
+        prev?.groupId === groupId || (prev?.isGroup && prev?.groupId === groupId) ? null : prev,
+      );
     },
     [socket, stopRingtone],
   );
@@ -929,6 +1077,7 @@ export const useCallSignaling = () => {
         }) => {
         if (response?.success && response?.token) {
           setIncomingGroupCall(null);
+          setIncomingCall(null);
           setActiveCall({
             callId: response.callId || groupId,
             token: response.token,
@@ -952,42 +1101,16 @@ export const useCallSignaling = () => {
       stopRingtone();
       socket.emit('group:call_reject', { groupId });
       setIncomingGroupCall(null);
+      setIncomingCall(prev =>
+        prev?.groupId === groupId || (prev?.isGroup && prev?.groupId === groupId) ? null : prev,
+      );
     },
     [socket, stopRingtone],
   );
 
-  const joinGroupCall = useCallback(
-    (groupId: string) => {
-      if (!socket) return;
-      console.log('[Call] Joining group call for', groupId);
-      stopRingtone();
-      socket.emit(
-        'group:call_join',
-        { groupId },
-        (response: {
-          success?: boolean;
-          token?: string;
-          callId?: string;
-          livekitUrl?: string;
-          roomName?: string;
-          callType?: 'AUDIO' | 'VIDEO';
-        }) => {
-        if (response?.success && response?.token) {
-          setActiveCall({
-            callId: response.callId || groupId,
-            token: response.token,
-            serverUrl: resolveLivekitUrl(response.livekitUrl),
-            roomName: response.roomName || groupId,
-            callType: response.callType || 'AUDIO',
-            isGroup: true,
-            groupId: groupId,
-            startedAt: Date.now(),
-          });
-        }
-      });
-    },
-    [socket, stopRingtone],
-  );
+  const clearActiveGroupCall = useCallback((groupId: string) => {
+    setActiveGroupCalls(prev => prev.filter(id => id !== groupId));
+  }, []);
 
   const leaveGroupCall = useCallback(
     (callId: string) => {
@@ -995,6 +1118,10 @@ export const useCallSignaling = () => {
       console.log('[Call] Leaving group call', callId);
       stopRingtone();
       userInitiatedHangupRef.current = true;
+      if (activeCallRef.current?.groupId) {
+        const gid = activeCallRef.current.groupId;
+        setActiveGroupCalls(prev => prev.filter(id => id !== gid));
+      }
       socket.emit('group:call_leave', { callId });
       setActiveCall(null);
     },
@@ -1104,7 +1231,11 @@ export const useCallSignaling = () => {
       popup.focus();
     }
 
-    // Smooth handoff: switch main tab into standby capsule after popup opens
+    // Smooth handoff: clear any stale incoming/outgoing call overlays and switch main tab into standby capsule
+    setIncomingCall(null);
+    setIncomingGroupCall(null);
+    setOutgoingCall(null);
+    setOutgoingGroupCall(null);
     setTimeout(() => {
       setIsCallPoppedOut(true);
     }, 100);
@@ -1140,6 +1271,7 @@ export const useCallSignaling = () => {
     rejectGroupCall,
     joinGroupCall,
     leaveGroupCall,
+    clearActiveGroupCall,
     onLiveKitDisconnected,
     isCallMinimized,
     setIsCallMinimized,

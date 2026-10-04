@@ -52,6 +52,16 @@ export function GroupSettingsDrawer({
 
   const [saving, setSaving] = useState(false);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setEditInfo(settings.editGroupInfoScope || "ALL_MEMBERS");
+      setSendMessages(settings.sendMessagesScope || "ALL_MEMBERS");
+      setAddMembers(settings.addMembersScope || "ALL_MEMBERS");
+      setApprovalMode(settings.joinApprovalMode || "DIRECT");
+      setDisappearSeconds(settings.disappearAfterSeconds ?? null);
+    }
+  }, [isOpen, settings]);
+
   const handleSave = async () => {
     if (!isAdmin) {
       toast.error("Only administrators can update group settings");

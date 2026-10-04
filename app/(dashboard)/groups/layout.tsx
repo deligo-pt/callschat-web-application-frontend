@@ -284,10 +284,17 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
     return <>{children}</>;
   }
 
+  const isViewingChat = pathname !== "/groups";
+
   return (
     <div className="flex h-full w-full bg-white dark:bg-[#111B21] overflow-hidden">
       {/* Left Panel (List) */}
-      <div className="hidden md:flex h-full w-full flex-col border-r border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] md:w-[380px] lg:w-[400px] shrink-0 relative">
+      <div
+        className={cn(
+          "h-full w-full flex-col border-r border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] md:w-[380px] lg:w-[400px] shrink-0 relative",
+          isViewingChat ? "hidden md:flex" : "flex"
+        )}
+      >
         
         {/* Header */}
         <div className="flex flex-col px-4 pt-5 pb-3 border-b border-[#E2E8F0]/60 dark:border-[#222D34]">
@@ -517,7 +524,9 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
       </div>
 
       {/* Main Content Area */}
-      {children}
+      <div className={cn("flex-1 flex flex-col h-full overflow-hidden", !isViewingChat ? "hidden md:flex" : "flex")}>
+        {children}
+      </div>
 
       {/* Delete Confirmation Modal */}
       {groupToDelete && (

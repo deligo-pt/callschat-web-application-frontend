@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { groupService } from "@/services/group.service";
 import { GroupChatView } from "@/components/group/GroupChatView";
+import { OfficialAnnouncementChatView } from "@/components/chat/OfficialAnnouncementChatView";
 import { CustomerService } from "@/services/customer-support.service";
 import { ContactService } from "@/services/contact.service";
 import { useContacts } from "@/context/ContactsContext";
@@ -222,6 +223,10 @@ function ChatRouter() {
       }).catch(() => {});
     }
   }, [conversationId, recipientIdFromQuery, bizHandle, typeParam]);
+
+  if (conversationId === "official") {
+    return <OfficialAnnouncementChatView />;
+  }
 
   if (isGroup) {
     return <GroupChatView groupId={conversationId} backUrl={basePath} />;
