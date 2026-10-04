@@ -1118,10 +1118,6 @@ export const useCallSignaling = () => {
       console.log('[Call] Leaving group call', callId);
       stopRingtone();
       userInitiatedHangupRef.current = true;
-      if (activeCallRef.current?.groupId) {
-        const gid = activeCallRef.current.groupId;
-        setActiveGroupCalls(prev => prev.filter(id => id !== gid));
-      }
       socket.emit('group:call_leave', { callId });
       setActiveCall(null);
     },
