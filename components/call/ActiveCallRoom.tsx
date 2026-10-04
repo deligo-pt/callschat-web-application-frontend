@@ -248,6 +248,7 @@ export const CustomCallLayout = ({
   } = useCallContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
+  const isLocalSpeaking = useIsSpeaking(localParticipant);
   const { contacts } = useContacts();
 
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
@@ -322,7 +323,7 @@ export const CustomCallLayout = ({
     gridClass += " grid-cols-2 grid-rows-2";
   } else {
     gridClass +=
-      " grid-cols-2 md:grid-cols-3 auto-rows-[minmax(200px,1fr)] overflow-y-auto";
+      " grid-cols-2 md:grid-cols-3 auto-rows-[minmax(200px,1fr)] overflow-y-auto no-scrollbar";
   }
 
   // Call duration timer - synchronized with activeCall.startedAt
@@ -1003,7 +1004,7 @@ export const CustomCallLayout = ({
               </div>
             ) : (
               // Group Audio Layout (Grid of Avatars)
-              <div className="w-full max-w-4xl max-h-[65vh] overflow-y-auto px-4 py-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-8 gap-x-6 items-center justify-items-center">
+              <div className="w-full max-w-4xl max-h-[65vh] overflow-y-auto no-scrollbar px-4 py-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-8 gap-x-6 items-center justify-items-center">
                 {allParticipants.map((p, idx) => {
                   const isLocal = p.identity === localParticipant.identity;
                   let name = isLocal ? "You" : p.name || p.identity || "Unknown";
@@ -1050,6 +1051,14 @@ export const CustomCallLayout = ({
             )}
           </div>
     
+          {/* WhatsApp-Style Speech-While-Muted Notification */}
+          {isLocalSpeaking && !isMicrophoneEnabled && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-[#EA0038]/90 px-4 py-1.5 text-white text-xs font-semibold shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-none">
+              <MicOff className="h-3.5 w-3.5" />
+              <span>Your microphone is muted</span>
+            </div>
+          )}
+
           <ControlDock />
         </div>
       </div>
@@ -1202,6 +1211,14 @@ export const CustomCallLayout = ({
         )}
       </div>
 
+      {/* WhatsApp-Style Speech-While-Muted Notification */}
+      {isLocalSpeaking && !isMicrophoneEnabled && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-[#EA0038]/90 px-4 py-1.5 text-white text-xs font-semibold shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-none">
+          <MicOff className="h-3.5 w-3.5" />
+          <span>Your microphone is muted</span>
+        </div>
+      )}
+
       {/* Local Reconnecting Overlay */}
       {isLocalReconnecting && (
         <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md">
@@ -1230,6 +1247,7 @@ export const ActiveCallRoom = () => {
     isCallPoppedOut,
     returnCallToMain,
     hangupCall,
+    leaveGroupCall,
     onLiveKitDisconnected,
   } = useCallContext();
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -1406,7 +1424,13 @@ export const ActiveCallRoom = () => {
               <span className="sm:hidden">Return</span>
             </button>
             <button
-              onClick={() => hangupCall(activeCall.callId)}
+              onClick={() => {
+                if (activeCall.isGroup && leaveGroupCall) {
+                  leaveGroupCall(activeCall.callId);
+                } else {
+                  hangupCall(activeCall.callId);
+                }
+              }}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EA0038] hover:bg-[#d00030] text-white transition-all duration-200 shadow-[0_0_12px_rgba(234,0,56,0.35)] cursor-pointer active:scale-95"
               title="End Call"
             >

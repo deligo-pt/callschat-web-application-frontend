@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
   LayoutDashboard,
+  Megaphone,
   Menu,
   ShieldCheck,
   TerminalSquare,
@@ -23,6 +24,7 @@ function AdminShellContent({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { name: "Announcements", href: "/admin/announcements", icon: Megaphone },
     { name: "Verifications", href: "/admin/verifications", icon: ShieldCheck, badge: "18" },
     { name: "User Management", href: "/admin/users", icon: Users },
     { name: "System Logs", href: "/admin/logs", icon: TerminalSquare },

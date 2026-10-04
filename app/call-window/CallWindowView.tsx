@@ -185,6 +185,7 @@ export default function CallWindowView() {
     acceptGroupCall: () => {},
     rejectGroupCall: () => {},
     joinGroupCall: () => {},
+    clearActiveGroupCall: () => {},
   };
 
   // Connecting state if active call data is still propagating

@@ -21,10 +21,11 @@ import { getOptimizedImageUrl } from "@/utils/image";
 import { formatGroupPreviewText } from "@/lib/group-preview";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { motion } from "framer-motion";
-import { Building2, Heart, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
+import { Building2, Heart, Megaphone, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { Suspense, useCallback, useEffect, useState, useRef } from "react";
+import { announcementService } from "@/services/announcement.service";
 
 interface Conversation {
   id: string;
@@ -88,6 +89,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
   // Real-time unread counts per conversation (incremented on new messages, cleared on seen)
   const [realtimeUnreadCounts, setRealtimeUnreadCounts] = useState<Record<string, number>>({});
+  // Official Announcements state
+  const [latestAnnouncement, setLatestAnnouncement] = useState<any>(null);
+  const [unreadOfficialCount, setUnreadOfficialCount] = useState<number>(0);
   const pathname = usePathname();
   const router = useRouter();
   // Read the "view" query param once (frozen) — only needed to decide which sidebar to show.
@@ -137,11 +141,20 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       const myId = decoded?.sub || decoded?.id || "";
       setCurrentUserId(myId);
 
-      // Fetch 1v1 conversations and groups in parallel for a unified WhatsApp-style inbox
-      const [convsRes, groupsRes] = await Promise.all([
+      // Fetch 1v1 conversations, groups, and official announcements in parallel
+      const [convsRes, groupsRes, latestAnnRes, unreadAnnRes] = await Promise.all([
         chatService.fetchMyConversations().catch(() => ({ success: false, data: [] })),
         groupService.fetchMyGroups().catch(() => ({ success: false, data: [] })),
+        announcementService.getLatestAnnouncement().catch(() => ({ success: false, data: null })),
+        announcementService.getUnreadCount().catch(() => ({ success: false, data: { unreadCount: 0 } })),
       ]);
+
+      if (latestAnnRes?.success && latestAnnRes.data) {
+        setLatestAnnouncement(latestAnnRes.data);
+      }
+      if (unreadAnnRes?.success && unreadAnnRes.data) {
+        setUnreadOfficialCount(unreadAnnRes.data.unreadCount);
+      }
 
       const directConvs: Conversation[] = (convsRes?.success && Array.isArray(convsRes?.data)) ? convsRes.data : [];
       const groupConvs: Conversation[] = (groupsRes?.success && Array.isArray(groupsRes?.data))
@@ -256,6 +269,26 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       return () => window.removeEventListener("chat:message_decrypted", handleDecrypted);
     }
   }, []);
+
+  // Real-time socket listener for official broadcasts
+  useEffect(() => {
+    if (!socket) return;
+    const handleNewAnnouncement = (ann: any) => {
+      setLatestAnnouncement(ann);
+      setUnreadOfficialCount((prev) => prev + 1);
+    };
+    socket.on("announcement:new", handleNewAnnouncement);
+    return () => {
+      socket.off("announcement:new", handleNewAnnouncement);
+    };
+  }, [socket]);
+
+  // Clear unread count when opening official channel
+  useEffect(() => {
+    if (pathname === "/chats/official" || pathname === `${basePath}/official`) {
+      setUnreadOfficialCount(0);
+    }
+  }, [pathname, basePath]);
 
   // Load the last-read timestamps from localStorage so unread badges survive page refreshes.
   const pathnameConvSegment =
@@ -1293,6 +1326,61 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : (
                   <div className="flex flex-col divide-y divide-[#F0F2F5] dark:divide-[#202C33]">
+                    {/* CallsChat Official Announcement Channel Item */}
+                    {(!searchQuery && (chatFilter === "all" || (chatFilter === "unread" && unreadOfficialCount > 0))) && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative group border-b border-[#F0F2F5] dark:border-[#202C33]"
+                      >
+                        <Link
+                          href="/chats/official"
+                          prefetch={false}
+                          className={cn(
+                            "flex w-full items-center gap-3.5 px-4 py-3 transition-colors relative",
+                            pathname === "/chats/official" || pathname === `${basePath}/official`
+                              ? "bg-[#F0F2F5] dark:bg-[#202C33] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-[#00A884]"
+                              : "hover:bg-[#F8FAFC] dark:hover:bg-[#182229]/60"
+                          )}
+                        >
+                          {/* Official Channel Avatar */}
+                          <div className="relative shrink-0">
+                            <div className="h-12 w-12 rounded-full overflow-hidden bg-gradient-to-tr from-[#00A884] to-[#128C7E] shadow-sm flex items-center justify-center text-white">
+                              <Megaphone className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+
+                          {/* Info & Snippet */}
+                          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-[14.5px] font-bold text-[#111B21] dark:text-[#E9EDEF] truncate tracking-tight">
+                                  CallsChat Official
+                                </span>
+                                <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
+                              </div>
+                              <span className="text-[11px] font-semibold text-[#008069] dark:text-[#00A884] shrink-0">
+                                {latestAnnouncement?.publishedAt
+                                  ? new Date(latestAnnouncement.publishedAt).toLocaleDateString([], { month: "short", day: "numeric" })
+                                  : "Official"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[13px] text-[#54656F] dark:text-[#8696A0] truncate font-normal">
+                                {latestAnnouncement?.title || "Official platform announcements & updates"}
+                              </p>
+                              {unreadOfficialCount > 0 && (
+                                <span className="shrink-0 flex items-center justify-center rounded-full bg-[#00A884] text-white font-bold text-[11px] px-1.5 min-w-5 h-5 shadow-xs">
+                                  {unreadOfficialCount}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    )}
+
                     {filteredConversations.map((conv, index) => {
                       const isGroup = !!conv.isGroup;
                       const hasValidPeer = conv.otherUserId && conv.otherUserId !== "null" && conv.otherUserId !== "undefined";
@@ -1376,6 +1464,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                     <VerifiedBadge
                                       type={conv.accountType === "BUSINESS" || conv.workspaceId ? "BUSINESS" : "USER"}
                                       size="xs"
+                                      showTooltip={false}
                                     />
                                   )}
                                   {isGroup && (

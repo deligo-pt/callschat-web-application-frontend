@@ -33,6 +33,20 @@ function getAudioContext(): AudioContext | null {
   }
 }
 
+// Global User Gesture Audio Unlocker for Browser Autoplay Policy
+if (typeof window !== 'undefined') {
+  const unlockAudioEngine = () => {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      void ctx.resume();
+    }
+  };
+  window.addEventListener('click', unlockAudioEngine, { once: true, passive: true });
+  window.addEventListener('keydown', unlockAudioEngine, { once: true, passive: true });
+  window.addEventListener('touchstart', unlockAudioEngine, { once: true, passive: true });
+  window.addEventListener('pointerdown', unlockAudioEngine, { once: true, passive: true });
+}
+
 /**
  * Synthesizes dual-frequency telephony tones using Web Audio API.
  * Prevents audio clipping with smooth gain attack and release ramps.

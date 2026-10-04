@@ -3,6 +3,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { useE2EE } from "@/context/E2EEContext";
 import { groupService, GroupItem } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
+import { useGroupStore } from "@/hooks/useGroupStore";
 import {
   generateGroupKey,
   encryptMessage,
@@ -1313,6 +1314,41 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       setGroupDetails((prev: any) => (prev ? { ...prev, ...payload.settings } : prev));
     };
 
+    const handleInfoUpdated = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      setGroupDetails((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              name: payload.name !== undefined ? payload.name : prev.name,
+              description: payload.description !== undefined ? payload.description : prev.description,
+              avatarUrl: payload.avatarUrl !== undefined ? payload.avatarUrl : prev.avatarUrl,
+            }
+          : prev
+      );
+      useGroupStore.getState().updateGroupInStore(groupId, {
+        name: payload.name,
+        description: payload.description,
+        avatarUrl: payload.avatarUrl,
+      });
+    };
+
+    const handleRoleUpdated = (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      const myId = currentUserIdRef.current;
+      if (payload.userId === myId) {
+        setGroupDetails((prev: any) => (prev ? { ...prev, myRole: payload.role } : prev));
+      }
+      groupService.fetchGroupDetails(groupId).then((res) => {
+        if (res.success && res.data) {
+          setGroupDetails(res.data);
+        }
+      });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("group:members_refresh", { detail: { groupId } }));
+      }
+    };
+
     const handleTypingStart = (payload: any) => {
       if (payload.groupId !== groupId || payload.userId === currentUserIdRef.current) return;
       setTypingUsers((prev) => {
@@ -1354,6 +1390,44 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             : m
         )
       );
+    };
+
+    const handleMessageEdited = async (payload: any) => {
+      if (payload.groupId !== groupId) return;
+      const { id: messageId, ciphertext, nonce } = payload;
+      const gKey = groupKeyRef.current;
+      let plainText: string | null = null;
+
+      if (ciphertext && nonce && gKey) {
+        try {
+          const dec = await decryptGroupMessage(ciphertext, nonce, gKey);
+          if (dec) {
+            plainText = parseEditedText(dec).text;
+          }
+        } catch (err) {
+          console.warn("[useGroupChat] Could not decrypt edited message:", err);
+        }
+      } else if (ciphertext && !nonce) {
+        plainText = parseEditedText(ciphertext).text;
+      }
+
+      if (!plainText) {
+        plainText = sentPlaintextCacheRef.current.get(messageId) || null;
+      }
+
+      if (plainText) {
+        const effectiveUserId = currentUserIdRef.current || currentUserId;
+        if (effectiveUserId) {
+          void storeDecryptedMessage(effectiveUserId, messageId, plainText);
+        }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, text: plainText!, ciphertext, nonce, isEdited: true }
+              : m
+          )
+        );
+      }
     };
 
     // Forward Secrecy: Automatic Group Key Rotation Handlers
@@ -1709,9 +1783,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     socket.on("group:pin_updated", handlePinUpdated);
     socket.on("group:poll_updated", handlePollUpdated);
     socket.on("group:settings_updated", handleSettingsUpdated);
+    socket.on("group:info_updated", handleInfoUpdated);
+    socket.on("group:role_updated", handleRoleUpdated);
     socket.on("group:typing_start", handleTypingStart);
     socket.on("group:typing_stop", handleTypingStop);
     socket.on("group:message_unsent", handleMessageUnsent);
+    socket.on("group:message_edited", handleMessageEdited);
     socket.on("group:request_rekey", handleRequestRekey);
     socket.on("group:key_rotated", handleKeyRotated);
     socket.on("group:member_removed", handleMemberRemoved);
@@ -1734,9 +1811,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       socket.off("group:pin_updated", handlePinUpdated);
       socket.off("group:poll_updated", handlePollUpdated);
       socket.off("group:settings_updated", handleSettingsUpdated);
+      socket.off("group:info_updated", handleInfoUpdated);
+      socket.off("group:role_updated", handleRoleUpdated);
       socket.off("group:typing_start", handleTypingStart);
       socket.off("group:typing_stop", handleTypingStop);
       socket.off("group:message_unsent", handleMessageUnsent);
+      socket.off("group:message_edited", handleMessageEdited);
       socket.off("group:request_rekey", handleRequestRekey);
       socket.off("group:key_rotated", handleKeyRotated);
       socket.off("group:member_removed", handleMemberRemoved);
@@ -2076,6 +2156,49 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     [groupId]
   );
 
+  const editMessage = useCallback(
+    async (messageId: string, newText: string) => {
+      if (!socket || !isConnected || !groupId) return;
+      const formattedText = `__EDITED__:${newText}`;
+      const gKey = groupKeyRef.current;
+      let ciphertext: string | null = null;
+      let nonce: string | null = null;
+
+      if (gKey) {
+        try {
+          const enc = await encryptGroupMessage(formattedText, gKey);
+          ciphertext = enc.ciphertext;
+          nonce = enc.nonce;
+        } catch (encErr) {
+          console.warn("[useGroupChat] Encrypting edited message failed, using plaintext fallback:", encErr);
+          ciphertext = formattedText;
+          nonce = null;
+        }
+      } else {
+        ciphertext = formattedText;
+        nonce = null;
+      }
+
+      sentPlaintextCacheRef.current.set(messageId, newText);
+      if (nonce) sentPlaintextCacheRef.current.set(nonce, newText);
+      if (ciphertext) sentPlaintextCacheRef.current.set(ciphertext, newText);
+
+      const effectiveUserId = currentUserIdRef.current || currentUserId;
+      if (effectiveUserId) {
+        void storeDecryptedMessage(effectiveUserId, messageId, newText);
+        if (nonce) void storeDecryptedMessage(effectiveUserId, `nonce_${nonce}`, newText);
+        if (ciphertext) void storeDecryptedMessage(effectiveUserId, `cipher_${ciphertext}`, newText);
+      }
+
+      socket.emit("group:edit_message", { groupId, messageId, ciphertext, nonce });
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, text: newText, isEdited: true } : m))
+      );
+    },
+    [socket, isConnected, groupId, currentUserId]
+  );
+
   const loadMoreMessages = useCallback(async () => {
     if (isLoadingMore || !hasMoreMessages || !groupId) return;
     const oldest = messagesRef.current.find((m) => !m.id.startsWith("optimistic-"));
@@ -2211,6 +2334,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     createPoll,
     votePoll,
     unsendMessage,
+    editMessage,
     rekeyGroup: () => performRekey("manual rotation"),
     getGroupKey: () => groupKeyRef.current,
   };

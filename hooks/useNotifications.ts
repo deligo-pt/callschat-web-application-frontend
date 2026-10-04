@@ -87,9 +87,26 @@ export function useNotifications() {
     // 2. Listen for the event
     socket.on('notification:new', handleNewNotification);
 
+    // Official broadcast announcement listener
+    const handleNewAnnouncement = (ann: any) => {
+      toast.info(`📢 Official Announcement: ${ann.title}`, {
+        description: ann.content?.slice(0, 100) + (ann.content?.length > 100 ? "..." : ""),
+        action: {
+          label: "View",
+          onClick: () => {
+            window.location.href = "/chats/official";
+          },
+        },
+      });
+      playNotificationSound('message');
+    };
+
+    socket.on('announcement:new', handleNewAnnouncement);
+
     // 4. Cleanup listener
     return () => {
       socket.off('notification:new', handleNewNotification);
+      socket.off('announcement:new', handleNewAnnouncement);
     };
   }, [socket, filter]);
 

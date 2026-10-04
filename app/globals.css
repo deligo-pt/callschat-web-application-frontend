@@ -314,6 +314,15 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Hide scrollbar while preserving scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* ── Active In-Call Heartbeat Animation (WhatsApp-grade) ───────────── */
 
 @keyframes callHeartbeat {

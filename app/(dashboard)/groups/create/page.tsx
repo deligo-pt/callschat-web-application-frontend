@@ -13,6 +13,7 @@ import { getUserPrivateKey, storeGroupKey } from "@/utils/keyStore";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useGroupStore } from "@/hooks/useGroupStore";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { toast } from "sonner";
 
 function parseJwt(token: string) {
   try {
@@ -74,7 +75,13 @@ export default function CreateGroupPage() {
   // Step 3 State
   const [privacyEnabled, setPrivacyEnabled] = useState(true);
 
-  const handleNext = () => setStep((s) => Math.min(s + 1, 3));
+  const handleNext = () => {
+    if (step === 1 && !groupName.trim()) {
+      toast.error("Please enter a group subject");
+      return;
+    }
+    setStep((s) => Math.min(s + 1, 3));
+  };
   const handleBack = () => setStep((s) => Math.max(s - 1, 1));
 
   const toggleMember = (id: string) => {
@@ -191,10 +198,12 @@ export default function CreateGroupPage() {
       });
       useGroupStore.getState().fetchGroups(true);
 
-      // Redirect to groups list
-      router.push(`/groups`);
-    } catch (err) {
+      toast.success("Group created successfully!");
+      // Redirect directly to the newly created group chat (WhatsApp style)
+      router.push(`/groups/${groupRes.data.id}`);
+    } catch (err: any) {
       console.error("Error creating group:", err);
+      toast.error(err?.message || "Failed to create group. Please try again.");
       setIsCreating(false);
     }
   };
