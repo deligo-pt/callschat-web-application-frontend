@@ -30,6 +30,10 @@ import {
   CheckCheck,
   FileText,
   Lock,
+  Bell,
+  BellOff,
+  BellRing,
+  Radio,
 } from "lucide-react";
 import {
   adminAnnouncementService,
@@ -54,7 +58,11 @@ export default function AdminAnnouncementsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [isComposerOpen, setIsComposerOpen] = useState<boolean>(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [pushConfirmItem, setPushConfirmItem] = useState<AnnouncementItem | null>(null);
+  const [isBroadcastingPush, setIsBroadcastingPush] = useState<boolean>(false);
+  const [forcePush, setForcePush] = useState<boolean>(false);
   const [previewDevice, setPreviewDevice] = useState<"mobile" | "desktop">("mobile");
+  const [previewType, setPreviewType] = useState<"chat" | "push">("chat");
 
   // Form State
   const [title, setTitle] = useState("");
@@ -63,6 +71,7 @@ export default function AdminAnnouncementsPage() {
   const [status, setStatus] = useState<AnnouncementStatus>("PUBLISHED");
   const [targetAudience, setTargetAudience] = useState<AnnouncementTargetAudience>("ALL");
   const [isPinned, setIsPinned] = useState(false);
+  const [sendPushNotification, setSendPushNotification] = useState(true);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaKey, setMediaKey] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"IMAGE" | "VIDEO" | null>(null);
@@ -171,6 +180,7 @@ export default function AdminAnnouncementsPage() {
         status,
         targetAudience,
         isPinned,
+        sendPushNotification,
         mediaUrl: mediaUrl || undefined,
         mediaKey: mediaKey || undefined,
         mediaType: mediaType || undefined,
@@ -182,7 +192,9 @@ export default function AdminAnnouncementsPage() {
       if (res.success) {
         toast.success(
           status === "PUBLISHED"
-            ? "Announcement broadcasted live to all users!"
+            ? sendPushNotification
+              ? "Announcement broadcasted live with push notifications dispatched!"
+              : "Announcement broadcasted live to in-app feed!"
             : "Draft saved successfully"
         );
         setIsComposerOpen(false);
@@ -204,11 +216,33 @@ export default function AdminAnnouncementsPage() {
     setStatus("PUBLISHED");
     setTargetAudience("ALL");
     setIsPinned(false);
+    setSendPushNotification(true);
     setMediaUrl(null);
     setMediaKey(null);
     setMediaType(null);
     setActionText("");
     setActionUrl("");
+    setPreviewType("chat");
+  };
+
+  const handleBroadcastPush = async (announcementId: string, force = false) => {
+    try {
+      setIsBroadcastingPush(true);
+      const res = await adminAnnouncementService.broadcastPush(announcementId, force);
+      if (res.success) {
+        toast.success("Broadcast push notifications dispatched to FCM queue!");
+        setPushConfirmItem(null);
+        setForcePush(false);
+        fetchData();
+      } else {
+        toast.error(res.message || "Failed to dispatch push notifications");
+      }
+    } catch (err: any) {
+      console.error("Broadcast push error:", err);
+      toast.error(err?.response?.data?.message || "Failed to broadcast push notifications");
+    } finally {
+      setIsBroadcastingPush(false);
+    }
   };
 
   const handleTogglePin = async (id: string, currentPinned: boolean) => {
@@ -521,12 +555,46 @@ export default function AdminAnnouncementsPage() {
                         <CheckCheck className="h-3.5 w-3.5" />
                         {item.readCount ?? 0} read receipts
                       </span>
+                      {item.pushDispatchedAt ? (
+                        <>
+                          <span>•</span>
+                          <span
+                            className="flex items-center gap-1 text-[#00A884]"
+                            title={`Dispatched: ${formatDate(item.pushDispatchedAt)} • ${item.pushSuccessCount ?? 0} succeeded, ${item.pushFailedCount ?? 0} failed`}
+                          >
+                            <Bell className="h-3 w-3" />
+                            <span>Push ({item.pushSuccessCount ?? 0} sent)</span>
+                          </span>
+                        </>
+                      ) : item.status === "PUBLISHED" ? (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-1 text-[#8696A0]" title="No push notifications sent yet">
+                            <BellOff className="h-3 w-3" />
+                            <span>No push</span>
+                          </span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 </div>
 
                 {/* Actions Toolbar */}
                 <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                  {item.status === "PUBLISHED" && (
+                    <button
+                      onClick={() => {
+                        setPushConfirmItem(item);
+                        setForcePush(false);
+                      }}
+                      title="Broadcast FCM Push Notification to Target Audience"
+                      className="flex items-center gap-1.5 rounded-lg border border-[#222D34] bg-[#202C33] px-2.5 py-1.5 text-xs font-semibold text-[#8696A0] hover:text-[#00A884] hover:border-[#00A884]/30 hover:bg-[#00A884]/10 transition-all duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                    >
+                      <BellRing className="h-3.5 w-3.5 text-[#00A884]" />
+                      <span>Push</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleTogglePin(item.id, item.isPinned)}
                     title={item.isPinned ? "Unpin Announcement" : "Pin to Top"}
@@ -760,6 +828,35 @@ export default function AdminAnnouncementsPage() {
                   </div>
                 </div>
 
+                {/* Push Notification Toggle Switch */}
+                <div className="flex items-center justify-between rounded-xl bg-[#0B141A] border border-[#222D34] p-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+                      sendPushNotification ? "bg-[#00A884]/20 text-[#00A884]" : "bg-[#202C33] text-[#8696A0]"
+                    )}>
+                      <BellRing className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-white">Broadcast Push Notification</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#00A884]/15 text-[#00A884] font-bold border border-[#00A884]/30">
+                          FCM Multi-Platform
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[#8696A0] mt-0.5">
+                        Immediately dispatches real-time push notification to {targetAudience === "ALL" ? "all devices" : `${targetAudience.toLowerCase()} accounts`} via Firebase Cloud Messaging
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={sendPushNotification}
+                    onChange={(e) => setSendPushNotification(e.target.checked)}
+                    className="h-4 w-4 rounded-sm border-[#222D34] bg-[#202C33] text-[#00A884] focus:ring-[#00A884] focus:ring-offset-[#0B141A]"
+                  />
+                </div>
+
                 {/* Pin Toggle Switch */}
                 <div className="flex items-center justify-between rounded-xl bg-[#0B141A] border border-[#222D34] p-3">
                   <div className="flex items-center gap-2.5">
@@ -811,33 +908,66 @@ export default function AdminAnnouncementsPage() {
 
               {/* Live Simulator Column (Right) */}
               <div className="lg:col-span-5 bg-[#0B141A] p-6 flex flex-col items-center justify-center">
-                <div className="w-full flex items-center justify-between mb-4">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[#8696A0] flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-[#00A884]" />
-                    Live WhatsApp Preview
-                  </span>
-                  <div className="flex items-center gap-1 rounded-lg bg-[#182229] border border-[#222D34] p-1 text-[#8696A0]">
+                <div className="w-full flex flex-col gap-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[#8696A0] flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-[#00A884]" />
+                      Live Device Simulator
+                    </span>
+
+                    <div className="flex items-center gap-1 rounded-lg bg-[#182229] border border-[#222D34] p-1 text-[#8696A0]">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDevice("mobile")}
+                        className={cn(
+                          "p-1 rounded-sm transition-colors",
+                          previewDevice === "mobile" ? "bg-[#00A884] text-white" : "hover:text-white"
+                        )}
+                        title="Mobile Device Preview"
+                      >
+                        <Smartphone className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDevice("desktop")}
+                        className={cn(
+                          "p-1 rounded-sm transition-colors",
+                          previewDevice === "desktop" ? "bg-[#00A884] text-white" : "hover:text-white"
+                        )}
+                        title="Desktop Web Preview"
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview Type Switcher (In-App Chat vs Lock-Screen Push) */}
+                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#182229] p-1 border border-[#222D34] text-xs">
                     <button
                       type="button"
-                      onClick={() => setPreviewDevice("mobile")}
+                      onClick={() => setPreviewType("chat")}
                       className={cn(
-                        "p-1 rounded-sm transition-colors",
-                        previewDevice === "mobile" ? "bg-[#00A884] text-white" : "hover:text-white"
+                        "rounded-lg py-1.5 font-semibold text-center transition-all flex items-center justify-center gap-1.5",
+                        previewType === "chat"
+                          ? "bg-[#00A884] text-white shadow-xs"
+                          : "text-[#8696A0] hover:text-white"
                       )}
-                      title="Mobile Device Preview"
                     >
-                      <Smartphone className="h-3.5 w-3.5" />
+                      <Megaphone className="h-3 w-3" />
+                      <span>In-App Feed</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPreviewDevice("desktop")}
+                      onClick={() => setPreviewType("push")}
                       className={cn(
-                        "p-1 rounded-sm transition-colors",
-                        previewDevice === "desktop" ? "bg-[#00A884] text-white" : "hover:text-white"
+                        "rounded-lg py-1.5 font-semibold text-center transition-all flex items-center justify-center gap-1.5",
+                        previewType === "push"
+                          ? "bg-[#00A884] text-white shadow-xs"
+                          : "text-[#8696A0] hover:text-white"
                       )}
-                      title="Desktop Web Preview"
                     >
-                      <Monitor className="h-3.5 w-3.5" />
+                      <BellRing className="h-3 w-3" />
+                      <span>Lock-Screen Push</span>
                     </button>
                   </div>
                 </div>
@@ -849,95 +979,165 @@ export default function AdminAnnouncementsPage() {
                     previewDevice === "mobile" ? "max-w-[340px] h-[520px]" : "max-w-[420px] h-[480px]"
                   )}
                 >
-                  {/* Mock Chat Header */}
-                  <div className="flex items-center justify-between border-b border-[#222D34] bg-[#202C33] px-4 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-[#00A884] to-[#128C7E] text-white shadow-xs">
-                        <Megaphone className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs font-bold text-white">CallsChat Official</span>
-                          <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
-                        </div>
-                        <span className="text-[10px] text-[#00A884] font-medium">Verified Channel</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mock Message Feed */}
-                  <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 custom-scrollbar">
-                    <div className="rounded-2xl border border-[#222D34] bg-[#1F2C34] p-3.5 shadow-md">
-                      {isPinned && (
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-amber-400 mb-1.5">
-                          <Pin className="h-3 w-3" /> PINNED ANNOUNCEMENT
-                        </div>
-                      )}
-
-                      {/* Attached Media Preview */}
-                      {mediaUrl && (
-                        <div className="mb-2.5 rounded-xl overflow-hidden bg-black border border-[#222D34] aspect-video flex items-center justify-center relative">
-                          {mediaType === "VIDEO" ? (
-                            <video
-                              src={mediaUrl}
-                              controls
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <img
-                              src={mediaUrl}
-                              alt="Announcement media"
-                              className="w-full h-full object-cover"
-                            />
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
-                            getPriorityBadge(priority)
-                          )}
-                        >
-                          {priority}
+                  {previewType === "push" ? (
+                    /* iOS / Android Lock-Screen Push Preview */
+                    <div className="flex-1 flex flex-col justify-between p-4 bg-gradient-to-b from-[#131D22] via-[#0E161B] to-[#0A0F12] relative overflow-hidden">
+                      {/* Lock Screen Time Display */}
+                      <div className="flex flex-col items-center pt-4 pb-6 text-center">
+                        <span className="text-[11px] font-medium text-[#8696A0] uppercase tracking-widest">
+                          Monday, October 5
                         </span>
-                        <span className="text-[10px] text-[#8696A0]">Just now</span>
+                        <span className="text-4xl font-extralight text-white tracking-tight mt-1">
+                          09:41
+                        </span>
                       </div>
 
-                      <h5 className="text-xs font-bold text-white mb-1 leading-snug">
-                        {title || "Your Announcement Headline"}
-                      </h5>
+                      {/* Push Notification Card */}
+                      <div className="rounded-2xl border border-white/10 bg-[#1F2C34]/90 backdrop-blur-md p-3.5 shadow-xl text-left transition-all hover:bg-[#1F2C34]">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#00A884] text-white">
+                              <Megaphone className="h-3 w-3" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white tracking-wide uppercase">
+                              CallsChat
+                            </span>
+                            <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
+                          </div>
+                          <span className="text-[10px] text-[#8696A0]">now</span>
+                        </div>
 
-                      <p className="text-[11px] text-[#D1D7DB] leading-relaxed whitespace-pre-wrap">
-                        {content || "Your message body content will appear here in the live broadcast feed..."}
-                      </p>
+                        <div className="flex gap-3 items-start">
+                          <div className="flex-1 min-w-0">
+                            <h6 className="text-xs font-bold text-white leading-snug line-clamp-1">
+                              {title ? (priority === "URGENT" ? `[URGENT] ${title}` : title) : "CallsChat Official Announcement"}
+                            </h6>
+                            <p className="text-[11px] text-[#D1D7DB] mt-1 line-clamp-2 leading-relaxed">
+                              {content || "Tap to view the latest official update and explore new features."}
+                            </p>
+                          </div>
 
-                      {actionText && (
-                        <div className="mt-2.5 pt-2 border-t border-[#222D34]">
-                          <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#00A884] py-1.5 text-center text-xs font-semibold text-white">
-                            {actionText}
-                            <ExternalLink className="h-3 w-3" />
+                          {mediaUrl && (
+                            <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-black border border-[#222D34]">
+                              {mediaType === "VIDEO" ? (
+                                <div className="h-full w-full flex items-center justify-center bg-[#202C33]">
+                                  <Play className="h-4 w-4 text-[#00A884] fill-[#00A884]" />
+                                </div>
+                              ) : (
+                                <img src={mediaUrl} alt="Thumbnail" className="h-full w-full object-cover" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-[#8696A0]">
+                          <span className="text-[#00A884] font-medium">
+                            Target: {targetAudience} users
                           </span>
+                          <span>Slide to open</span>
                         </div>
-                      )}
+                      </div>
 
-                      <div className="mt-2 flex items-center justify-between text-[10px] text-[#8696A0] pt-1.5 border-t border-[#222D34]">
-                        <span>0 views</span>
-                        <span className="flex items-center gap-1 text-[#53BDEB]">
-                          <CheckCheck className="h-3 w-3" />
-                          <span>Delivered</span>
-                        </span>
+                      {/* Lock Screen Bottom Bar */}
+                      <div className="pt-8 pb-2 flex flex-col items-center gap-1.5 text-center">
+                        <div className="h-1 w-24 rounded-full bg-white/30" />
+                        <span className="text-[9px] text-[#8696A0]/80">Swipe up to unlock</span>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* WhatsApp In-App Feed Mockup */
+                    <>
+                      {/* Mock Chat Header */}
+                      <div className="flex items-center justify-between border-b border-[#222D34] bg-[#202C33] px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-[#00A884] to-[#128C7E] text-white shadow-xs">
+                            <Megaphone className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-white">CallsChat Official</span>
+                              <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
+                            </div>
+                            <span className="text-[10px] text-[#00A884] font-medium">Verified Channel</span>
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Mock Read-Only Footer Banner */}
-                  <div className="border-t border-[#222D34] bg-[#111B21] p-2.5 text-center">
-                    <span className="text-[10px] text-[#8696A0] font-medium flex items-center justify-center gap-1">
-                      <Lock className="h-3 w-3" /> Read-only official channel · No replies
-                    </span>
-                  </div>
+                      {/* Mock Message Feed */}
+                      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 custom-scrollbar">
+                        <div className="rounded-2xl border border-[#222D34] bg-[#1F2C34] p-3.5 shadow-md">
+                          {isPinned && (
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-amber-400 mb-1.5">
+                              <Pin className="h-3 w-3" /> PINNED ANNOUNCEMENT
+                            </div>
+                          )}
+
+                          {/* Attached Media Preview */}
+                          {mediaUrl && (
+                            <div className="mb-2.5 rounded-xl overflow-hidden bg-black border border-[#222D34] aspect-video flex items-center justify-center relative">
+                              {mediaType === "VIDEO" ? (
+                                <video
+                                  src={mediaUrl}
+                                  controls
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <img
+                                  src={mediaUrl}
+                                  alt="Announcement media"
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
+                                getPriorityBadge(priority)
+                              )}
+                            >
+                              {priority}
+                            </span>
+                            <span className="text-[10px] text-[#8696A0]">Just now</span>
+                          </div>
+
+                          <h5 className="text-xs font-bold text-white mb-1 leading-snug">
+                            {title || "Your Announcement Headline"}
+                          </h5>
+
+                          <p className="text-[11px] text-[#D1D7DB] leading-relaxed whitespace-pre-wrap">
+                            {content || "Your message body content will appear here in the live broadcast feed..."}
+                          </p>
+
+                          {actionText && (
+                            <div className="mt-2.5 pt-2 border-t border-[#222D34]">
+                              <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#00A884] py-1.5 text-center text-xs font-semibold text-white">
+                                {actionText}
+                                <ExternalLink className="h-3 w-3" />
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="mt-2 flex items-center justify-between text-[10px] text-[#8696A0] pt-1.5 border-t border-[#222D34]">
+                            <span>0 views</span>
+                            <span className="flex items-center gap-1 text-[#53BDEB]">
+                              <CheckCheck className="h-3 w-3" />
+                              <span>Delivered</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mock Read-Only Footer Banner */}
+                      <div className="border-t border-[#222D34] bg-[#111B21] p-2.5 text-center">
+                        <span className="text-[10px] text-[#8696A0] font-medium flex items-center justify-center gap-1">
+                          <Lock className="h-3 w-3" /> Read-only official channel · No replies
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -974,6 +1174,127 @@ export default function AdminAnnouncementsPage() {
                 Confirm Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Re-Broadcast Push Notification Modal */}
+      {pushConfirmItem && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-[#222D34] bg-[#182229] p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#00A884]/15 text-[#00A884] border border-[#00A884]/25 shadow-xs">
+                <BellRing className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-white">Broadcast Push Notification</h4>
+                <p className="text-xs text-[#8696A0]">Send real-time alerts to registered user devices</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#222D34] bg-[#0B141A] p-3.5 mb-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-[#8696A0]">
+                <span>Announcement Title:</span>
+                <span className="font-semibold text-white truncate max-w-[200px]">{pushConfirmItem.title}</span>
+              </div>
+              <div className="flex items-center justify-between text-[#8696A0]">
+                <span>Target Audience:</span>
+                <span className="font-semibold text-[#00A884] uppercase">{pushConfirmItem.targetAudience}</span>
+              </div>
+              <div className="flex items-center justify-between text-[#8696A0]">
+                <span>Last Dispatched:</span>
+                <span className="font-semibold text-white">
+                  {pushConfirmItem.pushDispatchedAt ? formatDate(pushConfirmItem.pushDispatchedAt) : "Never"}
+                </span>
+              </div>
+              {pushConfirmItem.pushAttemptedCount ? (
+                <div className="flex items-center justify-between text-[#8696A0]">
+                  <span>Previous Delivery:</span>
+                  <span className="font-semibold text-emerald-400">
+                    {pushConfirmItem.pushSuccessCount ?? 0} delivered / {pushConfirmItem.pushAttemptedCount} attempted
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Cooldown Check: 10 minutes */}
+            {(() => {
+              const cooldownMs = 10 * 60 * 1000;
+              const lastSentMs = pushConfirmItem.pushDispatchedAt
+                ? new Date(pushConfirmItem.pushDispatchedAt).getTime()
+                : 0;
+              const elapsedMs = Date.now() - lastSentMs;
+              const isCoolingDown = Boolean(pushConfirmItem.pushDispatchedAt && elapsedMs < cooldownMs);
+              const minutesLeft = Math.ceil((cooldownMs - elapsedMs) / 60000);
+
+              return (
+                <>
+                  {isCoolingDown ? (
+                    <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Rate-Limit Cooldown Active</span>
+                          <p className="text-[11px] text-amber-400/90 mt-0.5">
+                            A push was recently dispatched ~{Math.floor(elapsedMs / 60000)}m ago. Cooldown remaining: {minutesLeft}m.
+                            Frequent pushes can disturb users.
+                          </p>
+                        </div>
+                      </div>
+                      <label className="mt-2.5 flex items-center gap-2 text-[11px] font-semibold text-amber-200 cursor-pointer pt-2 border-t border-amber-500/20">
+                        <input
+                          type="checkbox"
+                          checked={forcePush}
+                          onChange={(e) => setForcePush(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded-sm border-amber-500/40 bg-black/40 text-[#00A884]"
+                        />
+                        <span>Force Re-broadcast (Override cooldown)</span>
+                      </label>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#8696A0] mb-4 leading-relaxed">
+                      This will queue and dispatch high-throughput push notifications via Firebase Cloud Messaging to all users in the <span className="text-white font-medium">{pushConfirmItem.targetAudience}</span> audience segment.
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPushConfirmItem(null);
+                        setForcePush(false);
+                      }}
+                      disabled={isBroadcastingPush}
+                      className="rounded-xl border border-[#222D34] bg-[#202C33] px-4 py-2 text-xs font-semibold text-[#8696A0] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBroadcastingPush || (isCoolingDown && !forcePush)}
+                      onClick={() => handleBroadcastPush(pushConfirmItem.id, forcePush)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#00A884] hover:bg-[#008F6F] active:bg-[#007A5E] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#00A884]/20 disabled:opacity-50 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                    >
+                      {isBroadcastingPush ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Dispatching...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5" />
+                          <span>{isCoolingDown ? "Force Send Push" : "Send Push Broadcast"}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

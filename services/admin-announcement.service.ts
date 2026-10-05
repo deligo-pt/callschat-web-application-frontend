@@ -36,6 +36,10 @@ export interface AnnouncementItem {
   };
   viewsCount: number;
   readCount?: number;
+  pushDispatchedAt?: string | null;
+  pushAttemptedCount?: number | null;
+  pushSuccessCount?: number | null;
+  pushFailedCount?: number | null;
   publishedAt: string;
   createdAt: string;
   updatedAt: string;
@@ -48,6 +52,7 @@ export interface CreateAnnouncementPayload {
   status?: AnnouncementStatus;
   targetAudience?: AnnouncementTargetAudience;
   isPinned?: boolean;
+  sendPushNotification?: boolean;
   mediaUrl?: string | null;
   mediaKey?: string | null;
   mediaType?: AnnouncementMediaType | null;
@@ -147,6 +152,20 @@ export class AdminAnnouncementService {
     isPinned: boolean
   ): Promise<{ success: boolean; data: AnnouncementItem }> {
     const res = await apiClient.post(`/admin/announcements/${id}/pin`, { isPinned });
+    return res.data;
+  }
+
+  /**
+   * Admin: Explicitly broadcasts or re-broadcasts push notification for an announcement.
+   * POST /api/v1/admin/announcements/:id/push
+   */
+  async broadcastPush(
+    id: string,
+    force = false
+  ): Promise<{ success: boolean; message: string; dispatched: boolean }> {
+    const res = await apiClient.post(`/admin/announcements/${id}/push`, null, {
+      params: force ? { force: 'true' } : {},
+    });
     return res.data;
   }
 
