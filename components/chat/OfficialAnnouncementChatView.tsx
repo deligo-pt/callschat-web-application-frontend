@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Megaphone,
   ArrowLeft,
@@ -9,17 +9,13 @@ import {
   Eye,
   CheckCheck,
   ExternalLink,
-  Play,
   Clock,
   ShieldCheck,
   X,
-  Volume2,
-  VolumeX,
-  Maximize2,
-  AlertCircle,
+  Share2,
   Sparkles,
+  Info,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { announcementService } from "@/services/announcement.service";
 import type { AnnouncementItem, AnnouncementPriority } from "@/services/admin-announcement.service";
@@ -27,6 +23,55 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+/** Helper to format URLs inside announcement text as clickable hyperlinks */
+function formatAnnouncementText(text: string) {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.split(urlRegex).map((part, i) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#00A884] dark:text-[#25D366] font-medium underline underline-offset-2 hover:opacity-85 transition-opacity break-all inline-flex items-center gap-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span>{part}</span>
+          <ExternalLink className="h-3 w-3 inline shrink-0" />
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
+/** Formats a timestamp into a clean 12-hour string (e.g. 01:55 AM) */
+function formatTime(isoString?: string | null) {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Calculates date group label (Today, Yesterday, or full date) */
+function getDateGroupLabel(isoString?: string | null): string {
+  if (!isoString) return "Recent";
+  const date = new Date(isoString);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((today.getTime() - itemDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString([], {
+    month: "long",
+    day: "numeric",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
+}
 
 export function OfficialAnnouncementChatView() {
   const router = useRouter();
@@ -40,7 +85,7 @@ export function OfficialAnnouncementChatView() {
     try {
       setIsLoading(true);
       const res = await announcementService.getAnnouncements(1, 50);
-      if (res?.success) {
+      if (res?.success && Array.isArray(res.data)) {
         setAnnouncements(res.data);
       }
       // Auto mark all announcements as read when opening official channel
@@ -77,7 +122,7 @@ export function OfficialAnnouncementChatView() {
     };
   }, [socket]);
 
-  // Handle ESC key to close modal
+  // Handle ESC key to close lightbox modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && activeMediaModal) {
@@ -94,53 +139,65 @@ export function OfficialAnnouncementChatView() {
         return {
           pill: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25",
           dot: "bg-rose-500",
-          cardAccent: "border-l-4 border-l-rose-500",
+          label: "Urgent",
         };
       case "HIGH":
         return {
           pill: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25",
           dot: "bg-amber-500",
-          cardAccent: "border-l-4 border-l-amber-500",
+          label: "Important",
         };
       case "LOW":
         return {
           pill: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20",
           dot: "bg-slate-400",
-          cardAccent: "border-l-2 border-l-slate-300 dark:border-l-slate-600",
+          label: "Notice",
         };
       default:
         return {
           pill: "bg-[#00A884]/10 text-[#008069] dark:text-[#00A884] border border-[#00A884]/25",
           dot: "bg-[#00A884]",
-          cardAccent: "border-l-2 border-l-[#00A884]/40",
+          label: "Official",
         };
     }
   };
 
-  const formatDate = (isoString?: string | null) => {
-    if (!isoString) return "";
-    const date = new Date(isoString);
-    const now = new Date();
-    const isToday =
-      date.getDate() === now.getDate() &&
-      date.getMonth() === now.getMonth() &&
-      date.getFullYear() === now.getFullYear();
-
-    if (isToday) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const handleShare = (item: AnnouncementItem) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      const shareUrl = `${window.location.origin}/chats/official?id=${item.id}`;
+      navigator.clipboard.writeText(`${item.title}\n\n${item.content}\n\n${shareUrl}`);
+      toast.success("Announcement copied to clipboard");
     }
-    return date.toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
+  // Group announcements chronologically for WhatsApp date separators
+  const groupedAnnouncements = useMemo(() => {
+    // Sort oldest to newest for classic chat bottom flow, or newest first depending on preference
+    // WhatsApp channels display chronologically descending or ascending; in chat stream, newest at bottom
+    const sorted = [...announcements].sort((a, b) => {
+      const tA = new Date(a.publishedAt || a.createdAt).getTime();
+      const tB = new Date(b.publishedAt || b.createdAt).getTime();
+      return tA - tB; // ascending order so newest is at the bottom
+    });
+
+    const groups: { dateGroup: string; items: AnnouncementItem[] }[] = [];
+    sorted.forEach((item) => {
+      const label = getDateGroupLabel(item.publishedAt || item.createdAt);
+      const existingGroup = groups.find((g) => g.dateGroup === label);
+      if (existingGroup) {
+        existingGroup.items.push(item);
+      } else {
+        groups.push({ dateGroup: label, items: [item] });
+      }
+    });
+
+    return groups;
+  }, [announcements]);
+
   return (
-    <div className="flex flex-col h-full w-full bg-[#EFEAE2] dark:bg-[#0C1317] overflow-hidden select-text font-sans">
-      {/* Official Channel Header */}
-      <header className="flex items-center justify-between bg-white/95 dark:bg-[#202C33]/95 backdrop-blur-md px-4 py-3 border-b border-[#E2E8F0] dark:border-[#222D34] shadow-[0_1px_2px_rgba(0,0,0,0.04)] z-20 shrink-0 text-[#111B21] dark:text-[#E9EDEF]">
+    <div className="flex flex-col h-full w-full bg-[#EFEAE2] dark:bg-[#0B141A] chat-canvas-bg overflow-hidden select-text font-sans">
+      {/* ── WhatsApp Official Channel Top Bar ─────────────────────────────── */}
+      <header className="flex items-center justify-between bg-[#FFFFFF]/95 dark:bg-[#202C33]/95 backdrop-blur-md px-4 py-2.5 border-b border-[#E2E8F0] dark:border-[#222D34] shadow-[0_1px_2px_rgba(11,20,26,0.06)] z-20 shrink-0 text-[#111B21] dark:text-[#E9EDEF]">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/chats")}
@@ -151,19 +208,19 @@ export function OfficialAnnouncementChatView() {
           </button>
 
           {/* Official Channel Avatar */}
-          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-[#00A884] to-[#128C7E] text-white shadow-sm">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-[#00A884] to-[#128C7E] text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10">
             <Megaphone className="h-5 w-5 text-white" />
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5">
-              <h1 className="text-[15.5px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight">
+              <h1 className="text-[15.5px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight truncate">
                 CallsChat Official
               </h1>
               <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
             </div>
-            <span className="text-[11.5px] text-[#54656F] dark:text-[#8696A0] font-medium flex items-center gap-1">
-              <ShieldCheck className="h-3 w-3 text-[#00A884]" />
+            <span className="text-[11.5px] text-[#54656F] dark:text-[#8696A0] font-medium flex items-center gap-1 truncate">
+              <ShieldCheck className="h-3 w-3 text-[#00A884] shrink-0" />
               Verified Official Channel · Read-only
             </span>
           </div>
@@ -171,20 +228,20 @@ export function OfficialAnnouncementChatView() {
 
         {/* Security badge pill */}
         <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-[#00A884]/10 dark:bg-[#00A884]/15 border border-[#00A884]/25 px-3 py-1 text-xs font-semibold text-[#008069] dark:text-[#00A884]">
-          <ShieldCheck className="h-3.5 w-3.5" />
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
           <span>Official Announcements</span>
         </div>
       </header>
 
-      {/* Announcements Stream */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4.5 custom-scrollbar">
-        {/* Safety Header Banner */}
-        <div className="mx-auto max-w-lg rounded-xl bg-white/90 dark:bg-[#182229]/90 border border-[#E2E8F0] dark:border-[#222D34] py-2.5 px-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-xs">
-          <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-[#008069] dark:text-[#00A884]">
-            <ShieldCheck className="h-3.5 w-3.5" />
+      {/* ── WhatsApp Announcements Stream ─────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 flex flex-col gap-5 custom-scrollbar">
+        {/* Safety Header Banner (WhatsApp Style intro card) */}
+        <div className="mx-auto max-w-xl w-full rounded-2xl bg-white/90 dark:bg-[#182229]/90 border border-black/5 dark:border-white/10 py-3 px-4 text-center shadow-[0_1px_2px_rgba(11,20,26,0.08)] backdrop-blur-xs">
+          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#008069] dark:text-[#00A884]">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-[#00A884]" />
             <span>Official CallsChat Broadcast Feed</span>
           </div>
-          <p className="mt-0.5 text-[11px] text-[#54656F] dark:text-[#8696A0] leading-relaxed">
+          <p className="mt-1 text-[11.5px] text-[#54656F] dark:text-[#8696A0] leading-relaxed">
             All messages in this feed are official communications verified by CallsChat administrators.
             Members cannot post in this channel.
           </p>
@@ -192,20 +249,20 @@ export function OfficialAnnouncementChatView() {
 
         {/* Loading Skeletons */}
         {isLoading ? (
-          <div className="mx-auto w-full max-w-2xl flex flex-col gap-4 animate-pulse">
+          <div className="mx-auto w-full max-w-xl flex flex-col gap-4 animate-pulse">
             {[1, 2].map((n) => (
               <div
                 key={n}
-                className="rounded-2xl bg-white dark:bg-[#1F2C34] border border-[#E2E8F0] dark:border-[#222D34] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-3"
+                className="rounded-2xl rounded-tl-[4px] bg-white dark:bg-[#1F2C34] border border-[#E2E8F0] dark:border-[#222D34] p-4 shadow-[0_1px_2px_rgba(11,20,26,0.12)] flex flex-col gap-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                  <div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded-full" />
                   <div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded-full" />
                 </div>
                 <div className="h-5 w-3/4 bg-slate-200 dark:bg-slate-700 rounded-md" />
                 <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-md" />
                 <div className="h-4 w-5/6 bg-slate-100 dark:bg-slate-800 rounded-md" />
-                <div className="h-8 w-full bg-slate-200 dark:bg-slate-700 rounded-xl mt-2" />
+                <div className="h-9 w-full bg-slate-200 dark:bg-slate-700 rounded-xl mt-2" />
               </div>
             ))}
           </div>
@@ -218,136 +275,179 @@ export function OfficialAnnouncementChatView() {
               No Announcements Yet
             </h2>
             <p className="mt-1 text-xs text-[#54656F] dark:text-[#8696A0] max-w-xs leading-relaxed">
-              When platform updates, maintenance notices, or new features are released, they will appear here.
+              When platform updates, security notices, or new features are released, they will appear here.
             </p>
           </div>
         ) : (
-          announcements.map((item) => {
-            const priorityConfig = getPriorityBadge(item.priority);
-            return (
-              <article
-                key={item.id}
-                className={cn(
-                  "mx-auto w-full max-w-2xl rounded-2xl bg-white dark:bg-[#1F2C34] shadow-[0_1px_3px_rgba(0,0,0,0.08)] border border-[#E2E8F0] dark:border-[#222D34] overflow-hidden transition-all duration-150 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)]",
-                  priorityConfig.cardAccent
-                )}
-              >
-                {/* Announcement Card Header Strip */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#F0F2F5] dark:border-[#222D34] bg-[#F7F5F3]/60 dark:bg-[#182229]/60">
-                  <div className="flex items-center gap-2">
-                    {item.isPinned && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[10px] font-bold border border-amber-500/30">
-                        <Pin className="h-2.5 w-2.5" /> PINNED
-                      </span>
-                    )}
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                        priorityConfig.pill
-                      )}
-                    >
-                      <span className={cn("h-1.5 w-1.5 rounded-full", priorityConfig.dot)} />
-                      {item.priority}
-                    </span>
-                  </div>
+          /* Render grouped announcements with WhatsApp date dividers */
+          groupedAnnouncements.map((group) => (
+            <div key={group.dateGroup} className="flex flex-col gap-4">
+              {/* WhatsApp Centered Floating Date Divider */}
+              <div className="flex justify-center my-1 select-none">
+                <span className="rounded-lg bg-white/90 dark:bg-[#182229]/90 px-3 py-1 text-[11px] font-semibold text-[#54656F] dark:text-[#8696A0] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] uppercase tracking-wider backdrop-blur-xs border border-black/5 dark:border-white/5">
+                  {group.dateGroup}
+                </span>
+              </div>
 
-                  <span className="text-[11.5px] text-[#54656F] dark:text-[#8696A0] font-medium flex items-center gap-1">
-                    <Clock className="h-3 w-3 text-[#8696A0]" />
-                    {formatDate(item.publishedAt || item.createdAt)}
-                  </span>
-                </div>
+              {group.items.map((item) => {
+                const priorityConfig = getPriorityBadge(item.priority);
+                const titleText = item.title || "Official Announcement";
+                const contentText = item.content || "";
 
-                {/* Media Attachment (Video or Image) */}
-                {item.mediaUrl && (
-                  <div className="relative bg-black flex items-center justify-center overflow-hidden border-b border-[#F0F2F5] dark:border-[#222D34]">
-                    {item.mediaType === "VIDEO" ? (
-                      <div className="w-full aspect-video relative flex items-center justify-center bg-black">
-                        <video
-                          src={item.mediaUrl}
-                          controls
-                          playsInline
-                          preload="metadata"
-                          className="w-full h-full object-contain max-h-[380px]"
-                        />
+                return (
+                  <article
+                    key={item.id}
+                    className="mx-auto w-full max-w-xl rounded-2xl rounded-tl-[4px] bg-white dark:bg-[#1F2C34] shadow-[0_1px_2px_rgba(11,20,26,0.12)] border border-gray-200/70 dark:border-[#2A3942] overflow-hidden transition-all duration-150 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] flex flex-col group"
+                  >
+                    {/* Channel Author Strip Inside Bubble */}
+                    <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-[#00A884] to-[#128C7E] flex items-center justify-center text-white text-[10px] font-bold shadow-xs">
+                          <Megaphone className="h-3 w-3 text-white" />
+                        </div>
+                        <span className="text-[13px] font-bold text-[#111B21] dark:text-[#E9EDEF]">
+                          CallsChat Official
+                        </span>
+                        <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setActiveMediaModal(item.mediaUrl || null)}
-                        className="w-full relative group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
-                        aria-label={`View full image for ${item.title}`}
-                      >
-                        <img
-                          src={item.mediaUrl}
-                          alt={item.title}
-                          className="w-full max-h-[380px] object-cover transition-opacity duration-150 group-hover:opacity-95"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white text-[11px] font-medium px-3 py-1.5 rounded-full backdrop-blur-xs">
-                            Click to expand image
+
+                      <div className="flex items-center gap-1.5">
+                        {item.isPinned && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[10px] font-bold border border-amber-500/25">
+                            <Pin className="h-2.5 w-2.5 fill-amber-500/40" /> PINNED
+                          </span>
+                        )}
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                            priorityConfig.pill
+                          )}
+                        >
+                          <span className={cn("h-1.5 w-1.5 rounded-full", priorityConfig.dot)} />
+                          {priorityConfig.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Edge-to-Edge Media Attachment (Image or Video) */}
+                    {item.mediaUrl && (
+                      <div className="relative bg-black/90 flex items-center justify-center overflow-hidden border-y border-gray-100 dark:border-[#2A3942]">
+                        {item.mediaType === "VIDEO" ? (
+                          <div className="w-full aspect-video relative flex items-center justify-center bg-black">
+                            <video
+                              src={item.mediaUrl}
+                              controls
+                              playsInline
+                              preload="metadata"
+                              className="w-full h-full object-contain max-h-[380px]"
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setActiveMediaModal(item.mediaUrl || null)}
+                            className="w-full relative group/media cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                            aria-label={`View full image for ${titleText}`}
+                          >
+                            <img
+                              src={item.mediaUrl}
+                              alt={titleText}
+                              className="w-full max-h-[380px] object-cover transition-transform duration-200 group-hover/media:scale-[1.01]"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/15 transition-colors flex items-center justify-center">
+                              <span className="opacity-0 group-hover/media:opacity-100 transition-opacity bg-black/70 text-white text-[11px] font-medium px-3 py-1.5 rounded-full backdrop-blur-xs">
+                                Click to view full image
+                              </span>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Card Content Area */}
+                    <div className="px-4 pt-3 pb-3 flex flex-col gap-2">
+                      {/* Prominent Announcement Headline */}
+                      <h2 className="text-[16px] sm:text-[17px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight leading-snug">
+                        {titleText}
+                      </h2>
+
+                      {/* Announcement Body Content */}
+                      {contentText ? (
+                        <div className="text-[13.5px] sm:text-[14px] text-[#111B21] dark:text-[#D1D7DB] leading-relaxed whitespace-pre-wrap break-words font-normal">
+                          {formatAnnouncementText(contentText)}
+                        </div>
+                      ) : null}
+
+                      {/* Interactive WhatsApp Action Button (Filtered: ignores incomplete routes like /channels) */}
+                      {(() => {
+                        const isChannelsRoute =
+                          item.actionUrl?.toLowerCase().includes("channels") ||
+                          item.actionText?.toLowerCase().includes("explore channels");
+                        if (!item.actionText || !item.actionUrl || isChannelsRoute) return null;
+
+                        return (
+                          <div className="mt-2 pt-2">
+                            <a
+                              href={item.actionUrl}
+                              target={item.actionUrl.startsWith("http") ? "_blank" : "_self"}
+                              rel="noopener noreferrer"
+                              className="w-full py-2.5 px-4 flex items-center justify-center gap-2 rounded-xl bg-[#00A884] hover:bg-[#008F6F] active:bg-[#007A5E] text-white font-semibold text-[13px] shadow-xs transition-all duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] focus-visible:ring-offset-2"
+                            >
+                              <span>{item.actionText}</span>
+                              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                            </a>
+                          </div>
+                        );
+                      })()}
+
+                      {/* WhatsApp Bottom Metadata Strip */}
+                      <div className="mt-1 pt-2 flex items-center justify-between text-[11px] sm:text-[11.5px] text-[#54656F] dark:text-[#8696A0] border-t border-gray-100 dark:border-[#2A3942]/60 select-none">
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Eye className="h-3.5 w-3.5 text-[#8696A0]" />
+                            <span>{item.viewsCount ?? 1} views</span>
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleShare(item)}
+                            className="flex items-center gap-1 font-medium hover:text-[#00A884] transition-colors focus-visible:outline-none"
+                            title="Copy announcement link"
+                          >
+                            <Share2 className="h-3 w-3" />
+                            <span>Share</span>
+                          </button>
+                        </div>
+
+                        {/* WhatsApp Clock & Blue Double Checkmarks */}
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <span>{formatTime(item.publishedAt || item.createdAt)}</span>
+                          <span className="text-[#53BDEB] flex items-center" title="Verified Delivery">
+                            <CheckCheck className="h-4 w-4" />
                           </span>
                         </div>
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Announcement Content */}
-                <div className="p-4 sm:p-5 flex flex-col gap-2.5">
-                  <h2 className="text-[16px] sm:text-[17px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight leading-snug">
-                    {item.title}
-                  </h2>
-
-                  <p className="text-[13.5px] text-[#3B4A54] dark:text-[#D1D7DB] leading-relaxed whitespace-pre-wrap font-normal">
-                    {item.content}
-                  </p>
-
-                  {/* Interactive Action Button (Call-to-Action) */}
-                  {item.actionText && item.actionUrl && (
-                    <div className="mt-2 pt-3 border-t border-[#F0F2F5] dark:border-[#222D34]">
-                      <a
-                        href={item.actionUrl}
-                        target={item.actionUrl.startsWith("http") ? "_blank" : "_self"}
-                        rel="noreferrer"
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00A884] hover:bg-[#008F6F] active:bg-[#007A5E] px-4 py-2.5 text-[13px] font-semibold text-white shadow-xs transition-all duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] focus-visible:ring-offset-2"
-                      >
-                        <span>{item.actionText}</span>
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
+                      </div>
                     </div>
-                  )}
-
-                  {/* Footer Stats & Read Receipt Indicator */}
-                  <div className="mt-2 flex items-center justify-between text-[11.5px] text-[#54656F] dark:text-[#8696A0] pt-2.5 border-t border-[#F0F2F5] dark:border-[#222D34]/50">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Eye className="h-3.5 w-3.5 text-[#8696A0]" />
-                      <span>{item.viewsCount} views</span>
-                    </span>
-
-                    <span className="flex items-center gap-1 text-[#53BDEB] font-medium">
-                      <CheckCheck className="h-4 w-4" />
-                      <span>Verified Broadcast</span>
-                    </span>
-                  </div>
-                </div>
-              </article>
-            );
-          })
+                  </article>
+                );
+              })}
+            </div>
+          ))
         )}
         <div ref={feedEndRef} />
       </main>
 
-      {/* Locked Read-Only Bottom Bar */}
-      <footer className="shrink-0 bg-white/95 dark:bg-[#111B21]/95 border-t border-[#E2E8F0] dark:border-[#222D34] px-4 py-3 shadow-[0_-1px_3px_rgba(0,0,0,0.03)]">
-        <div className="mx-auto max-w-2xl rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] border border-[#E2E8F0] dark:border-[#2A3942] py-2.5 px-4 flex items-center justify-center gap-2 text-center">
-          <Lock className="h-4 w-4 text-[#54656F] dark:text-[#8696A0] shrink-0" />
-          <span className="text-[12.5px] font-semibold text-[#54656F] dark:text-[#8696A0]">
-            🔒 This is an official announcement channel. Only administrators can post messages.
+      {/* ── WhatsApp Read-Only Footer Banner ──────────────────────────────── */}
+      <footer className="shrink-0 bg-white/95 dark:bg-[#111B21]/95 border-t border-[#E2E8F0] dark:border-[#222D34] px-4 py-2.5 shadow-[0_-1px_3px_rgba(11,20,26,0.03)] z-20">
+        <div className="mx-auto max-w-xl rounded-full bg-[#F0F2F5] dark:bg-[#202C33] border border-black/5 dark:border-white/5 py-2 px-4 flex items-center justify-center gap-2 text-center shadow-xs">
+          <Lock className="h-3.5 w-3.5 text-[#54656F] dark:text-[#8696A0] shrink-0" />
+          <span className="text-[12px] font-medium text-[#54656F] dark:text-[#8696A0]">
+            🔒 Only administrators can post in this channel.
           </span>
         </div>
       </footer>
 
-      {/* Image Lightbox Modal */}
+      {/* ── Lightbox Image Modal ──────────────────────────────────────────── */}
       {activeMediaModal && (
         <div
           role="dialog"
@@ -358,7 +458,7 @@ export function OfficialAnnouncementChatView() {
         >
           <button
             onClick={() => setActiveMediaModal(null)}
-            className="absolute top-4 right-4 rounded-full bg-black/60 p-2.5 text-white hover:bg-black/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="absolute top-4 right-4 rounded-full bg-black/60 p-2.5 text-white hover:bg-black/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
             aria-label="Close image preview"
           >
             <X className="h-5 w-5" />
