@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 @custom-variant foldable (@media (horizontal-viewport-segments: 2));
 
 @theme inline {
@@ -92,37 +92,38 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0B141A;
+  --foreground: #E9EDEF;
+  --card: #111B21;
+  --card-foreground: #E9EDEF;
+  --popover: #202C33;
+  --popover-foreground: #E9EDEF;
+  --primary: #00A884;
+  --primary-foreground: #FFFFFF;
+  --secondary: #202C33;
+  --secondary-foreground: #E9EDEF;
+  --muted: #202C33;
+  --muted-foreground: #8696A0;
+  --accent: #2A3942;
+  --accent-foreground: #E9EDEF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #222D34;
+  --input: #2A3942;
+  --ring: #00A884;
+  --chart-1: #00A884;
+  --chart-2: #25D366;
+  --chart-3: #34B7F1;
+  --chart-4: #F59E0B;
+  --chart-5: #EC4899;
+  --sidebar: #111B21;
+  --sidebar-foreground: #E9EDEF;
+  --sidebar-primary: #00A884;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #202C33;
+  --sidebar-accent-foreground: #E9EDEF;
+  --sidebar-border: #222D34;
+  --sidebar-ring: #00A884;
 }
 
 /* Custom styles for react-phone-number-input to match Figma design */

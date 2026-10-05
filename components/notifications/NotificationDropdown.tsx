@@ -76,26 +76,31 @@ export function NotificationDropdown({ channelId, onlyChannelTypes, customTrigge
             customTrigger
           )
         ) : (
-          <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E6EAFA] bg-[#F4F6FC] transition-colors hover:bg-[#E6EAFA]">
-            <Bell className="h-5 w-5 text-[#3B58F5]" strokeWidth={2.5} />
+          <button 
+            type="button"
+            aria-label="Notifications"
+            title="Notifications"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] cursor-pointer"
+          >
+            <Bell className="h-5 w-5" strokeWidth={2} />
             {unreadCount > 0 && (
-              <div className="absolute right-2 top-2 flex h-3 w-3 items-center justify-center rounded-full border-2 border-[#F4F6FC] bg-red-500 text-[8px] font-bold text-white">
+              <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-[#00A884] ring-2 ring-white dark:ring-[#111B21]">
                 <span className="sr-only">Unread notifications</span>
-              </div>
+              </span>
             )}
           </button>
         )}
       </PopoverTrigger>
 
-      <PopoverContent className="w-[380px] p-0 rounded-2xl shadow-xl overflow-hidden border border-border mr-4 mt-2 bg-white" align="end">
+      <PopoverContent className="w-[380px] p-0 rounded-2xl shadow-xl overflow-hidden border border-[#E2E8F0] dark:border-[#222D34] mr-4 mt-2 bg-white dark:bg-[#111B21] text-[#111B21] dark:text-[#E9EDEF]" align="end">
         {/* Header */}
-        <div className="flex flex-col gap-4 p-4 border-b border-border">
+        <div className="flex flex-col gap-4 p-4 border-b border-[#F0F2F5] dark:border-[#202C33]">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">{t("title")}</h2>
+            <h2 className="text-lg font-bold text-[#111B21] dark:text-[#E9EDEF]">{t("title")}</h2>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                className="text-xs font-semibold text-[#00A884] hover:underline transition-colors cursor-pointer"
               >
                 {t("mark_all_read")}
               </button>
@@ -107,10 +112,10 @@ export function NotificationDropdown({ channelId, onlyChannelTypes, customTrigge
             <button
               onClick={() => setFilter("all")}
               className={cn(
-                "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                "px-3.5 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer",
                 filter === "all"
-                  ? "bg-blue-600 text-white"
-                  : "bg-muted text-foreground hover:bg-muted/80"
+                  ? "bg-[#00A884] text-white"
+                  : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E2E8F0] dark:hover:bg-[#2A3942]"
               )}
             >
               {t("all")}
@@ -118,10 +123,10 @@ export function NotificationDropdown({ channelId, onlyChannelTypes, customTrigge
             <button
               onClick={() => setFilter("unread")}
               className={cn(
-                "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                "px-3.5 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer",
                 filter === "unread"
-                  ? "bg-blue-600 text-white"
-                  : "bg-muted text-foreground hover:bg-muted/80"
+                  ? "bg-[#00A884] text-white"
+                  : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E2E8F0] dark:hover:bg-[#2A3942]"
               )}
             >
               {t("unread")}
@@ -135,9 +140,9 @@ export function NotificationDropdown({ channelId, onlyChannelTypes, customTrigge
           onScroll={handleScroll}
         >
           {notifications.length === 0 && !isLoading ? (
-            <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center">
-              <Bell className="h-10 w-10 text-muted-foreground/30 mb-3" />
-              <p className="font-medium text-sm">{channelId ? "No notifications for this channel" : t("no_notifications")}</p>
+            <div className="p-8 text-center text-[#8696A0] flex flex-col items-center justify-center">
+              <Bell className="h-10 w-10 text-[#8696A0]/40 mb-3" />
+              <p className="font-medium text-sm text-[#8696A0]">{channelId ? "No notifications for this channel" : t("no_notifications")}</p>
             </div>
           ) : (
             notifications.map((notification) => (
@@ -155,7 +160,7 @@ export function NotificationDropdown({ channelId, onlyChannelTypes, customTrigge
 
           {isLoading && (
             <div className="p-4 flex justify-center">
-              <div className="h-5 w-5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+              <div className="h-5 w-5 rounded-full border-2 border-[#00A884] border-t-transparent animate-spin" />
             </div>
           )}
         </div>

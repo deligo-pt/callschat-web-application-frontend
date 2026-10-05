@@ -263,7 +263,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
   };
 
   return (
-    <div className="flex h-full flex-col bg-[#F8FAFC] relative overflow-hidden">
+    <div className="flex h-full flex-col bg-[#F8FAFC] dark:bg-[#0C1317] relative overflow-hidden">
       {/* Header */}
       <div
         className="flex items-center justify-between px-6 py-5 shrink-0 shadow-md"
@@ -274,7 +274,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
             <button
               onClick={onBack}
               aria-label="Go back"
-              className="flex items-center justify-center h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all duration-200"
+              className="flex items-center justify-center h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all duration-200 cursor-pointer"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -291,7 +291,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
 
         <button
           onClick={() => setIsSyncModalOpen(true)}
-          className="flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 px-4 py-2 text-[13px] font-bold text-white backdrop-blur-sm transition-all duration-200 shadow-sm hover:scale-105 active:scale-95"
+          className="flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 px-4 py-2 text-[13px] font-bold text-white backdrop-blur-sm transition-all duration-200 shadow-sm hover:scale-105 active:scale-95 cursor-pointer"
         >
           <RefreshCw className="h-4 w-4" />
           <span>{t("sync_contacts")}</span>
@@ -299,21 +299,21 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
       </div>
 
       {/* Action Bar / Search & Custom Message Toggle */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 shrink-0 flex flex-col gap-3 shadow-sm">
+      <div className="bg-white dark:bg-[#111B21] border-b border-slate-200 dark:border-[#222D34] px-6 py-4 shrink-0 flex flex-col gap-3 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-[#8696A0]" />
             <input
               type="text"
               placeholder={t("search_placeholder") || "Search by name or phone..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 w-full rounded-xl bg-slate-100 pl-10 pr-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3B58F5]/20 border border-transparent focus:border-[#3B58F5] transition-all"
+              className="h-10 w-full rounded-xl bg-slate-100 dark:bg-[#202C33] pl-10 pr-4 text-[13px] font-medium text-slate-800 dark:text-[#E9EDEF] placeholder-slate-400 dark:placeholder-[#8696A0] focus:bg-white dark:focus:bg-[#111B21] focus:outline-none focus:ring-2 focus:ring-[#3B58F5]/20 border border-transparent focus:border-[#3B58F5] dark:focus:border-[#00A884] transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -322,10 +322,10 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
 
           <button
             onClick={() => setShowCustomMsg(!showCustomMsg)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-bold transition-all cursor-pointer ${
               showCustomMsg
-                ? "bg-[#EEF2FF] text-[#3B58F5] border border-blue-200"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
+                ? "bg-[#EEF2FF] dark:bg-[#2563EB]/20 text-[#3B58F5] dark:text-[#38BDF8] border border-blue-200 dark:border-[#2563EB]/40"
+                : "bg-slate-100 dark:bg-[#202C33] text-slate-600 dark:text-[#8696A0] hover:bg-slate-200 dark:hover:bg-[#2A3942] border border-transparent"
             }`}
           >
             <MessageSquare className="h-4 w-4" />
@@ -343,15 +343,15 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <div className="pt-2 pb-1 border-t border-slate-100 flex flex-col gap-2">
+              <div className="pt-2 pb-1 border-t border-slate-100 dark:border-[#222D34] flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5">
-                    <Info className="h-3.5 w-3.5 text-[#3B58F5]" />
+                  <label className="text-[12px] font-bold text-slate-700 dark:text-[#E9EDEF] flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5 text-[#3B58F5] dark:text-[#38BDF8]" />
                     <span>{t("custom_message")}</span>
                   </label>
                   <button
                     onClick={() => setCustomMessage(t("default_invite_msg"))}
-                    className="text-[11px] font-semibold text-blue-600 hover:underline"
+                    className="text-[11px] font-semibold text-blue-600 dark:text-[#38BDF8] hover:underline cursor-pointer"
                   >
                     Reset to default
                   </button>
@@ -360,7 +360,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                   value={customMessage}
                   onChange={(e) => setCustomMessage(e.target.value)}
                   rows={2}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3B58F5]/20 focus:border-[#3B58F5] transition-all resize-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-[#2A3942] bg-slate-50 dark:bg-[#202C33] p-3 text-[13px] font-medium text-slate-800 dark:text-[#E9EDEF] placeholder-slate-400 dark:placeholder-[#8696A0] focus:bg-white dark:focus:bg-[#111B21] focus:outline-none focus:ring-2 focus:ring-[#3B58F5]/20 focus:border-[#3B58F5] dark:focus:border-[#00A884] transition-all resize-none"
                   placeholder="Type custom invitation message..."
                 />
               </div>
@@ -373,23 +373,23 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
       <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-hide">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
-            <p className="text-[14px] font-medium text-slate-500">{tCommon("loading")}</p>
+            <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5] dark:text-[#38BDF8]" />
+            <p className="text-[14px] font-medium text-slate-500 dark:text-[#8696A0]">{tCommon("loading")}</p>
           </div>
         ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 max-w-sm mx-auto">
-            <div className="h-20 w-20 rounded-full bg-[#EEF2FF] flex items-center justify-center text-[#3B58F5] mb-4 shadow-inner">
+            <div className="h-20 w-20 rounded-full bg-[#EEF2FF] dark:bg-[#202C33] flex items-center justify-center text-[#3B58F5] dark:text-[#38BDF8] mb-4 shadow-inner">
               <Users className="h-10 w-10" />
             </div>
-            <h3 className="text-[17px] font-bold text-slate-800 mb-2">
+            <h3 className="text-[17px] font-bold text-slate-800 dark:text-[#E9EDEF] mb-2">
               {t("no_contacts")}
             </h3>
-            <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-6">
+            <p className="text-[13px] font-medium text-slate-500 dark:text-[#8696A0] leading-relaxed mb-6">
               {t("no_contacts_desc")}
             </p>
             <button
               onClick={() => setIsSyncModalOpen(true)}
-              className="flex items-center gap-2 rounded-full bg-[#3B58F5] hover:bg-blue-700 px-6 py-2.5 text-[14px] font-bold text-white shadow-md hover:shadow-lg transition-all"
+              className="flex items-center gap-2 rounded-full bg-[#3B58F5] hover:bg-blue-700 px-6 py-2.5 text-[14px] font-bold text-white shadow-md hover:shadow-lg transition-all cursor-pointer"
             >
               <RefreshCw className="h-4 w-4" />
               <span>{t("sync_contacts")}</span>
@@ -398,7 +398,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
         ) : (
           <div className="mx-auto max-w-2xl flex flex-col gap-3 pb-8">
             <div className="flex items-center justify-between mb-1 px-1">
-              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider">
+              <span className="text-[12px] font-bold text-slate-500 dark:text-[#8696A0] uppercase tracking-wider">
                 Unregistered Contacts ({pagination.total})
               </span>
             </div>
@@ -411,7 +411,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2, delay: index * 0.03 }}
-                  className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 group"
+                  className="flex items-center justify-between rounded-2xl border border-slate-200/80 dark:border-[#222D34] bg-white dark:bg-[#111B21] p-4 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-[#2A3942] transition-all duration-200 group"
                 >
                   <div className="flex items-center gap-4 min-w-0">
                     <div
@@ -422,10 +422,10 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                       {getInitials(contact.name)}
                     </div>
                     <div className="flex flex-col items-start min-w-0 leading-tight">
-                      <span className="text-[15px] font-bold text-slate-900 truncate w-full group-hover:text-[#3B58F5] transition-colors">
+                      <span className="text-[15px] font-bold text-slate-900 dark:text-[#E9EDEF] truncate w-full group-hover:text-[#3B58F5] dark:group-hover:text-[#38BDF8] transition-colors">
                         {contact.name}
                       </span>
-                      <span className="text-[13px] font-medium text-slate-400 mt-0.5 font-mono">
+                      <span className="text-[13px] font-medium text-slate-400 dark:text-[#8696A0] mt-0.5 font-mono">
                         {contact.phoneNumber}
                       </span>
                     </div>
@@ -433,7 +433,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
 
                   <div className="flex items-center gap-2 shrink-0 ml-4">
                     {contact.isInvited ? (
-                      <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[13px] font-bold">
+                      <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-300 text-[13px] font-bold">
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                         <span>{t("invited")}</span>
                       </div>
@@ -441,7 +441,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                       <button
                         onClick={() => handleInvite(contact)}
                         disabled={invitingId === contact.id}
-                        className="flex items-center gap-2 rounded-full bg-[#EEF2FF] hover:bg-[#3B58F5] text-[#3B58F5] hover:text-white px-5 py-2 text-[13px] font-bold transition-all duration-200 shadow-sm hover:shadow active:scale-95 disabled:opacity-70"
+                        className="flex items-center gap-2 rounded-full bg-[#EEF2FF] dark:bg-[#202C33] hover:bg-[#3B58F5] text-[#3B58F5] dark:text-[#38BDF8] hover:text-white dark:hover:text-white px-5 py-2 text-[13px] font-bold transition-all duration-200 shadow-sm hover:shadow active:scale-95 disabled:opacity-70 cursor-pointer"
                       >
                         {invitingId === contact.id ? (
                           <>
@@ -466,15 +466,15 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
 
       {/* Pagination Footer */}
       {pagination.totalPages > 1 && (
-        <div className="bg-white border-t border-slate-200 px-6 py-3 shrink-0 flex items-center justify-between">
-          <span className="text-[13px] font-medium text-slate-500">
+        <div className="bg-white dark:bg-[#111B21] border-t border-slate-200 dark:border-[#222D34] px-6 py-3 shrink-0 flex items-center justify-between">
+          <span className="text-[13px] font-medium text-slate-500 dark:text-[#8696A0]">
             {t("page_info", { current: pagination.page, total: pagination.totalPages })}
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => fetchUnregistered(pagination.page - 1, searchQuery)}
               disabled={!pagination.hasPrevPage || isLoading}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#2A3942] text-[13px] font-semibold text-slate-700 dark:text-[#E9EDEF] hover:bg-slate-50 dark:hover:bg-[#202C33] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <ChevronLeft className="h-4 w-4" />
               <span>{t("prev")}</span>
@@ -482,7 +482,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
             <button
               onClick={() => fetchUnregistered(pagination.page + 1, searchQuery)}
               disabled={!pagination.hasNextPage || isLoading}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#2A3942] text-[13px] font-semibold text-slate-700 dark:text-[#E9EDEF] hover:bg-slate-50 dark:hover:bg-[#202C33] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <span>{t("next")}</span>
               <ChevronRight className="h-4 w-4" />
@@ -499,7 +499,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]"
+              className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#111B21] shadow-2xl overflow-hidden border border-slate-100 dark:border-[#222D34] flex flex-col max-h-[90vh]"
             >
               {/* Modal Header */}
               <div
@@ -519,20 +519,20 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                 </div>
                 <button
                   onClick={() => setIsSyncModalOpen(false)}
-                  className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                  className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               {/* Tabs */}
-              <div className="flex border-b border-slate-200 px-6 pt-3 shrink-0 bg-slate-50/50">
+              <div className="flex border-b border-slate-200 dark:border-[#222D34] px-6 pt-3 shrink-0 bg-slate-50/50 dark:bg-[#182229]">
                 <button
                   onClick={() => setSyncTab("manual")}
-                  className={`pb-3 px-4 text-[14px] font-bold border-b-2 transition-all flex items-center gap-2 ${
+                  className={`pb-3 px-4 text-[14px] font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
                     syncTab === "manual"
-                      ? "border-[#3B58F5] text-[#3B58F5]"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
+                      ? "border-[#3B58F5] dark:border-[#38BDF8] text-[#3B58F5] dark:text-[#38BDF8]"
+                      : "border-transparent text-slate-500 dark:text-[#8696A0] hover:text-slate-800 dark:hover:text-[#E9EDEF]"
                   }`}
                 >
                   <Plus className="h-4 w-4" />
@@ -540,10 +540,10 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                 </button>
                 <button
                   onClick={() => setSyncTab("device")}
-                  className={`pb-3 px-4 text-[14px] font-bold border-b-2 transition-all flex items-center gap-2 ${
+                  className={`pb-3 px-4 text-[14px] font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
                     syncTab === "device"
-                      ? "border-[#3B58F5] text-[#3B58F5]"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
+                      ? "border-[#3B58F5] dark:border-[#38BDF8] text-[#3B58F5] dark:text-[#38BDF8]"
+                      : "border-transparent text-slate-500 dark:text-[#8696A0] hover:text-slate-800 dark:hover:text-[#E9EDEF]"
                   }`}
                 >
                   <Smartphone className="h-4 w-4" />
@@ -556,13 +556,13 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                 {syncTab === "manual" ? (
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-bold text-slate-700">
+                      <span className="text-[13px] font-bold text-slate-700 dark:text-[#E9EDEF]">
                         Enter Contacts to Sync
                       </span>
                       <button
                         onClick={loadSampleContacts}
                         type="button"
-                        className="text-[12px] font-bold text-[#3B58F5] hover:underline flex items-center gap-1"
+                        className="text-[12px] font-bold text-[#3B58F5] dark:text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
                         <span>{t("load_sample")}</span>
@@ -573,27 +573,27 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                       {manualContacts.map((item, index) => (
                         <div
                           key={index}
-                          className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200"
+                          className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-[#202C33] border border-slate-200 dark:border-[#2A3942]"
                         >
                           <input
                             type="text"
                             placeholder={t("name_placeholder")}
                             value={item.name}
                             onChange={(e) => updateManualRow(index, "name", e.target.value)}
-                            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#3B58F5]"
+                            className="flex-1 rounded-lg border border-slate-200 dark:border-[#2A3942] bg-white dark:bg-[#111B21] px-3 py-2 text-[13px] font-medium text-slate-800 dark:text-[#E9EDEF] placeholder-slate-400 dark:placeholder-[#8696A0] focus:outline-none focus:ring-1 focus:ring-[#3B58F5]"
                           />
                           <input
                             type="text"
                             placeholder={t("phone_placeholder")}
                             value={item.phoneNumber}
                             onChange={(e) => updateManualRow(index, "phoneNumber", e.target.value)}
-                            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#3B58F5] font-mono"
+                            className="flex-1 rounded-lg border border-slate-200 dark:border-[#2A3942] bg-white dark:bg-[#111B21] px-3 py-2 text-[13px] font-medium text-slate-800 dark:text-[#E9EDEF] placeholder-slate-400 dark:placeholder-[#8696A0] focus:outline-none focus:ring-1 focus:ring-[#3B58F5] font-mono"
                           />
                           {manualContacts.length > 1 && (
                             <button
                               type="button"
                               onClick={() => removeManualRow(index)}
-                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-2 text-slate-400 dark:text-[#8696A0] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -605,7 +605,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                     <button
                       type="button"
                       onClick={addManualRow}
-                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-300 text-slate-600 hover:text-[#3B58F5] text-[13px] font-bold transition-all bg-slate-50/50 hover:bg-blue-50/30"
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-[#2A3942] hover:border-blue-300 dark:hover:border-blue-500/50 text-slate-600 dark:text-[#8696A0] hover:text-[#3B58F5] dark:hover:text-[#38BDF8] text-[13px] font-bold transition-all bg-slate-50/50 dark:bg-[#202C33]/50 hover:bg-blue-50/30 dark:hover:bg-[#202C33] cursor-pointer"
                     >
                       <Plus className="h-4 w-4" />
                       <span>{t("add_row")}</span>
@@ -613,19 +613,19 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center py-8 px-4">
-                    <div className="h-16 w-16 rounded-full bg-blue-50 text-[#3B58F5] flex items-center justify-center mb-4">
+                    <div className="h-16 w-16 rounded-full bg-blue-50 dark:bg-blue-950/40 text-[#3B58F5] dark:text-[#38BDF8] flex items-center justify-center mb-4">
                       <Smartphone className="h-8 w-8" />
                     </div>
-                    <h4 className="text-[16px] font-bold text-slate-800 mb-2">
+                    <h4 className="text-[16px] font-bold text-slate-800 dark:text-[#E9EDEF] mb-2">
                       {t("sync_device")}
                     </h4>
-                    <p className="text-[13px] font-medium text-slate-500 max-w-sm mb-6">
+                    <p className="text-[13px] font-medium text-slate-500 dark:text-[#8696A0] max-w-sm mb-6">
                       Select contacts directly from your phone or mobile device to match against CallsChat users.
                     </p>
                     <button
                       onClick={handleDeviceSync}
                       disabled={isSyncing}
-                      className="flex items-center gap-2 rounded-full bg-[#3B58F5] hover:bg-blue-700 text-white px-8 py-3 text-[14px] font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-70"
+                      className="flex items-center gap-2 rounded-full bg-[#3B58F5] hover:bg-blue-700 text-white px-8 py-3 text-[14px] font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-70 cursor-pointer"
                     >
                       {isSyncing ? (
                         <>
@@ -645,11 +645,11 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
 
               {/* Modal Footer */}
               {syncTab === "manual" && (
-                <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
+                <div className="px-6 py-4 bg-slate-50 dark:bg-[#182229] border-t border-slate-200 dark:border-[#222D34] flex items-center justify-end gap-3 shrink-0">
                   <button
                     type="button"
                     onClick={() => setIsSyncModalOpen(false)}
-                    className="px-5 py-2.5 rounded-full text-[13px] font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                    className="px-5 py-2.5 rounded-full text-[13px] font-bold text-slate-600 dark:text-[#8696A0] hover:bg-slate-200 dark:hover:bg-[#202C33] transition-colors cursor-pointer"
                   >
                     {tCommon("cancel")}
                   </button>
@@ -657,7 +657,7 @@ export function InviteFriends({ onBack }: InviteFriendsProps) {
                     type="button"
                     onClick={handleSyncSubmit}
                     disabled={isSyncing}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#3B58F5] hover:bg-blue-700 text-white text-[13px] font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-70"
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#3B58F5] hover:bg-blue-700 text-white text-[13px] font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-70 cursor-pointer"
                   >
                     {isSyncing ? (
                       <>

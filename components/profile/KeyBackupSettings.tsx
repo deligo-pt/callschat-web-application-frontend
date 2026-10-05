@@ -152,26 +152,26 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
   const isPinMismatch = confirmPin.length > 0 && pin !== confirmPin;
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#F8FAFC] overflow-y-auto">
+    <div className="flex flex-col h-full w-full bg-[#F8FAFC] dark:bg-[#0C1317] overflow-y-auto">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#E6EAFA] bg-white/95 px-6 py-4 backdrop-blur-md transition-all shadow-xs">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#E6EAFA] dark:border-[#222D34] bg-white/95 dark:bg-[#111B21]/95 px-6 py-4 backdrop-blur-md transition-all shadow-xs">
         <div className="flex items-center gap-3.5">
           {onBack && (
             <button
               onClick={onBack}
               aria-label="Go back"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer active:scale-95"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 dark:text-[#8696A0] hover:bg-slate-100 dark:hover:bg-[#202C33] hover:text-slate-800 dark:hover:text-[#E9EDEF] transition-colors cursor-pointer active:scale-95"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#2563EB]">
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#2563EB] dark:text-[#38BDF8]">
                 Security & Privacy
               </span>
             </div>
-            <h1 className="text-[18px] md:text-[20px] font-bold text-[#0F172A] tracking-tight">
+            <h1 className="text-[18px] md:text-[20px] font-bold text-[#0F172A] dark:text-[#E9EDEF] tracking-tight">
               E2EE Key Backup Vault
             </h1>
           </div>
@@ -180,12 +180,12 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
         {/* Status Pill & Refresh Action */}
         <div className="flex items-center gap-2.5">
           {loading ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium animate-pulse">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#2563EB]" />
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-[#202C33] text-slate-500 dark:text-[#8696A0] text-xs font-medium animate-pulse">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#2563EB] dark:text-[#38BDF8]" />
               <span>Checking vault...</span>
             </div>
           ) : backupData ? (
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[12px] font-semibold shadow-2xs">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 text-[12px] font-semibold shadow-2xs">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]" />
@@ -194,8 +194,8 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
               <span>Vault Active</span>
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 text-[12px] font-semibold shadow-2xs">
-              <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-[12px] font-semibold shadow-2xs">
+              <ShieldAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
               <span>Backup Inactive</span>
             </div>
           )}
@@ -205,9 +205,9 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
             disabled={loading}
             aria-label="Refresh vault status"
             title="Refresh vault status"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 dark:text-[#8696A0] hover:bg-slate-100 dark:hover:bg-[#202C33] hover:text-slate-800 dark:hover:text-[#E9EDEF] transition-colors disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin text-[#2563EB]")} />
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin text-[#2563EB] dark:text-[#38BDF8]")} />
           </button>
         </div>
       </header>
@@ -217,7 +217,7 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
         <div className="mx-auto max-w-3xl space-y-6">
           {/* Status Hero Card */}
           {backupData ? (
-            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/60 via-white to-slate-50/60 p-6 md:p-7 shadow-xs">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/80 dark:border-emerald-800/40 bg-gradient-to-br from-emerald-50/60 via-white to-slate-50/60 dark:from-emerald-950/30 dark:via-[#111B21] dark:to-emerald-950/20 p-6 md:p-7 shadow-xs">
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-[#00A884] shadow-xs">
@@ -225,14 +225,14 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-[17px] font-bold text-slate-900 tracking-tight">
+                      <h2 className="text-[17px] font-bold text-slate-900 dark:text-[#E9EDEF] tracking-tight">
                         Zero-Knowledge Key Vault is Active
                       </h2>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300">
                         Protected
                       </span>
                     </div>
-                    <p className="text-[13px] text-slate-600 mt-1 leading-relaxed max-w-xl">
+                    <p className="text-[13px] text-slate-600 dark:text-[#8696A0] mt-1 leading-relaxed max-w-xl">
                       Your Signal-protocol private keys are encrypted on-device and safely backed up. When you log in from another browser or device, your PIN will unlock and restore your encrypted messages.
                     </p>
                   </div>
@@ -240,38 +240,38 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
               </div>
 
               {/* Cryptographic Spec Chips */}
-              <div className="mt-6 pt-5 border-t border-emerald-200/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="flex items-center gap-2.5 rounded-xl bg-white/80 p-3 border border-emerald-100 shadow-2xs">
+              <div className="mt-6 pt-5 border-t border-emerald-200/60 dark:border-emerald-900/40 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex items-center gap-2.5 rounded-xl bg-white/80 dark:bg-[#202C33] p-3 border border-emerald-100 dark:border-[#2A3942] shadow-2xs">
                   <Cpu className="h-4 w-4 text-[#00A884] shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-[#8696A0]">
                       Cipher Suite
                     </span>
-                    <span className="text-[12.5px] font-semibold text-slate-800 truncate">
+                    <span className="text-[12.5px] font-semibold text-slate-800 dark:text-[#E9EDEF] truncate">
                       XChaCha20-Poly1305
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 rounded-xl bg-white/80 p-3 border border-emerald-100 shadow-2xs">
+                <div className="flex items-center gap-2.5 rounded-xl bg-white/80 dark:bg-[#202C33] p-3 border border-emerald-100 dark:border-[#2A3942] shadow-2xs">
                   <Database className="h-4 w-4 text-[#00A884] shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-[#8696A0]">
                       Key Derivation
                     </span>
-                    <span className="text-[12.5px] font-semibold text-slate-800 truncate">
+                    <span className="text-[12.5px] font-semibold text-slate-800 dark:text-[#E9EDEF] truncate">
                       {backupData.kdfAlgorithm} ({backupData.kdfIterations?.toLocaleString() || "100,000"} r)
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 rounded-xl bg-white/80 p-3 border border-emerald-100 shadow-2xs">
+                <div className="flex items-center gap-2.5 rounded-xl bg-white/80 dark:bg-[#202C33] p-3 border border-emerald-100 dark:border-[#2A3942] shadow-2xs">
                   <Clock className="h-4 w-4 text-[#00A884] shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-[#8696A0]">
                       Last Updated
                     </span>
-                    <span className="text-[12px] font-semibold text-slate-800 truncate" title={new Date(backupData.updatedAt).toLocaleString()}>
+                    <span className="text-[12px] font-semibold text-slate-800 dark:text-[#E9EDEF] truncate" title={new Date(backupData.updatedAt).toLocaleString()}>
                       {new Date(backupData.updatedAt).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",
@@ -283,21 +283,21 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
               </div>
             </div>
           ) : (
-            <div className="relative overflow-hidden rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50/70 via-white to-slate-50/60 p-6 md:p-7 shadow-xs">
+            <div className="relative overflow-hidden rounded-2xl border border-amber-200/90 dark:border-amber-800/40 bg-gradient-to-br from-amber-50/70 via-white to-slate-50/60 dark:from-amber-950/30 dark:via-[#111B21] dark:to-amber-950/20 p-6 md:p-7 shadow-xs">
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 shadow-xs">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 shadow-xs">
                   <ShieldAlert className="h-6 w-6" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-[17px] font-bold text-slate-900 tracking-tight">
+                    <h2 className="text-[17px] font-bold text-slate-900 dark:text-[#E9EDEF] tracking-tight">
                       No Encrypted Backup Found
                     </h2>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300">
                       Vulnerable
                     </span>
                   </div>
-                  <p className="text-[13px] text-slate-600 mt-1 leading-relaxed">
+                  <p className="text-[13px] text-slate-600 dark:text-[#8696A0] mt-1 leading-relaxed">
                     Your private identity and pre-keys currently only exist in this browser&apos;s local cache. If you clear browsing data, change computers, or log in on a new device, you will permanently lose access to previous conversation history unless a backup PIN is configured.
                   </p>
                 </div>
@@ -307,55 +307,55 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
 
           {/* Architecture Highlights */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-[#E6EAFA] bg-white p-4.5 shadow-2xs hover:shadow-xs transition-shadow">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#2563EB] mb-3 border border-blue-100">
+            <div className="rounded-2xl border border-[#E6EAFA] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-4.5 shadow-2xs hover:shadow-xs transition-shadow">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/40 text-[#2563EB] dark:text-[#38BDF8] mb-3 border border-blue-100 dark:border-blue-900/40">
                 <KeyRound className="h-4.5 w-4.5" />
               </div>
-              <h3 className="text-[13.5px] font-bold text-slate-900">
+              <h3 className="text-[13.5px] font-bold text-slate-900 dark:text-[#E9EDEF]">
                 Client-Side Derivation
               </h3>
-              <p className="text-[12px] text-slate-500 mt-1 leading-relaxed">
+              <p className="text-[12px] text-slate-500 dark:text-[#8696A0] mt-1 leading-relaxed">
                 Your PIN derives a 256-bit AES master key entirely inside your browser using 100,000 PBKDF2 iterations.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-[#E6EAFA] bg-white p-4.5 shadow-2xs hover:shadow-xs transition-shadow">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-[#00A884] mb-3 border border-emerald-100">
+            <div className="rounded-2xl border border-[#E6EAFA] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-4.5 shadow-2xs hover:shadow-xs transition-shadow">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-[#00A884] mb-3 border border-emerald-100 dark:border-emerald-900/40">
                 <Lock className="h-4.5 w-4.5" />
               </div>
-              <h3 className="text-[13.5px] font-bold text-slate-900">
+              <h3 className="text-[13.5px] font-bold text-slate-900 dark:text-[#E9EDEF]">
                 Zero-Knowledge Cloud
               </h3>
-              <p className="text-[12px] text-slate-500 mt-1 leading-relaxed">
+              <p className="text-[12px] text-slate-500 dark:text-[#8696A0] mt-1 leading-relaxed">
                 CallsChat servers only store ciphertext and random salts. We cannot view your PIN or decrypt your messages.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-[#E6EAFA] bg-white p-4.5 shadow-2xs hover:shadow-xs transition-shadow">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600 mb-3 border border-purple-100">
+            <div className="rounded-2xl border border-[#E6EAFA] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-4.5 shadow-2xs hover:shadow-xs transition-shadow">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 mb-3 border border-purple-100 dark:border-purple-900/40">
                 <Sparkles className="h-4.5 w-4.5" />
               </div>
-              <h3 className="text-[13.5px] font-bold text-slate-900">
+              <h3 className="text-[13.5px] font-bold text-slate-900 dark:text-[#E9EDEF]">
                 Seamless Multi-Device
               </h3>
-              <p className="text-[12px] text-slate-500 mt-1 leading-relaxed">
+              <p className="text-[12px] text-slate-500 dark:text-[#8696A0] mt-1 leading-relaxed">
                 Enter your PIN on any new tablet, phone, or laptop to instantly restore full cryptographic access.
               </p>
             </div>
           </div>
 
           {/* Form Card */}
-          <div className="rounded-2xl border border-[#E6EAFA] bg-white p-6 md:p-8 shadow-xs">
+          <div className="rounded-2xl border border-[#E6EAFA] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-6 md:p-8 shadow-xs">
             <div className="flex flex-col mb-6">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#2563EB]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#2563EB] dark:text-[#38BDF8]">
                   {backupData ? "Re-encryption & Password Update" : "Vault Setup"}
                 </span>
               </div>
-              <h3 className="text-[16px] md:text-[18px] font-bold text-slate-900 mt-0.5">
+              <h3 className="text-[16px] md:text-[18px] font-bold text-slate-900 dark:text-[#E9EDEF] mt-0.5">
                 {backupData ? "Update Security PIN" : "Create Security PIN"}
               </h3>
-              <p className="text-[13px] text-slate-500 mt-1">
+              <p className="text-[13px] text-slate-500 dark:text-[#8696A0] mt-1">
                 Choose a memorable PIN or passphrase of at least 6 characters. Make sure you remember it—there is no &quot;Forgot PIN&quot; reset due to zero-knowledge encryption.
               </p>
             </div>
@@ -364,14 +364,14 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
               {/* Field 1: PIN */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[12px] font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-[12px] font-bold uppercase tracking-wider text-slate-700 dark:text-[#E9EDEF]">
                     Security PIN / Passphrase
                   </label>
                   {pin.length > 0 && (
                     <span
                       className={cn(
                         "text-[11px] font-medium flex items-center gap-1",
-                        isPinValid ? "text-emerald-600" : "text-amber-600"
+                        isPinValid ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                       )}
                     >
                       {isPinValid ? (
@@ -385,7 +385,7 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                   )}
                 </div>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8696A0]">
                     <Lock className="h-4 w-4" />
                   </div>
                   <input
@@ -393,13 +393,13 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
                     placeholder="Enter at least 6 digits or passphrase"
-                    className="w-full h-11.5 pl-10 pr-11 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white text-[14px] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
+                    className="w-full h-11.5 pl-10 pr-11 rounded-xl border border-slate-200 dark:border-[#2A3942] bg-slate-50/50 dark:bg-[#202C33] hover:bg-white dark:hover:bg-[#202C33] text-[14px] text-slate-900 dark:text-[#E9EDEF] placeholder:text-slate-400 dark:placeholder:text-[#8696A0] focus:bg-white dark:focus:bg-[#111B21] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPin(!showPin)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8696A0] hover:text-slate-600 dark:hover:text-[#E9EDEF] transition-colors cursor-pointer"
                     aria-label={showPin ? "Hide PIN" : "Show PIN"}
                   >
                     {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -410,14 +410,14 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
               {/* Field 2: Confirm PIN */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[12px] font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-[12px] font-bold uppercase tracking-wider text-slate-700 dark:text-[#E9EDEF]">
                     Confirm Security PIN
                   </label>
                   {confirmPin.length > 0 && (
                     <span
                       className={cn(
                         "text-[11px] font-medium flex items-center gap-1",
-                        isPinMatching ? "text-emerald-600" : "text-red-500"
+                        isPinMatching ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
                       )}
                     >
                       {isPinMatching ? (
@@ -431,7 +431,7 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                   )}
                 </div>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8696A0]">
                     <CheckCircle2 className="h-4 w-4" />
                   </div>
                   <input
@@ -440,17 +440,17 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                     onChange={(e) => setConfirmPin(e.target.value)}
                     placeholder="Re-enter your PIN"
                     className={cn(
-                      "w-full h-11.5 pl-10 pr-11 rounded-xl border bg-slate-50/50 hover:bg-white text-[14px] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all",
+                      "w-full h-11.5 pl-10 pr-11 rounded-xl border bg-slate-50/50 dark:bg-[#202C33] hover:bg-white dark:hover:bg-[#202C33] text-[14px] text-slate-900 dark:text-[#E9EDEF] placeholder:text-slate-400 dark:placeholder:text-[#8696A0] focus:bg-white dark:focus:bg-[#111B21] focus:outline-none transition-all",
                       isPinMismatch
-                        ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                        : "border-slate-200 focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+                        ? "border-red-300 dark:border-red-800/60 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                        : "border-slate-200 dark:border-[#2A3942] focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
                     )}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPin(!showConfirmPin)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8696A0] hover:text-slate-600 dark:hover:text-[#E9EDEF] transition-colors cursor-pointer"
                     aria-label={showConfirmPin ? "Hide PIN" : "Show PIN"}
                   >
                     {showConfirmPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -483,17 +483,17 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
 
           {/* Danger Zone: Delete Cloud Backup */}
           {backupData && (
-            <div className="rounded-2xl border border-red-200/80 bg-red-50/30 p-6 shadow-2xs">
+            <div className="rounded-2xl border border-red-200/80 dark:border-red-900/40 bg-red-50/30 dark:bg-red-950/20 p-6 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-3.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600 border border-red-200">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/40">
                     <Trash2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="text-[14px] font-bold text-red-950">
+                    <h4 className="text-[14px] font-bold text-red-950 dark:text-red-300">
                       Delete Cloud Key Vault
                     </h4>
-                    <p className="text-[12px] text-red-700/80 mt-0.5 leading-relaxed max-w-lg">
+                    <p className="text-[12px] text-red-700/80 dark:text-red-300/80 mt-0.5 leading-relaxed max-w-lg">
                       Permanently wipes your encrypted vault from CallsChat servers. Your local device keys remain active, but you won&apos;t be able to restore chats on another device.
                     </p>
                   </div>
@@ -503,7 +503,7 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="self-start sm:self-center shrink-0 px-4 py-2 rounded-xl text-[13px] font-semibold text-red-600 hover:bg-red-100/80 border border-red-200 bg-white transition-all cursor-pointer hover:border-red-300 active:scale-95 shadow-2xs"
+                    className="self-start sm:self-center shrink-0 px-4 py-2 rounded-xl text-[13px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-100/80 dark:hover:bg-red-950/40 border border-red-200 dark:border-red-900/40 bg-white dark:bg-[#202C33] transition-all cursor-pointer hover:border-red-300 active:scale-95 shadow-2xs"
                   >
                     Delete Backup
                   </button>
@@ -521,7 +521,7 @@ export function KeyBackupSettings({ onBack }: KeyBackupSettingsProps) {
                       type="button"
                       onClick={() => setShowDeleteConfirm(false)}
                       disabled={submitting}
-                      className="px-3.5 py-2 rounded-xl text-[12.5px] font-semibold text-slate-700 hover:bg-slate-200/80 bg-white border border-slate-200 transition-all cursor-pointer active:scale-95"
+                      className="px-3.5 py-2 rounded-xl text-[12.5px] font-semibold text-slate-700 dark:text-[#E9EDEF] hover:bg-slate-200/80 dark:hover:bg-[#2A3942] bg-white dark:bg-[#202C33] border border-slate-200 dark:border-[#2A3942] transition-all cursor-pointer active:scale-95"
                     >
                       Cancel
                     </button>

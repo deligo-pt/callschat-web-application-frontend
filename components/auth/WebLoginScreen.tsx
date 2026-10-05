@@ -23,6 +23,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import * as React from "react";
 import QRCode from "react-qr-code";
 import Modal from "../shared/Modal";
@@ -46,7 +47,9 @@ export default function WebLoginScreen() {
   const [stayLoggedIn, setStayLoggedIn] = React.useState(true);
   const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false);
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const isDarkMode = mounted && resolvedTheme === "dark";
   const [currentLocale, setCurrentLocale] = React.useState<Locale>("en");
   const helpRef = React.useRef<HTMLDivElement>(null);
 
@@ -62,13 +65,10 @@ export default function WebLoginScreen() {
   const isError = status === "error";
   const isExpired = status === "expired";
 
-  // Initialize theme & locale from localStorage on mount
+  // Initialize theme & locale on mount
   React.useEffect(() => {
+    setMounted(true);
     try {
-      // Force light mode initially per user request
-      setIsDarkMode(false);
-      document.documentElement.classList.remove("dark");
-
       const storedLocale = localStorage.getItem("callschat_locale") as Locale | null;
       if (storedLocale && routing.locales.includes(storedLocale)) {
         setCurrentLocale(storedLocale);
@@ -94,19 +94,7 @@ export default function WebLoginScreen() {
   }, [isHelpOpen]);
 
   const toggleDarkMode = () => {
-    const nextDark = !isDarkMode;
-    setIsDarkMode(nextDark);
-    try {
-      if (nextDark) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("callschat_theme", "dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("callschat_theme", "light");
-      }
-    } catch {
-      // Ignore storage errors
-    }
+    setTheme(isDarkMode ? "light" : "dark");
   };
 
   const handleLanguageChange = (locale: Locale) => {
@@ -181,8 +169,7 @@ export default function WebLoginScreen() {
 
         {/* Nav Controls: Dark mode toggle & Language dropdown */}
         <div className="flex items-center gap-2 sm:gap-[12px]">
-          {/* Dark mode toggle (hidden temporarily) */}
-          {/* 
+          {/* Dark mode toggle */}
           <button
             type="button"
             onClick={toggleDarkMode}
@@ -216,7 +203,7 @@ export default function WebLoginScreen() {
               style={{
                 width: 40,
                 height: 22,
-                background: "#155DFC",
+                background: isDarkMode ? "#00A884" : "#155DFC",
                 borderRadius: 9999,
               }}
             >
@@ -234,7 +221,6 @@ export default function WebLoginScreen() {
               />
             </div>
           </button>
-          */}
 
           {/* Language Dropdown */}
           <DropdownMenu>

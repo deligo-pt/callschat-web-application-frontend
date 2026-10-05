@@ -190,7 +190,7 @@ export function VerificationForm({
     <form
       onSubmit={handleSubmit(onSubmit)}
       className={cn(
-        "space-y-6 rounded-3xl bg-white p-6 md:p-8 border border-[#E6EAFA] shadow-xs transition-all",
+        "space-y-6 rounded-3xl bg-white dark:bg-[#111B21] p-6 md:p-8 border border-[#E6EAFA] dark:border-[#222D34] shadow-xs transition-all",
         className
       )}
     >
@@ -199,17 +199,17 @@ export function VerificationForm({
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             {isUserIdentity ? (
-              <Shield className="h-5 w-5 text-indigo-600" />
+              <Shield className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             ) : (
-              <Building2 className="h-5 w-5 text-purple-600" />
+              <Building2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             )}
-            <h3 className="text-lg font-bold text-[#1D2A54]">
+            <h3 className="text-lg font-bold text-[#1D2A54] dark:text-[#E9EDEF]">
               {mode === "update"
                 ? `Update ${isUserIdentity ? "Identity" : "Business"} Verification`
                 : `Submit ${isUserIdentity ? "Identity (KYC)" : "Business (KYB)"} Documents`}
             </h3>
           </div>
-          <p className="text-xs md:text-sm text-[#8F95B2] leading-relaxed">
+          <p className="text-xs md:text-sm text-[#8F95B2] dark:text-[#8696A0] leading-relaxed">
             {isUserIdentity
               ? "Upload a government-issued photo ID to unlock verified badge status and elevated caller trust."
               : "Upload official legal credentials to register your business enterprise and earn a verified green checkmark."}
@@ -221,7 +221,7 @@ export function VerificationForm({
             type="button"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#202C33] transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -230,7 +230,7 @@ export function VerificationForm({
 
       {/* ID Type Selection */}
       <div className="space-y-2">
-        <label className="text-xs font-bold text-[#1D2A54] uppercase tracking-wider">
+        <label className="text-xs font-bold text-[#1D2A54] dark:text-[#E9EDEF] uppercase tracking-wider">
           Select Document Type <span className="text-red-500">*</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -242,17 +242,17 @@ export function VerificationForm({
                 type="button"
                 onClick={() => setValue("idType", opt.value)}
                 className={cn(
-                  "flex flex-col text-left p-3.5 rounded-2xl border transition-all text-xs",
+                  "flex flex-col text-left p-3.5 rounded-2xl border transition-all text-xs cursor-pointer",
                   isSelected
-                    ? "border-[#8B5CF6] bg-purple-50/60 ring-2 ring-purple-500/20 shadow-xs"
-                    : "border-[#E6EAFA] bg-[#F8FAFC] hover:border-[#D1D8F5] hover:bg-gray-50 text-[#1D2A54]"
+                    ? "border-[#8B5CF6] bg-purple-50/60 dark:bg-purple-950/40 ring-2 ring-purple-500/20 shadow-xs"
+                    : "border-[#E6EAFA] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33] hover:border-[#D1D8F5] dark:hover:border-[#374248] hover:bg-gray-50 dark:hover:bg-[#2A3942] text-[#1D2A54] dark:text-[#E9EDEF]"
                 )}
               >
-                <div className="flex items-center justify-between font-bold text-sm mb-1 text-[#1D2A54]">
+                <div className="flex items-center justify-between font-bold text-sm mb-1 text-[#1D2A54] dark:text-[#E9EDEF]">
                   <span>{opt.label}</span>
-                  {isSelected && <FileCheck2 className="h-4 w-4 text-[#8B5CF6] shrink-0" />}
+                  {isSelected && <FileCheck2 className="h-4 w-4 text-[#8B5CF6] dark:text-purple-400 shrink-0" />}
                 </div>
-                <span className="text-[11px] text-[#8F95B2] leading-normal">{opt.hint}</span>
+                <span className="text-[11px] text-[#8F95B2] dark:text-[#8696A0] leading-normal">{opt.hint}</span>
               </button>
             );
           })}
@@ -262,11 +262,11 @@ export function VerificationForm({
       {/* Document Identification Number */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-[#1D2A54] uppercase tracking-wider flex items-center gap-1.5">
-            <CreditCard className="h-3.5 w-3.5 text-[#8F95B2]" />
+          <label className="text-xs font-bold text-[#1D2A54] dark:text-[#E9EDEF] uppercase tracking-wider flex items-center gap-1.5">
+            <CreditCard className="h-3.5 w-3.5 text-[#8F95B2] dark:text-[#8696A0]" />
             Document ID / Registration Number
           </label>
-          <span className="text-[11px] text-[#8F95B2]">Optional / Confidential</span>
+          <span className="text-[11px] text-[#8F95B2] dark:text-[#8696A0]">Optional / Confidential</span>
         </div>
         <input
           type="text"
@@ -276,13 +276,13 @@ export function VerificationForm({
               ? "e.g. 1990123456789 or A01234567"
               : "e.g. TRAD/DNCC/012345/2026 or TIN-9876543210"
           }
-          className="w-full rounded-xl border border-[#E6EAFA] bg-[#F8FAFC] px-4 py-3 text-sm text-[#1D2A54] placeholder-[#A0A7C2] focus:border-[#8B5CF6] focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
+          className="w-full rounded-xl border border-[#E6EAFA] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33] px-4 py-3 text-sm text-[#1D2A54] dark:text-[#E9EDEF] placeholder-[#A0A7C2] dark:placeholder-[#8696A0] focus:border-[#8B5CF6] focus:bg-white dark:focus:bg-[#111B21] focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
         />
       </div>
 
       {/* File Upload Zone */}
       <div className="space-y-2">
-        <label className="text-xs font-bold text-[#1D2A54] uppercase tracking-wider">
+        <label className="text-xs font-bold text-[#1D2A54] dark:text-[#E9EDEF] uppercase tracking-wider">
           Upload Document File <span className="text-red-500">*</span>
         </label>
 
@@ -295,8 +295,8 @@ export function VerificationForm({
             className={cn(
               "relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-200 group",
               isDragging
-                ? "border-[#8B5CF6] bg-purple-50/50 scale-[0.99]"
-                : "border-[#D1D8F5] hover:border-[#8B5CF6] bg-[#F8FAFC] hover:bg-purple-50/20"
+                ? "border-[#8B5CF6] bg-purple-50/50 dark:bg-purple-950/30 scale-[0.99]"
+                : "border-[#D1D8F5] dark:border-[#2A3942] hover:border-[#8B5CF6] bg-[#F8FAFC] dark:bg-[#202C33]/50 hover:bg-purple-50/20 dark:hover:bg-purple-950/20"
             )}
           >
             <input
@@ -310,32 +310,32 @@ export function VerificationForm({
               }}
               className="hidden"
             />
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-md text-[#8B5CF6] group-hover:scale-110 transition-transform mb-3 border border-[#E6EAFA]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white dark:bg-[#202C33] shadow-md text-[#8B5CF6] dark:text-purple-400 group-hover:scale-110 transition-transform mb-3 border border-[#E6EAFA] dark:border-[#2A3942]">
               <Upload className="h-6 w-6" strokeWidth={2.5} />
             </div>
-            <span className="text-sm font-bold text-[#1D2A54]">
-              Click to select document <span className="font-normal text-[#8F95B2]">or drag and drop</span>
+            <span className="text-sm font-bold text-[#1D2A54] dark:text-[#E9EDEF]">
+              Click to select document <span className="font-normal text-[#8F95B2] dark:text-[#8696A0]">or drag and drop</span>
             </span>
-            <span className="mt-1 text-xs text-[#8F95B2] font-medium">
+            <span className="mt-1 text-xs text-[#8F95B2] dark:text-[#8696A0] font-medium">
               Supported formats: JPEG, PNG, WEBP or PDF (Max 15MB)
             </span>
           </div>
         ) : (
-          <div className="flex items-center justify-between rounded-2xl border border-[#E6EAFA] bg-[#F8FAFC] p-4">
+          <div className="flex items-center justify-between rounded-2xl border border-[#E6EAFA] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33] p-4">
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-[#8B5CF6]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-900/40 text-[#8B5CF6] dark:text-purple-300">
                 <FileText className="h-6 w-6" strokeWidth={2.5} />
               </div>
               <div className="overflow-hidden">
-                <p className="text-sm font-bold text-[#1D2A54] truncate">{selectedFile.name}</p>
-                <p className="text-xs font-semibold text-[#8F95B2]">{formatFileSize(selectedFile.size)}</p>
+                <p className="text-sm font-bold text-[#1D2A54] dark:text-[#E9EDEF] truncate">{selectedFile.name}</p>
+                <p className="text-xs font-semibold text-[#8F95B2] dark:text-[#8696A0]">{formatFileSize(selectedFile.size)}</p>
               </div>
             </div>
             <button
               type="button"
               onClick={removeFile}
               disabled={isSubmitting}
-              className="rounded-full p-2 text-[#8F95B2] hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+              className="rounded-full p-2 text-[#8F95B2] dark:text-[#8696A0] hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
               title="Remove file"
             >
               <X className="h-5 w-5" />
@@ -345,8 +345,8 @@ export function VerificationForm({
       </div>
 
       {/* Security notice */}
-      <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-200/80 text-slate-700 text-xs">
-        <AlertCircle className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 rounded-2xl bg-slate-50 dark:bg-[#202C33] p-4 border border-slate-200/80 dark:border-[#2A3942] text-slate-700 dark:text-[#8696A0] text-xs">
+        <AlertCircle className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
         <p className="leading-relaxed font-medium">
           Uploaded verification files are strongly encrypted at rest using AES-256-GCM in our isolated compliance vault.
           Only authenticated administrative compliance officers can access these records for legal identity verification.
@@ -360,7 +360,7 @@ export function VerificationForm({
             type="button"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="w-full sm:w-auto px-6 py-3.5 rounded-2xl border border-[#E6EAFA] bg-white text-sm font-bold text-[#1D2A54] hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-3.5 rounded-2xl border border-[#E6EAFA] dark:border-[#2A3942] bg-white dark:bg-[#202C33] text-sm font-bold text-[#1D2A54] dark:text-[#E9EDEF] hover:bg-gray-50 dark:hover:bg-[#2A3942]/80 transition-colors disabled:opacity-50 cursor-pointer"
           >
             Cancel
           </button>
@@ -368,7 +368,7 @@ export function VerificationForm({
         <button
           type="submit"
           disabled={!selectedFile || isSubmitting}
-          className="flex-1 w-full flex items-center justify-center gap-2 rounded-2xl bg-[#8B5CF6] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-500/25 transition-all hover:bg-[#7C3AED] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+          className="flex-1 w-full flex items-center justify-center gap-2 rounded-2xl bg-[#8B5CF6] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-500/25 transition-all hover:bg-[#7C3AED] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
         >
           {isSubmitting ? (
             <>

@@ -1567,7 +1567,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       {/* Main Content Area */}
       <div
         className={cn(
-          "flex-1 flex-col h-full bg-[#F8FAFC]",
+          "flex-1 flex-col h-full bg-[#F8FAFC] dark:bg-[#0C1317]",
           isRootChatsPage ? "hidden md:flex" : "flex"
         )}
       >
@@ -1576,16 +1576,16 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* Delete Confirmation Modal */}
       {conversationToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1D2A54]/40 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#202C33] border border-black/10 dark:border-white/10 p-6 shadow-2xl"
           >
-            <h2 className="text-[18px] font-bold text-[#1D2A54] mb-2">
+            <h2 className="text-[18px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-2">
               {conversations.find((c) => c.id === conversationToDelete)?.isGroup ? "Leave Group" : "Delete Conversation"}
             </h2>
-            <p className="text-[14px] font-medium text-[#8F95B2] mb-6">
+            <p className="text-[14px] font-medium text-[#54656F] dark:text-[#8696A0] mb-6">
               {conversations.find((c) => c.id === conversationToDelete)?.isGroup
                 ? "Are you sure you want to leave this group? You will need an invite to rejoin."
                 : "Are you sure you want to delete this conversation? This action cannot be undone."}
@@ -1593,14 +1593,14 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setConversationToDelete(null)}
-                className="flex-1 rounded-xl bg-[#F8FAFC] py-3 text-[14px] font-bold text-[#1D2A54] transition-colors hover:bg-[#E6EAFA]"
+                className="flex-1 rounded-xl bg-[#F0F2F5] dark:bg-[#182229] py-3 text-[14px] font-bold text-[#111B21] dark:text-[#E9EDEF] transition-colors hover:bg-[#E9EDEF] dark:hover:bg-[#222D34] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 disabled={isDeleting}
                 onClick={() => handleDeleteConversation(conversationToDelete)}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-[14px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-70"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-[14px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-70 cursor-pointer"
               >
                 {isDeleting ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -1623,7 +1623,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
 export default function ChatsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<div className="h-full w-full bg-[#F8FAFC]"></div>}>
+    <Suspense fallback={<div className="h-full w-full bg-[#F8FAFC] dark:bg-[#0C1317]"></div>}>
       <ChatsLayoutContent>{children}</ChatsLayoutContent>
     </Suspense>
   );

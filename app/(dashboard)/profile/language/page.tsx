@@ -11,7 +11,7 @@ export default function ProfileLanguageRoute() {
   const currentLocale = useLocale() as Locale;
 
   return (
-    <div className="flex-1 flex flex-col bg-white overflow-y-auto h-full">
+    <div className="flex-1 flex flex-col bg-white dark:bg-[#111B21] overflow-y-auto h-full">
       <LanguageSelector
         currentLocale={currentLocale}
         onBack={() => router.push("/profile/edit")}

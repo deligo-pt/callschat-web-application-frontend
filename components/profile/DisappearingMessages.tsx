@@ -75,7 +75,7 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
   };
 
   return (
-    <div className="flex h-full flex-col bg-white relative overflow-hidden">
+    <div className="flex h-full flex-col bg-white dark:bg-[#111B21] relative overflow-hidden">
       {/* Header */}
       <div
         className="flex items-center gap-3 px-6 py-5 shrink-0 shadow-sm"
@@ -85,7 +85,7 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
           <button
             onClick={onBack}
             aria-label="Go back"
-            className="flex items-center gap-3 text-white hover:opacity-80 transition-opacity"
+            className="flex items-center gap-3 text-white hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="h-5 w-5" />
             <h2 className="text-[18px] font-bold text-white tracking-tight">
@@ -103,15 +103,15 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
       <div className="flex-1 overflow-y-auto px-6 py-8 scrollbar-hide">
         <div className="mx-auto max-w-[480px] flex flex-col gap-4 pb-8">
           {/* Banner Card */}
-          <div className="flex items-start gap-4 rounded-2xl border border-[#E9D5FF] bg-[#FAF5FF] p-5 shadow-sm mb-2">
+          <div className="flex items-start gap-4 rounded-2xl border border-[#E9D5FF] dark:border-purple-900/40 bg-[#FAF5FF] dark:bg-purple-950/20 p-5 shadow-sm mb-2">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#8B5CF6] text-white shadow-sm">
               <Shield className="h-6 w-6" />
             </div>
             <div className="flex flex-col">
-              <h3 className="text-[16px] font-bold text-[#1E1B4B] mb-1">
+              <h3 className="text-[16px] font-bold text-[#1E1B4B] dark:text-[#E9EDEF] mb-1">
                 Global Setting
               </h3>
-              <p className="text-[13px] text-[#4C1D95]/80 font-medium leading-relaxed">
+              <p className="text-[13px] text-[#4C1D95]/80 dark:text-purple-200/80 font-medium leading-relaxed">
                 This setting applies to <strong>all your personal conversations</strong>. When enabled, new messages in every chat will automatically disappear after the selected time — just like WhatsApp's global disappearing messages.
               </p>
             </div>
@@ -132,8 +132,8 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
                   className={cn(
                     "flex w-full items-center justify-between rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed",
                     isSelected
-                      ? "bg-[#EEF2FF] border-2 border-[#3B82F6] shadow-sm"
-                      : "bg-white border border-[#E2E8F0] hover:bg-slate-50 shadow-sm"
+                      ? "bg-[#EEF2FF] dark:bg-[#202C33] border-2 border-[#3B82F6] dark:border-[#38BDF8] shadow-sm"
+                      : "bg-white dark:bg-[#111B21] border border-[#E2E8F0] dark:border-[#222D34] hover:bg-slate-50 dark:hover:bg-[#202C33]/60 shadow-sm"
                   )}
                 >
                   <div className="flex items-center gap-3.5">
@@ -143,7 +143,7 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors",
                         isSelected
                           ? "bg-[#2563EB] text-white shadow-sm"
-                          : "bg-slate-100 text-slate-500"
+                          : "bg-slate-100 dark:bg-[#202C33] text-slate-500 dark:text-[#8696A0]"
                       )}
                     >
                       {isOff ? (
@@ -158,7 +158,7 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
                       <span
                         className={cn(
                           "text-[15px] font-bold",
-                          isSelected ? "text-[#1E3A8A]" : "text-[#0F172A]"
+                          isSelected ? "text-[#1E3A8A] dark:text-[#38BDF8]" : "text-[#0F172A] dark:text-[#E9EDEF]"
                         )}
                       >
                         {option.label}
@@ -167,7 +167,7 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
                         <span
                           className={cn(
                             "text-[12px] font-medium mt-0.5",
-                            isSelected ? "text-slate-500" : "text-slate-400"
+                            isSelected ? "text-slate-500 dark:text-[#8696A0]" : "text-slate-400 dark:text-[#8696A0]"
                           )}
                         >
                           {option.sublabel}
@@ -178,7 +178,7 @@ export function DisappearingMessages({ onBack }: DisappearingMessagesProps) {
 
                   {/* Checkmark */}
                   {isSelected && (
-                    <CheckCircle2 className="h-5 w-5 text-[#2563EB] fill-[#2563EB] text-white shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-[#2563EB] fill-[#2563EB] dark:text-[#38BDF8] dark:fill-[#38BDF8] text-white shrink-0" />
                   )}
                 </button>
               );

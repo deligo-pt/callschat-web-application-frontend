@@ -154,18 +154,18 @@ export function AttachmentUploader({
           className={cn(
             'flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 select-none',
             isDragging
-              ? 'border-[#2563EB] bg-[#EEF2FF]'
-              : 'border-[#E2E8F0] bg-[#F8FAFC] hover:bg-slate-100 hover:border-slate-300',
+              ? 'border-[#2563EB] dark:border-[#38BDF8] bg-[#EEF2FF] dark:bg-blue-950/40'
+              : 'border-[#E2E8F0] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33]/40 hover:bg-slate-100 dark:hover:bg-[#202C33] hover:border-slate-300 dark:hover:border-[#38BDF8]/40',
             disabled && 'opacity-60 cursor-not-allowed'
           )}
         >
-          <div className="flex items-center gap-2 text-slate-600">
-            <UploadCloud className="h-5 w-5 text-[#2563EB]" />
-            <span className="text-[13px] font-semibold text-[#0F172A]">
+          <div className="flex items-center gap-2 text-slate-600 dark:text-[#8696A0]">
+            <UploadCloud className="h-5 w-5 text-[#2563EB] dark:text-[#38BDF8]" />
+            <span className="text-[13px] font-semibold text-[#0F172A] dark:text-[#E9EDEF]">
               Drop files here or click to browse
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400 dark:text-[#8696A0] mt-1">
             Screenshots, logs, or error dumps (Images, PDF, TXT up to 10MB) &bull; Max {maxFiles} attachments ({attachments.length}/{maxFiles})
           </p>
         </div>
@@ -173,7 +173,7 @@ export function AttachmentUploader({
 
       {/* Uploading indicator */}
       {uploadingFiles.length > 0 && (
-        <div className="flex items-center gap-2 p-2.5 bg-blue-50/70 border border-blue-200/60 rounded-lg text-[12px] text-blue-700 animate-pulse">
+        <div className="flex items-center gap-2 p-2.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 rounded-lg text-[12px] text-blue-700 dark:text-blue-300 animate-pulse">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Uploading {uploadingFiles.length} file(s)...</span>
         </div>
@@ -185,7 +185,7 @@ export function AttachmentUploader({
           {attachments.map((file, idx) => (
             <div
               key={`${file.fileUrl}-${idx}`}
-              className="flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white shadow-2xs hover:border-slate-300 transition-colors"
+              className="flex items-center justify-between p-2 rounded-lg border border-slate-200 dark:border-[#2A3942] bg-white dark:bg-[#202C33] shadow-2xs hover:border-slate-300 dark:hover:border-[#374248] transition-colors"
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 {file.fileType.startsWith('image/') ? (
@@ -193,18 +193,18 @@ export function AttachmentUploader({
                   <img
                     src={file.fileUrl}
                     alt={file.fileName}
-                    className="h-9 w-9 rounded-md object-cover border border-slate-200 shrink-0"
+                    className="h-9 w-9 rounded-md object-cover border border-slate-200 dark:border-[#2A3942] shrink-0"
                   />
                 ) : (
-                  <div className="h-9 w-9 rounded-md bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
+                  <div className="h-9 w-9 rounded-md bg-slate-100 dark:bg-[#111B21] flex items-center justify-center shrink-0 border border-slate-200 dark:border-[#2A3942]">
                     {getFileIcon(file.fileType)}
                   </div>
                 )}
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-[12px] font-semibold text-[#0F172A] truncate" title={file.fileName}>
+                  <span className="text-[12px] font-semibold text-[#0F172A] dark:text-[#E9EDEF] truncate" title={file.fileName}>
                     {file.fileName}
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-400 dark:text-[#8696A0]">
                     {formatFileSize(file.fileSize)}
                   </span>
                 </div>
@@ -217,7 +217,7 @@ export function AttachmentUploader({
                     e.stopPropagation();
                     removeAttachment(idx);
                   }}
-                  className="h-6 w-6 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 ml-1"
+                  className="h-6 w-6 rounded-full flex items-center justify-center text-slate-400 dark:text-[#8696A0] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0 ml-1"
                   title="Remove file"
                   aria-label={`Remove ${file.fileName}`}
                 >

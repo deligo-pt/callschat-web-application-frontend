@@ -13,10 +13,13 @@ import {
     Languages,
     ShieldCheck,
     ChevronRight,
-    HelpCircle
+    HelpCircle,
+    Sun,
+    Moon
 } from "lucide-react";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { useTranslations } from "next-intl";
+import { useTheme } from "next-themes";
 import Modal from "./Modal";
 
 export default function Navbar() {
@@ -29,6 +32,17 @@ export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const navContainerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+
+    const { setTheme, resolvedTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const toggleTheme = () => {
+        setTheme(resolvedTheme === "dark" ? "light" : "dark");
+    };
 
     const openModal = () => setIsDownloadModalOpen(true);
     const closeModal = () => setIsDownloadModalOpen(false);
@@ -308,9 +322,27 @@ export default function Navbar() {
                     })}
                 </nav>
 
-                {/* Right Action Buttons (WhatsApp Style: Outline Log In + Green Download) */}
+                {/* Right Action Buttons (WhatsApp Style: Outline Log In + Green Download + Theme Toggle) */}
                 <div className="hidden lg:flex items-center gap-3.5">
-                    
+                    {/* Theme Toggle Button */}
+                    {mounted ? (
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            className="flex h-10 w-10 items-center justify-center rounded-full border border-[#111b21]/20 dark:border-white/20 text-[#111b21] dark:text-[#E9EDEF] hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                            title={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                        >
+                            {resolvedTheme === "dark" ? (
+                                <Sun className="h-5 w-5 text-amber-400" />
+                            ) : (
+                                <Moon className="h-5 w-5 text-slate-700" />
+                            )}
+                        </button>
+                    ) : (
+                        <div className="h-10 w-10" />
+                    )}
+
                     {/* Log In Outline Pill */}
                     <button
                         onClick={handleLogin}
@@ -330,12 +362,30 @@ export default function Navbar() {
                     </button>
                 </div>
 
-                {/* Mobile Menu Hamburger (Right) */}
-                <button
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-[#111b21] dark:text-white hover:bg-black/5 dark:hover:bg-white/10 lg:hidden focus:outline-none transition-colors"
-                    aria-label="Toggle Navigation Menu"
-                >
+                {/* Mobile Header Right Controls: Theme Toggle & Hamburger */}
+                <div className="flex items-center gap-2 lg:hidden">
+                    {mounted && (
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            className="flex h-10 w-10 items-center justify-center rounded-full text-[#111b21] dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                            title={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                        >
+                            {resolvedTheme === "dark" ? (
+                                <Sun className="h-5 w-5 text-amber-400" />
+                            ) : (
+                                <Moon className="h-5 w-5 text-slate-700" />
+                            )}
+                        </button>
+                    )}
+
+                    {/* Mobile Menu Hamburger */}
+                    <button
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-[#111b21] dark:text-white hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none transition-colors"
+                        aria-label="Toggle Navigation Menu"
+                    >
                     <motion.svg
                         className="h-6 w-6"
                         viewBox="0 0 24 24"
@@ -376,6 +426,7 @@ export default function Navbar() {
                         />
                     </motion.svg>
                 </button>
+                </div>
             </div>
 
             {/* Mobile Dropdown Sheet (WhatsApp Style) */}

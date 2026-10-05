@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientIntlProvider } from "@/components/i18n/ClientIntlProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -30,13 +31,20 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen flex flex-col bg-zinc-100 overflow-x-clip`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#0C1317] text-[#111B21] dark:text-[#E9EDEF] overflow-x-clip`}
         suppressHydrationWarning
       >
-        <ClientIntlProvider>
-          <main className="flex-1">{children}</main>
-          <Toaster position="top-right" richColors />
-        </ClientIntlProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ClientIntlProvider>
+            <main className="flex-1">{children}</main>
+            <Toaster position="top-right" richColors />
+          </ClientIntlProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

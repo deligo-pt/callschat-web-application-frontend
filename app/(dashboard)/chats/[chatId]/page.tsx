@@ -237,7 +237,7 @@ function ChatRouter() {
 
 export default function ChatRoomPage() {
   return (
-    <React.Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-[#F8FAFC]"><Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" /></div>}>
+    <React.Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-[#F8FAFC] dark:bg-[#0C1317]"><Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" /></div>}>
       <ChatRouter />
     </React.Suspense>
   );
@@ -710,7 +710,7 @@ function ChatRoomPageContent() {
 
   if (!conversationId) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#F8FAFC]">
+      <div className="flex h-full w-full items-center justify-center bg-[#F8FAFC] dark:bg-[#0C1317]">
         <Loader2 className="h-8 w-8 animate-spin text-[#3B58F5]" />
       </div>
     );
@@ -718,7 +718,7 @@ function ChatRoomPageContent() {
 
   return (
     <div
-      className="flex h-full w-full flex-col bg-[#F8FAFC] relative overflow-hidden"
+      className="flex h-full w-full flex-col bg-[#F8FAFC] dark:bg-[#0C1317] relative overflow-hidden"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

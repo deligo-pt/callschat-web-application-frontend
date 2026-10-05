@@ -134,7 +134,7 @@ export function CreateFeedbackModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in-0 duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70 backdrop-blur-xs animate-in fade-in-0 duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
@@ -144,15 +144,15 @@ export function CreateFeedbackModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-feedback-title"
-        className="relative flex flex-col w-full max-w-2xl max-h-[92vh] rounded-2xl bg-white shadow-xl border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative flex flex-col w-full max-w-2xl max-h-[92vh] rounded-2xl bg-white dark:bg-[#111B21] shadow-xl border border-slate-200/80 dark:border-[#222D34] overflow-hidden animate-in zoom-in-95 duration-200"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-[#222D34] bg-white dark:bg-[#111B21] sticky top-0 z-10">
           <div>
-            <h2 id="create-feedback-title" className="text-[17px] font-bold text-[#0F172A]">
+            <h2 id="create-feedback-title" className="text-[17px] font-bold text-[#0F172A] dark:text-[#E9EDEF]">
               Submit Feedback or Bug Report
             </h2>
-            <p className="text-[12px] text-slate-500">
+            <p className="text-[12px] text-slate-500 dark:text-[#8696A0]">
               Help us improve CallsChat. Your feedback goes directly to our product team.
             </p>
           </div>
@@ -160,7 +160,7 @@ export function CreateFeedbackModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 dark:text-[#8696A0] hover:text-slate-600 dark:hover:text-[#E9EDEF] hover:bg-slate-100 dark:hover:bg-[#202C33] transition-colors disabled:opacity-50"
             aria-label="Close dialog"
           >
             <X className="h-5 w-5" />
@@ -171,7 +171,7 @@ export function CreateFeedbackModal({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
           {/* Error Banner */}
           {errorMsg && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-[12.5px]">
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-700 dark:text-rose-300 text-[12.5px]">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{errorMsg}</div>
             </div>
@@ -179,7 +179,7 @@ export function CreateFeedbackModal({
 
           {/* 1. Category / Type Selection */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-bold text-[#0F172A] uppercase tracking-wider">
+            <label className="text-[12px] font-bold text-[#0F172A] dark:text-[#E9EDEF] uppercase tracking-wider">
               Category
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -194,11 +194,11 @@ export function CreateFeedbackModal({
                     className={cn(
                       'flex items-center gap-2 p-2.5 rounded-xl border text-[13px] font-semibold transition-all cursor-pointer text-left',
                       isSelected
-                        ? 'border-[#2563EB] bg-[#EEF2FF] text-[#2563EB] shadow-2xs'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                        ? 'border-[#2563EB] dark:border-[#38BDF8] bg-[#EEF2FF] dark:bg-blue-950/50 text-[#2563EB] dark:text-[#38BDF8] shadow-2xs'
+                        : 'border-slate-200 dark:border-[#2A3942] bg-white dark:bg-[#202C33] text-slate-700 dark:text-[#E9EDEF] hover:bg-slate-50 dark:hover:bg-[#2A3942]/70 hover:border-slate-300 dark:hover:border-[#374248]'
                     )}
                   >
-                    <Icon className={cn('h-4 w-4 shrink-0', isSelected ? 'text-[#2563EB]' : 'text-slate-400')} />
+                    <Icon className={cn('h-4 w-4 shrink-0', isSelected ? 'text-[#2563EB] dark:text-[#38BDF8]' : 'text-slate-400 dark:text-[#8696A0]')} />
                     <span>{opt.label}</span>
                   </button>
                 );
@@ -208,7 +208,7 @@ export function CreateFeedbackModal({
 
           {/* 2. Priority Selection */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-bold text-[#0F172A] uppercase tracking-wider">
+            <label className="text-[12px] font-bold text-[#0F172A] dark:text-[#E9EDEF] uppercase tracking-wider">
               Severity / Priority
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -222,14 +222,14 @@ export function CreateFeedbackModal({
                     className={cn(
                       'flex flex-col p-2.5 rounded-xl border transition-all cursor-pointer text-left',
                       isSelected
-                        ? 'border-[#2563EB] bg-[#EEF2FF] text-[#2563EB] shadow-2xs'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                        ? 'border-[#2563EB] dark:border-[#38BDF8] bg-[#EEF2FF] dark:bg-blue-950/50 text-[#2563EB] dark:text-[#38BDF8] shadow-2xs'
+                        : 'border-slate-200 dark:border-[#2A3942] bg-white dark:bg-[#202C33] text-slate-700 dark:text-[#E9EDEF] hover:bg-slate-50 dark:hover:bg-[#2A3942]/70 hover:border-slate-300 dark:hover:border-[#374248]'
                     )}
                   >
-                    <span className={cn('text-[13px] font-bold', isSelected ? 'text-[#2563EB]' : 'text-[#0F172A]')}>
+                    <span className={cn('text-[13px] font-bold', isSelected ? 'text-[#2563EB] dark:text-[#38BDF8]' : 'text-[#0F172A] dark:text-[#E9EDEF]')}>
                       {opt.label}
                     </span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">{opt.desc}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-[#8696A0] mt-0.5">{opt.desc}</span>
                   </button>
                 );
               })}
@@ -239,10 +239,10 @@ export function CreateFeedbackModal({
           {/* 3. Subject Input */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <label htmlFor="feedback-subject" className="text-[12px] font-bold text-[#0F172A] uppercase tracking-wider">
+              <label htmlFor="feedback-subject" className="text-[12px] font-bold text-[#0F172A] dark:text-[#E9EDEF] uppercase tracking-wider">
                 Subject <span className="text-rose-500">*</span>
               </label>
-              <span className={cn('text-[11px]', subject.length > 200 ? 'text-rose-500 font-bold' : 'text-slate-400')}>
+              <span className={cn('text-[11px]', subject.length > 200 ? 'text-rose-500 font-bold' : 'text-slate-400 dark:text-[#8696A0]')}>
                 {subject.length}/200
               </span>
             </div>
@@ -253,10 +253,10 @@ export function CreateFeedbackModal({
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g. Call audio disconnects when switching to Bluetooth"
               className={cn(
-                'w-full h-11 px-3.5 rounded-xl border bg-white text-[13px] font-medium text-[#0F172A] placeholder:text-slate-400 focus:outline-none transition-colors',
+                'w-full h-11 px-3.5 rounded-xl border bg-white dark:bg-[#202C33] text-[13px] font-medium text-[#0F172A] dark:text-[#E9EDEF] placeholder:text-slate-400 dark:placeholder:text-[#8696A0] focus:outline-none transition-colors',
                 subject.length > 0 && !isSubjectValid
-                  ? 'border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                  : 'border-slate-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20'
+                  ? 'border-rose-300 dark:border-rose-800/60 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                  : 'border-slate-200 dark:border-[#2A3942] focus:border-[#2563EB] dark:focus:border-[#38BDF8] focus:ring-2 focus:ring-[#2563EB]/20 dark:focus:ring-[#38BDF8]/20'
               )}
             />
             {subject.length > 0 && subject.length < 5 && (
@@ -267,10 +267,10 @@ export function CreateFeedbackModal({
           {/* 4. Description Textarea */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <label htmlFor="feedback-description" className="text-[12px] font-bold text-[#0F172A] uppercase tracking-wider">
+              <label htmlFor="feedback-description" className="text-[12px] font-bold text-[#0F172A] dark:text-[#E9EDEF] uppercase tracking-wider">
                 Detailed Description <span className="text-rose-500">*</span>
               </label>
-              <span className={cn('text-[11px]', description.length > 5000 ? 'text-rose-500 font-bold' : 'text-slate-400')}>
+              <span className={cn('text-[11px]', description.length > 5000 ? 'text-rose-500 font-bold' : 'text-slate-400 dark:text-[#8696A0]')}>
                 {description.length}/5000
               </span>
             </div>
@@ -281,10 +281,10 @@ export function CreateFeedbackModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what happened, steps to reproduce, or why this feature would help..."
               className={cn(
-                'w-full p-3.5 rounded-xl border bg-white text-[13px] font-medium text-[#0F172A] placeholder:text-slate-400 focus:outline-none transition-colors resize-y min-h-[110px]',
+                'w-full p-3.5 rounded-xl border bg-white dark:bg-[#202C33] text-[13px] font-medium text-[#0F172A] dark:text-[#E9EDEF] placeholder:text-slate-400 dark:placeholder:text-[#8696A0] focus:outline-none transition-colors resize-y min-h-[110px]',
                 description.length > 0 && !isDescriptionValid
-                  ? 'border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                  : 'border-slate-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20'
+                  ? 'border-rose-300 dark:border-rose-800/60 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                  : 'border-slate-200 dark:border-[#2A3942] focus:border-[#2563EB] dark:focus:border-[#38BDF8] focus:ring-2 focus:ring-[#2563EB]/20 dark:focus:ring-[#38BDF8]/20'
               )}
             />
             {description.length > 0 && description.length < 10 && (
@@ -294,7 +294,7 @@ export function CreateFeedbackModal({
 
           {/* 5. Attachment Dropzone */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-bold text-[#0F172A] uppercase tracking-wider">
+            <label className="text-[12px] font-bold text-[#0F172A] dark:text-[#E9EDEF] uppercase tracking-wider">
               Attachments (Screenshots / Logs)
             </label>
             <AttachmentUploader
@@ -306,35 +306,35 @@ export function CreateFeedbackModal({
           </div>
 
           {/* 6. Device Diagnostics Telemetry (Collapsible) */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-[#F8FAFC]">
+          <div className="border border-slate-200 dark:border-[#2A3942] rounded-xl overflow-hidden bg-[#F8FAFC] dark:bg-[#182229]">
             <button
               type="button"
               onClick={() => setShowDiagnostics(!showDiagnostics)}
-              className="flex items-center justify-between w-full px-4 py-2.5 text-left text-slate-700 hover:bg-slate-100 transition-colors"
+              className="flex items-center justify-between w-full px-4 py-2.5 text-left text-slate-700 dark:text-[#E9EDEF] hover:bg-slate-100 dark:hover:bg-[#202C33] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <MonitorSmartphone className="h-4 w-4 text-[#2563EB]" />
-                <span className="text-[12px] font-bold text-[#0F172A]">
+                <MonitorSmartphone className="h-4 w-4 text-[#2563EB] dark:text-[#38BDF8]" />
+                <span className="text-[12px] font-bold text-[#0F172A] dark:text-[#E9EDEF]">
                   Device Diagnostics (Auto-Detected)
                 </span>
               </div>
               {showDiagnostics ? (
-                <ChevronUp className="h-4 w-4 text-slate-400" />
+                <ChevronUp className="h-4 w-4 text-slate-400 dark:text-[#8696A0]" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-slate-400" />
+                <ChevronDown className="h-4 w-4 text-slate-400 dark:text-[#8696A0]" />
               )}
             </button>
 
             {showDiagnostics && (
-              <div className="p-3.5 border-t border-slate-200 bg-white">
-                <p className="text-[11px] text-slate-400 mb-2">
+              <div className="p-3.5 border-t border-slate-200 dark:border-[#2A3942] bg-white dark:bg-[#111B21]">
+                <p className="text-[11px] text-slate-400 dark:text-[#8696A0] mb-2">
                   This system information is shared to help developers reproduce and fix bugs accurately.
                 </p>
                 <textarea
                   rows={4}
                   value={deviceInfo}
                   onChange={(e) => setDeviceInfo(e.target.value)}
-                  className="w-full font-mono text-[11px] p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:bg-white resize-y"
+                  className="w-full font-mono text-[11px] p-2.5 rounded-lg border border-slate-200 dark:border-[#2A3942] bg-slate-50 dark:bg-[#202C33] text-slate-700 dark:text-[#E9EDEF] focus:outline-none focus:bg-white dark:focus:bg-[#182229] resize-y"
                 />
               </div>
             )}
@@ -342,12 +342,12 @@ export function CreateFeedbackModal({
         </form>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-[#222D34] bg-slate-50 dark:bg-[#182229]">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-xl text-[13px] font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors disabled:opacity-50"
+            className="px-4 py-2 rounded-xl text-[13px] font-semibold text-slate-600 dark:text-[#8696A0] hover:bg-slate-200/60 dark:hover:bg-[#202C33] hover:text-slate-900 dark:hover:text-[#E9EDEF] transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
