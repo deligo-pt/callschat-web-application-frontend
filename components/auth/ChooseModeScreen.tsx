@@ -55,9 +55,9 @@ export default function ChooseModeScreen({ authType = "signup" }: ChooseModeScre
           <ChevronLeft className="h-4 w-4" /> Back
         </button>
         <Link href="/" className="flex items-center gap-1.5">
-          <Image src="/call_chats_logo.png" height={36} width={36} alt="CallsChat Logo" className="drop-shadow-sm" />
-          <span className="font-extrabold text-lg sm:text-xl text-[#0A2540]">
-            Calls<span className="text-[#2563EB]">Chat</span>
+          <Image src="/call_chats_logo.png" height={36} width={36} alt="CallsChat Logo" className="drop-shadow-sm dark:drop-shadow-[0_0_10px_rgba(3,124,253,0.35)]" />
+          <span className="font-extrabold text-lg sm:text-xl text-[#0A2540] dark:text-white transition-colors">
+            Calls<span className="text-[#2563EB] dark:text-[#38BDF8]">Chat</span>
           </span>
         </Link>
       </div>

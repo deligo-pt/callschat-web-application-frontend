@@ -175,11 +175,11 @@ export default function Navbar() {
                         alt="CallsChat"
                         width={79}
                         height={57}
-                        className="object-contain transition-transform duration-300 group-hover:scale-105"
+                        className="object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-xs dark:drop-shadow-[0_0_14px_rgba(3,124,253,0.4)]"
                         priority
                     />
                     <span
-                        className="inline-block"
+                        className="inline-block tracking-tight"
                         style={{
                             fontFamily: "Inter",
                             fontWeight: 700,
@@ -188,8 +188,8 @@ export default function Navbar() {
                             marginLeft: -12,
                         }}
                     >
-                        <span style={{ color: "#02235F" }} className="dark:text-white">Calls</span>
-                        <span style={{ color: "#037CFD" }}>Chat</span>
+                        <span className="text-[#02235F] dark:text-white transition-colors duration-200">Calls</span>
+                        <span className="text-[#037CFD] dark:text-[#38BDF8] transition-colors duration-200">Chat</span>
                     </span>
                 </Link>
 
