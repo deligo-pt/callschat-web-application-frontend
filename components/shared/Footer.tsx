@@ -18,7 +18,7 @@ export default function Footer() {
     };
 
     return (
-        <footer className="w-full bg-white pt-16 pb-8 border-t border-gray-100 overflow-hidden">
+        <footer className="w-full bg-white dark:bg-[#111B21] pt-16 pb-8 border-t border-gray-100 dark:border-[#222D34] overflow-hidden transition-colors duration-200">
             <div className="container mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8">
 
                 {/* Upper Two-Column Matrix: Branding (left) + Newsletter & Social (right) */}
@@ -50,12 +50,12 @@ export default function Footer() {
                                     marginLeft: -12,
                                 }}
                             >
-                                <span style={{ color: "#02235F" }}>Calls</span>
+                                <span style={{ color: "#02235F" }} className="dark:text-white">Calls</span>
                                 <span style={{ color: "#037CFD" }}>Chat</span>
                             </span>
                         </Link>
 
-                        <p className="mt-5 text-[15px] font-semibold leading-relaxed text-[#0A2540]">
+                        <p className="mt-5 text-[15px] font-semibold leading-relaxed text-[#0A2540] dark:text-[#8696A0]">
                             The future of secure messaging with AI-powered intelligence, real-time translation, and enterprise-grade privacy.
                         </p>
 
@@ -64,22 +64,22 @@ export default function Footer() {
                             {/* App Store */}
                             <button
                                 onClick={openModal}
-                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl border border-[#1A62E8] bg-transparent px-5 py-2.5 text-left text-gray-800 transition-colors duration-200 hover:bg-blue-50 focus:outline-none w-full sm:w-auto"
+                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl border border-[#1A62E8] dark:border-[#222D34] bg-transparent dark:bg-[#202C33] px-5 py-2.5 text-left text-gray-800 dark:text-[#E9EDEF] transition-colors duration-200 hover:bg-blue-50 dark:hover:bg-[#2A3942] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-[#00A884] w-full sm:w-auto cursor-pointer"
                             >
                                 {/* Outlined Apple Logo Icon */}
-                                <svg fill="#2563EB" width="24px" height="24px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <svg fill="#2563EB" width="24px" height="24px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="dark:fill-[#38BDF8]">
                                     <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z" />
                                 </svg>
                                 <div className="flex flex-col leading-none">
-                                    <span className="text-[10px] text-gray-500 font-medium">Download on the</span>
-                                    <span className="text-[13px] font-bold tracking-tight mt-0.5 text-[#1A62E8]">App Store</span>
+                                    <span className="text-[10px] text-gray-500 dark:text-[#8696A0] font-medium">Download on the</span>
+                                    <span className="text-[13px] font-bold tracking-tight mt-0.5 text-[#1A62E8] dark:text-[#38BDF8]">App Store</span>
                                 </div>
                             </button>
 
                             {/* Google Play */}
                             <button
                                 onClick={openModal}
-                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl bg-[#1A62E8] px-5 py-2.5 text-left text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 focus:outline-none w-full sm:w-auto"
+                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl bg-[#1A62E8] px-5 py-2.5 text-left text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 w-full sm:w-auto cursor-pointer"
                             >
                                 <Play className="h-4 w-4 shrink-0 fill-white text-white" />
                                 <div className="flex flex-col leading-none">
@@ -93,7 +93,7 @@ export default function Footer() {
                     {/* Right Block: Newsletter Subscription Card + Social Handles */}
                     <div className="flex flex-col items-center w-full">
                         {/* Newsletter Subscription Banner Box */}
-                        <div className="w-full rounded-3xl bg-[#1A62E8] px-6 py-10 sm:py-12 sm:px-12 text-center text-white shadow-lg shadow-blue-600/10">
+                        <div className="w-full rounded-3xl bg-[#1A62E8] dark:bg-gradient-to-r dark:from-[#1E3A8A] dark:to-[#1D4ED8] dark:border dark:border-blue-500/30 px-6 py-10 sm:py-12 sm:px-12 text-center text-white shadow-lg shadow-blue-600/10">
                             <h3 className="text-3xl sm:text-4xl font-bold tracking-tight">Stay Updated</h3>
                             <p className="mt-3 text-xs sm:text-sm text-white/80 font-medium">
                                 Get the latest updates, features, and news delivered to your inbox.
@@ -111,7 +111,7 @@ export default function Footer() {
                                 </div>
                                 <button
                                     type="submit"
-                                    className="w-full sm:w-auto shrink-0 rounded-full bg-white px-6 py-3 sm:py-2.5 text-sm font-bold text-[#1A62E8] shadow-sm transition-transform duration-200 hover:bg-gray-50 active:scale-[0.98]"
+                                    className="w-full sm:w-auto shrink-0 rounded-full bg-white px-6 py-3 sm:py-2.5 text-sm font-bold text-[#1A62E8] shadow-sm transition-transform duration-200 hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
                                 >
                                     Subscribe
                                 </button>
@@ -121,14 +121,14 @@ export default function Footer() {
                         {/* Social Handle Connections Row */}
                         <div className="mt-8 flex items-center gap-4">
                             {/* Facebook */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105" aria-label="Facebook">
+                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="Facebook">
                                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8.02 9.57v-6.77H7.56v-2.8h2.46V9.86c0-2.43 1.44-3.78 3.66-3.78 1.06 0 2.18.19 2.18.19v2.4h-1.23c-1.21 0-1.58.75-1.58 1.52v1.83h2.7l-.43 2.8h-2.27V21.57C18.56 20.87 22 16.84 22 12z" />
                                 </svg>
                             </a>
 
                             {/* Website Global / Network */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105" aria-label="Website">
+                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="Website">
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                                     <circle cx="12" cy="12" r="10" />
                                     <line x1="2" x2="22" y1="12" y2="12" />
@@ -137,14 +137,14 @@ export default function Footer() {
                             </a>
 
                             {/* LinkedIn */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105" aria-label="LinkedIn">
+                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="LinkedIn">
                                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
                                 </svg>
                             </a>
 
                             {/* Instagram */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105" aria-label="Instagram">
+                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="Instagram">
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                                     <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
                                     <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
@@ -157,12 +157,12 @@ export default function Footer() {
                 </div>
 
                 {/* Global Structural Copyright Bar Asset Line */}
-                <div className="pt-6 border-t border-[#1A62E8]/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-medium text-[#0A2540] text-center sm:text-left">
+                <div className="pt-6 border-t border-[#1A62E8]/30 dark:border-[#222D34] flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-medium text-[#0A2540] dark:text-[#8696A0] text-center sm:text-left">
                     <span>© 2026 CallsChat. All rights reserved.</span>
                     <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-center">
-                        <Link href="/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
-                        <Link href="/terms-of-service" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
-                        <Link href="/cookie-policy" className="hover:text-blue-600 transition-colors">Cookie Policy</Link>
+                        <Link href="/privacy-policy" className="text-slate-600 dark:text-[#8696A0] hover:text-blue-600 dark:hover:text-[#00A884] transition-colors">Privacy Policy</Link>
+                        <Link href="/terms-of-service" className="text-slate-600 dark:text-[#8696A0] hover:text-blue-600 dark:hover:text-[#00A884] transition-colors">Terms of Service</Link>
+                        <Link href="/cookie-policy" className="text-slate-600 dark:text-[#8696A0] hover:text-blue-600 dark:hover:text-[#00A884] transition-colors">Cookie Policy</Link>
                     </div>
                 </div>
 

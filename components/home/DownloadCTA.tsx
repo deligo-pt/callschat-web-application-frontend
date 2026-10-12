@@ -24,7 +24,7 @@ export default function DownloadCTA() {
     return (
         <section
             id="download"
-            className="relative w-full bg-slate-950 text-white px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden border-t border-slate-800"
+            className="relative w-full bg-slate-950 dark:bg-[#0C1317] text-white px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden border-t border-slate-800 dark:border-[#222D34] transition-colors duration-200"
         >
             {/* Ambient Background Aura Mesh */}
             <div
@@ -83,7 +83,7 @@ export default function DownloadCTA() {
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true, margin: "-50px" }}
                         transition={{ duration: 0.5 }}
-                        className="rounded-[2.5rem] border border-blue-500/20 bg-slate-900/80 p-6 sm:p-8 lg:p-10 shadow-xl shadow-blue-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300"
+                        className="rounded-[2.5rem] border border-blue-500/20 dark:border-[#222D34] bg-slate-900/80 dark:bg-[#111B21] p-6 sm:p-8 lg:p-10 shadow-xl shadow-blue-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-blue-500/40 dark:hover:border-[#2A3942] transition-all duration-300"
                     >
                         {/* Soft Ambient Radial Corner */}
                         <div className="pointer-events-none absolute -top-24 -left-24 w-60 h-60 bg-blue-500/10 rounded-full blur-2xl" />
@@ -205,7 +205,7 @@ export default function DownloadCTA() {
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true, margin: "-50px" }}
                         transition={{ duration: 0.5 }}
-                        className="rounded-[2.5rem] border border-emerald-500/20 bg-slate-900/80 p-6 sm:p-8 lg:p-10 shadow-xl shadow-emerald-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300"
+                        className="rounded-[2.5rem] border border-emerald-500/20 dark:border-[#222D34] bg-slate-900/80 dark:bg-[#111B21] p-6 sm:p-8 lg:p-10 shadow-xl shadow-emerald-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/40 dark:hover:border-[#2A3942] transition-all duration-300"
                     >
                         {/* Soft Ambient Radial Corner */}
                         <div className="pointer-events-none absolute -top-24 -right-24 w-60 h-60 bg-emerald-500/10 rounded-full blur-2xl" />
@@ -318,7 +318,7 @@ export default function DownloadCTA() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.4, delay: 0.2 }}
-                    className="mt-12 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 sm:p-6 grid grid-cols-2 lg:grid-cols-4 gap-4 text-center"
+                    className="mt-12 rounded-2xl border border-slate-800 dark:border-[#222D34] bg-slate-900/60 dark:bg-[#111B21]/80 p-5 sm:p-6 grid grid-cols-2 lg:grid-cols-4 gap-4 text-center"
                 >
                     <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-300">
                         <CheckCircle2 className="h-4 w-4 text-emerald-400" />

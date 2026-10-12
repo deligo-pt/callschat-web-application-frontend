@@ -158,7 +158,7 @@ export default function Navbar() {
         <header
             className={`sticky top-0 z-50 w-full transition-all duration-300 ${
                 isScrolled
-                    ? "bg-[#FCF5EB]/95 dark:bg-[#111b21]/95 backdrop-blur-md shadow-sm border-b border-[#E9EDEF] dark:border-slate-800"
+                    ? "bg-[#FCF5EB]/95 dark:bg-[#111b21]/95 backdrop-blur-md shadow-sm border-b border-[#E9EDEF] dark:border-[#222D34]"
                     : "bg-[#FCF5EB] dark:bg-[#111b21] border-b border-transparent"
             }`}
         >
@@ -278,7 +278,7 @@ export default function Navbar() {
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: 6, scale: 0.98 }}
                                                 transition={{ duration: 0.18, ease: "easeOut" }}
-                                                className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-[360px] rounded-2xl bg-white dark:bg-[#1f2c34] p-3 shadow-2xl border border-[#E9EDEF] dark:border-slate-700/60 z-50"
+                                                className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-[360px] rounded-2xl bg-white dark:bg-[#1f2c34] p-3 shadow-2xl border border-[#E9EDEF] dark:border-[#222D34] z-50"
                                             >
                                                 <div className="space-y-1">
                                                     {featureSubItems.map((item) => {
@@ -448,7 +448,7 @@ export default function Navbar() {
                             initial="hidden"
                             animate="visible"
                             exit="hidden"
-                            className="absolute top-full left-0 w-full border-b border-[#E9EDEF] dark:border-slate-800 bg-[#FCF5EB] dark:bg-[#111b21] px-6 pb-8 pt-4 shadow-2xl lg:hidden z-50 origin-top max-h-[calc(100vh-5rem)] overflow-y-auto"
+                            className="absolute top-full left-0 w-full border-b border-[#E9EDEF] dark:border-[#222D34] bg-[#FCF5EB] dark:bg-[#111b21] px-6 pb-8 pt-4 shadow-2xl lg:hidden z-50 origin-top max-h-[calc(100vh-5rem)] overflow-y-auto"
                         >
                             <div className="flex flex-col gap-2">
                                 

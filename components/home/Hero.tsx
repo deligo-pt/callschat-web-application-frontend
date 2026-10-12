@@ -158,7 +158,7 @@ export default function Hero({ onDownloadClick }: HeroProps) {
                             >
                                 <Button
                                     onClick={onDownloadClick}
-                                    className="group relative flex h-14 w-full sm:w-auto items-center justify-start gap-3.5 rounded-2xl bg-[#0A1628] hover:bg-[#060e1a] px-6 text-white shadow-xl shadow-slate-950/15 border border-slate-700/30 transition-all duration-200"
+                                    className="group relative flex h-14 w-full sm:w-auto items-center justify-start gap-3.5 rounded-2xl bg-[#0A1628] dark:bg-[#111B21] hover:bg-[#060e1a] dark:hover:bg-[#182229] px-6 text-white shadow-xl shadow-slate-950/15 border border-slate-700/30 dark:border-[#222D34] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                                 >
                                     {/* Apple Logo SVG */}
                                     <svg className="h-6 w-6 fill-white transition-transform group-hover:scale-105" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -184,7 +184,7 @@ export default function Hero({ onDownloadClick }: HeroProps) {
                                 <Button
                                     onClick={onDownloadClick}
                                     variant="outline"
-                                    className="group relative flex h-14 w-full sm:w-auto items-center justify-start gap-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:bg-slate-50 dark:hover:bg-slate-800/80 px-6 text-slate-900 dark:text-white shadow-md shadow-slate-200/50 dark:shadow-none transition-all duration-200"
+                                    className="group relative flex h-14 w-full sm:w-auto items-center justify-start gap-3.5 rounded-2xl border border-slate-200 dark:border-[#222D34] bg-white dark:bg-[#202C33] hover:bg-slate-50 dark:hover:bg-[#2A3942] px-6 text-slate-900 dark:text-[#E9EDEF] shadow-md shadow-slate-200/50 dark:shadow-none transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                                 >
                                     {/* Google Play Logo SVG */}
                                     <svg className="h-6 w-6 transition-transform group-hover:scale-105" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

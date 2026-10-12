@@ -123,7 +123,7 @@ export default function Faq() {
     return (
         <section
             id="faq"
-            className="relative w-full bg-slate-50/70 dark:bg-slate-950 px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden border-t border-slate-200/80 dark:border-slate-800"
+            className="relative w-full bg-slate-50/70 dark:bg-[#0C1317] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden border-t border-slate-200/80 dark:border-[#222D34] transition-colors duration-200"
         >
             {/* Ambient Background Radial Glow */}
             <div
@@ -182,7 +182,7 @@ export default function Faq() {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder={t("search_placeholder")}
-                            className="w-full pl-11 pr-10 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 text-sm text-slate-900 dark:text-white placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+                            className="w-full pl-11 pr-10 py-3.5 rounded-2xl border border-slate-200 dark:border-[#2A3942] bg-white dark:bg-[#202C33] text-sm text-slate-900 dark:text-[#E9EDEF] placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
                         />
                         {searchTerm && (
                             <button
@@ -210,7 +210,7 @@ export default function Faq() {
                                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
                                     isSelected
                                         ? "bg-blue-600 text-white shadow-md shadow-blue-600/20 scale-105"
-                                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/40 hover:text-blue-600"
+                                        : "bg-white dark:bg-[#111B21] text-slate-600 dark:text-[#8696A0] border border-slate-200/80 dark:border-[#222D34] hover:border-blue-500/40 hover:text-blue-600 dark:hover:text-[#E9EDEF]"
                                 }`}
                             >
                                 <Icon className="h-3.5 w-3.5" />
@@ -238,10 +238,10 @@ export default function Faq() {
                             return (
                                 <div
                                     key={faq.id}
-                                    className={`rounded-2xl border transition-all duration-200 bg-white dark:bg-slate-900/90 shadow-sm overflow-hidden ${
+                                    className={`rounded-2xl border transition-all duration-200 bg-white dark:bg-[#111B21] shadow-sm overflow-hidden ${
                                         isOpen
-                                            ? "border-blue-500/50 shadow-md shadow-blue-500/5"
-                                            : "border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700"
+                                            ? "border-blue-500/50 dark:border-blue-500/50 shadow-md shadow-blue-500/5"
+                                            : "border-slate-200/80 dark:border-[#222D34] hover:border-slate-300 dark:hover:border-[#2A3942]"
                                     }`}
                                 >
                                     <h3>
@@ -267,7 +267,7 @@ export default function Faq() {
                                                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform duration-300 ${
                                                     isOpen
                                                         ? "bg-blue-600 text-white rotate-180"
-                                                        : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                                        : "bg-slate-100 dark:bg-[#202C33] text-slate-500 dark:text-[#8696A0]"
                                                 }`}
                                             >
                                                 <ChevronDown className="h-4 w-4" />
@@ -287,7 +287,7 @@ export default function Faq() {
                                                 transition={{ duration: 0.25, ease: "easeOut" }}
                                                 className="overflow-hidden"
                                             >
-                                                <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800/80">
+                                                <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-600 dark:text-[#8696A0] leading-relaxed border-t border-slate-100 dark:border-[#222D34]">
                                                     {faq.answer}
                                                 </div>
                                             </motion.div>
@@ -325,7 +325,7 @@ export default function Faq() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: "-50px" }}
                     transition={{ duration: 0.5, delay: 0.2 }}
-                    className="mt-16 rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-gradient-to-r from-blue-50/80 via-white dark:from-slate-900/90 dark:via-slate-900/90 dark:to-blue-950/40 p-6 sm:p-8 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6"
+                    className="mt-16 rounded-3xl border border-slate-200/80 dark:border-[#222D34] bg-gradient-to-r from-blue-50/80 via-white dark:from-[#111B21] dark:via-[#182229] dark:to-[#111B21] p-6 sm:p-8 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6"
                 >
                     <div className="flex items-start gap-4 text-center lg:text-left">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-600/20 mx-auto lg:mx-0">
@@ -345,19 +345,19 @@ export default function Faq() {
                     <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
                         <a
                             href="mailto:support@callschat.com"
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-blue-500 hover:text-blue-600 transition-all shadow-xs"
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-[#202C33] border border-slate-200 dark:border-[#2A3942] text-xs font-bold text-slate-700 dark:text-[#E9EDEF] hover:border-blue-500 hover:text-blue-600 transition-all shadow-xs"
                         >
                             <span>support@callschat.com</span>
                         </a>
                         <a
                             href="mailto:security@callschat.com"
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-emerald-500 hover:text-emerald-600 transition-all shadow-xs"
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-[#202C33] border border-slate-200 dark:border-[#2A3942] text-xs font-bold text-slate-700 dark:text-[#E9EDEF] hover:border-emerald-500 hover:text-emerald-600 transition-all shadow-xs"
                         >
                             <span>security@callschat.com</span>
                         </a>
                         <a
                             href="mailto:privacy@callschat.com"
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-purple-500 hover:text-purple-600 transition-all shadow-xs"
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-[#202C33] border border-slate-200 dark:border-[#2A3942] text-xs font-bold text-slate-700 dark:text-[#E9EDEF] hover:border-purple-500 hover:text-purple-600 transition-all shadow-xs"
                         >
                             <span>privacy@callschat.com</span>
                         </a>

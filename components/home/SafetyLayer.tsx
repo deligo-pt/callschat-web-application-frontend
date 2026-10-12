@@ -61,7 +61,7 @@ export default function SafetyLayer() {
     };
 
     return (
-        <section id="ai-service" className="w-full bg-[#EDF7FD] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
+        <section id="ai-service" className="w-full bg-[#EDF7FD] dark:bg-[#0C1317] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden transition-colors duration-200 border-b border-transparent dark:border-[#222D34]">
             <div className="container mx-auto max-w-7xl w-full">
 
                 {/* Top Header Badge Pill */}
@@ -72,7 +72,7 @@ export default function SafetyLayer() {
                     viewport={{ once: true, margin: "-100px" }}
                     variants={badgeVariants}
                 >
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#0A2540]/10 bg-[#0A2540] px-4 py-1.5 text-xs font-semibold text-[#4AA5FF] shadow-sm">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#0A2540]/10 dark:border-blue-500/30 bg-[#0A2540] dark:bg-blue-950/60 px-4 py-1.5 text-xs font-semibold text-[#4AA5FF] shadow-sm">
                         <Cpu className="h-3.5 w-3.5 text-[#4AA5FF]" />
                         AI Protection
                     </div>
@@ -86,13 +86,13 @@ export default function SafetyLayer() {
                     viewport={{ once: true, margin: "-100px" }}
                     variants={headerVariants}
                 >
-                    <h2 className="text-4xl font-extrabold tracking-tight text-[#1A62E8] sm:text-5xl">
+                    <h2 className="text-4xl font-extrabold tracking-tight text-[#1A62E8] dark:text-[#38BDF8] sm:text-5xl">
                         AI Safety Layer.
                     </h2>
-                    <span className="block mt-2 text-3xl font-bold text-[#0A2540] sm:text-4xl">
+                    <span className="block mt-2 text-3xl font-bold text-[#0A2540] dark:text-[#E9EDEF] sm:text-4xl">
                         Always watching your back.
                     </span>
-                    <p className="mx-auto mt-6 max-w-2xl text-[16px] leading-relaxed text-gray-500 font-normal">
+                    <p className="mx-auto mt-6 max-w-2xl text-[16px] leading-relaxed text-gray-500 dark:text-[#8696A0] font-normal">
                         Ultra-secure encrypted conversations with advanced protection features that<br />
                         keep your most sensitive chats completely private.
                     </p>
@@ -114,52 +114,52 @@ export default function SafetyLayer() {
                         <motion.div
                             variants={monitorVariants}
                             style={{ transformOrigin: "42% 42%" }}
-                            className="w-full rounded-[1.75rem] bg-white p-6 shadow-2xl shadow-blue-900/5 flex flex-col gap-4"
+                            className="w-full rounded-[1.75rem] bg-white dark:bg-[#111B21] border border-gray-100 dark:border-[#222D34] p-6 shadow-2xl shadow-blue-900/5 dark:shadow-black/40 flex flex-col gap-4"
                         >
 
                             {/* Header Status Bar */}
-                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-[#222D34]">
                                 <div className="flex items-center gap-2.5">
                                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#BF5AF2] text-white">
                                         <Cpu className="h-4 w-4" />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-[#0A2540]">AI Safety Monitor</span>
-                                        <span className="text-[10px] text-gray-400 font-normal">Real-time protection active</span>
+                                        <span className="text-xs font-bold text-[#0A2540] dark:text-[#E9EDEF]">AI Safety Monitor</span>
+                                        <span className="text-[10px] text-gray-400 dark:text-[#8696A0] font-normal">Real-time protection active</span>
                                     </div>
                                 </div>
                                 <div className="h-2 w-2 rounded-full bg-[#34C759] shadow-sm animate-pulse" />
                             </div>
 
                             {/* Status Layer Blocks with clean hover transitions */}
-                            <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex gap-3 transition-all duration-300 hover:bg-red-100/50 hover:scale-[1.01]">
+                            <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 p-4 flex gap-3 transition-all duration-300 hover:bg-red-100/50 dark:hover:bg-red-950/50 hover:scale-[1.01]">
                                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                                 <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-bold text-[#1D2E5B]">Potential Scam Detected</span>
-                                    <span className="text-[10px] leading-normal text-gray-500 font-normal">
+                                    <span className="text-xs font-bold text-[#1D2E5B] dark:text-red-300">Potential Scam Detected</span>
+                                    <span className="text-[10px] leading-normal text-gray-500 dark:text-red-200/80 font-normal">
                                         This message may be suspicious. Be careful sharing personal information.
                                     </span>
-                                    <div className="rounded-lg bg-white/60 border border-black/3 px-2.5 py-1.5 text-[9px] text-gray-400 font-medium italic">
+                                    <div className="rounded-lg bg-white/60 dark:bg-[#111B21]/60 border border-black/3 dark:border-red-900/30 px-2.5 py-1.5 text-[9px] text-gray-400 dark:text-gray-300 font-medium italic">
                                         {"Congratulations! You've won $10,000. Click here to claim your prize..."}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3 transition-all duration-300 hover:bg-amber-100/50 hover:scale-[1.01]">
+                            <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/30 p-4 flex gap-3 transition-all duration-300 hover:bg-amber-100/50 dark:hover:bg-amber-950/50 hover:scale-[1.01]">
                                 <Link className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-xs font-bold text-[#1D2E5B]">Suspicious Link Detected</span>
-                                    <span className="text-[10px] leading-normal text-gray-500 font-normal">
+                                    <span className="text-xs font-bold text-[#1D2E5B] dark:text-amber-300">Suspicious Link Detected</span>
+                                    <span className="text-[10px] leading-normal text-gray-500 dark:text-amber-200/80 font-normal">
                                         This link may lead to a phishing or malicious website.
                                     </span>
                                 </div>
                             </div>
 
-                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex gap-3 transition-all duration-300 hover:bg-emerald-100/50 hover:scale-[1.01]">
+                            <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/30 p-4 flex gap-3 transition-all duration-300 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/50 hover:scale-[1.01]">
                                 <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-xs font-bold text-[#1D2E5B]">Message Verified Safe</span>
-                                    <span className="text-[10px] leading-normal text-gray-500 font-normal">
+                                    <span className="text-xs font-bold text-[#1D2E5B] dark:text-emerald-300">Message Verified Safe</span>
+                                    <span className="text-[10px] leading-normal text-gray-500 dark:text-emerald-200/80 font-normal">
                                         No threats detected. This conversation appears secure.
                                     </span>
                                 </div>
@@ -183,7 +183,7 @@ export default function SafetyLayer() {
                                     key={idx}
                                     variants={infoRowVariants}
                                     whileHover={{ y: -4, scale: 1.01 }}
-                                    className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md hover:border-gray-300/40 cursor-default"
+                                    className="rounded-2xl border border-gray-200/50 dark:border-[#222D34] bg-white dark:bg-[#111B21] p-6 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-300/40 dark:hover:border-slate-700 cursor-default"
                                 >
                                     <div className="flex items-start gap-5">
                                         {/* Circle Icon Badge */}
@@ -193,10 +193,10 @@ export default function SafetyLayer() {
 
                                         {/* Metadata Text Strings */}
                                         <div className="flex flex-col gap-1">
-                                            <h3 className="text-[15px] font-bold text-[#1A2E5B] tracking-wide">
+                                            <h3 className="text-[15px] font-bold text-[#1A2E5B] dark:text-[#E9EDEF] tracking-wide">
                                                 {item.title}
                                             </h3>
-                                            <p className="text-[13px] leading-relaxed text-gray-500 font-normal">
+                                            <p className="text-[13px] leading-relaxed text-gray-500 dark:text-[#8696A0] font-normal">
                                                 {item.description}
                                             </p>
                                         </div>

@@ -70,7 +70,7 @@ export default function Translation() {
     };
 
     return (
-        <section id="live-translation" className="w-full bg-white px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden">
+        <section id="live-translation" className="w-full bg-white dark:bg-[#0C1317] px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden transition-colors duration-200 border-b border-gray-100 dark:border-[#222D34]">
             <div className="container mx-auto max-w-7xl">
 
                 {/* Top Header Badge Pill */}
@@ -81,8 +81,8 @@ export default function Translation() {
                     viewport={{ once: true, margin: "-100px" }}
                     variants={badgeVariants}
                 >
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#A7F3D0] bg-[#E6F4EA] px-4 py-1.5 text-xs font-semibold text-[#059669] shadow-sm">
-                        <Globe className="h-4 w-4 text-[#10B981]" />
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#A7F3D0] dark:border-emerald-500/30 bg-[#E6F4EA] dark:bg-emerald-950/40 px-4 py-1.5 text-xs font-semibold text-[#059669] dark:text-emerald-400 shadow-sm">
+                        <Globe className="h-4 w-4 text-[#10B981] dark:text-emerald-400" />
                         Live Translation
                     </div>
                 </motion.div>
@@ -95,11 +95,11 @@ export default function Translation() {
                     viewport={{ once: true, margin: "-100px" }}
                     variants={headerVariants}
                 >
-                    <h2 className="text-4xl font-medium tracking-tight text-[#0A2540] sm:text-5xl">
+                    <h2 className="text-4xl font-medium tracking-tight text-[#0A2540] dark:text-[#E9EDEF] sm:text-5xl">
                         Speak any language.<br />
                         <span className="text-[#00B074] block mt-1">Understand everyone.</span>
                     </h2>
-                    <p className="mx-auto mt-6 max-w-2xl text-[16px] leading-relaxed text-gray-500 font-normal">
+                    <p className="mx-auto mt-6 max-w-2xl text-[16px] leading-relaxed text-gray-500 dark:text-[#8696A0] font-normal">
                         Break down language barriers with real-time AI-powered translation.<br />
                         Communicate seamlessly with anyone, anywhere, in over 100 languages.
                     </p>
@@ -121,7 +121,7 @@ export default function Translation() {
                         <motion.div
                             variants={chatPanelVariants}
                             style={{ transformOrigin: "center" }}
-                            className="w-full rounded-4xl border border-gray-100 bg-[#EBF1FA] p-6 shadow-2xl shadow-gray-200/80 flex flex-col gap-5"
+                            className="w-full rounded-4xl border border-gray-100 dark:border-[#222D34] bg-[#EBF1FA] dark:bg-[#111B21] p-6 shadow-2xl shadow-gray-200/80 dark:shadow-black/40 flex flex-col gap-5"
                         >
 
                             {/* Message Block 1: Remote User */}
@@ -130,23 +130,23 @@ export default function Translation() {
                                     <div className="h-5 w-5 rounded-full bg-gray-400 overflow-hidden">
                                         <div className="w-full h-full bg-linear-to-tr from-amber-400 to-orange-500" />
                                     </div>
-                                    <span className="text-xs font-bold text-[#0A2540]">Zara</span>
+                                    <span className="text-xs font-bold text-[#0A2540] dark:text-[#E9EDEF]">Zara</span>
                                 </div>
-                                <div className="rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 shadow-sm max-w-[85%] border border-black/3">
-                                    <p className="text-[13px] font-bold text-[#0A2540] border-b border-gray-300 pb-1.5">Quiero verte mañana.</p>
-                                    <p className="text-[11px] text-gray-400 mt-1 italic font-normal">✨ Translated from Spanish</p>
+                                <div className="rounded-2xl rounded-tl-sm bg-white dark:bg-[#202C33] px-4 py-2.5 shadow-sm max-w-[85%] border border-black/3 dark:border-[#2A3942]">
+                                    <p className="text-[13px] font-bold text-[#0A2540] dark:text-[#E9EDEF] border-b border-gray-300 dark:border-[#2A3942] pb-1.5">Quiero verte mañana.</p>
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-400 mt-1 italic font-normal">✨ Translated from Spanish</p>
                                 </div>
                             </div>
 
                             {/* Message Block 2: Sender User */}
                             <div className="flex flex-col gap-1.5 items-end">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-[#0A2540]">You</span>
+                                    <span className="text-xs font-bold text-[#0A2540] dark:text-[#E9EDEF]">You</span>
                                     <div className="h-5 w-5 rounded-full bg-gray-400 overflow-hidden">
                                         <div className="w-full h-full bg-linear-to-tr from-blue-400 to-indigo-500" />
                                     </div>
                                 </div>
-                                <div className="rounded-2xl rounded-tr-sm bg-[#1A62E8] px-4 py-2.5 text-white shadow-sm max-w-[85%]">
+                                <div className="rounded-2xl rounded-tr-sm bg-[#1A62E8] dark:bg-[#005C4B] px-4 py-2.5 text-white shadow-sm max-w-[85%]">
                                     <p className="text-[13px] font-semibold leading-normal">That sounds great! What time works for you?</p>
                                 </div>
                             </div>
@@ -157,34 +157,34 @@ export default function Translation() {
                                     <div className="h-5 w-5 rounded-full bg-gray-400 overflow-hidden">
                                         <div className="w-full h-full bg-linear-to-tr from-amber-400 to-orange-500" />
                                     </div>
-                                    <span className="text-xs font-bold text-[#0A2540]">Zara</span>
+                                    <span className="text-xs font-bold text-[#0A2540] dark:text-[#E9EDEF]">Zara</span>
                                 </div>
-                                <div className="rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 shadow-sm max-w-[85%] border border-black/3">
+                                <div className="rounded-2xl rounded-tl-sm bg-white dark:bg-[#202C33] px-4 py-2.5 shadow-sm max-w-[85%] border border-black/3 dark:border-[#2A3942]">
                                     {/* Mock Audio Waves */}
                                     <div className="flex items-center gap-1 py-1 text-gray-400">
-                                        <span className="text-[#1A62E8] text-sm">▶</span>
+                                        <span className="text-[#1A62E8] dark:text-[#00A884] text-sm">▶</span>
                                         <div className="flex gap-0.5 items-center h-4 px-1">
-                                            <div className="w-0.5 h-2 bg-gray-300 rounded-full"></div>
-                                            <motion.div animate={{ height: [12, 4, 12] }} transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }} className="w-0.5 bg-[#1A62E8] rounded-full"></motion.div>
-                                            <motion.div animate={{ height: [16, 6, 16] }} transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }} className="w-0.5 bg-[#1A62E8] rounded-full"></motion.div>
-                                            <motion.div animate={{ height: [8, 14, 8] }} transition={{ repeat: Infinity, duration: 1.1, ease: "easeInOut" }} className="w-0.5 bg-[#1A62E8] rounded-full"></motion.div>
-                                            <div className="w-0.5 h-3 bg-gray-300 rounded-full"></div>
-                                            <div className="w-0.5 h-4 bg-gray-300 rounded-full"></div>
-                                            <div className="w-0.5 h-2 bg-gray-300 rounded-full"></div>
+                                            <div className="w-0.5 h-2 bg-gray-300 dark:bg-[#8696A0]/50 rounded-full"></div>
+                                            <motion.div animate={{ height: [12, 4, 12] }} transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }} className="w-0.5 bg-[#1A62E8] dark:bg-[#00A884] rounded-full"></motion.div>
+                                            <motion.div animate={{ height: [16, 6, 16] }} transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }} className="w-0.5 bg-[#1A62E8] dark:bg-[#00A884] rounded-full"></motion.div>
+                                            <motion.div animate={{ height: [8, 14, 8] }} transition={{ repeat: Infinity, duration: 1.1, ease: "easeInOut" }} className="w-0.5 bg-[#1A62E8] dark:bg-[#00A884] rounded-full"></motion.div>
+                                            <div className="w-0.5 h-3 bg-gray-300 dark:bg-[#8696A0]/50 rounded-full"></div>
+                                            <div className="w-0.5 h-4 bg-gray-300 dark:bg-[#8696A0]/50 rounded-full"></div>
+                                            <div className="w-0.5 h-2 bg-gray-300 dark:bg-[#8696A0]/50 rounded-full"></div>
                                         </div>
                                     </div>
-                                    <p className="text-[11px] text-gray-400 mt-1 italic font-normal">✨ Translated from Spanish</p>
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-400 mt-1 italic font-normal">✨ Translated from Spanish</p>
                                 </div>
                             </div>
 
                             {/* Active Bottom Floating Action Status Banner */}
-                            <div className="mt-2 rounded-xl border border-[#A7F3D0] bg-[#E6F4EA] px-3.5 py-2.5 flex items-center gap-3">
+                            <div className="mt-2 rounded-xl border border-[#A7F3D0] dark:border-emerald-500/30 bg-[#E6F4EA] dark:bg-emerald-950/40 px-3.5 py-2.5 flex items-center gap-3">
                                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#00B074] text-white">
                                     <Languages className="h-4 w-4" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[11px] font-bold text-[#059669]">AI Translation Active</span>
-                                    <span className="text-[10px] text-[#059669]/80 font-normal">Messages are being translated in real-time</span>
+                                    <span className="text-[11px] font-bold text-[#059669] dark:text-emerald-400">AI Translation Active</span>
+                                    <span className="text-[10px] text-[#059669]/80 dark:text-emerald-400/80 font-normal">Messages are being translated in real-time</span>
                                 </div>
                             </div>
 
@@ -205,7 +205,7 @@ export default function Translation() {
                                 <motion.div
                                     key={idx}
                                     variants={infoRowVariants}
-                                    className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-gray-300/60 hover:translate-x-1"
+                                    className="rounded-2xl border border-gray-200/80 dark:border-[#222D34] bg-white dark:bg-[#111B21] p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-gray-300/60 dark:hover:border-slate-700 hover:translate-x-1"
                                 >
                                     <div className="flex items-start gap-5">
                                         {/* Dynamic Gradient Circle Asset */}
@@ -215,10 +215,10 @@ export default function Translation() {
 
                                         {/* Metadata Context Copy */}
                                         <div className="flex flex-col gap-1">
-                                            <h3 className="text-[15px] font-bold text-[#0A2540] tracking-wide">
+                                            <h3 className="text-[15px] font-bold text-[#0A2540] dark:text-[#E9EDEF] tracking-wide">
                                                 {item.title}
                                             </h3>
-                                            <p className="text-[13px] leading-relaxed text-gray-500 font-normal">
+                                            <p className="text-[13px] leading-relaxed text-gray-500 dark:text-[#8696A0] font-normal">
                                                 {item.description}
                                             </p>
                                         </div>
