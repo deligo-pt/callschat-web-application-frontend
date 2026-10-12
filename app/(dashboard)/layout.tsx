@@ -11,9 +11,8 @@ import { UserProvider, useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
-import { Briefcase, CheckCircle2, Contact, Folder, MessageSquare, PhoneCall, Share2, UserCircle2, Users, UsersRound, Sun, Moon } from "lucide-react";
+import { Briefcase, CheckCircle2, Contact, Folder, MessageSquare, PhoneCall, Share2, UserCircle2, Users, UsersRound } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -22,7 +21,6 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const { theme, resolvedTheme, setTheme } = useTheme();
   const { user, currentMode, businessProfile, workspace, isLoading } = useUser();
   const { socket } = useSocket();
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
@@ -172,8 +170,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isDark = mounted && resolvedTheme === "dark";
-  const toggleTheme = () => setTheme(isDark ? "light" : "dark");
+
 
   return (
     <div className="flex h-screen w-full bg-[#F8FAFC] dark:bg-[#0C1317] overflow-hidden">
@@ -246,27 +243,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
           })}
         </div>
 
-        {/* Quick Theme Switcher (Sun/Moon) */}
-        <div className="w-full px-2 mb-1">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-            aria-label="Toggle theme"
-            className="group flex w-full flex-col items-center justify-center py-1.5 transition-all cursor-pointer focus:outline-none"
-          >
-            <div className="flex h-[46px] w-[46px] items-center justify-center rounded-[18px] transition-all duration-300 shadow-xs relative bg-[#F8FAFC] dark:bg-[#1E293B]/60 text-[#64748B] dark:text-[#94A3B8] hover:bg-[#EEF2FF]/60 dark:hover:bg-[#2563EB]/20 hover:text-[#2563EB] dark:hover:text-[#38BDF8]">
-              {isDark ? (
-                <Sun className="h-5 w-5 text-amber-400 transition-transform duration-300 group-hover:rotate-45" strokeWidth={2} />
-              ) : (
-                <Moon className="h-5 w-5 transition-transform duration-300 group-hover:-rotate-12" strokeWidth={2} />
-              )}
-            </div>
-            <span className="text-[11px] font-semibold mt-1.5 text-[#64748B] dark:text-[#94A3B8] group-hover:text-[#2563EB] dark:group-hover:text-[#38BDF8] transition-colors">
-              {isDark ? "Light" : "Dark"}
-            </span>
-          </button>
-        </div>
+
 
         {/* Profile Button at bottom */}
         <div className="w-full mb-2 px-2">
@@ -340,24 +317,6 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
-        {/* Mobile Quick Theme Toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="flex flex-col items-center gap-1.5 shrink-0 min-w-[50px] cursor-pointer"
-          title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-[12px] transition-colors text-[#64748B] dark:text-[#94A3B8]">
-            {isDark ? (
-              <Sun className="h-5 w-5 text-amber-400" strokeWidth={2} />
-            ) : (
-              <Moon className="h-5 w-5" strokeWidth={2} />
-            )}
-          </div>
-          <span className="text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
-            {isDark ? "Light" : "Dark"}
-          </span>
-        </button>
         <Link href="/profile" className="flex flex-col items-center gap-1.5 shrink-0 min-w-[50px]">
           <div className={cn(
             "flex h-9 w-9 items-center justify-center rounded-[12px] transition-colors",

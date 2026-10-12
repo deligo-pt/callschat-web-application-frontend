@@ -22,7 +22,8 @@
     "media": "Media",
     "channel": "Channel",
     "communities": "Communities",
-    "profile": "Profile"
+    "profile": "Profile",
+    "theme": "Theme"
   },
   "landing_nav": {
     "features": "Features",

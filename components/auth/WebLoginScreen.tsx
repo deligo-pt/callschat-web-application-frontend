@@ -110,7 +110,7 @@ export default function WebLoginScreen() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-white dark:bg-[#0C1317] font-sans overflow-x-hidden flex flex-col transition-colors duration-300">
+    <div className="relative min-h-screen w-full bg-white dark:bg-[#0C1317] font-sans overflow-x-clip flex flex-col transition-colors duration-300">
       
       {/* Background SVG pattern from Figma */}
       <img
