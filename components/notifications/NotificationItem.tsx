@@ -197,8 +197,8 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
     <div
       onClick={handleClick}
       className={cn(
-        "flex items-start gap-4 p-4 border-b border-border/50 cursor-pointer transition-colors hover:bg-muted/50",
-        !notification.isRead ? "bg-blue-50/50 dark:bg-blue-900/20" : ""
+        "flex items-start gap-4 p-4 border-b border-[#F0F2F5] dark:border-[#202C33] cursor-pointer transition-colors hover:bg-[#F8FAFC] dark:hover:bg-[#202C33]/50",
+        !notification.isRead ? "bg-blue-50/50 dark:bg-[#005C4B]/20" : ""
       )}
     >
       <div className="shrink-0 relative">
@@ -206,28 +206,28 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
           <img
             src={getOptimizedImageUrl(avatarUrl)}
             alt={issuerName}
-            className="h-12 w-12 rounded-full object-cover border border-border"
+            className="h-12 w-12 rounded-full object-cover border border-[#E2E8F0] dark:border-[#222D34]"
           />
         ) : (
-          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center border border-border">
+          <div className="h-12 w-12 rounded-full bg-[#F0F2F5] dark:bg-[#202C33] flex items-center justify-center border border-[#E2E8F0] dark:border-[#222D34]">
             <Icon className={`h-5 w-5 ${iconClass}`} />
           </div>
         )}
         {avatarUrl && (
-          <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background flex items-center justify-center shadow-sm border border-border/50">
+          <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-white dark:bg-[#111B21] flex items-center justify-center shadow-sm border border-[#E2E8F0] dark:border-[#222D34]">
             <Icon className={`h-3 w-3 ${iconClass}`} />
           </div>
         )}
       </div>
 
       <div className="flex-1 flex flex-col pt-1">
-        <p className="text-sm text-muted-foreground leading-snug">
+        <p className="text-sm text-[#54656F] dark:text-[#8696A0] leading-snug">
           {textContent}
         </p>
 
         {/* Action buttons for CONTACT_ADDED were removed to mimic WhatsApp behavior */}
 
-        <span className="text-xs font-medium text-muted-foreground mt-1">
+        <span className="text-xs font-medium text-[#8696A0] mt-1">
           {getRelativeTimeShort(notification.createdAt, t)}
         </span>
       </div>

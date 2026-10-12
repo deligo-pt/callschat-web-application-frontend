@@ -82,7 +82,7 @@ export default function Security() {
     return (
         <section
             id="security"
-            className="relative w-full bg-slate-900 dark:bg-black text-white px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden"
+            className="relative w-full bg-slate-900 dark:bg-[#0C1317] text-white px-4 py-24 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden border-t border-slate-800 dark:border-[#222D34] transition-colors duration-200"
         >
             {/* Ambient Background Cybersecurity Glow Mesh */}
             <div

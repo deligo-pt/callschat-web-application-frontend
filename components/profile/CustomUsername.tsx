@@ -160,7 +160,7 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
       <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
         <div className="w-full max-w-[440px] flex flex-col items-center gap-5">
           {/* Card 1: YOUR USERNAME BANNER */}
-          <div className="w-full rounded-[20px] bg-[#0F172A] p-6 text-white shadow-md flex items-center gap-4 transition-all">
+          <div className="w-full rounded-[20px] bg-[#0F172A] dark:bg-[#111B21] border border-transparent dark:border-[#222D34] p-6 text-white shadow-md flex items-center gap-4 transition-all">
             <div className="flex h-12 w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-2xl bg-[#2563EB] text-white shadow-sm">
               <AtSign className="h-6 w-6 md:h-7 md:w-7 stroke-[2.2]" />
             </div>
@@ -173,15 +173,15 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
           </div>
 
           {/* Card 2: SET USERNAME INPUT */}
-          <div className="w-full rounded-[20px] border border-[#E2E8F0] bg-white p-6 shadow-xs flex flex-col">
-            <label className="text-[13px] font-bold text-[#0F172A] mb-2.5">Set Username</label>
+          <div className="w-full rounded-[20px] border border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-6 shadow-xs flex flex-col">
+            <label className="text-[13px] font-bold text-[#0F172A] dark:text-[#E9EDEF] mb-2.5">Set Username</label>
             <div
               className={`relative flex h-[50px] w-full items-center justify-between rounded-xl border px-4 transition-all ${
                 status === "AVAILABLE" && rule4_unique
-                  ? "border-[#22C55E] bg-[#F0FDF4]/40"
+                  ? "border-[#22C55E] bg-[#F0FDF4]/40 dark:bg-[#22C55E]/10"
                   : status === "TAKEN" || (status === "INVALID" && usernameInput.length > 0)
-                  ? "border-[#EF4444] bg-[#FEF2F2]/40"
-                  : "border-[#E2E8F0] bg-[#F8FAFC] focus-within:border-[#2563EB] focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/10"
+                  ? "border-[#EF4444] bg-[#FEF2F2]/40 dark:bg-[#EF4444]/10"
+                  : "border-[#E2E8F0] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33] focus-within:border-[#2563EB] dark:focus-within:border-[#00A884] focus-within:bg-white dark:focus-within:bg-[#202C33] focus-within:ring-2 focus-within:ring-blue-500/10 dark:focus-within:ring-[#00A884]/20"
               }`}
             >
               <input
@@ -190,9 +190,9 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
                 onChange={(e) => setUsernameInput(e.target.value)}
                 placeholder="your user name"
                 maxLength={30}
-                className="w-full bg-transparent text-[14px] font-semibold text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none"
+                className="w-full bg-transparent text-[14px] font-semibold text-[#0F172A] dark:text-[#E9EDEF] placeholder:text-[#94A3B8] dark:placeholder:text-[#8696A0] focus:outline-none"
               />
-              <span className="text-[12px] font-semibold text-[#94A3B8] shrink-0 ml-2">
+              <span className="text-[12px] font-semibold text-[#94A3B8] dark:text-[#8696A0] shrink-0 ml-2">
                 {usernameInput.length}/30
               </span>
             </div>
@@ -227,8 +227,8 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
           </div>
 
           {/* Card 3: USERNAME RULES */}
-          <div className="w-full rounded-[20px] border border-[#E2E8F0] bg-white p-6 shadow-xs flex flex-col">
-            <span className="text-[11px] font-bold tracking-wider text-[#94A3B8] uppercase mb-4 block">
+          <div className="w-full rounded-[20px] border border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-6 shadow-xs flex flex-col">
+            <span className="text-[11px] font-bold tracking-wider text-[#94A3B8] dark:text-[#8696A0] uppercase mb-4 block">
               USERNAME RULES
             </span>
 
@@ -237,12 +237,12 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
               <div className="flex items-center gap-3">
                 <div
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors ${
-                    rule1_length ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] text-[#94A3B8]"
+                    rule1_length ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] dark:bg-[#202C33] text-[#94A3B8] dark:text-[#8696A0]"
                   }`}
                 >
                   {rule1_length ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : <X className="h-3.5 w-3.5 stroke-[2.5]" />}
                 </div>
-                <span className={`text-[13px] font-medium transition-colors ${rule1_length ? "text-[#334155] font-semibold" : "text-[#64748B]"}`}>
+                <span className={`text-[13px] font-medium transition-colors ${rule1_length ? "text-[#334155] dark:text-[#E9EDEF] font-semibold" : "text-[#64748B] dark:text-[#8696A0]"}`}>
                   4–30 characters
                 </span>
               </div>
@@ -251,12 +251,12 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
               <div className="flex items-center gap-3">
                 <div
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors ${
-                    rule2_chars ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] text-[#94A3B8]"
+                    rule2_chars ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] dark:bg-[#202C33] text-[#94A3B8] dark:text-[#8696A0]"
                   }`}
                 >
                   {rule2_chars ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : <X className="h-3.5 w-3.5 stroke-[2.5]" />}
                 </div>
-                <span className={`text-[13px] font-medium transition-colors ${rule2_chars ? "text-[#334155] font-semibold" : "text-[#64748B]"}`}>
+                <span className={`text-[13px] font-medium transition-colors ${rule2_chars ? "text-[#334155] dark:text-[#E9EDEF] font-semibold" : "text-[#64748B] dark:text-[#8696A0]"}`}>
                   Letters, numbers, or underscore
                 </span>
               </div>
@@ -265,12 +265,12 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
               <div className="flex items-center gap-3">
                 <div
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors ${
-                    rule3_nospaces ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] text-[#94A3B8]"
+                    rule3_nospaces ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] dark:bg-[#202C33] text-[#94A3B8] dark:text-[#8696A0]"
                   }`}
                 >
                   {rule3_nospaces ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : <X className="h-3.5 w-3.5 stroke-[2.5]" />}
                 </div>
-                <span className={`text-[13px] font-medium transition-colors ${rule3_nospaces ? "text-[#334155] font-semibold" : "text-[#64748B]"}`}>
+                <span className={`text-[13px] font-medium transition-colors ${rule3_nospaces ? "text-[#334155] dark:text-[#E9EDEF] font-semibold" : "text-[#64748B] dark:text-[#8696A0]"}`}>
                   No spaces
                 </span>
               </div>
@@ -279,12 +279,12 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
               <div className="flex items-center gap-3">
                 <div
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors ${
-                    rule4_unique ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] text-[#94A3B8]"
+                    rule4_unique ? "bg-[#22C55E] text-white" : "bg-[#F1F5F9] dark:bg-[#202C33] text-[#94A3B8] dark:text-[#8696A0]"
                   }`}
                 >
                   {rule4_unique ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : <X className="h-3.5 w-3.5 stroke-[2.5]" />}
                 </div>
-                <span className={`text-[13px] font-medium transition-colors ${rule4_unique ? "text-[#334155] font-semibold" : "text-[#64748B]"}`}>
+                <span className={`text-[13px] font-medium transition-colors ${rule4_unique ? "text-[#334155] dark:text-[#E9EDEF] font-semibold" : "text-[#64748B] dark:text-[#8696A0]"}`}>
                   Unique username
                 </span>
               </div>
@@ -297,8 +297,8 @@ export const CustomUsername: React.FC<CustomUsernameProps> = ({ onBack, showHead
             disabled={!canSave || isSaving || isPending}
             className={`mt-3 flex h-[48px] w-full items-center justify-center rounded-xl text-[14px] font-bold transition-all ${
               canSave
-                ? "bg-[#2563EB] text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 active:scale-[0.99] cursor-pointer"
-                : "bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed"
+                ? "bg-[#2563EB] dark:bg-[#00A884] text-white shadow-lg shadow-blue-500/25 dark:shadow-none hover:bg-blue-700 dark:hover:bg-[#008f6f] active:scale-[0.99] cursor-pointer"
+                : "bg-[#F1F5F9] dark:bg-[#202C33] text-[#94A3B8] dark:text-[#8696A0] cursor-not-allowed"
             }`}
           >
             {isSaving || isPending ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : "Save Username"}

@@ -85,15 +85,15 @@ export function ChatActionModals({
   return (
     <>
       <AlertDialog open={isClearChatOpen} onOpenChange={setIsClearChatOpen}>
-        <AlertDialogContent className="bg-white">
+        <AlertDialogContent className="bg-white dark:bg-[#111B21] border border-slate-200/80 dark:border-[#222D34] text-slate-900 dark:text-[#E9EDEF]">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("clear_chat_title")}</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-slate-900 dark:text-[#E9EDEF]">{t("clear_chat_title")}</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500 dark:text-[#8696A0]">
               {t("clear_chat_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClearing}>{tCommon("cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={isClearing} className="dark:bg-[#202C33] dark:text-[#E9EDEF] dark:border-[#2A3942] dark:hover:bg-[#2A3942]">{tCommon("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={isClearing}
               onClick={(e) => {
@@ -109,19 +109,19 @@ export function ChatActionModals({
       </AlertDialog>
 
       <AlertDialog open={isBlockUserOpen} onOpenChange={setIsBlockUserOpen}>
-        <AlertDialogContent className="bg-white">
+        <AlertDialogContent className="bg-white dark:bg-[#111B21] border border-slate-200/80 dark:border-[#222D34] text-slate-900 dark:text-[#E9EDEF]">
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="text-slate-900 dark:text-[#E9EDEF]">
               {isBlockedByMe ? t("unblock_title") : t("block_title")}
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-slate-500 dark:text-[#8696A0]">
               {isBlockedByMe
                 ? t("unblock_desc")
                 : t("block_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isBlocking}>{tCommon("cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={isBlocking} className="dark:bg-[#202C33] dark:text-[#E9EDEF] dark:border-[#2A3942] dark:hover:bg-[#2A3942]">{tCommon("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={isBlocking}
               onClick={(e) => {
@@ -132,8 +132,10 @@ export function ChatActionModals({
             >
               {isBlocking
                 ? isBlockedByMe
-                  ? t("unblocking")
-                  : t("blocking")
+                : t("blocking")
+                ? isBlockedByMe
+                  ? t("unblock_user")
+                  : t("block_user")
                 : isBlockedByMe
                   ? t("unblock_user")
                   : t("block_user")}

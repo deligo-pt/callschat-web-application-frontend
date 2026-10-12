@@ -7,7 +7,7 @@ export default function KeyBackupPage() {
   const router = useRouter();
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full bg-[#F8FAFC] dark:bg-[#0C1317]">
       <KeyBackupSettings onBack={() => router.push("/profile/edit")} />
     </div>
   );

@@ -222,26 +222,6 @@ export default function CallWindowView() {
           isExiting ? "opacity-0 scale-95 pointer-events-none" : "opacity-100 scale-100"
         )}
       >
-        {/* Sleek Native Titlebar Ribbon for Standalone Window */}
-        <header className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2.5 bg-gradient-to-b from-black/80 via-black/40 to-transparent pointer-events-auto">
-          {/* Left: Encryption badge */}
-          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
-            <Lock className="h-3 w-3 text-[#00A884]" />
-            <span className="text-[11px] font-medium text-[#8696A0]">End-to-End Encrypted</span>
-          </div>
-
-          {/* Right: Quick Return to Tab Button */}
-          <button
-            onClick={handleReturnToMain}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#202C33]/90 hover:bg-[#2A3942] text-[#E9EDEF] hover:text-[#25D366] text-xs font-medium border border-white/10 transition-all duration-200 shadow-md cursor-pointer active:scale-95"
-            title="Return call to main browser tab (Esc)"
-          >
-            <ArrowDownLeft className="h-3.5 w-3.5 text-[#25D366]" />
-            <span>Dock to Tab</span>
-            <kbd className="hidden sm:inline text-[9px] bg-white/10 px-1 py-0.5 rounded text-[#8696A0]">Esc</kbd>
-          </button>
-        </header>
-
         <LiveKitRoom
           key={activeCall.token}
           video={activeCall.callType === "VIDEO"}

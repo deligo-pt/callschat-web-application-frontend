@@ -23,6 +23,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import * as React from "react";
 import QRCode from "react-qr-code";
 import Modal from "../shared/Modal";
@@ -46,7 +47,9 @@ export default function WebLoginScreen() {
   const [stayLoggedIn, setStayLoggedIn] = React.useState(true);
   const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false);
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const isDarkMode = mounted && resolvedTheme === "dark";
   const [currentLocale, setCurrentLocale] = React.useState<Locale>("en");
   const helpRef = React.useRef<HTMLDivElement>(null);
 
@@ -62,13 +65,10 @@ export default function WebLoginScreen() {
   const isError = status === "error";
   const isExpired = status === "expired";
 
-  // Initialize theme & locale from localStorage on mount
+  // Initialize theme & locale on mount
   React.useEffect(() => {
+    setMounted(true);
     try {
-      // Force light mode initially per user request
-      setIsDarkMode(false);
-      document.documentElement.classList.remove("dark");
-
       const storedLocale = localStorage.getItem("callschat_locale") as Locale | null;
       if (storedLocale && routing.locales.includes(storedLocale)) {
         setCurrentLocale(storedLocale);
@@ -94,19 +94,7 @@ export default function WebLoginScreen() {
   }, [isHelpOpen]);
 
   const toggleDarkMode = () => {
-    const nextDark = !isDarkMode;
-    setIsDarkMode(nextDark);
-    try {
-      if (nextDark) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("callschat_theme", "dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("callschat_theme", "light");
-      }
-    } catch {
-      // Ignore storage errors
-    }
+    setTheme(isDarkMode ? "light" : "dark");
   };
 
   const handleLanguageChange = (locale: Locale) => {
@@ -122,7 +110,7 @@ export default function WebLoginScreen() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-white dark:bg-[#0A0F1D] font-sans overflow-x-hidden flex flex-col transition-colors duration-300">
+    <div className="relative min-h-screen w-full bg-white dark:bg-[#0C1317] font-sans overflow-x-clip flex flex-col transition-colors duration-300">
       
       {/* Background SVG pattern from Figma */}
       <img
@@ -142,7 +130,7 @@ export default function WebLoginScreen() {
 
       {/* ── NAVBAR (64px height, exact brand logo & controls) ── */}
       <header
-        className="relative z-30 flex items-center justify-between w-full bg-white dark:bg-[#0E1528] border-b border-[#F3F4F6] dark:border-slate-800 transition-colors duration-300"
+        className="relative z-30 flex items-center justify-between w-full bg-white dark:bg-[#111B21] border-b border-[#F3F4F6] dark:border-[#222D34] transition-colors duration-300"
         style={{
           height: 64,
           paddingLeft: "clamp(1rem, 5vw, 43px)",
@@ -161,11 +149,11 @@ export default function WebLoginScreen() {
             alt="CallsChat"
             width={79}
             height={57}
-            className="object-contain"
+            className="object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-xs dark:drop-shadow-[0_0_14px_rgba(3,124,253,0.4)]"
             priority
           />
           <span
-            className="hidden sm:inline-block"
+            className="hidden sm:inline-block tracking-tight"
             style={{
               fontFamily: "Inter",
               fontWeight: 700,
@@ -174,34 +162,27 @@ export default function WebLoginScreen() {
               marginLeft: -12,
             }}
           >
-            <span style={{ color: "#02235F" }} className="dark:text-white">Calls</span>
-            <span style={{ color: "#037CFD" }}>Chat</span>
+            <span className="text-[#02235F] dark:text-white transition-colors duration-200">Calls</span>
+            <span className="text-[#037CFD] dark:text-[#38BDF8] transition-colors duration-200">Chat</span>
           </span>
         </Link>
 
         {/* Nav Controls: Dark mode toggle & Language dropdown */}
         <div className="flex items-center gap-2 sm:gap-[12px]">
-          {/* Dark mode toggle (hidden temporarily) */}
-          {/* 
+          {/* Dark mode toggle */}
           <button
             type="button"
             onClick={toggleDarkMode}
-            className="flex items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors focus:outline-none"
-            style={{
-              gap: 10,
-              padding: "8px 12px",
-              border: "0.667px solid #B5B5B5",
-              borderRadius: 18,
-            }}
+            className="flex items-center gap-2.5 px-3 py-2 border border-[#B5B5B5] dark:border-[#2A3942] rounded-[18px] cursor-pointer hover:bg-slate-50 dark:hover:bg-[#202C33] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-[#00A884]"
             aria-label="Toggle dark mode"
           >
             {isDarkMode ? (
               <Sun size={16} className="text-amber-400" />
             ) : (
-              <Moon size={16} style={{ color: "#364153" }} className="dark:text-slate-300" />
+              <Moon size={16} className="text-[#364153] dark:text-slate-300" />
             )}
             <span
-              className="hidden md:inline-block text-[#364153] dark:text-slate-200"
+              className="hidden md:inline-block text-[#364153] dark:text-[#E9EDEF]"
               style={{
                 fontFamily: "Inter",
                 fontWeight: 500,
@@ -216,7 +197,7 @@ export default function WebLoginScreen() {
               style={{
                 width: 40,
                 height: 22,
-                background: "#155DFC",
+                background: isDarkMode ? "#00A884" : "#155DFC",
                 borderRadius: 9999,
               }}
             >
@@ -234,25 +215,18 @@ export default function WebLoginScreen() {
               />
             </div>
           </button>
-          */}
 
           {/* Language Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors focus:outline-none"
-                style={{
-                  gap: 8,
-                  padding: "8px 12px",
-                  border: "0.667px solid #B5B5B5",
-                  borderRadius: 18,
-                }}
+                className="flex items-center gap-2 px-3 py-2 border border-[#B5B5B5] dark:border-[#2A3942] rounded-[18px] cursor-pointer hover:bg-slate-50 dark:hover:bg-[#202C33] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-[#00A884]"
                 aria-label="Select Language"
               >
-                <Globe size={16} style={{ color: "#364153" }} className="dark:text-slate-300" />
+                <Globe size={16} className="text-[#364153] dark:text-[#E9EDEF]" />
                 <span
-                  className="hidden md:inline-block text-[#364153] dark:text-slate-200"
+                  className="hidden md:inline-block text-[#364153] dark:text-[#E9EDEF]"
                   style={{
                     fontFamily: "Inter",
                     fontWeight: 500,
@@ -268,9 +242,9 @@ export default function WebLoginScreen() {
                   height={14}
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#364153"
+                  stroke="currentColor"
                   strokeWidth={2}
-                  className="dark:stroke-slate-300"
+                  className="text-[#364153] dark:text-[#E9EDEF]"
                 >
                   <path d="m6 9 6 6 6-6" />
                 </svg>
@@ -278,7 +252,7 @@ export default function WebLoginScreen() {
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="w-48 p-1.5 rounded-2xl shadow-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+              className="w-48 p-1.5 rounded-2xl shadow-xl bg-white dark:bg-[#202C33] border border-slate-200 dark:border-[#2A3942]"
             >
               {routing.locales.map((loc) => {
                 const item = LANGUAGE_LABELS[loc];
@@ -290,15 +264,15 @@ export default function WebLoginScreen() {
                     className={cn(
                       "flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium cursor-pointer transition-colors",
                       isSelected
-                        ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-semibold"
-                        : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-[#38BDF8] font-semibold"
+                        : "hover:bg-slate-100 dark:hover:bg-[#111B21] text-slate-700 dark:text-[#E9EDEF]"
                     )}
                   >
                     <div className="flex items-center gap-2.5">
                       <span>{item.flag}</span>
                       <span>{item.label}</span>
                     </div>
-                    {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                    {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-[#38BDF8]" />}
                   </DropdownMenuItem>
                 );
               })}
@@ -322,7 +296,7 @@ export default function WebLoginScreen() {
               The future of
             </h1>
             <h1
-              className="text-4xl sm:text-5xl lg:text-[56px] leading-[1.2em] text-[#155DFC] m-0 lg:pt-2 tracking-tight"
+              className="text-4xl sm:text-5xl lg:text-[56px] leading-[1.2em] text-[#155DFC] dark:text-[#38BDF8] m-0 lg:pt-2 tracking-tight transition-colors"
               style={{ fontFamily: "Roboto", fontWeight: 700 }}
             >
               secure messaging
@@ -344,14 +318,10 @@ export default function WebLoginScreen() {
             
             {/* E2E Encrypted */}
             <div
-              className="relative shrink-0 flex flex-col transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md group cursor-default"
+              className="relative shrink-0 flex flex-col transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md group cursor-default bg-white dark:bg-[#111B21] border border-[#2563EB]/40 dark:border-[#2A3942] dark:hover:border-[#00A884]/60 rounded-[10.44px] p-4"
               style={{
                 width: "clamp(140px, 15vw, 157.89px)",
                 height: 117.44,
-                background: "#fff",
-                border: "1.305px solid #2563EB",
-                borderRadius: 10.44,
-                padding: "16px",
               }}
             >
               <Image
@@ -362,10 +332,10 @@ export default function WebLoginScreen() {
                 className="object-cover mb-auto group-hover:scale-110 transition-transform duration-300"
               />
               <div className="flex flex-col">
-                <span style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 14.35, color: "#2563EB" }}>
+                <span className="font-['Inter'] font-bold text-[14.35px] text-[#2563EB] dark:text-[#E9EDEF]">
                   E2E Encrypted
                 </span>
-                <span style={{ fontFamily: "Inter", fontWeight: 300, fontSize: 13.05, color: "#2563EB" }}>
+                <span className="font-['Inter'] font-light text-[13.05px] text-[#2563EB]/80 dark:text-[#8696A0]">
                   Military-grade
                 </span>
               </div>
@@ -381,13 +351,11 @@ export default function WebLoginScreen() {
             >
               {/* dark bg shadow layer */}
               <div
-                className="absolute right-0 bottom-0 w-[calc(100%-6px)] h-[calc(100%-6px)] bg-[#131928] rounded-[13.05px]"
-                style={{ border: "1.305px solid #222836" }}
+                className="absolute right-0 bottom-0 w-[calc(100%-6px)] h-[calc(100%-6px)] bg-[#131928] dark:bg-[#00A884]/20 rounded-[13.05px] border border-[#222836] dark:border-[#00A884]/30"
               />
               {/* white card on top */}
               <div
-                className="absolute left-0 top-0 w-[calc(100%-6px)] h-[calc(100%-6px)] bg-white rounded-[10.44px] flex flex-col p-4"
-                style={{ border: "1.305px solid #2563EB" }}
+                className="absolute left-0 top-0 w-[calc(100%-6px)] h-[calc(100%-6px)] bg-white dark:bg-[#111B21] border border-[#2563EB] dark:border-[#00A884] rounded-[10.44px] flex flex-col p-4 dark:shadow-[0_0_20px_rgba(0,168,132,0.15)]"
               >
                 <Image
                   src="/figma/icon_ai.png"
@@ -397,10 +365,10 @@ export default function WebLoginScreen() {
                   className="object-cover mb-auto group-hover:scale-110 transition-transform duration-300"
                 />
                 <div className="flex flex-col">
-                  <span style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 14.35, color: "#2563EB" }}>
+                  <span className="font-['Inter'] font-semibold text-[14.35px] text-[#2563EB] dark:text-[#E9EDEF]">
                     AI-Powered
                   </span>
-                  <span style={{ fontFamily: "Inter", fontWeight: 300, fontSize: 11.74, color: "#2563EB" }}>
+                  <span className="font-['Inter'] font-light text-[11.74px] text-[#2563EB]/80 dark:text-[#8696A0]">
                     Smart replies
                   </span>
                 </div>
@@ -409,14 +377,10 @@ export default function WebLoginScreen() {
 
             {/* Instant Sync */}
             <div
-              className="relative shrink-0 flex flex-col transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md group cursor-default"
+              className="relative shrink-0 flex flex-col transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md group cursor-default bg-white dark:bg-[#111B21] border border-[#2563EB]/40 dark:border-[#2A3942] dark:hover:border-[#00A884]/60 rounded-[10.44px] p-4"
               style={{
                 width: "clamp(140px, 15vw, 157.89px)",
                 height: 117.44,
-                background: "#fff",
-                border: "1.305px solid #2563EB",
-                borderRadius: 10.44,
-                padding: "16px",
               }}
             >
               <Image
@@ -427,10 +391,10 @@ export default function WebLoginScreen() {
                 className="object-cover mb-auto group-hover:scale-110 transition-transform duration-300"
               />
               <div className="flex flex-col">
-                <span style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 13.05, color: "#2563EB" }}>
+                <span className="font-['Inter'] font-bold text-[13.05px] text-[#2563EB] dark:text-[#E9EDEF]">
                   Instant Sync
                 </span>
-                <span style={{ fontFamily: "Inter", fontWeight: 400, fontSize: 11.74, color: "#2563EB" }}>
+                <span className="font-['Inter'] font-normal text-[11.74px] text-[#2563EB]/80 dark:text-[#8696A0]">
                   All devices
                 </span>
               </div>
@@ -440,20 +404,11 @@ export default function WebLoginScreen() {
           {/* ── APP DOWNLOAD CARD & PHONE MOCKUPS ── */}
           <div className="relative z-20 mx-auto lg:mx-0 w-full max-w-[402px] lg:ml-[78px] xl:ml-[78px]">
             <div
-              className="bg-white dark:bg-slate-900 transition-colors"
-              style={{
-                border: "0.667px solid #F3F4F6",
-                borderRadius: 16,
-                boxShadow: "0px 1px 2px -1px rgba(0,0,0,.1),0px 1px 3px 0px rgba(0,0,0,.1)",
-                padding: 20,
-                display: "flex",
-                flexDirection: "column",
-                gap: 20,
-              }}
+              className="bg-white dark:bg-[#111B21] border border-[#F3F4F6] dark:border-[#222D34] rounded-2xl p-5 flex flex-col gap-5 shadow-xs dark:shadow-md transition-colors"
             >
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 11 }}>
                 <span
-                  className="text-[#101828] dark:text-white"
+                  className="text-[#101828] dark:text-[#E9EDEF]"
                   style={{
                     fontFamily: "Inter",
                     fontWeight: 600,
@@ -471,20 +426,7 @@ export default function WebLoginScreen() {
                 <button
                   type="button"
                   onClick={() => setIsDownloadModalOpen(true)}
-                  className="hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    width: "100%",
-                    maxWidth: 188,
-                    height: 55,
-                    padding: "10px 16px",
-                    border: "2px solid #E5E7EB",
-                    borderRadius: 18,
-                    background: "transparent",
-                  }}
+                  className="flex items-center justify-center gap-2 w-full max-w-[188px] h-[55px] px-4 py-2.5 border-2 border-[#E5E7EB] dark:border-[#2A3942] rounded-[18px] bg-transparent hover:bg-slate-50 dark:hover:bg-[#202C33]/60 hover:border-blue-500 dark:hover:border-[#00A884] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-[#00A884]"
                   aria-label="Download from Google Play"
                 >
                   <svg width={20} height={20} viewBox="0 0 512 512">
@@ -494,10 +436,10 @@ export default function WebLoginScreen() {
                     <path fill="#48FF48" d="M22 83l256.5 256 68-68L76 2.1C55.7-9.6 35.2-8.1 22 4.2L22 83z" />
                   </svg>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                    <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 9, lineHeight: "13.5px", color: "#6A7282" }}>
+                    <span className="font-['Inter'] font-medium text-[9px] leading-[13.5px] text-[#6A7282] dark:text-[#8696A0]">
                       GET IT ON
                     </span>
-                    <span className="text-[#101828] dark:text-white" style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, lineHeight: "17.5px" }}>
+                    <span className="text-[#101828] dark:text-[#E9EDEF]" style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, lineHeight: "17.5px" }}>
                       Google Play
                     </span>
                   </div>
@@ -507,30 +449,17 @@ export default function WebLoginScreen() {
                 <button
                   type="button"
                   onClick={() => setIsDownloadModalOpen(true)}
-                  className="hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    width: "100%",
-                    maxWidth: 188,
-                    height: 55,
-                    padding: "10px 16px",
-                    border: "2px solid #E5E7EB",
-                    borderRadius: 18,
-                    background: "transparent",
-                  }}
+                  className="flex items-center justify-center gap-2 w-full max-w-[188px] h-[55px] px-4 py-2.5 border-2 border-[#E5E7EB] dark:border-[#2A3942] rounded-[18px] bg-transparent hover:bg-slate-50 dark:hover:bg-[#202C33]/60 hover:border-blue-500 dark:hover:border-[#00A884] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-[#00A884]"
                   aria-label="Download on App Store"
                 >
-                  <svg width={20} height={20} viewBox="0 0 384 512" className="fill-[#101828] dark:fill-white">
+                  <svg width={20} height={20} viewBox="0 0 384 512" className="fill-[#101828] dark:fill-[#E9EDEF]">
                     <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
                   </svg>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                    <span style={{ fontFamily: "Inter", fontWeight: 500, fontSize: 9, lineHeight: "13.5px", color: "#6A7282" }}>
+                    <span className="font-['Inter'] font-medium text-[9px] leading-[13.5px] text-[#6A7282] dark:text-[#8696A0]">
                       Download on the
                     </span>
-                    <span className="text-[#101828] dark:text-white" style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, lineHeight: "17.5px" }}>
+                    <span className="text-[#101828] dark:text-[#E9EDEF]" style={{ fontFamily: "Inter", fontWeight: 600, fontSize: 14, lineHeight: "17.5px" }}>
                       App Store
                     </span>
                   </div>
@@ -565,7 +494,7 @@ export default function WebLoginScreen() {
         <div className="flex flex-col w-full lg:w-1/2 max-w-[530px] items-center lg:items-end z-20">
           
           {/* Main Scan Card (WhatsApp Web Refined Design & Rich Typography) */}
-          <div className="w-full bg-white dark:bg-[#111B21] rounded-[28px] border border-[#E9ECEF] dark:border-slate-800 p-6 sm:p-8 md:p-9 shadow-[0_4px_30px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300 flex flex-col gap-6">
+          <div className="w-full bg-white dark:bg-[#111B21] rounded-[28px] border border-[#E9ECEF] dark:border-[#222D34] p-6 sm:p-8 md:p-9 shadow-[0_4px_30px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.45)] transition-all duration-300 flex flex-col gap-6">
             
             {/* Header: Title */}
             <div>
@@ -578,10 +507,10 @@ export default function WebLoginScreen() {
                 {/* Step 1 */}
                 <div className="flex items-start gap-3.5">
                   <div className="flex flex-col items-center">
-                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-slate-600 bg-white dark:bg-slate-800 text-[#111B21] dark:text-white text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
+                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-[#2A3942] bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
                       1
                     </div>
-                    <div className="w-[1.5px] h-7 bg-[#E2E8F0] dark:bg-slate-700/80 my-1" />
+                    <div className="w-[1.5px] h-7 bg-[#E2E8F0] dark:bg-[#2A3942] my-1" />
                   </div>
                   <p className="text-[14px] text-[#3B4A54] dark:text-[#8696A0] pt-0.5 leading-snug">
                     Open CallsChat on your phone
@@ -591,10 +520,10 @@ export default function WebLoginScreen() {
                 {/* Step 2 */}
                 <div className="flex items-start gap-3.5">
                   <div className="flex flex-col items-center">
-                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-slate-600 bg-white dark:bg-slate-800 text-[#111B21] dark:text-white text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
+                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-[#2A3942] bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
                       2
                     </div>
-                    <div className="w-[1.5px] h-7 bg-[#E2E8F0] dark:bg-slate-700/80 my-1" />
+                    <div className="w-[1.5px] h-7 bg-[#E2E8F0] dark:bg-[#2A3942] my-1" />
                   </div>
                   <p className="text-[14px] text-[#3B4A54] dark:text-[#8696A0] pt-0.5 leading-snug">
                     Tap <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">Menu</strong> or <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">Settings</strong> and select <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">Linked Devices</strong>
@@ -604,7 +533,7 @@ export default function WebLoginScreen() {
                 {/* Step 3 */}
                 <div className="flex items-start gap-3.5">
                   <div className="flex flex-col items-center">
-                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-slate-600 bg-white dark:bg-slate-800 text-[#111B21] dark:text-white text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
+                    <div className="w-6 h-6 rounded-full border border-[#D1D7DB] dark:border-[#2A3942] bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] text-[12px] font-semibold flex items-center justify-center shrink-0 shadow-2xs">
                       3
                     </div>
                   </div>
@@ -619,7 +548,7 @@ export default function WebLoginScreen() {
                 <button
                   type="button"
                   onClick={() => setIsHelpOpen(true)}
-                  className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-[#037CFD] hover:underline cursor-pointer group focus:outline-none"
+                  className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline cursor-pointer group focus:outline-none"
                 >
                   <span>Need help?</span>
                   <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -629,7 +558,7 @@ export default function WebLoginScreen() {
 
             {/* ── QR CODE FRAME (With Centered CallsChat Logo & Subtle Animations) ── */}
             <div className="w-full flex flex-col items-center justify-center py-1">
-              <div className="relative w-full max-w-[260px] aspect-square bg-white rounded-2xl p-4 border border-slate-200/90 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden transition-all duration-300">
+              <div className="relative w-full max-w-[260px] aspect-square bg-white rounded-2xl p-4 border border-slate-200/90 dark:border-[#2A3942] shadow-sm dark:shadow-[0_4px_24px_rgba(0,0,0,0.6)] flex items-center justify-center overflow-hidden transition-all duration-300">
                 
                 {/* Live QR code */}
                 {isQrReady && qrValue && (
@@ -675,19 +604,19 @@ export default function WebLoginScreen() {
                   </div>
                 )}
 
-                {/* Expired / Error overlay with frosted backdrop blur */}
+                {/* Expired / Error overlay with soothing dark backdrop */}
                 {(isExpired || isError) && (
-                  <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center gap-2.5 animate-in fade-in duration-200">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shadow-xs">
-                      <RefreshCw size={20} className="text-slate-600" />
+                  <div className="absolute inset-0 bg-white/95 dark:bg-[#111B21]/95 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center gap-2.5 animate-in fade-in duration-200">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-[#202C33] text-slate-700 dark:text-[#E9EDEF] flex items-center justify-center shadow-xs border border-transparent dark:border-[#2A3942]">
+                      <RefreshCw size={20} className="text-slate-600 dark:text-[#8696A0]" />
                     </div>
-                    <p className="text-xs font-semibold text-slate-800">
+                    <p className="text-xs font-semibold text-slate-800 dark:text-[#E9EDEF]">
                       {isError ? errorMessage || "Connection failed" : "QR code expired"}
                     </p>
                     <button
                       type="button"
                       onClick={refreshQrCode}
-                      className="px-4 py-2 rounded-xl bg-[#037CFD] hover:bg-blue-600 text-white text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-[#037CFD] dark:bg-[#00A884] hover:bg-blue-600 dark:hover:bg-[#008069] text-white text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
                     >
                       Click to reload QR
                     </button>
@@ -711,7 +640,7 @@ export default function WebLoginScreen() {
                   </span>
                   
                   <span>
-                    Expires in <strong className="font-semibold text-[#111B21] dark:text-slate-200">{formatTime(countdown)}</strong>
+                    Expires in <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">{formatTime(countdown)}</strong>
                   </span>
                 </div>
 
@@ -719,7 +648,7 @@ export default function WebLoginScreen() {
                   type="button"
                   onClick={refreshQrCode}
                   disabled={isLoading || isSuccess}
-                  className="text-xs font-semibold text-[#037CFD] hover:underline disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer group"
+                  className="text-xs font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer group"
                 >
                   <RefreshCw
                     size={12}
@@ -734,13 +663,13 @@ export default function WebLoginScreen() {
             </div>
 
             {/* Bottom Row inside card: Stay logged in checkbox & Phone login link */}
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="pt-4 border-t border-slate-100 dark:border-[#222D34] flex flex-col sm:flex-row items-center justify-between gap-3">
               <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-[#3B4A54] dark:text-[#8696A0]">
                 <input
                   type="checkbox"
                   checked={stayLoggedIn}
                   onChange={(e) => setStayLoggedIn(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#037CFD] focus:ring-[#037CFD] border-slate-300 dark:border-slate-600 dark:bg-slate-800 accent-[#037CFD] cursor-pointer"
+                  className="w-4 h-4 rounded text-[#037CFD] focus:ring-[#037CFD] border-slate-300 dark:border-[#2A3942] dark:bg-[#202C33] accent-[#037CFD] dark:accent-[#00A884] cursor-pointer"
                 />
                 <span>Stay logged in on this browser</span>
                 <span title="Keeps you signed in on this device so you don't need to re-scan.">
@@ -755,7 +684,7 @@ export default function WebLoginScreen() {
               <button
                 type="button"
                 onClick={() => router.push("/login")}
-                className="text-xs sm:text-sm font-semibold text-[#037CFD] hover:underline inline-flex items-center gap-0.5 cursor-pointer group focus:outline-none"
+                className="text-xs sm:text-sm font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline inline-flex items-center gap-0.5 cursor-pointer group focus:outline-none"
               >
                 <span>Log in with phone number</span>
                 <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
@@ -769,7 +698,7 @@ export default function WebLoginScreen() {
               Don&apos;t have a CallsChat account?{" "}
               <Link
                 href="/signup"
-                className="font-semibold text-[#037CFD] hover:underline inline-flex items-center gap-0.5 ml-0.5 group"
+                className="font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline inline-flex items-center gap-0.5 ml-0.5 group"
               >
                 <span>Get started</span>
                 <ArrowUpRight size={13} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -793,28 +722,17 @@ export default function WebLoginScreen() {
       >
         {isHelpOpen && (
           <div
-            className="animate-in fade-in slide-in-from-bottom-3 duration-200"
-            style={{
-              width: 170,
-              background: "#fff",
-              border: "1px solid #E8E8E8",
-              borderRadius: 16,
-              boxShadow: "4px 4px 23.3px 0px rgba(0,0,0,0.19)",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              paddingBottom: 8,
-            }}
+            className="animate-in fade-in slide-in-from-bottom-3 duration-200 w-[170px] bg-white dark:bg-[#202C33] border border-[#E8E8E8] dark:border-[#2A3942] rounded-2xl shadow-[4px_4px_23.3px_0px_rgba(0,0,0,0.19)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden pb-2"
           >
             {/* Need help heading */}
-            <div style={{ padding: "12px 16px 8px" }} className="flex items-center justify-between">
-              <span style={{ fontFamily: "Roboto", fontWeight: 700, fontSize: 16, color: "#102A63" }}>
+            <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+              <span className="font-['Roboto'] font-bold text-base text-[#102A63] dark:text-[#E9EDEF]">
                 Need help?
               </span>
               <button
                 type="button"
                 onClick={() => setIsHelpOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-0.5"
+                className="text-slate-400 hover:text-slate-700 dark:text-[#8696A0] dark:hover:text-[#E9EDEF] p-0.5 cursor-pointer"
                 aria-label="Close"
               >
                 <X size={14} />
@@ -828,19 +746,10 @@ export default function WebLoginScreen() {
                 setIsHelpOpen(false);
                 router.push("/connect");
               }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-              }}
-              className="hover:bg-blue-50 transition-colors text-left"
+              className="flex items-center gap-2 px-3 py-2 bg-transparent hover:bg-blue-50 dark:hover:bg-[#111B21] transition-colors text-left cursor-pointer group"
             >
-              <MessageSquare size={18} color="#102A63" />
-              <span style={{ fontFamily: "Roboto", fontWeight: 500, fontSize: 12, color: "#102A63" }}>
+              <MessageSquare size={18} className="text-[#102A63] dark:text-[#00A884] group-hover:scale-105 transition-transform" />
+              <span className="font-['Roboto'] font-medium text-xs text-[#102A63] dark:text-[#E9EDEF]">
                 Live Support
               </span>
             </button>
@@ -849,19 +758,10 @@ export default function WebLoginScreen() {
             <Link
               href="/#faq"
               onClick={() => setIsHelpOpen(false)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-              }}
-              className="hover:bg-blue-50 transition-colors text-left"
+              className="flex items-center gap-2 px-3 py-2 bg-transparent hover:bg-blue-50 dark:hover:bg-[#111B21] transition-colors text-left cursor-pointer group"
             >
-              <HelpCircle size={18} color="#102A63" />
-              <span style={{ fontFamily: "Roboto", fontWeight: 500, fontSize: 12, color: "#102A63" }}>
+              <HelpCircle size={18} className="text-[#102A63] dark:text-[#00A884] group-hover:scale-105 transition-transform" />
+              <span className="font-['Roboto'] font-medium text-xs text-[#102A63] dark:text-[#E9EDEF]">
                 Help Center
               </span>
             </Link>
@@ -870,19 +770,10 @@ export default function WebLoginScreen() {
             <a
               href="mailto:support@callschat.com"
               onClick={() => setIsHelpOpen(false)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-              }}
-              className="hover:bg-blue-50 transition-colors text-left"
+              className="flex items-center gap-2 px-3 py-2 bg-transparent hover:bg-blue-50 dark:hover:bg-[#111B21] transition-colors text-left cursor-pointer group"
             >
-              <Mail size={16} color="#102A63" />
-              <span style={{ fontFamily: "Roboto", fontWeight: 500, fontSize: 12, color: "#102A63" }}>
+              <Mail size={16} className="text-[#102A63] dark:text-[#00A884] group-hover:scale-105 transition-transform" />
+              <span className="font-['Roboto'] font-medium text-xs text-[#102A63] dark:text-[#E9EDEF]">
                 Email support
               </span>
             </a>
@@ -893,22 +784,10 @@ export default function WebLoginScreen() {
         <button
           type="button"
           onClick={() => setIsHelpOpen(!isHelpOpen)}
-          style={{
-            width: 48,
-            height: 48,
-            background: "#155DFC",
-            borderRadius: 9999,
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0px 4px 6px -4px rgba(0,0,0,.1),0px 10px 15px -3px rgba(0,0,0,.1)",
-          }}
-          className="hover:scale-105 active:scale-95 transition-transform"
+          className="w-12 h-12 rounded-full bg-[#155DFC] dark:bg-[#00A884] hover:bg-blue-700 dark:hover:bg-[#008069] flex items-center justify-center shadow-lg dark:shadow-[0_4px_16px_rgba(0,168,132,0.35)] hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-[#00A884]"
           aria-label="Open support menu"
         >
-          {isHelpOpen ? <X size={22} color="#fff" /> : <MessageCircle size={24} fill="#fff" color="#fff" />}
+          {isHelpOpen ? <X size={22} className="text-white" /> : <MessageCircle size={24} className="fill-white text-white" />}
         </button>
       </div>
 

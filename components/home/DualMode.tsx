@@ -91,7 +91,7 @@ export default function DualMood() {
     return (
         <section
             id="dual-mood"
-            className="relative w-full bg-slate-50/50 dark:bg-slate-950/50 px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden border-y border-slate-200/60 dark:border-slate-800/60"
+            className="relative w-full bg-slate-50/50 dark:bg-[#0C1317] px-4 py-20 sm:px-6 lg:px-8 scroll-mt-16 overflow-hidden border-y border-slate-200/60 dark:border-[#222D34] transition-colors duration-200"
         >
             {/* Ambient Background Glow Mesh */}
             <div
@@ -150,7 +150,7 @@ export default function DualMood() {
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true, margin: "-50px" }}
                         transition={{ duration: 0.5 }}
-                        className="rounded-[2.5rem] border border-purple-200/70 dark:border-purple-900/40 bg-white/90 dark:bg-slate-900/90 p-6 sm:p-8 lg:p-10 shadow-lg shadow-purple-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-purple-300 dark:hover:border-purple-800 transition-all duration-300"
+                        className="rounded-[2.5rem] border border-purple-200/70 dark:border-[#222D34] bg-white/90 dark:bg-[#111B21] p-6 sm:p-8 lg:p-10 shadow-lg shadow-purple-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-purple-300 dark:hover:border-[#2A3942] transition-all duration-300"
                     >
                         {/* Soft Ambient Radial Corner */}
                         <div className="pointer-events-none absolute -top-24 -left-24 w-60 h-60 bg-gradient-to-br from-purple-500/15 to-pink-500/5 rounded-full blur-2xl" />
@@ -181,7 +181,7 @@ export default function DualMood() {
                             </p>
 
                             {/* Interactive 1v1 Chat Mockup Window */}
-                            <div className="mt-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/80 p-4 sm:p-5 shadow-inner space-y-3.5">
+                            <div className="mt-8 rounded-3xl border border-slate-200/80 dark:border-[#222D34] bg-slate-50/90 dark:bg-[#202C33]/70 p-4 sm:p-5 shadow-inner space-y-3.5">
                                 
                                 {/* Contact Bar */}
                                 <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800/80 text-xs">
@@ -305,7 +305,7 @@ export default function DualMood() {
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true, margin: "-50px" }}
                         transition={{ duration: 0.5 }}
-                        className="rounded-[2.5rem] border border-blue-200/70 dark:border-blue-900/40 bg-white/90 dark:bg-slate-900/90 p-6 sm:p-8 lg:p-10 shadow-lg shadow-blue-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-300"
+                        className="rounded-[2.5rem] border border-blue-200/70 dark:border-[#222D34] bg-white/90 dark:bg-[#111B21] p-6 sm:p-8 lg:p-10 shadow-lg shadow-blue-500/5 flex flex-col justify-between relative overflow-hidden group hover:border-blue-300 dark:hover:border-[#2A3942] transition-all duration-300"
                     >
                         {/* Soft Ambient Radial Corner */}
                         <div className="pointer-events-none absolute -top-24 -right-24 w-60 h-60 bg-gradient-to-bl from-blue-500/15 to-cyan-500/5 rounded-full blur-2xl" />
@@ -336,7 +336,7 @@ export default function DualMood() {
                             </p>
 
                             {/* Interactive Shared Team Inbox Mockup Window */}
-                            <div className="mt-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/80 p-4 sm:p-5 shadow-inner space-y-3.5">
+                            <div className="mt-8 rounded-3xl border border-slate-200/80 dark:border-[#222D34] bg-slate-50/90 dark:bg-[#202C33]/70 p-4 sm:p-5 shadow-inner space-y-3.5">
                                 
                                 {/* Org Team Bar */}
                                 <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800/80 text-xs">

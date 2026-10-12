@@ -334,10 +334,10 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full h-full font-sans bg-white md:bg-[#F8FAFC] overflow-y-auto relative">
+    <div className="flex flex-col w-full h-full font-sans bg-white md:bg-[#F8FAFC] dark:bg-[#0C1317] overflow-y-auto relative">
       {/* Top Header */}
       {showHeader && (
-        <div className="bg-[#2563EB] py-4 px-6 md:px-8 flex items-center justify-between text-white shrink-0 shadow-sm print:hidden">
+        <div className="bg-[#2563EB] dark:bg-[#111B21] py-4 px-6 md:px-8 flex items-center justify-between text-white shrink-0 shadow-sm print:hidden border-b border-transparent dark:border-[#222D34]">
           <div className="flex items-center gap-3">
             {onBack && (
               <button
@@ -454,9 +454,9 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
           <div className="mt-6 flex justify-center w-full print:hidden">
             <button
               onClick={handleEditClick}
-              className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] cursor-pointer"
+              className="flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#222D34] bg-white dark:bg-[#111B21] px-5 py-2.5 text-xs font-bold text-slate-700 dark:text-[#E9EDEF] shadow-xs hover:bg-slate-50 dark:hover:bg-[#202C33] hover:border-slate-300 dark:hover:border-[#2A3942] transition-all active:scale-[0.98] cursor-pointer"
             >
-              <Pencil className="h-3.5 w-3.5 text-slate-500" strokeWidth={2.2} />
+              <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-[#8696A0]" strokeWidth={2.2} />
               <span>Edit Card Details</span>
             </button>
           </div>
@@ -466,12 +466,12 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
             <button
               onClick={handleDownloadPNGClick}
               disabled={downloadingPng}
-              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 shadow-xs hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer disabled:opacity-60"
+              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 dark:border-[#222D34] bg-white dark:bg-[#111B21] px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 dark:text-[#E9EDEF] shadow-xs hover:bg-slate-50 dark:hover:bg-[#202C33] hover:border-slate-300 dark:hover:border-[#2A3942] hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer disabled:opacity-60"
             >
               {downloadingPng ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
+                <Loader2 className="h-4 w-4 animate-spin text-slate-600 dark:text-[#8696A0]" />
               ) : (
-                <Download className="h-4 w-4 text-slate-600" strokeWidth={2.2} />
+                <Download className="h-4 w-4 text-slate-600 dark:text-[#8696A0]" strokeWidth={2.2} />
               )}
               <span>Download PNG</span>
             </button>
@@ -479,12 +479,12 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
             <button
               onClick={handleDownloadPDFClick}
               disabled={downloadingPdf}
-              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 shadow-xs hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer disabled:opacity-60"
+              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 dark:border-[#222D34] bg-white dark:bg-[#111B21] px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 dark:text-[#E9EDEF] shadow-xs hover:bg-slate-50 dark:hover:bg-[#202C33] hover:border-slate-300 dark:hover:border-[#2A3942] hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer disabled:opacity-60"
             >
               {downloadingPdf ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
+                <Loader2 className="h-4 w-4 animate-spin text-slate-600 dark:text-[#8696A0]" />
               ) : (
-                <FileText className="h-4 w-4 text-slate-600" strokeWidth={2.2} />
+                <FileText className="h-4 w-4 text-slate-600 dark:text-[#8696A0]" strokeWidth={2.2} />
               )}
               <span>Download PDF</span>
             </button>
@@ -492,21 +492,21 @@ export const DigitalBusinessCard: React.FC<DigitalBusinessCardProps> = ({
             <button
               onClick={handleShareClick}
               disabled={sharingCard}
-              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 shadow-xs hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer disabled:opacity-60"
+              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 dark:border-[#222D34] bg-white dark:bg-[#111B21] px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 dark:text-[#E9EDEF] shadow-xs hover:bg-slate-50 dark:hover:bg-[#202C33] hover:border-slate-300 dark:hover:border-[#2A3942] hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer disabled:opacity-60"
             >
               {sharingCard ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
+                <Loader2 className="h-4 w-4 animate-spin text-slate-600 dark:text-[#8696A0]" />
               ) : (
-                <Share2 className="h-4 w-4 text-slate-600" strokeWidth={2.2} />
+                <Share2 className="h-4 w-4 text-slate-600 dark:text-[#8696A0]" strokeWidth={2.2} />
               )}
               <span>Share Card</span>
             </button>
 
             <button
               onClick={handlePrintClick}
-              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 shadow-xs hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer"
+              className="flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 dark:border-[#222D34] bg-white dark:bg-[#111B21] px-5 py-3.5 text-xs md:text-sm font-bold text-slate-800 dark:text-[#E9EDEF] shadow-xs hover:bg-slate-50 dark:hover:bg-[#202C33] hover:border-slate-300 dark:hover:border-[#2A3942] hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer"
             >
-              <Printer className="h-4 w-4 text-slate-600" strokeWidth={2.2} />
+              <Printer className="h-4 w-4 text-slate-600 dark:text-[#8696A0]" strokeWidth={2.2} />
               <span>Print Card</span>
             </button>
           </div>

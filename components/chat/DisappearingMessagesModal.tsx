@@ -100,18 +100,21 @@ export function DisappearingMessagesModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-white sm:max-w-[420px] rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
+      <DialogContent 
+        overlayClassName="bg-black/50 dark:bg-black/75 backdrop-blur-xs"
+        className="bg-white dark:bg-[#111B21] sm:max-w-[420px] rounded-2xl p-0 overflow-hidden border border-slate-200/80 dark:border-[#222D34] shadow-2xl"
+      >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-[#EEF2FF] bg-gradient-to-br from-[#F5F0FF] to-white">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-[#EEF2FF] dark:border-[#222D34] bg-gradient-to-br from-[#F5F0FF] to-white dark:from-purple-950/30 dark:via-[#111B21] dark:to-[#111B21]">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7C3AED]/10">
-              <Flame className="h-5 w-5 text-[#7C3AED]" strokeWidth={2.5} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7C3AED]/10 dark:bg-purple-950/50">
+              <Flame className="h-5 w-5 text-[#7C3AED] dark:text-purple-400" strokeWidth={2.5} />
             </div>
             <div>
-              <DialogTitle className="text-[16px] font-bold text-[#11142D]">
+              <DialogTitle className="text-[16px] font-bold text-[#11142D] dark:text-[#E9EDEF]">
                 Disappearing Messages
               </DialogTitle>
-              <DialogDescription className="text-[12px] text-[#8F95B2] mt-0.5">
+              <DialogDescription className="text-[12px] text-[#8F95B2] dark:text-[#8696A0] mt-0.5">
                 {isCurrentlyEphemeral
                   ? "Choose a new timer or turn off disappearing messages."
                   : "When turned on, messages sent in this chat will vanish automatically."}
@@ -121,9 +124,9 @@ export function DisappearingMessagesModal({
         </DialogHeader>
 
         {/* ── Info Banner ──────────────────────────────────────────────────── */}
-        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-purple-50 border border-purple-100 px-4 py-3">
-          <Lock className="h-4 w-4 text-[#7C3AED] mt-0.5 shrink-0" strokeWidth={2.5} />
-          <p className="text-[12px] font-medium text-[#6B3FC0] leading-relaxed">
+        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40 px-4 py-3">
+          <Lock className="h-4 w-4 text-[#7C3AED] dark:text-purple-400 mt-0.5 shrink-0" strokeWidth={2.5} />
+          <p className="text-[12px] font-medium text-[#6B3FC0] dark:text-purple-300 leading-relaxed">
             When turned on, new messages sent in this chat will disappear after the selected duration.
           </p>
         </div>
@@ -137,28 +140,28 @@ export function DisappearingMessagesModal({
                 key={String(opt.value)}
                 onClick={() => setSelected(opt.value)}
                 className={cn(
-                  "flex items-center justify-between w-full rounded-xl px-4 py-3.5 text-left transition-all",
+                  "flex items-center justify-between w-full rounded-xl px-4 py-3.5 text-left transition-all cursor-pointer",
                   isActive
-                    ? "bg-[#F0E9FF] border border-[#C9B3FF]"
-                    : "hover:bg-[#F8FAFC] border border-transparent",
+                    ? "bg-[#F0E9FF] dark:bg-purple-950/40 border border-[#C9B3FF] dark:border-purple-800/60"
+                    : "hover:bg-[#F8FAFC] dark:hover:bg-[#202C33] border border-transparent",
                 )}
               >
                 <div className="flex flex-col">
                   <span
                     className={cn(
                       "text-[14px] font-bold",
-                      isActive ? "text-[#7C3AED]" : "text-[#1D2A54]",
+                      isActive ? "text-[#7C3AED] dark:text-purple-300" : "text-[#1D2A54] dark:text-[#E9EDEF]",
                     )}
                   >
                     {opt.label}
                   </span>
-                  <span className="text-[11px] font-medium text-[#8F95B2]">
+                  <span className="text-[11px] font-medium text-[#8F95B2] dark:text-[#8696A0]">
                     {opt.sublabel}
                   </span>
                 </div>
                 {isActive && (
                   <CheckCircle2
-                    className="h-5 w-5 text-[#7C3AED] shrink-0"
+                    className="h-5 w-5 text-[#7C3AED] dark:text-purple-400 shrink-0"
                     strokeWidth={2.5}
                   />
                 )}
@@ -168,23 +171,23 @@ export function DisappearingMessagesModal({
         </div>
 
         {/* ── Footer ─────────────────────────────────────────────────────── */}
-        <div className="flex gap-3 px-6 pb-6">
+        <div className="flex gap-3 px-6 pb-6 border-t border-slate-100 dark:border-[#222D34] pt-4">
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="flex-1 h-11 rounded-xl border border-[#EEF2FF] bg-[#F8FAFC] text-[14px] font-bold text-[#1D2A54] transition-colors hover:bg-[#EEF2FF] disabled:opacity-60"
+            className="flex-1 h-11 rounded-xl border border-[#EEF2FF] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33] text-[14px] font-bold text-[#1D2A54] dark:text-[#E9EDEF] transition-colors hover:bg-[#EEF2FF] dark:hover:bg-[#2A3942] disabled:opacity-60 cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || selected === currentValue}
-            className="flex-1 h-11 rounded-xl bg-[#7C3AED] text-[14px] font-bold text-white transition-colors hover:bg-[#6D28CC] disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 h-11 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-[14px] font-bold text-white transition-colors disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
           >
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {selected === null ? "Turning off…" : "Starting…"}
+                <span>{selected === null ? "Turning off…" : "Starting…"}</span>
               </>
             ) : selected === null ? (
               "Turn Off"

@@ -15,13 +15,39 @@ interface ParticipantTileProps {
   className?: string;
   groupMembers?: any[];
   isReconnecting?: boolean;
+  fitMode?: "contain" | "cover";
+  onAspectRatioChange?: (isPortrait: boolean) => void;
 }
 
-export function ParticipantTile({ trackRef, disableOverlay, hideName, className, groupMembers = [], isReconnecting }: ParticipantTileProps) {
+export function ParticipantTile({ 
+  trackRef, 
+  disableOverlay, 
+  hideName, 
+  className, 
+  groupMembers = [], 
+  isReconnecting,
+  fitMode,
+  onAspectRatioChange,
+}: ParticipantTileProps) {
   const { participant } = trackRef;
   const isSpeaking = useIsSpeaking(participant);
   const { quality } = useConnectionQualityIndicator({ participant });
   const { contacts } = useContacts();
+
+  React.useEffect(() => {
+    if (!onAspectRatioChange) return;
+
+    const checkDimensions = () => {
+      const dimensions = (trackRef.publication?.track as any)?.dimensions;
+      if (dimensions?.width && dimensions?.height) {
+        onAspectRatioChange(dimensions.height > dimensions.width);
+      }
+    };
+
+    checkDimensions();
+    const interval = setInterval(checkDimensions, 1200);
+    return () => clearInterval(interval);
+  }, [trackRef, onAspectRatioChange]);
 
   const isScreenShare = trackRef.source === Track.Source.ScreenShare;
   const isVideoOn = (participant.isCameraEnabled && trackRef.source === Track.Source.Camera) || isScreenShare;
@@ -81,7 +107,9 @@ export function ParticipantTile({ trackRef, disableOverlay, hideName, className,
           trackRef={trackRef as any}
           className={cn(
             "h-full w-full",
-            isScreenShare ? "object-contain bg-black" : "object-cover",
+            fitMode
+              ? (fitMode === "contain" ? "object-contain bg-black" : "object-cover")
+              : (isScreenShare ? "object-contain bg-black" : "object-cover"),
             participant.isLocal && !isScreenShare && "scale-x-[-1]"
           )}
         />
