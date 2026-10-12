@@ -28,6 +28,7 @@ import {
   VolumeX,
   ChevronDown,
   Maximize2,
+  Minimize2,
   Lock,
   ExternalLink,
   ArrowDownLeft,
@@ -35,6 +36,8 @@ import {
   ScreenShareOff,
   Settings,
   GripHorizontal,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticipantTile } from "./ParticipantTile";
@@ -253,6 +256,40 @@ export const CustomCallLayout = ({
   const { contacts } = useContacts();
 
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [internalSettingsOpen, setInternalSettingsOpen] = useState(false);
+  const handleSettingsClick = onOpenDeviceSettings || (() => setInternalSettingsOpen(true));
+  const handleCloseInternalSettings = () => {
+    if (onCloseDeviceSettings) onCloseDeviceSettings();
+    setInternalSettingsOpen(false);
+  };
+
+  const [isPortraitScreenShare, setIsPortraitScreenShare] = useState(false);
+  const [screenShareFitMode, setScreenShareFitMode] = useState<"contain" | "cover">("contain");
+  const [isScreenShareFullscreen, setIsScreenShareFullscreen] = useState(false);
+  const screenShareContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleScreenShareFullscreen = async () => {
+    if (!screenShareContainerRef.current) return;
+    try {
+      if (!document.fullscreenElement) {
+        await screenShareContainerRef.current.requestFullscreen();
+        setIsScreenShareFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsScreenShareFullscreen(false);
+      }
+    } catch (err) {
+      console.warn("Fullscreen toggle error:", err);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsScreenShareFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
 
   useEffect(() => {
     if (activeCall?.isGroup && activeCall.groupId) {
@@ -432,21 +469,21 @@ export const CustomCallLayout = ({
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Modern WhatsApp Control Dock
+  // Modern WhatsApp Control Dock (Responsive & Immune to Squeeze)
   // ─────────────────────────────────────────────────────────────────────────
   const ControlDock = ({ compact = false }: { compact?: boolean }) => (
     <div className={cn(
-      "flex items-center justify-between gap-3 md:gap-5 z-50 rounded-full bg-[#202C33]/90 px-6 py-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl border border-white/10",
+      "flex items-center justify-between gap-1.5 sm:gap-3 md:gap-5 z-50 rounded-full bg-[#202C33]/90 px-3 sm:px-6 py-2.5 sm:py-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl border border-white/10 max-w-[96vw] sm:max-w-max overflow-x-auto no-scrollbar",
       compact
-        ? "absolute bottom-6 left-1/2 -translate-x-1/2 w-auto max-w-[90vw]"
-        : "absolute bottom-8 left-1/2 -translate-x-1/2 w-auto max-w-[90vw]"
+        ? "absolute bottom-5 left-1/2 -translate-x-1/2"
+        : "absolute bottom-8 left-1/2 -translate-x-1/2"
     )}>
       {/* Video Toggle */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 shrink-0">
         <button
           onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
           className={cn(
-            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
+            "flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 cursor-pointer shadow-md active:scale-95",
             isCameraEnabled
               ? "bg-[#00A884] text-white shadow-md hover:bg-[#008069]"
               : "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
@@ -454,17 +491,17 @@ export const CustomCallLayout = ({
           aria-label={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
           title={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
         >
-          {isCameraEnabled ? <Video className="h-5 w-5 md:h-6 md:w-6" /> : <VideoOff className="h-5 w-5 md:h-6 md:w-6" />}
+          {isCameraEnabled ? <Video className="h-5 w-5 md:h-6 md:w-6 shrink-0" /> : <VideoOff className="h-5 w-5 md:h-6 md:w-6 shrink-0" />}
         </button>
-        <span className="text-[11px] font-medium text-[#8696A0]">Video</span>
+        <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">Video</span>
       </div>
 
       {/* Mic Toggle */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 shrink-0">
         <button
           onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
           className={cn(
-            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
+            "flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 cursor-pointer shadow-md active:scale-95",
             isMicrophoneEnabled
               ? "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
               : "bg-[#EA0038] text-white shadow-md hover:bg-[#d00030]"
@@ -472,13 +509,13 @@ export const CustomCallLayout = ({
           aria-label={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
           title={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
         >
-          {isMicrophoneEnabled ? <Mic className="h-5 w-5 md:h-6 md:w-6" /> : <MicOff className="h-5 w-5 md:h-6 md:w-6" />}
+          {isMicrophoneEnabled ? <Mic className="h-5 w-5 md:h-6 md:w-6 shrink-0" /> : <MicOff className="h-5 w-5 md:h-6 md:w-6 shrink-0" />}
         </button>
-        <span className="text-[11px] font-medium text-[#8696A0]">{isMicrophoneEnabled ? "Mic" : "Muted"}</span>
+        <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">{isMicrophoneEnabled ? "Mic" : "Muted"}</span>
       </div>
 
       {/* Screen Share Toggle */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 shrink-0">
         <button
           onClick={async () => {
             try {
@@ -488,7 +525,7 @@ export const CustomCallLayout = ({
             }
           }}
           className={cn(
-            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
+            "flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 cursor-pointer shadow-md active:scale-95",
             isScreenShareEnabled
               ? "bg-[#00A884] text-white shadow-md hover:bg-[#008069]"
               : "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
@@ -497,22 +534,22 @@ export const CustomCallLayout = ({
           title={isScreenShareEnabled ? "Stop sharing screen" : "Share screen"}
         >
           {isScreenShareEnabled ? (
-            <ScreenShareOff className="h-5 w-5 md:h-6 md:w-6" />
+            <ScreenShareOff className="h-5 w-5 md:h-6 md:w-6 shrink-0" />
           ) : (
-            <ScreenShare className="h-5 w-5 md:h-6 md:w-6" />
+            <ScreenShare className="h-5 w-5 md:h-6 md:w-6 shrink-0" />
           )}
         </button>
-        <span className="text-[11px] font-medium text-[#8696A0]">
+        <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">
           {isScreenShareEnabled ? "Sharing" : "Share"}
         </span>
       </div>
 
       {/* Speaker Toggle */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 shrink-0">
         <button
           onClick={() => setIsSpeakerMuted(!isSpeakerMuted)}
           className={cn(
-            "flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
+            "flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 cursor-pointer shadow-md active:scale-95",
             !isSpeakerMuted
               ? "bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] border border-white/10"
               : "bg-[#EA0038] text-white shadow-md hover:bg-[#d00030]"
@@ -520,82 +557,232 @@ export const CustomCallLayout = ({
           aria-label={!isSpeakerMuted ? "Mute Speaker" : "Unmute Speaker"}
           title={!isSpeakerMuted ? "Mute Speaker" : "Unmute Speaker"}
         >
-          {!isSpeakerMuted ? <Volume2 className="h-5 w-5 md:h-6 md:w-6" /> : <VolumeX className="h-5 w-5 md:h-6 md:w-6" />}
+          {!isSpeakerMuted ? <Volume2 className="h-5 w-5 md:h-6 md:w-6 shrink-0" /> : <VolumeX className="h-5 w-5 md:h-6 md:w-6 shrink-0" />}
         </button>
-        <span className="text-[11px] font-medium text-[#8696A0]">Speaker</span>
+        <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">Speaker</span>
       </div>
 
       {/* Add Participant shortcut */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 shrink-0">
         <button
           onClick={onOpenInvite}
-          className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer"
+          className="flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer shadow-md active:scale-95"
           aria-label="Add People"
           title="Add People to Call"
         >
-          <UserPlus className="h-5 w-5 md:h-6 md:w-6" />
+          <UserPlus className="h-5 w-5 md:h-6 md:w-6 shrink-0" />
         </button>
-        <span className="text-[11px] font-medium text-[#8696A0]">Add</span>
+        <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">Add</span>
       </div>
 
       {/* Device Settings shortcut */}
-      {onOpenDeviceSettings && (
-        <div className="flex flex-col items-center gap-1">
-          <button
-            onClick={onOpenDeviceSettings}
-            className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer"
-            aria-label="Device Settings"
-            title="Audio & Video Settings"
-          >
-            <Settings className="h-5 w-5 md:h-6 md:w-6" />
-          </button>
-          <span className="text-[11px] font-medium text-[#8696A0]">Settings</span>
-        </div>
-      )}
+      <div className="flex flex-col items-center gap-1 shrink-0">
+        <button
+          onClick={handleSettingsClick}
+          className="flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer shadow-md active:scale-95"
+          aria-label="Device Settings"
+          title="Audio & Video Settings"
+        >
+          <Settings className="h-5 w-5 md:h-6 md:w-6 shrink-0" strokeWidth={1.9} />
+        </button>
+        <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">Settings</span>
+      </div>
 
-      {/* Pop out to Standalone Window OR Return to Tab */}
+      {/* Pop out to Standalone Window (hidden on mobile touch screens) */}
       {!isStandaloneWindow && popOutCallWindow && (
-        <div className="flex flex-col items-center gap-1">
+        <div className="hidden sm:flex flex-col items-center gap-1 shrink-0">
           <button
             onClick={popOutCallWindow}
-            className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer"
+            className="flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#00A884] border border-white/10 transition-all duration-200 cursor-pointer shadow-md active:scale-95"
             aria-label="Open in separate window"
             title="Open in separate window"
           >
-            <ExternalLink className="h-5 w-5 md:h-6 md:w-6" />
+            <ExternalLink className="h-5 w-5 md:h-6 md:w-6 shrink-0" />
           </button>
-          <span className="text-[11px] font-medium text-[#8696A0]">Pop out</span>
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">Pop out</span>
         </div>
       )}
 
       {isStandaloneWindow && onReturnToMain && (
-        <div className="flex flex-col items-center gap-1">
+        <div className="hidden sm:flex flex-col items-center gap-1 shrink-0">
           <button
             onClick={onReturnToMain}
-            className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#25D366] border border-white/10 transition-all duration-200 cursor-pointer"
+            className="flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-[#2A3942] text-[#E9EDEF] hover:bg-[#374248] hover:text-[#25D366] border border-white/10 transition-all duration-200 cursor-pointer shadow-md active:scale-95"
             aria-label="Return to tab"
             title="Return to main tab"
           >
-            <ArrowDownLeft className="h-5 w-5 md:h-6 md:w-6 text-[#25D366]" />
+            <ArrowDownLeft className="h-5 w-5 md:h-6 md:w-6 text-[#25D366] shrink-0" />
           </button>
-          <span className="text-[11px] font-medium text-[#8696A0]">Return</span>
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#8696A0]">Return</span>
         </div>
       )}
 
       {/* End Call Button */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 shrink-0">
         <button
           onClick={handleEndCall}
-          className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-[#EA0038] text-white transition-all duration-200 hover:bg-[#d00030] hover:scale-105 active:scale-95 shadow-[0_0_25px_rgba(234,0,56,0.4)] cursor-pointer"
+          className="flex h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-[#EA0038] text-white transition-all duration-200 hover:bg-[#d00030] hover:scale-105 active:scale-95 shadow-[0_0_25px_rgba(234,0,56,0.4)] cursor-pointer"
           aria-label="End call"
           title="End Call"
         >
-          <PhoneOff className="h-5 w-5 md:h-6 md:w-6" fill="currentColor" />
+          <PhoneOff className="h-5 w-5 md:h-6 md:w-6 shrink-0" fill="currentColor" />
         </button>
-        <span className="text-[11px] font-medium text-red-400">End</span>
+        <span className="text-[10px] sm:text-[11px] font-medium text-red-400">End</span>
       </div>
     </div>
   );
+
+  // Dedicated Screen Share Layout (Responsive for Phone ⇄ Web)
+  const renderScreenShareLayout = () => {
+    if (!screenShareTrack) return null;
+    const isOneOnOneScreen = !activeCall?.isGroup && cameraTracks.length <= 1;
+    const remoteCameraTrack = cameraTracks.find(t => !t.participant.isLocal) || cameraTracks[0];
+
+    return (
+      <div className="relative w-full h-full flex flex-col items-center justify-between overflow-hidden">
+        {/* Main Content Area */}
+        <div className={cn(
+          "relative w-full flex-1 flex items-center justify-center overflow-hidden gap-4 p-2 sm:p-4",
+          isPortraitScreenShare ? "flex-col md:flex-row" : "flex-col"
+        )}>
+          {/* Main Prominent Screen Share Viewport */}
+          <div 
+            ref={screenShareContainerRef}
+            className={cn(
+              "relative rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10 flex items-center justify-center transition-all duration-300",
+              isPortraitScreenShare 
+                ? "h-full w-full max-w-[460px] lg:max-w-[520px] aspect-[9/16] shrink-0" 
+                : "w-full h-full flex-1"
+            )}
+          >
+            <ParticipantTile
+              key={`${screenShareTrack.participant.identity}-screen`}
+              trackRef={screenShareTrack}
+              groupMembers={groupMembers}
+              isReconnecting={screenShareTrack.participant.identity === reconnectingUserId}
+              fitMode={screenShareFitMode}
+              onAspectRatioChange={setIsPortraitScreenShare}
+            />
+
+            {/* Top Ribbon Overlay on Screen Share Viewport */}
+            <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20 pointer-events-auto">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/15 text-xs font-semibold text-white shadow-md">
+                  {isPortraitScreenShare ? (
+                    <>
+                      <Smartphone className="h-3.5 w-3.5 text-[#25D366] shrink-0" />
+                      <span>Phone Screen</span>
+                    </>
+                  ) : (
+                    <>
+                      <Monitor className="h-3.5 w-3.5 text-[#00A884] shrink-0" />
+                      <span>Desktop Screen</span>
+                    </>
+                  )}
+                  <span className="text-white/40">·</span>
+                  <span className="text-[#8696A0] font-normal truncate max-w-[130px] sm:max-w-[200px]">
+                    {screenShareTrack.participant.isLocal ? "Your screen" : `${screenShareTrack.participant.name || "Peer"}'s screen`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Viewport Control Actions */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setScreenShareFitMode(prev => prev === "contain" ? "cover" : "contain")}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15 transition-colors cursor-pointer shadow-md"
+                  title={screenShareFitMode === "contain" ? "Fill screen (Zoom)" : "Fit to screen (Contain)"}
+                >
+                  <span>{screenShareFitMode === "contain" ? "Fill" : "Fit"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleScreenShareFullscreen}
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 hover:bg-white/20 text-white backdrop-blur-md border border-white/15 transition-colors cursor-pointer shadow-md"
+                  title={isScreenShareFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                >
+                  {isScreenShareFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* In 1-on-1 Call with Screen Share: Floating Corner PiP for the other participant */}
+            {isOneOnOneScreen && remoteCameraTrack && (
+              <div className="absolute top-14 right-3 sm:top-14 sm:right-4 w-28 h-20 sm:w-40 sm:h-28 z-30 rounded-xl overflow-hidden shadow-2xl border-2 border-white/25 bg-[#111B21] animate-in fade-in zoom-in-95 duration-200">
+                <ParticipantTile
+                  key={`${remoteCameraTrack.participant.identity}-pip`}
+                  trackRef={remoteCameraTrack}
+                  groupMembers={groupMembers}
+                  hideName
+                  isReconnecting={remoteCameraTrack.participant.identity === reconnectingUserId}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Group Call Camera Tiles */}
+          {!isOneOnOneScreen && cameraTracks.length > 0 && (
+            isPortraitScreenShare ? (
+              // When portrait on desktop: Vertical right-side column; on mobile: compact horizontal strip
+              <>
+                <div className="hidden md:flex flex-col gap-2.5 max-h-[72vh] overflow-y-auto no-scrollbar w-36 lg:w-44 shrink-0 py-1">
+                  {cameraTracks.map((trackRef, idx) => (
+                    <div
+                      key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
+                      className="w-full h-24 rounded-xl overflow-hidden shadow-lg border border-white/20 shrink-0 bg-[#111B21]"
+                    >
+                      <ParticipantTile
+                        trackRef={trackRef}
+                        groupMembers={groupMembers}
+                        isReconnecting={trackRef.participant.identity === reconnectingUserId}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex md:hidden w-full overflow-x-auto gap-2 py-1 shrink-0 justify-center">
+                  {cameraTracks.map((trackRef, idx) => (
+                    <div
+                      key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
+                      className="w-24 h-16 rounded-xl overflow-hidden shadow-lg border border-white/20 shrink-0 bg-[#111B21]"
+                    >
+                      <ParticipantTile
+                        trackRef={trackRef}
+                        groupMembers={groupMembers}
+                        isReconnecting={trackRef.participant.identity === reconnectingUserId}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              // When landscape: Horizontal Camera Strip Below (with mb-16 to clear ControlDock)
+              <div className="w-full flex items-center justify-center gap-3 py-1 overflow-x-auto z-10 shrink-0 mb-16 sm:mb-20">
+                {cameraTracks.map((trackRef, idx) => (
+                  <div
+                    key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
+                    className="w-32 h-20 sm:w-44 sm:h-28 rounded-xl overflow-hidden shadow-lg border border-white/20 shrink-0 bg-[#111B21]"
+                  >
+                    <ParticipantTile
+                      trackRef={trackRef}
+                      groupMembers={groupMembers}
+                      isReconnecting={trackRef.participant.identity === reconnectingUserId}
+                    />
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+
+        <ControlDock compact />
+      </div>
+    );
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Peer info resolution
@@ -943,19 +1130,27 @@ export const CustomCallLayout = ({
               </div>
             </div>
 
-            {/* Video grid */}
-            <div className={cn("absolute inset-0 z-0 pt-20 pb-28 px-4", gridClass)}>
-              {tracks.map((trackRef, idx) => (
-                <ParticipantTile 
-                  key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} 
-                  trackRef={trackRef} 
-                  groupMembers={groupMembers} 
-                  isReconnecting={trackRef.participant.identity === reconnectingUserId}
-                />
-              ))}
-            </div>
+            {screenShareTrack ? (
+              <div className="pt-16 sm:pt-20 pb-4 px-2 sm:px-4 md:px-6 h-full w-full">
+                {renderScreenShareLayout()}
+              </div>
+            ) : (
+              <>
+                {/* Video grid */}
+                <div className={cn("absolute inset-0 z-0 pt-20 pb-28 px-4", gridClass)}>
+                  {tracks.map((trackRef, idx) => (
+                    <ParticipantTile 
+                      key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`} 
+                      trackRef={trackRef} 
+                      groupMembers={groupMembers} 
+                      isReconnecting={trackRef.participant.identity === reconnectingUserId}
+                    />
+                  ))}
+                </div>
 
-            <ControlDock />
+                <ControlDock />
+              </>
+            )}
           </div>
         </div>
       );
@@ -1215,40 +1410,12 @@ export const CustomCallLayout = ({
       </div>
 
       {/* Main Video Area */}
-      <div className="flex-1 flex flex-col pt-20 pb-28 px-4 md:px-6">
+      <div className={cn(
+        "flex-1 flex flex-col overflow-hidden",
+        screenShareTrack ? "pt-16 sm:pt-20 pb-4 px-2 sm:px-4 md:px-6" : "pt-20 pb-28 px-4 md:px-6"
+      )}>
         {screenShareTrack ? (
-          // Dedicated Screen Share Hero Layout
-          <div className="relative w-full h-full flex flex-col items-center justify-between gap-3">
-            {/* Main Prominent Screen Share Viewport */}
-            <div className="relative w-full flex-1 rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10">
-              <ParticipantTile
-                key={`${screenShareTrack.participant.identity}-screen`}
-                trackRef={screenShareTrack}
-                groupMembers={groupMembers}
-                isReconnecting={screenShareTrack.participant.identity === reconnectingUserId}
-              />
-            </div>
-
-            {/* Bottom Horizontal Camera Tiles Strip */}
-            {cameraTracks.length > 0 && (
-              <div className="w-full flex items-center justify-center gap-3 py-1 overflow-x-auto z-10 shrink-0">
-                {cameraTracks.map((trackRef, idx) => (
-                  <div
-                    key={`${trackRef.participant.identity}-${trackRef.source}-${idx}`}
-                    className="w-32 h-20 sm:w-44 sm:h-28 rounded-xl overflow-hidden shadow-lg border border-white/20 shrink-0 bg-[#111B21]"
-                  >
-                    <ParticipantTile
-                      trackRef={trackRef}
-                      groupMembers={groupMembers}
-                      isReconnecting={trackRef.participant.identity === reconnectingUserId}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <ControlDock compact />
-          </div>
+          renderScreenShareLayout()
         ) : isOneOnOne && localTrack && remoteTrack ? (
           // 1-on-1 Picture-in-Picture Layout
           <div className="relative w-full h-full max-w-5xl mx-auto rounded-3xl overflow-visible shadow-2xl bg-[#111B21]">
@@ -1325,6 +1492,12 @@ export const CustomCallLayout = ({
         </div>
       )}
 
+      {internalSettingsOpen && (
+        <DeviceSettingsModal
+          open={internalSettingsOpen}
+          onClose={handleCloseInternalSettings}
+        />
+      )}
     </div>
   );
 };
