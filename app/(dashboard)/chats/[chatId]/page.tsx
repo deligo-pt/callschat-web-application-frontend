@@ -507,6 +507,7 @@ function ChatRoomPageContent() {
     typingUsers,
     handleTyping,
     requestManualResend,
+    recipientPublicKey,
   } = useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -1204,6 +1205,7 @@ function ChatRoomPageContent() {
           peerId={recipient.id}
           peerName={recipient.name}
           peerAvatar={recipient.avatarUrl}
+          peerPublicKey={recipientPublicKey || undefined}
         />
       )}
     </div>
