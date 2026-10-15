@@ -554,19 +554,25 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 }
 
                 if (previousKey && previousKey !== latestPubKey) {
-                  setMessages((prev) => [
-                    ...prev,
-                    {
-                      id: `sec-notice-${Date.now()}`,
-                      text: "Your safety number with this contact has changed. This could mean they reinstalled the app or changed devices. Tap to verify.",
-                      senderId: "system",
-                      recipientId: currentUserId,
-                      conversationId,
-                      createdAt: new Date().toISOString(),
-                      isSystem: true,
-                      systemType: "SAFETY_NUMBER_CHANGED",
-                    },
-                  ]);
+                  setMessages((prev) => {
+                    const alreadyHasNotice = prev.some(
+                      (m) => m.isSystem && m.systemType === "SAFETY_NUMBER_CHANGED"
+                    );
+                    if (alreadyHasNotice) return prev;
+                    return [
+                      ...prev,
+                      {
+                        id: `sec-notice-${Date.now()}`,
+                        text: "Your safety number with this contact has changed. This could mean they reinstalled the app or changed devices. Tap to verify.",
+                        senderId: "system",
+                        recipientId: currentUserId,
+                        conversationId,
+                        createdAt: new Date().toISOString(),
+                        isSystem: true,
+                        systemType: "SAFETY_NUMBER_CHANGED",
+                      },
+                    ];
+                  });
                 }
               }
             } catch (err) {
@@ -1992,19 +1998,25 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
         // If the public key rotated/changed, alert user of safety number update
         if (previousKey && previousKey !== payload.publicKey) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `sec-notice-${Date.now()}`,
-              text: "Your safety number with this contact has changed. This could mean they reinstalled the app or changed devices. Tap to verify.",
-              senderId: "system",
-              recipientId: currentUserId,
-              conversationId,
-              createdAt: new Date().toISOString(),
-              isSystem: true,
-              systemType: "SAFETY_NUMBER_CHANGED",
-            },
-          ]);
+          setMessages((prev) => {
+            const alreadyHasNotice = prev.some(
+              (m) => m.isSystem && m.systemType === "SAFETY_NUMBER_CHANGED"
+            );
+            if (alreadyHasNotice) return prev;
+            return [
+              ...prev,
+              {
+                id: `sec-notice-${Date.now()}`,
+                text: "Your safety number with this contact has changed. This could mean they reinstalled the app or changed devices. Tap to verify.",
+                senderId: "system",
+                recipientId: currentUserId,
+                conversationId,
+                createdAt: new Date().toISOString(),
+                isSystem: true,
+                systemType: "SAFETY_NUMBER_CHANGED",
+              },
+            ];
+          });
         }
 
         // Re-attempt decryption for any pending messages in this chat with the new key
@@ -3318,6 +3330,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     typingUsers,
     handleTyping,
     requestManualResend,
+    recipientPublicKey,
     // UI considers the chat ready as long as we have our own keys and a valid connection
     isReady: !!(myPrivateKey && isConnected && conversationId),
   };

@@ -92,7 +92,7 @@ export function SecurityCodeModal({
         }
         if (isMounted) setCurrentUserId(myUid);
 
-        // 1. Get my identity public key from IndexedDB / Signal store
+        // 1. Get my identity public key from IndexedDB / Signal store / localStorage
         let myKey = await getUserPublicKey(myUid);
         if (!myKey && myUid) {
           try {
@@ -104,17 +104,20 @@ export function SecurityCodeModal({
           } catch {}
         }
         if (!myKey && myUid) {
-          // Fallback to local storage if not in IndexedDB
           myKey = localStorage.getItem(`publicKey_${myUid}`) || localStorage.getItem("publicKey");
         }
 
-        // 2. Get peer's identity public key
+        // 2. Get peer's identity public key (prefer in-memory directPeerPublicKey)
         let peerKey = directPeerPublicKey;
         if (!peerKey) {
           try {
             const keysRes = await chatService.fetchRecipientKey(peerId);
-            if (keysRes?.success && keysRes.data?.length > 0) {
+            if (keysRes?.data && Array.isArray(keysRes.data) && keysRes.data.length > 0) {
               peerKey = keysRes.data[0].publicKey;
+            } else if (keysRes?.data?.publicKey) {
+              peerKey = keysRes.data.publicKey;
+            } else if (keysRes?.publicKey) {
+              peerKey = keysRes.publicKey;
             }
           } catch (fetchErr) {
             console.warn("Could not fetch peer public key for safety number:", fetchErr);
@@ -128,7 +131,7 @@ export function SecurityCodeModal({
           throw new Error(`Public keys for ${peerName} are not published yet.`);
         }
 
-        // 3. Compute 60-digit safety number (Signal Fingerprint v2)
+        // 3. Compute 60-digit safety number with fast hardware-accelerated Signal Fingerprint
         let result: SafetyNumberResult;
         try {
           if (myUid && peerId) {
