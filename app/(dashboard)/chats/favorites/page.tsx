@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, Heart } from "lucide-react";
+import { ArrowLeft, Heart, Users, MessageSquare, HeartOff, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useContacts } from "@/hooks/useContacts";
 import { cn } from "@/lib/utils";
-
 import { groupService, GroupItem } from "@/services/group.service";
+import { chatService } from "@/services/chat.service";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { useGroupStore } from "@/hooks/useGroupStore";
@@ -22,6 +22,7 @@ export default function FavoritesPage() {
 
   const [favoriteGroups, setFavoriteGroups] = useState<GroupItem[]>([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(true);
+  const [openingChatId, setOpeningChatId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchFavoriteGroups = async () => {
@@ -48,29 +49,54 @@ export default function FavoritesPage() {
     }
   }, [currentMode]);
 
+  const handleStartChat = async (targetUserId: string) => {
+    setOpeningChatId(targetUserId);
+    try {
+      const res = await chatService.initiateConversation(targetUserId);
+      const convId = res?.data?.conversationId ?? res?.conversationId;
+      if (convId) {
+        router.push(`/chats/${convId}?recipientId=${targetUserId}`);
+      }
+    } catch (error) {
+      console.error("Failed to start conversation:", error);
+      toast.error("Failed to start chat");
+    } finally {
+      setOpeningChatId(null);
+    }
+  };
+
+  const handleOpenGroup = (groupId: string) => {
+    router.push(`/groups/${groupId}`);
+  };
+
   const handleToggleFavouriteGroup = async (group: GroupItem) => {
     // Optimistic UI update
-    setFavoriteGroups(prev => prev.filter(g => g.id !== group.id));
+    setFavoriteGroups((prev) => prev.filter((g) => g.id !== group.id));
     useGroupStore.getState().toggleFavouriteInStore(group.id, false);
-    
+
     // API Call
     const res = await groupService.toggleFavourite(group.id, false);
     if (!res.success) {
       toast.error("Failed to remove group from favorites");
       // Rollback
-      setFavoriteGroups(prev => [...prev, group]);
+      setFavoriteGroups((prev) => [...prev, group]);
       useGroupStore.getState().toggleFavouriteInStore(group.id, true);
+    } else {
+      toast.success("Removed from favorites");
     }
   };
 
   const getInitials = (name: string) => {
-    return name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase();
   };
 
   const getRandomColor = (name: string) => {
-    const colors = [
-      "bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-pink-500"
-    ];
+    const colors = ["bg-emerald-600", "bg-blue-600", "bg-indigo-600", "bg-purple-600", "bg-teal-600"];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -79,45 +105,89 @@ export default function FavoritesPage() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col bg-white">
-      {/* Header */}
-      <div className="flex items-center gap-4 bg-[#3B58F5] px-6 py-5 text-white shadow-sm shrink-0">
-        <button
-          onClick={() => router.push("/chats")}
-          className="rounded-full p-1.5 transition-colors hover:bg-white/20"
-        >
-          <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
-        </button>
-        <h1 className="text-[18px] font-semibold">Favorites</h1>
+    <div className="flex h-full w-full flex-col bg-[#F8FAFC] dark:bg-[#0C1317] overflow-hidden text-[#111B21] dark:text-[#E9EDEF]">
+      {/* ── CallsChat Clean Header ────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between border-b border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] px-6 py-4 shrink-0 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push("/chats")}
+            className="rounded-full p-2 text-[#54656F] dark:text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] transition-colors cursor-pointer"
+            title="Back to chats"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500">
+              <Heart className="h-4 w-4 fill-rose-500" />
+            </div>
+            <div>
+              <h1 className="text-[17px] font-bold tracking-tight">Favorites</h1>
+              <p className="text-[11.5px] text-[#667781] dark:text-[#8696A0]">
+                Quick access to your starred contacts & groups
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0]">
+            {favoriteContacts.length + favoriteGroups.length} starred
+          </span>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-10">
-        {/* Favorite Contacts Section */}
-        <div className="mt-6 px-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Heart className="h-5 w-5 fill-red-500 text-red-500" />
-            <h2 className="text-[15px] font-bold text-[#1D2A54]">Favorite Contacts</h2>
+      {/* ── Scrollable Body ─────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto w-full">
+        {/* Favorite Contacts Card */}
+        <section className="rounded-2xl bg-white dark:bg-[#111B21] border border-[#E2E8F0] dark:border-[#222D34] p-5 shadow-xs transition-colors">
+          <div className="flex items-center justify-between pb-3.5 mb-2 border-b border-[#F0F2F5] dark:border-[#202C33]">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-[#00A884]" />
+              <h2 className="text-[13px] font-bold uppercase tracking-wider text-[#111B21] dark:text-[#E9EDEF]">
+                Favorite Contacts
+              </h2>
+            </div>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0]">
+              {favoriteContacts.length}
+            </span>
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col">
             {favoriteContacts.length === 0 ? (
-              <p className="text-[13px] text-[#8F95B2] py-4">No favorite contacts yet.</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
+                <div className="h-10 w-10 rounded-full bg-rose-50 dark:bg-rose-950/30 flex items-center justify-center text-rose-400">
+                  <Heart className="h-5 w-5" />
+                </div>
+                <p className="text-[13.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
+                  No favorite contacts yet
+                </p>
+                <p className="text-[12px] text-[#667781] dark:text-[#8696A0] max-w-xs">
+                  Star your most frequent contacts to access them quickly here.
+                </p>
+              </div>
             ) : (
               favoriteContacts.map((contact) => (
-                <div key={contact.id} className="flex items-center justify-between py-3 border-b border-[#F4F6FC] last:border-0">
-                  <div className="flex items-center gap-4">
+                <div
+                  key={contact.id}
+                  className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F0F2F5]/70 dark:hover:bg-[#202C33]/60 transition-colors border-b border-[#F0F2F5] dark:border-[#202C33] last:border-0"
+                >
+                  <div
+                    onClick={() => handleStartChat(contact.userId || contact.id)}
+                    className="flex items-center gap-3.5 flex-1 min-w-0 cursor-pointer"
+                  >
                     {/* Avatar */}
                     <div className="relative shrink-0">
                       {contact.avatarUrl ? (
                         <img
-                          src={getOptimizedImageUrl(contact.avatarUrl)}
+                          src={getOptimizedImageUrl(contact.avatarUrl, 44, 44)}
                           alt={contact.name}
-                          className="h-[46px] w-[46px] rounded-full object-cover"
+                          className="h-11 w-11 rounded-full object-cover"
                         />
                       ) : (
                         <div
                           className={cn(
-                            "flex h-[46px] w-[46px] items-center justify-center rounded-full text-[15px] font-bold text-white shadow-sm",
+                            "flex h-11 w-11 items-center justify-center rounded-full text-[14px] font-bold text-white shadow-xs",
                             getRandomColor(contact.name)
                           )}
                         >
@@ -126,54 +196,103 @@ export default function FavoritesPage() {
                       )}
                     </div>
                     {/* Info */}
-                    <div className="flex flex-col">
-                      <h3 className="text-[15px] font-bold text-[#1D2A54]">{contact.name}</h3>
-                      <p className="text-[13px] font-medium text-[#8F95B2]">{contact.phone}</p>
+                    <div className="flex flex-col min-w-0">
+                      <h3 className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF] group-hover:text-[#00A884] transition-colors truncate">
+                        {contact.name}
+                      </h3>
+                      <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
+                        {contact.phone || "No phone registered"}
+                      </p>
                     </div>
                   </div>
-                  {/* Remove Button */}
-                  <button
-                    onClick={() => handleToggleFavourite(contact.id, true)}
-                    className="text-[14px] font-semibold text-[#3B58F5] hover:text-[#2A41C7] transition-colors px-2 py-1"
-                  >
-                    Remove
-                  </button>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                    <button
+                      type="button"
+                      onClick={() => handleStartChat(contact.userId || contact.id)}
+                      disabled={openingChatId === (contact.userId || contact.id)}
+                      className="p-2 rounded-lg text-[#00A884] hover:bg-[#00A884]/10 transition-colors cursor-pointer disabled:opacity-50"
+                      title="Open Chat"
+                    >
+                      {openingChatId === (contact.userId || contact.id) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFavourite(contact.id, true)}
+                      className="flex items-center gap-1 text-[12px] font-semibold text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      title="Remove from favorites"
+                    >
+                      <HeartOff className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Remove</span>
+                    </button>
+                  </div>
                 </div>
               ))
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Favorite Groups Section */}
-        <div className="mt-8 px-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Heart className="h-5 w-5 fill-red-500 text-red-500" />
-            <h2 className="text-[15px] font-bold text-[#1D2A54]">Favorite Groups</h2>
+        {/* Favorite Groups Card */}
+        <section className="rounded-2xl bg-white dark:bg-[#111B21] border border-[#E2E8F0] dark:border-[#222D34] p-5 shadow-xs transition-colors">
+          <div className="flex items-center justify-between pb-3.5 mb-2 border-b border-[#F0F2F5] dark:border-[#202C33]">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-[#00A884]" />
+              <h2 className="text-[13px] font-bold uppercase tracking-wider text-[#111B21] dark:text-[#E9EDEF]">
+                Favorite Groups
+              </h2>
+            </div>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0]">
+              {favoriteGroups.length}
+            </span>
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col">
             {isLoadingGroups ? (
-              <p className="text-[13px] text-[#8F95B2] py-4">Loading favorite groups...</p>
+              <div className="flex items-center justify-center py-8 text-gray-400 gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-[#00A884]" />
+                <span className="text-xs">Loading favorite groups...</span>
+              </div>
             ) : favoriteGroups.length === 0 ? (
-              <p className="text-[13px] text-[#8F95B2] py-4">No favorite groups yet.</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
+                <div className="h-10 w-10 rounded-full bg-rose-50 dark:bg-rose-950/30 flex items-center justify-center text-rose-400">
+                  <Heart className="h-5 w-5" />
+                </div>
+                <p className="text-[13.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
+                  No favorite groups yet
+                </p>
+                <p className="text-[12px] text-[#667781] dark:text-[#8696A0] max-w-xs">
+                  Star important groups to access them quickly from here.
+                </p>
+              </div>
             ) : (
               favoriteGroups.map((group) => {
                 const color = getRandomColor(group.name);
                 return (
-                  <div key={group.id} className="flex items-center justify-between py-3 border-b border-[#F4F6FC] last:border-0">
-                    <div className="flex items-center gap-4">
+                  <div
+                    key={group.id}
+                    className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F0F2F5]/70 dark:hover:bg-[#202C33]/60 transition-colors border-b border-[#F0F2F5] dark:border-[#202C33] last:border-0"
+                  >
+                    <div
+                      onClick={() => handleOpenGroup(group.id)}
+                      className="flex items-center gap-3.5 flex-1 min-w-0 cursor-pointer"
+                    >
                       {/* Avatar */}
                       <div className="relative shrink-0">
                         {group.avatarUrl ? (
                           <img
-                            src={getOptimizedImageUrl(group.avatarUrl)}
+                            src={getOptimizedImageUrl(group.avatarUrl, 44, 44)}
                             alt={group.name}
-                            className="h-[46px] w-[46px] rounded-full object-cover"
+                            className="h-11 w-11 rounded-full object-cover"
                           />
                         ) : (
                           <div
                             className={cn(
-                              "flex h-[46px] w-[46px] items-center justify-center rounded-full text-[15px] font-bold text-white shadow-md",
+                              "flex h-11 w-11 items-center justify-center rounded-full text-[14px] font-bold text-white shadow-xs",
                               color
                             )}
                           >
@@ -182,27 +301,43 @@ export default function FavoritesPage() {
                         )}
                       </div>
                       {/* Info */}
-                      <div className="flex flex-col">
-                        <h3 className="text-[15px] font-bold text-[#1D2A54]">{group.name}</h3>
-                        <p className="text-[13px] font-medium text-[#8F95B2] flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                          {group.memberCount} members
+                      <div className="flex flex-col min-w-0">
+                        <h3 className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF] group-hover:text-[#00A884] transition-colors truncate">
+                          {group.name}
+                        </h3>
+                        <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{group.memberCount} members</span>
                         </p>
                       </div>
                     </div>
-                    {/* Remove Button */}
-                    <button
-                      onClick={() => handleToggleFavouriteGroup(group)}
-                      className="text-[14px] font-semibold text-[#3B58F5] hover:text-[#2A41C7] transition-colors px-2 py-1"
-                    >
-                      Remove
-                    </button>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenGroup(group.id)}
+                        className="p-2 rounded-lg text-[#00A884] hover:bg-[#00A884]/10 transition-colors cursor-pointer"
+                        title="Open Group"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFavouriteGroup(group)}
+                        className="flex items-center gap-1 text-[12px] font-semibold text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        title="Remove from favorites"
+                      >
+                        <HeartOff className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Remove</span>
+                      </button>
+                    </div>
                   </div>
-                )
+                );
               })
             )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

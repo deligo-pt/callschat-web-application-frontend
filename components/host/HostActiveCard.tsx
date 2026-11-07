@@ -28,6 +28,17 @@ export function HostActiveCard({ profile, onLaunchStudio }: HostActiveCardProps)
       })
     : "Active";
 
+  const totalDiamonds =
+    profile.stats?.totalDiamondsEarned ??
+    profile.totalDiamondsEarned ??
+    0;
+  const totalLiveHours =
+    profile.stats?.totalLiveHours ??
+    profile.totalLiveHours ??
+    0;
+  const followersCount = profile.followersCount ?? 0;
+  const badgeLevel = profile.badgeLevel ?? profile.level ?? 1;
+
   return (
     <div className="space-y-6">
       {/* Active Host Status Header */}
@@ -70,7 +81,7 @@ export function HostActiveCard({ profile, onLaunchStudio }: HostActiveCardProps)
             <Clock className="h-4 w-4 text-blue-500" />
           </div>
           <div className="text-2xl font-black text-[#1D2A54] dark:text-[#E9EDEF]">
-            {profile.totalLiveHours}h
+            {totalLiveHours}h
           </div>
           <p className="text-[10px] text-[#8F95B2] dark:text-[#8696A0]">Total stage broadcast time</p>
         </div>
@@ -83,7 +94,7 @@ export function HostActiveCard({ profile, onLaunchStudio }: HostActiveCardProps)
             <Gem className="h-4 w-4 text-purple-500" />
           </div>
           <div className="text-2xl font-black text-[#1D2A54] dark:text-[#E9EDEF]">
-            {profile.totalDiamondsEarned.toLocaleString()}
+            {totalDiamonds.toLocaleString()}
           </div>
           <p className="text-[10px] text-[#8F95B2] dark:text-[#8696A0]">Stage gifts revenue</p>
         </div>
@@ -96,7 +107,7 @@ export function HostActiveCard({ profile, onLaunchStudio }: HostActiveCardProps)
             <Users className="h-4 w-4 text-indigo-500" />
           </div>
           <div className="text-2xl font-black text-[#1D2A54] dark:text-[#E9EDEF]">
-            {profile.followersCount.toLocaleString()}
+            {followersCount.toLocaleString()}
           </div>
           <p className="text-[10px] text-[#8F95B2] dark:text-[#8696A0]">Loyal stage listeners</p>
         </div>
@@ -109,7 +120,7 @@ export function HostActiveCard({ profile, onLaunchStudio }: HostActiveCardProps)
             <Award className="h-4 w-4 text-amber-500" />
           </div>
           <div className="text-2xl font-black text-[#1D2A54] dark:text-[#E9EDEF]">
-            Level {profile.badgeLevel}
+            Level {badgeLevel}
           </div>
           <p className="text-[10px] text-[#8F95B2] dark:text-[#8696A0]">Approved since {approvedDate}</p>
         </div>

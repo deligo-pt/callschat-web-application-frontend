@@ -282,6 +282,13 @@ export const useCallSignaling = () => {
       livekitUrl: string;
       roomName: string;
       callType: 'AUDIO' | 'VIDEO';
+      peerId?: string;
+      peerName?: string;
+      peerAvatar?: string | null;
+      callerName?: string;
+      callerAvatar?: string | null;
+      receiverName?: string;
+      receiverAvatar?: string | null;
     }) => {
       console.log('[Call] Call connected, joining LiveKit room:', payload);
 
@@ -311,14 +318,30 @@ export const useCallSignaling = () => {
       setOutgoingCall(null);
       acceptedCallIdRef.current = null;
       setOutgoingCallStatus('CALLING');
+
+      const resolvedPeerName =
+        payload.peerName ||
+        (isOurOutgoing
+          ? (payload.receiverName || pendingPeerRef.current.name)
+          : (payload.callerName || pendingPeerRef.current.name)) ||
+        pendingPeerRef.current.name ||
+        'CallsChat User';
+
+      const resolvedPeerAvatar =
+        payload.peerAvatar ||
+        (isOurOutgoing
+          ? (payload.receiverAvatar || pendingPeerRef.current.avatar)
+          : (payload.callerAvatar || pendingPeerRef.current.avatar)) ||
+        pendingPeerRef.current.avatar;
+
       setActiveCall({
         callId: payload.callId,
         token: payload.token,
         serverUrl: resolveLivekitUrl(payload.livekitUrl),
         roomName: payload.roomName,
         callType: payload.callType,
-        peerName: pendingPeerRef.current.name,
-        peerAvatar: pendingPeerRef.current.avatar,
+        peerName: resolvedPeerName,
+        peerAvatar: resolvedPeerAvatar,
         startedAt: Date.now(),
       });
       pendingPeerRef.current = {};

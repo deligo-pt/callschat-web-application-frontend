@@ -33,10 +33,22 @@ export interface HostProfileData {
   id: string;
   userId: string;
   status: HostProfileStatus;
-  badgeLevel: number;
-  totalLiveHours: number;
-  totalDiamondsEarned: number;
-  followersCount: number;
+  badgeLevel?: number;
+  level?: number;
+  totalLiveHours?: number;
+  totalDiamondsEarned?: number;
+  followersCount?: number;
+  stats?: {
+    totalLiveHours?: number;
+    totalDiamondsEarned?: number;
+    totalLiveSessions?: number;
+    peakViewers?: number;
+    totalGiftsReceived?: number;
+  };
+  earnings?: {
+    withdrawableDiamonds?: number;
+    pendingWithdrawalDiamonds?: number;
+  };
   approvedAt?: string | null;
   createdAt: string;
   updatedAt: string;

@@ -786,106 +786,112 @@ export default function ContactsPage() {
 
       {/* ── Right Slide-Over Panel: Add Contact Form ──────────────────────── */}
       {isAddContactPanelOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[400px] flex-col border-l border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] shadow-2xl animate-in slide-in-from-right duration-200">
-          {/* Header */}
-          <div className="flex items-center gap-3 border-b border-[#E2E8F0] dark:border-[#222D34] px-6 py-5 bg-[#F0F2F5]/60 dark:bg-[#202C33]/60 backdrop-blur-md">
-            <button
-              onClick={() => setIsAddContactPanelOpen(false)}
-              className="rounded-full p-1.5 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-              title="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <h2 className="text-[17px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight">
-              {t("new_contact")}
-            </h2>
-          </div>
+        <>
+          {/* Backdrop overlay for smooth closing */}
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+            onClick={() => setIsAddContactPanelOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[400px] flex-col border-l border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] shadow-2xl animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="flex items-center gap-3 border-b border-[#E2E8F0] dark:border-[#222D34] px-6 py-5 bg-[#F0F2F5]/60 dark:bg-[#202C33]/60 backdrop-blur-md">
+              <button
+                type="button"
+                onClick={() => setIsAddContactPanelOpen(false)}
+                className="rounded-full p-1.5 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <h2 className="text-[17px] font-bold text-[#111B21] dark:text-[#E9EDEF] tracking-tight">
+                {t("new_contact")}
+              </h2>
+            </div>
 
-          {/* Form */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <form onSubmit={handleAddContact} className="flex flex-col gap-6">
-              
-              {/* First Name */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
-                  {t("first_name")}
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696A0]" />
+            {/* Form */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <form onSubmit={handleAddContact} className="flex flex-col gap-6">
+                
+                {/* First Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
+                    {t("first_name")}
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696A0]" />
+                    <input
+                      type="text"
+                      placeholder="Enter first name"
+                      value={newContactFirstName}
+                      onChange={(e) => setNewContactFirstName(e.target.value)}
+                      className="w-full rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] pl-10 pr-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Last Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
+                    {t("last_name")}
+                  </label>
                   <input
                     type="text"
-                    placeholder="Enter first name"
-                    value={newContactFirstName}
-                    onChange={(e) => setNewContactFirstName(e.target.value)}
-                    className="w-full rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] pl-10 pr-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all"
-                    required
+                    placeholder="Enter last name (optional)"
+                    value={newContactLastName}
+                    onChange={(e) => setNewContactLastName(e.target.value)}
+                    className="w-full rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] px-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all"
                   />
                 </div>
-              </div>
 
-              {/* Last Name */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
-                  {t("last_name")}
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter last name (optional)"
-                  value={newContactLastName}
-                  onChange={(e) => setNewContactLastName(e.target.value)}
-                  className="w-full rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] px-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all"
-                />
-              </div>
-
-              {/* Phone Number */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
-                  {t("phone_number")}
-                </label>
-                <div className="whatsapp-phone-input">
-                  <PhoneInput
-                    international
-                    defaultCountry="US"
-                    value={newContactPhone}
-                    onChange={setNewContactPhone}
-                    className="flex w-full gap-3"
-                    numberInputProps={{
-                      className:
-                        "flex-1 rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] px-4 py-2.5 text-[14px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] border border-transparent focus:border-[#00A884] focus:outline-none transition-all",
-                    }}
-                  />
+                {/* Phone Number */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-semibold text-[#667781] dark:text-[#8696A0] uppercase tracking-wider">
+                    {t("phone_number")}
+                  </label>
+                  <div className="whatsapp-phone-input">
+                    <PhoneInput
+                      international
+                      defaultCountry="US"
+                      value={newContactPhone}
+                      onChange={setNewContactPhone}
+                      placeholder="Enter phone number"
+                      className="flex w-full gap-3"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {addContactError && (
-                <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 p-3">
-                  <p className="text-[13px] font-medium text-red-600 dark:text-red-400">{addContactError}</p>
+                {addContactError && (
+                  <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 p-3">
+                    <p className="text-[13px] font-medium text-red-600 dark:text-red-400">{addContactError}</p>
+                  </div>
+                )}
+
+                {/* Save CTA */}
+                <div className="mt-4 flex flex-col gap-3">
+                  <button
+                    type="submit"
+                    disabled={isAddingContact}
+                    className="w-full rounded-full bg-[#00A884] hover:bg-[#008069] py-3 text-[14px] font-bold text-white transition-all shadow-sm active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isAddingContact && (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    )}
+                    {isAddingContact ? tCommon("saving") : t("save")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddContactPanelOpen(false)}
+                    className="w-full rounded-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 py-2.5 text-[13.5px] font-semibold text-[#667781] dark:text-[#8696A0] transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
                 </div>
-              )}
-
-              {/* Save CTA */}
-              <div className="mt-4 flex flex-col gap-3">
-                <button
-                  type="submit"
-                  disabled={isAddingContact}
-                  className="w-full rounded-full bg-[#00A884] hover:bg-[#008069] py-3 text-[14px] font-bold text-white transition-all shadow-sm active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isAddingContact && (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  )}
-                  {isAddingContact ? tCommon("saving") : t("save")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddContactPanelOpen(false)}
-                  className="w-full rounded-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 py-2.5 text-[13.5px] font-semibold text-[#667781] dark:text-[#8696A0] transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Explore Businesses Modal */}
