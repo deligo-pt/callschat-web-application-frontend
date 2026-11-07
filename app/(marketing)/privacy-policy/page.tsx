@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import LegalPageLayout from "@/components/legal/LegalPageLayout";
-import { privacyPolicy } from "@/lib/legal/privacy-policy";
+import { fetchLegalDocument } from "@/lib/legal/legal-api";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const description =
     "How CallsChat collects, uses, and protects your information. Privacy-first communication using unique CallsChat IDs.";
@@ -17,6 +20,7 @@ export const metadata: Metadata = {
     },
 };
 
-export default function PrivacyPolicyPage() {
-    return <LegalPageLayout data={privacyPolicy} />;
+export default async function PrivacyPolicyPage() {
+    const document = await fetchLegalDocument("privacy-policy");
+    return <LegalPageLayout data={document} />;
 }

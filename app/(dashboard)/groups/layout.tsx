@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Search, Users, Plus, Loader2, MoreVertical, Trash2, Star, Heart, X, QrCode, Check, CheckCheck, Clock, Camera, Video, Mic, FileText, BarChart2, Phone, Lock } from "lucide-react";
+import { Search, Users, Plus, Loader2, Trash2, Star, Heart, X, QrCode, Check, CheckCheck, Clock, Camera, Video, Mic, FileText, BarChart2, Phone, Lock } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { formatGroupPreviewText } from "@/lib/group-preview";
 import { getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey } from "@/utils/keyStore";
 import { decryptGroupMessage } from "@/utils/crypto";
 import { decryptGroupNotification } from "@/utils/notificationPreview";
+import { ConversationContextMenu } from "@/components/chat/ConversationContextMenu";
 
 const COLORS = ["bg-pink-500", "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500"];
 
@@ -32,9 +33,10 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
   
   const { groups, isLoading, fetchGroups, removeGroupFromStore, toggleFavouriteInStore, updateGroupMessageTimestamp } = useGroupStore();
   const [searchQuery, setSearchQuery] = useState("");
-  const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
+  const [groupToLeave, setGroupToLeave] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
@@ -207,6 +209,61 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
     } finally {
       setIsDeleting(false);
       setGroupToDelete(null);
+    }
+  };
+
+  const handleToggleRead = (group: GroupItem) => {
+    const isCurrentlyUnread = hasUnreadGroup(group);
+    if (isCurrentlyUnread) {
+      const now = new Date().toISOString();
+      setLastReadMap((prev) => {
+        const next = { ...prev, [group.id]: now };
+        try { localStorage.setItem("lastReadMap", JSON.stringify(next)); } catch {}
+        return next;
+      });
+    } else {
+      setLastReadMap((prev) => {
+        const next = { ...prev };
+        delete next[group.id];
+        try { localStorage.setItem("lastReadMap", JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
+  };
+
+  const handleToggleMute = async (group: GroupItem) => {
+    const newMuted = !group.isMuted;
+    try {
+      const res = await groupService.toggleMute(group.id, newMuted);
+      if (res.success) {
+        toast.success(newMuted ? "Group notifications muted" : "Group notifications unmuted");
+      } else {
+        toast.error("Failed to update notification settings");
+      }
+    } catch {
+      toast.error("Failed to update notification settings");
+    }
+  };
+
+  const handleLeaveGroup = async (groupId: string) => {
+    setIsLeaving(true);
+    try {
+      const res = await groupService.removeMember(groupId, currentUserId);
+      if (res.success) {
+        removeGroupFromStore(groupId);
+        if (pathname === `/groups/${groupId}`) {
+          window.location.href = '/groups';
+        }
+        toast.success("Left group successfully");
+      } else {
+        toast.error(res.error || "Failed to leave group");
+      }
+    } catch (err) {
+      console.error("Failed to leave group", err);
+      toast.error("Failed to leave group");
+    } finally {
+      setIsLeaving(false);
+      setGroupToLeave(null);
     }
   };
 
@@ -391,121 +448,86 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
                 return (
                   <div
                     key={group.id}
-                    className="relative group px-2 mb-0.5"
-                    onMouseLeave={() => setMenuOpenForId(null)}
+                    className="relative px-2 mb-0.5"
                   >
-                    <Link 
-                      href={`/groups/${group.id}`} 
-                      className={cn(
-                        "flex items-center gap-3.5 px-3 py-2.5 rounded-xl transition-colors cursor-pointer group/item",
-                        isActive 
-                          ? "bg-[#F0F2F5] dark:bg-[#202C33]" 
-                          : "hover:bg-[#F0F2F5]/70 dark:hover:bg-[#202C33]/70"
-                      )}
+                    <ConversationContextMenu
+                      isGroup={true}
+                      myRole={group.myRole}
+                      isMuted={group.isMuted}
+                      isFavourite={group.isFavourite}
+                      hasUnread={hasUnreadGroup(group)}
+                      onToggleRead={() => handleToggleRead(group)}
+                      onToggleMute={() => handleToggleMute(group)}
+                      onToggleFavourite={() => handleToggleFavourite(group.id, !!group.isFavourite)}
+                      onLeaveGroup={() => setGroupToLeave(group.id)}
+                      onDelete={group.myRole === 'ADMIN' ? () => setGroupToDelete(group.id) : undefined}
                     >
-                      {/* Avatar */}
-                      <div className="relative shrink-0">
-                        {group.avatarUrl ? (
-                          <img 
-                            src={getOptimizedImageUrl(group.avatarUrl)} 
-                            alt={group.name} 
-                            className="h-[46px] w-[46px] rounded-full object-cover bg-slate-100 dark:bg-slate-800"
-                          />
-                        ) : (
-                          <div className={cn("h-[46px] w-[46px] rounded-full flex items-center justify-center text-white font-bold text-[15px] shadow-xs", color)}>
-                            {getInitials(group.name)}
-                          </div>
+                      <Link 
+                        href={`/groups/${group.id}`} 
+                        className={cn(
+                          "flex items-center gap-3.5 px-3 py-2.5 rounded-xl transition-colors cursor-pointer group/item",
+                          isActive 
+                            ? "bg-[#F0F2F5] dark:bg-[#202C33]" 
+                            : "hover:bg-[#F0F2F5]/70 dark:hover:bg-[#202C33]/70"
                         )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
-                        <div className="flex items-center justify-between">
-                          <h3 className={cn(
-                            "text-[14.5px] truncate pr-2 leading-snug",
-                            hasUnreadGroup(group) && !isActive ? "font-bold text-[#111B21] dark:text-[#E9EDEF]" : "font-semibold text-[#111B21] dark:text-[#E9EDEF]"
-                          )}>
-                            {group.name}
-                          </h3>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={cn(
-                              "text-[11.5px] font-normal shrink-0",
-                              hasUnreadGroup(group) && !isActive ? "font-bold text-[#25D366]" : "text-[#667781] dark:text-[#8696A0]"
-                            )}>
-                              {formatTime(lastMsgTime)}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex w-full items-center justify-between gap-2 mt-0.5">
-                          <p className={cn(
-                            "truncate text-left text-[12.5px] leading-tight flex-1 min-w-0 flex items-center",
-                            hasUnreadGroup(group) && !isActive ? "font-semibold text-[#111B21] dark:text-[#E9EDEF]" : "font-normal text-[#667781] dark:text-[#8696A0]"
-                          )}>
-                            <span className="truncate flex items-center">
-                              {renderStatusIcon(group)}
-                              {renderMediaIcon(previewInfo.mediaIcon)}
-                              {!previewInfo.isSystemEvent && previewInfo.senderPrefix && (
-                                <span className="font-medium mr-1 text-[#111B21] dark:text-[#D1D7DB]">{previewInfo.senderPrefix}</span>
-                              )}
-                              <span className="truncate">{previewInfo.previewText}</span>
-                            </span>
-                          </p>
-                          {hasUnreadGroup(group) && (
-                            <div className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-white shadow-xs shrink-0">
-                              1
+                      >
+                        {/* Avatar */}
+                        <div className="relative shrink-0">
+                          {group.avatarUrl ? (
+                            <img 
+                              src={getOptimizedImageUrl(group.avatarUrl)} 
+                              alt={group.name} 
+                              className="h-[46px] w-[46px] rounded-full object-cover bg-slate-100 dark:bg-slate-800"
+                            />
+                          ) : (
+                            <div className={cn("h-[46px] w-[46px] rounded-full flex items-center justify-center text-white font-bold text-[15px] shadow-xs", color)}>
+                              {getInitials(group.name)}
                             </div>
                           )}
                         </div>
-                      </div>
-                    </Link>
 
-                    {/* Context Menu Button */}
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      <button 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setMenuOpenForId(menuOpenForId === group.id ? null : group.id);
-                        }}
-                        className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#8696A0] hover:text-[#111B21] dark:hover:text-[#E9EDEF] cursor-pointer"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      {menuOpenForId === group.id && (
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#202C33] rounded-xl shadow-xl border border-[#E2E8F0] dark:border-[#2A3942] py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleToggleFavourite(group.id, !!group.isFavourite);
-                              setMenuOpenForId(null);
-                            }}
-                            className="w-full px-3.5 py-2 text-left text-[13px] font-medium text-[#111B21] dark:text-[#E9EDEF] hover:bg-[#F0F2F5] dark:hover:bg-[#182229] flex items-center gap-2 cursor-pointer"
-                          >
-                            <Heart className={cn("h-4 w-4", group.isFavourite ? "fill-red-500 text-red-500" : "text-[#8696A0]")} />
-                            <span>{group.isFavourite ? t("remove_from_favorites") : t("add_to_favorites")}</span>
-                          </button>
-
-                          {group.myRole === 'ADMIN' && (
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setGroupToDelete(group.id);
-                                setMenuOpenForId(null);
-                              }}
-                              className="w-full px-3.5 py-2 text-left text-[13px] font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 border-t border-[#E2E8F0] dark:border-[#2A3942] cursor-pointer"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span>{t("delete_group")}</span>
-                            </button>
-                          )}
+                        {/* Info */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
+                          <div className="flex items-center justify-between">
+                            <h3 className={cn(
+                              "text-[14.5px] truncate pr-2 leading-snug",
+                              hasUnreadGroup(group) && !isActive ? "font-bold text-[#111B21] dark:text-[#E9EDEF]" : "font-semibold text-[#111B21] dark:text-[#E9EDEF]"
+                            )}>
+                              {group.name}
+                            </h3>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className={cn(
+                                "text-[11.5px] font-normal shrink-0",
+                                hasUnreadGroup(group) && !isActive ? "font-bold text-[#25D366]" : "text-[#667781] dark:text-[#8696A0]"
+                              )}>
+                                {formatTime(lastMsgTime)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex w-full items-center justify-between gap-2 mt-0.5">
+                            <p className={cn(
+                              "truncate text-left text-[12.5px] leading-tight flex-1 min-w-0 flex items-center",
+                              hasUnreadGroup(group) && !isActive ? "font-semibold text-[#111B21] dark:text-[#E9EDEF]" : "font-normal text-[#667781] dark:text-[#8696A0]"
+                            )}>
+                              <span className="truncate flex items-center">
+                                {renderStatusIcon(group)}
+                                {renderMediaIcon(previewInfo.mediaIcon)}
+                                {!previewInfo.isSystemEvent && previewInfo.senderPrefix && (
+                                  <span className="font-medium mr-1 text-[#111B21] dark:text-[#D1D7DB]">{previewInfo.senderPrefix}</span>
+                                )}
+                                <span className="truncate">{previewInfo.previewText}</span>
+                              </span>
+                            </p>
+                            {hasUnreadGroup(group) && (
+                              <div className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-white shadow-xs shrink-0">
+                                1
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      </Link>
+                    </ConversationContextMenu>
                   </div>
                 );
               })}
@@ -552,6 +574,37 @@ export default function GroupsLayout({ children }: { children: React.ReactNode }
                   <Loader2 className="h-4 w-4 animate-spin text-white" />
                 ) : (
                   t("delete_group")
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Group Confirmation Modal */}
+      {groupToLeave && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#111B21] border border-[#E2E8F0] dark:border-[#2A3942] p-6 shadow-2xl">
+            <h2 className="text-[17px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-1.5">{t("leave_group")}</h2>
+            <p className="text-[13px] font-normal text-[#667781] dark:text-[#8696A0] mb-6">
+              Are you sure you want to leave this group? You will need an invite link to rejoin.
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setGroupToLeave(null)}
+                className="flex-1 rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] py-2.5 text-[13px] font-semibold text-[#111B21] dark:text-[#E9EDEF] transition-colors hover:bg-[#E5E9EC] dark:hover:bg-[#2A3942] cursor-pointer"
+              >
+                {tCommon("cancel")}
+              </button>
+              <button
+                disabled={isLeaving}
+                onClick={() => handleLeaveGroup(groupToLeave)}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-70 cursor-pointer shadow-xs"
+              >
+                {isLeaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                ) : (
+                  t("leave_group")
                 )}
               </button>
             </div>
