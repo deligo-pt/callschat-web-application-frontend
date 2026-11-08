@@ -27,7 +27,7 @@ export default function Footer() {
     };
 
     return (
-        <footer className="w-full bg-[#FCF5EB]/60 dark:bg-[#0C1317] border-t border-[#E2E8F0] dark:border-[#222D34] pt-16 pb-12 text-[#1C1E21] dark:text-[#E9EDEF] overflow-hidden transition-colors duration-200">
+        <footer className="w-full bg-[#111B21] border-t border-[#222D34] pt-16 pb-12 text-[#E9EDEF] overflow-hidden transition-colors duration-200">
             <div className="container mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8">
 
                 {/* ── Upper Grid: Brand & Description (left) + 4-Column Sitemap (right) ── */}
@@ -46,7 +46,7 @@ export default function Footer() {
                                 alt="CallsChat Logo"
                                 width={75}
                                 height={54}
-                                className="object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-xs dark:drop-shadow-[0_0_14px_rgba(0,168,132,0.4)]"
+                                className="object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-[0_0_14px_rgba(0,168,132,0.4)]"
                                 priority
                             />
                             <span
@@ -59,17 +59,17 @@ export default function Footer() {
                                     marginLeft: -10,
                                 }}
                             >
-                                <span className="text-[#1C1E21] dark:text-white transition-colors duration-200">Calls</span>
-                                <span className="text-[#00A884] dark:text-[#25D366] transition-colors duration-200">Chat</span>
+                                <span className="text-white transition-colors duration-200">Calls</span>
+                                <span className="text-[#25D366] transition-colors duration-200">Chat</span>
                             </span>
                         </Link>
 
-                        <p className="text-[14.5px] leading-relaxed text-[#54656F] dark:text-[#8696A0] max-w-sm">
+                        <p className="text-[14.5px] leading-relaxed text-[#8696A0] max-w-sm">
                             Next-generation secure communication with end-to-end encryption, ultra-low latency voice & video calls, and privacy-first CallsChat IDs.
                         </p>
 
                         {/* Security Assurance Badge */}
-                        <div className="inline-flex items-center gap-2 rounded-full border border-[#00A884]/20 bg-[#00A884]/10 dark:bg-[#00A884]/15 px-3.5 py-1 text-xs font-semibold text-[#00803E] dark:text-[#25D366]">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#00A884]/30 bg-[#00A884]/15 px-3.5 py-1 text-xs font-semibold text-[#25D366]">
                             <ShieldCheck className="h-4 w-4 shrink-0" />
                             <span>End-to-End Cryptographically Encrypted</span>
                         </div>
@@ -80,14 +80,14 @@ export default function Footer() {
                             <button
                                 type="button"
                                 onClick={openModal}
-                                className="flex items-center justify-center sm:justify-start gap-3 rounded-2xl border border-[#E2E8F0] dark:border-[#2A3942] bg-white dark:bg-[#111B21] px-4 py-2.5 text-left text-[#1C1E21] dark:text-[#E9EDEF] transition-all duration-200 hover:border-[#00A884] dark:hover:border-[#25D366] hover:bg-white/80 dark:hover:bg-[#1A2730] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] shadow-xs cursor-pointer group"
+                                className="flex items-center justify-center sm:justify-start gap-3 rounded-2xl border border-[#2A3942] bg-[#1A2730] px-4 py-2.5 text-left text-[#E9EDEF] transition-all duration-200 hover:border-[#25D366] hover:bg-[#202C33] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] shadow-xs cursor-pointer group"
                             >
-                                <svg fill="currentColor" width="22px" height="22px" viewBox="0 0 24 24" className="text-[#1C1E21] dark:text-white group-hover:text-[#00A884] dark:group-hover:text-[#25D366] transition-colors">
+                                <svg fill="currentColor" width="22px" height="22px" viewBox="0 0 24 24" className="text-white group-hover:text-[#25D366] transition-colors">
                                     <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z" />
                                 </svg>
                                 <div className="flex flex-col leading-none">
-                                    <span className="text-[10px] text-[#667781] dark:text-[#8696A0] font-medium">Download on the</span>
-                                    <span className="text-[13px] font-bold tracking-tight mt-0.5">App Store</span>
+                                    <span className="text-[10px] text-[#8696A0] font-medium">Download on the</span>
+                                    <span className="text-[13px] font-bold tracking-tight mt-0.5 text-white">App Store</span>
                                 </div>
                             </button>
 
@@ -95,7 +95,7 @@ export default function Footer() {
                             <button
                                 type="button"
                                 onClick={openModal}
-                                className="flex items-center justify-center sm:justify-start gap-3 rounded-2xl bg-[#111B21] dark:bg-[#202C33] border border-transparent dark:border-[#2A3942] px-4 py-2.5 text-left text-white shadow-xs transition-all duration-200 hover:bg-[#00A884] dark:hover:bg-[#00A884] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] cursor-pointer group"
+                                className="flex items-center justify-center sm:justify-start gap-3 rounded-2xl bg-[#202C33] border border-[#2A3942] px-4 py-2.5 text-left text-white shadow-xs transition-all duration-200 hover:bg-[#00A884] hover:border-[#00A884] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] cursor-pointer group"
                             >
                                 <Play className="h-4 w-4 shrink-0 fill-white text-white group-hover:scale-110 transition-transform" />
                                 <div className="flex flex-col leading-none">
@@ -111,32 +111,32 @@ export default function Footer() {
 
                         {/* Column 1: Features */}
                         <div className="flex flex-col space-y-3.5">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#00803E] dark:text-[#00A884]">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
                                 Features
                             </h3>
                             <ul className="space-y-2.5 text-[14px]">
                                 <li>
-                                    <Link href="/chats" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/chats" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Private Chat
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/calls" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/calls" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Voice & Video Calls
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/live/rooms" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/live/rooms" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Live Audio Rooms
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/communities" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/communities" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Group Communities
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/mall" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/mall" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Diamond Economy
                                     </Link>
                                 </li>
@@ -145,27 +145,27 @@ export default function Footer() {
 
                         {/* Column 2: Company */}
                         <div className="flex flex-col space-y-3.5">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#00803E] dark:text-[#00A884]">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
                                 Company
                             </h3>
                             <ul className="space-y-2.5 text-[14px]">
                                 <li>
-                                    <Link href="/" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         About CallsChat
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/privacy-policy#security-measures" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/privacy-policy#security-measures" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Security & Cryptography
                                     </Link>
                                 </li>
                                 <li>
-                                    <button type="button" onClick={openModal} className="text-left text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors cursor-pointer">
+                                    <button type="button" onClick={openModal} className="text-left text-[#8696A0] hover:text-[#25D366] transition-colors cursor-pointer">
                                         Web Desktop App
                                     </button>
                                 </li>
                                 <li>
-                                    <a href="mailto:press@callschat.com" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <a href="mailto:press@callschat.com" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Press & Media
                                     </a>
                                 </li>
@@ -174,27 +174,27 @@ export default function Footer() {
 
                         {/* Column 3: Support & Help */}
                         <div className="flex flex-col space-y-3.5">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#00803E] dark:text-[#00A884]">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
                                 Support
                             </h3>
                             <ul className="space-y-2.5 text-[14px]">
                                 <li>
-                                    <a href="mailto:support@callschat.com" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <a href="mailto:support@callschat.com" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Help Center
                                     </a>
                                 </li>
                                 <li>
-                                    <Link href="/privacy-policy#phone-number-privacy" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/privacy-policy#phone-number-privacy" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Phone Number Privacy
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/privacy-policy#ai-moderation-and-abuse-prevention" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/privacy-policy#ai-moderation-and-abuse-prevention" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Safety & Moderation
                                     </Link>
                                 </li>
                                 <li>
-                                    <a href="mailto:abuse@callschat.com" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <a href="mailto:abuse@callschat.com" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Report Abuse
                                     </a>
                                 </li>
@@ -203,27 +203,27 @@ export default function Footer() {
 
                         {/* Column 4: Legal & Compliance */}
                         <div className="flex flex-col space-y-3.5">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#00803E] dark:text-[#00A884]">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
                                 Legal
                             </h3>
                             <ul className="space-y-2.5 text-[14px]">
                                 <li>
-                                    <Link href="/privacy-policy" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors font-medium">
+                                    <Link href="/privacy-policy" className="text-[#8696A0] hover:text-[#25D366] transition-colors font-medium">
                                         Privacy Policy
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/terms-of-service" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/terms-of-service" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Terms of Service
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/cookie-policy" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/cookie-policy" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         Cookie Policy
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/privacy-policy#gdpr-privacy-rights" className="text-[#54656F] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] transition-colors">
+                                    <Link href="/privacy-policy#gdpr-privacy-rights" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
                                         GDPR & CCPA Rights
                                     </Link>
                                 </li>
@@ -235,17 +235,17 @@ export default function Footer() {
                 </div>
 
                 {/* ── Middle Band: Sleek Minimalist Newsletter Subscription Bar (Option A) ── */}
-                <div className="border-t border-b border-[#E2E8F0] dark:border-[#222D34] py-8 my-4">
+                <div className="border-t border-b border-[#222D34] py-8 my-4">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-3.5 text-center md:text-left">
-                            <div className="h-10 w-10 shrink-0 rounded-2xl bg-[#00A884]/10 dark:bg-[#00A884]/20 flex items-center justify-center text-[#00803E] dark:text-[#25D366]">
+                            <div className="h-10 w-10 shrink-0 rounded-2xl bg-[#00A884]/20 flex items-center justify-center text-[#25D366]">
                                 <Mail className="h-5 w-5" />
                             </div>
                             <div>
-                                <h4 className="text-[15px] font-bold text-[#1C1E21] dark:text-[#E9EDEF]">
+                                <h4 className="text-[15px] font-bold text-white">
                                     Stay informed with CallsChat
                                 </h4>
-                                <p className="text-xs text-[#54656F] dark:text-[#8696A0]">
+                                <p className="text-xs text-[#8696A0]">
                                     Subscribe to product updates, security advisories, and feature releases.
                                 </p>
                             </div>
@@ -258,7 +258,7 @@ export default function Footer() {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="Enter your email"
-                                    className="w-full rounded-full border border-[#E2E8F0] dark:border-[#2A3942] bg-white dark:bg-[#111B21] px-4 py-2.5 text-xs sm:text-sm text-[#1C1E21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:border-[#00A884] focus:outline-none focus:ring-1 focus:ring-[#00A884] transition-colors shadow-2xs"
+                                    className="w-full rounded-full border border-[#2A3942] bg-[#1A2730] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8696A0] focus:border-[#25D366] focus:outline-none focus:ring-1 focus:ring-[#25D366] transition-colors shadow-2xs"
                                     required
                                 />
                             </div>
@@ -273,13 +273,13 @@ export default function Footer() {
                 </div>
 
                 {/* ── Bottom Sub-Footer: Copyright, Status, Socials & Language ── */}
-                <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-medium text-[#667781] dark:text-[#8696A0]">
+                <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-medium text-[#8696A0]">
 
                     {/* Left: Copyright & Operational Status */}
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
                         <span>© 2026 CallsChat LLC. All rights reserved.</span>
-                        <span className="hidden sm:inline text-gray-300 dark:text-gray-700">•</span>
-                        <div className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                        <span className="hidden sm:inline text-gray-700">•</span>
+                        <div className="inline-flex items-center gap-1.5 text-emerald-400">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             <span className="font-semibold">All Systems Operational</span>
                         </div>
@@ -294,7 +294,7 @@ export default function Footer() {
                                 href="https://x.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 rounded-full text-[#667781] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
                                 aria-label="X (Twitter)"
                             >
                                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
@@ -307,7 +307,7 @@ export default function Footer() {
                                 href="https://instagram.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 rounded-full text-[#667781] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
                                 aria-label="Instagram"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -322,7 +322,7 @@ export default function Footer() {
                                 href="https://linkedin.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 rounded-full text-[#667781] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
                                 aria-label="LinkedIn"
                             >
                                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
@@ -335,7 +335,7 @@ export default function Footer() {
                                 href="https://github.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 rounded-full text-[#667781] dark:text-[#8696A0] hover:text-[#00A884] dark:hover:text-[#25D366] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
                                 aria-label="GitHub"
                             >
                                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
@@ -345,8 +345,8 @@ export default function Footer() {
                         </div>
 
                         {/* Region & Language Selector Pill */}
-                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[#E2E8F0] dark:border-[#2A3942] bg-white dark:bg-[#111B21] px-3 py-1 text-[11.5px] font-semibold text-[#1C1E21] dark:text-[#E9EDEF] shadow-2xs">
-                            <Globe className="h-3.5 w-3.5 text-[#00A884] dark:text-[#25D366]" />
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[#2A3942] bg-[#1A2730] px-3 py-1 text-[11.5px] font-semibold text-[#E9EDEF] shadow-2xs">
+                            <Globe className="h-3.5 w-3.5 text-[#25D366]" />
                             <span>English (US)</span>
                         </div>
                     </div>

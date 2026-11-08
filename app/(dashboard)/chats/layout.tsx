@@ -18,6 +18,7 @@ import { decryptGroupNotification } from "@/utils/notificationPreview";
 import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey, getStoredSenderKey, storeSenderKey } from "@/utils/keyStore";
 import { wrapSenderKeyForMember } from "@/utils/senderKeyEngine";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { AvatarImage } from "@/components/ui/AvatarImage";
 import { formatGroupPreviewText } from "@/lib/group-preview";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { motion } from "framer-motion";
@@ -1552,10 +1553,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                       const isActive = pathname === `${basePath}/${conv.id}`;
 
                       const displayName = isGroup ? (conv.groupName || "Group") : conv.otherUserName;
-                      const avatarUrl = isGroup
-                        ? (conv.groupAvatar ? getOptimizedImageUrl(conv.groupAvatar, 48, 48) : null)
-                        : (getOptimizedImageUrl(conv.otherUserAvatar, 48, 48) ||
-                           `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=E0F2FE&color=0284C7&bold=true`);
+                      const rawAvatar = isGroup ? conv.groupAvatar : conv.otherUserAvatar;
+                      const avatarUrl = rawAvatar ? getOptimizedImageUrl(rawAvatar, 96, 96) : null;
 
                       const isOnline = !isGroup && (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline);
                       const isTyping = typingConvIds.has(conv.id);
@@ -1596,25 +1595,13 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                           >
                             {/* Avatar with subtle online dot pip or Group Icon */}
                             <div className="relative shrink-0">
-                              <div className="h-12 w-12 rounded-full overflow-hidden bg-[#F0F2F5] dark:bg-[#202C33] shadow-xs flex items-center justify-center">
-                                {avatarUrl ? (
-                                  <img
-                                    src={getOptimizedImageUrl(avatarUrl)}
-                                    alt={displayName}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : isGroup ? (
-                                  <div className="h-full w-full bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                                    <Users className="h-6 w-6" />
-                                  </div>
-                                ) : (
-                                  <img
-                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=E0F2FE&color=0284C7&bold=true`}
-                                    alt={displayName}
-                                    className="h-full w-full object-cover"
-                                  />
-                                )}
-                              </div>
+                              <AvatarImage
+                                src={avatarUrl}
+                                alt={displayName}
+                                size={48}
+                                isGroup={isGroup}
+                                className="shadow-xs"
+                              />
                               {isOnline && (
                                 <span
                                   aria-hidden="true"

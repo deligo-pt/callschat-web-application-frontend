@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useChat, QuotedMessage } from "@/hooks/useChat";
 import {
   Send,
@@ -42,6 +43,7 @@ import { toast } from "sonner";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { isMessageExpired } from "@/components/chat/DisappearingMessagesModal";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { AvatarImage } from "@/components/ui/AvatarImage";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 function parseJwt(token: string) {
@@ -318,25 +320,8 @@ function ChatRoomPageContent() {
   const [pastedMediaCaption, setPastedMediaCaption] = useState<string>("");
   const [isMediaPreviewOpen, setIsMediaPreviewOpen] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const scrollToMessage = useCallback((messageId: string) => {
-    const el = document.getElementById(`msg-${messageId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.remove("highlight-pulse");
-      void el.offsetWidth; // trigger reflow
-      el.classList.add("highlight-pulse");
-      setTimeout(() => el.classList.remove("highlight-pulse"), 2500);
-    } else {
-      toast.info("Original message is further up in history");
-    }
-  }, []);
+  const parentRef = useRef<HTMLDivElement>(null);
 
   // ── Initialization ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -537,9 +522,76 @@ function ChatRoomPageContent() {
     return () => { socket.off("chat:disappear_updated", handler); };
   }, [socket, conversationId]);
 
+  // ── Virtualization & Visible Message Computation ──────────────────────────
+  const visibleMsgs = useMemo(() => {
+    return messages.filter((msg) => {
+      const timer = (msg as any).disappearAfterSeconds ?? disappearAfterSeconds;
+      return !isMessageExpired(msg.createdAt, timer);
+    });
+  }, [messages, disappearAfterSeconds, tick]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: visibleMsgs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    overscan: 8,
+  });
+
+  const isAtBottomRef = useRef(true);
+  const prevCountRef = useRef(0);
+
+  const handleScroll = useCallback(() => {
+    if (!parentRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = parentRef.current;
+    isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 120;
+  }, []);
+
+  const scrollToBottom = useCallback(
+    (behavior: "smooth" | "auto" = "smooth") => {
+      if (visibleMsgs.length > 0) {
+        rowVirtualizer.scrollToIndex(visibleMsgs.length - 1, { align: "end", behavior });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior });
+      }
+    },
+    [visibleMsgs.length, rowVirtualizer]
+  );
+
+  const scrollToMessage = useCallback(
+    (messageId: string) => {
+      const targetIdx = visibleMsgs.findIndex((m) => m.id === messageId);
+      if (targetIdx !== -1) {
+        rowVirtualizer.scrollToIndex(targetIdx, { align: "center", behavior: "smooth" });
+        setTimeout(() => {
+          const el = document.getElementById(`msg-${messageId}`);
+          if (el) {
+            el.classList.remove("highlight-pulse");
+            void el.offsetWidth; // trigger reflow
+            el.classList.add("highlight-pulse");
+            setTimeout(() => el.classList.remove("highlight-pulse"), 2500);
+          }
+        }, 200);
+      } else {
+        toast.info("Original message is further up in history");
+      }
+    },
+    [visibleMsgs, rowVirtualizer]
+  );
+
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (visibleMsgs.length === 0) return;
+    const isInitial = prevCountRef.current === 0;
+    prevCountRef.current = visibleMsgs.length;
+
+    if (isInitial || isAtBottomRef.current) {
+      requestAnimationFrame(() => {
+        rowVirtualizer.scrollToIndex(visibleMsgs.length - 1, {
+          align: "end",
+          behavior: isInitial ? "auto" : "smooth",
+        });
+      });
+    }
+  }, [visibleMsgs.length, rowVirtualizer]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -763,20 +815,13 @@ function ChatRoomPageContent() {
               className="flex items-center gap-3 cursor-pointer group"
               onClick={() => setIsContactProfileOpen(true)}
             >
-              <div
-                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F0F2F5] dark:bg-[#2A3942] overflow-hidden shadow-xs"
-              >
-                {recipient?.avatarUrl ? (
-                  <img
-                    src={getOptimizedImageUrl(recipient.avatarUrl)}
-                    alt={recipient.name}
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="text-[#00A884] font-bold text-sm">
-                    {recipient?.name?.charAt(0) || "U"}
-                  </div>
-                )}
+              <div className="relative shrink-0">
+                <AvatarImage
+                  src={recipient?.avatarUrl ? getOptimizedImageUrl(recipient.avatarUrl, 80, 80) : null}
+                  alt={recipient?.name || "User"}
+                  size={40}
+                  className="shadow-xs"
+                />
                 {(!blockStatus?.isBlocked && ((isMounted && isUserOnline(recipientId)) || recipient?.isOnline)) && (
                   <span
                     aria-hidden="true"
@@ -999,8 +1044,12 @@ function ChatRoomPageContent() {
       )}
 
       {/* ── Messages ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-3 chat-canvas-bg custom-scrollbar relative">
-        {messages.length === 0 ? (
+      <div
+        ref={parentRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 sm:p-5 chat-canvas-bg custom-scrollbar relative"
+      >
+        {visibleMsgs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2]">
             {isReady || isBizChat ? (
               disappearAfterSeconds ? (
@@ -1028,76 +1077,91 @@ function ChatRoomPageContent() {
             )}
           </div>
         ) : (
-          messages
-            .filter((msg) => {
-              // Use the per-message timer first (stamped at send time).
-              // Fall back to the conversation-level timer for messages sent before
-              // the per-message stamping was introduced.
-              const timer = (msg as any).disappearAfterSeconds ?? disappearAfterSeconds;
-              return !isMessageExpired(msg.createdAt, timer);
-            })
-            .map((msg, index, visibleMsgs) => {
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const msg = visibleMsgs[virtualRow.index];
+              const index = virtualRow.index;
               const isMe = msg.senderId === currentUserId;
               const showTail =
-                index === 0 || visibleMsgs[index - 1].senderId !== msg.senderId;
+                index === 0 || visibleMsgs[index - 1]?.senderId !== msg.senderId;
               const isPinned = pinnedMessages?.some((p: any) => p.messageId === msg.id);
 
               return (
-                <MessageBubble
-                  key={msg.id}
-                  msg={msg}
-                  isMe={isMe}
-                  showTail={showTail}
-                  peerId={recipientId}
-                  peerName={isBizChat ? bizName : recipient?.name}
-                  peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
-                  onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}
-                  onManualResend={(msgId) => requestManualResend(msgId)}
-                  disappearAfterSeconds={(msg as any).disappearAfterSeconds ?? disappearAfterSeconds ?? null}
-                  onEdit={(msgId, newText) => editMessage(msgId, newText)}
-                  isPinned={isPinned}
-                  onPin={(dur, previewText, previewMedia) =>
-                    pinMessage(
-                      msg.id,
-                      "pin",
-                      dur,
-                      previewText || msg.text,
-                      previewMedia || msg.mediaType || undefined,
-                      "You"
-                    )
-                  }
-                  onUnpin={() =>
-                    pinMessage(
-                      msg.id,
-                      "unpin",
-                      undefined,
-                      undefined,
-                      undefined,
-                      "You"
-                    )
-                  }
-                  onUnsend={unsendMessage}
-                  onReact={(mId, emoji) => toggleReaction(mId, emoji)}
-                  onReply={(m) =>
-                    setReplyingTo({
-                      id: m.id,
-                      senderId: m.senderId,
-                      senderName:
-                        m.senderId === currentUserId
-                          ? "You"
-                          : isBizChat
-                          ? bizName
-                          : recipient?.name || "Contact",
-                      text: m.text,
-                      mediaUrl: m.mediaUrl,
-                      mediaType: m.mediaType,
-                    })
-                  }
-                  onScrollToMessage={scrollToMessage}
-                  currentUserId={currentUserId}
-                />
+                <div
+                  key={virtualRow.key}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className="pb-2.5"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <MessageBubble
+                    msg={msg}
+                    isMe={isMe}
+                    showTail={showTail}
+                    peerId={recipientId}
+                    peerName={isBizChat ? bizName : recipient?.name}
+                    peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
+                    onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}
+                    onManualResend={(msgId) => requestManualResend(msgId)}
+                    disappearAfterSeconds={(msg as any).disappearAfterSeconds ?? disappearAfterSeconds ?? null}
+                    onEdit={(msgId, newText) => editMessage(msgId, newText)}
+                    isPinned={isPinned}
+                    onPin={(dur, previewText, previewMedia) =>
+                      pinMessage(
+                        msg.id,
+                        "pin",
+                        dur,
+                        previewText || msg.text,
+                        previewMedia || msg.mediaType || undefined,
+                        "You"
+                      )
+                    }
+                    onUnpin={() =>
+                      pinMessage(
+                        msg.id,
+                        "unpin",
+                        undefined,
+                        undefined,
+                        undefined,
+                        "You"
+                      )
+                    }
+                    onUnsend={unsendMessage}
+                    onReact={(mId, emoji) => toggleReaction(mId, emoji)}
+                    onReply={(m) =>
+                      setReplyingTo({
+                        id: m.id,
+                        senderId: m.senderId,
+                        senderName:
+                          m.senderId === currentUserId
+                            ? "You"
+                            : isBizChat
+                            ? bizName
+                            : recipient?.name || "Contact",
+                        text: m.text,
+                        mediaUrl: m.mediaUrl,
+                        mediaType: m.mediaType,
+                      })
+                    }
+                    onScrollToMessage={scrollToMessage}
+                    currentUserId={currentUserId}
+                  />
+                </div>
               );
-            })
+            })}
+          </div>
         )}
         
         {typingUsers.size > 0 && (

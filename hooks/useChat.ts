@@ -37,6 +37,10 @@ import {
 import { compressImage } from "@/utils/image";
 import { queueVaultSync } from "@/utils/vaultSync";
 import { toast } from "sonner";
+import { useChatTyping } from "./chat/useChatTyping";
+import { useChatPinned } from "./chat/useChatPinned";
+import { useChatReactions } from "./chat/useChatReactions";
+import { useChatMedia } from "./chat/useChatMedia";
 
 export interface MessageReceipt {
   id: string;
@@ -254,12 +258,26 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
   const [myPrivateKey, setMyPrivateKey] = useState<string | null>(null);
   const [myPublicKey, setMyPublicKey] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   
-  // Typing indicator state
-  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const isTypingLocallyRef = useRef(false);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Sub-hooks: typing indicators
+  const { typingUsers, handleTyping } = useChatTyping({
+    conversationId,
+    currentUserId,
+    socket,
+    isConnected,
+  });
+
+  // Sub-hooks: encrypted media uploads
+  const { isUploading, uploadMedia } = useChatMedia();
+
+  // Sub-hooks: message reactions
+  const { toggleReaction } = useChatReactions({
+    conversationId,
+    currentUserId,
+    messages,
+    setMessages,
+    socket,
+  });
 
   // Use refs so the receive handler always has the latest key values
   // without needing to re-register every time they change
@@ -2508,26 +2526,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }));
     };
 
-    const handleTypingStart = (payload: { conversationId: string; userId: string }) => {
-      if (payload.conversationId !== conversationId) return;
-      if (payload.userId === currentUserIdRef.current) return;
-      
-      setTypingUsers((prev) => {
-        const newSet = new Set(prev);
-        newSet.add(payload.userId);
-        return newSet;
-      });
-    };
 
-    const handleTypingStop = (payload: { conversationId: string; userId: string }) => {
-      if (payload.conversationId !== conversationId) return;
-      
-      setTypingUsers((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(payload.userId);
-        return newSet;
-      });
-    };
 
     const handleRetryExpired = (payload: {
       messageId: string;
@@ -2579,27 +2578,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
     };
 
-    const handleReactionsUpdated = (payload: any) => {
-      if (payload.conversationId && payload.conversationId !== conversationId) return;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === payload.messageId ? { ...m, reactions: payload.reactions || [] } : m
-        )
-      );
-    };
-
-    socket.on("chat:receive_message", handleReceiveMessage);
-    socket.on("NEW_MESSAGE", handleReceiveMessage);
-    // Internal replay channel: the drain effect emits this locally when the
-    // private key becomes available, replaying queued pre-key messages.
-    socket.on("__e2ee_internal_replay__", handleReceiveMessage);
-    socket.on("chat:message_edited", handleMessageEdited);
-    socket.on("chat:message_unsent", handleMessageUnsent);
-    socket.on("chat:message_status_update", handleStatusUpdate);
     socket.on("chat:conversation_status_update", handleConversationStatusUpdate);
-    socket.on("chat:reaction_updated", handleReactionsUpdated);
-    socket.on("chat:typing_start", handleTypingStart);
-    socket.on("chat:typing_stop", handleTypingStop);
     socket.on("chat:error", handleChatError);
     socket.on("e2ee:peer_key_updated", handlePeerKeyUpdated);
     socket.on("e2ee:process_retry", handleProcessRetry);
@@ -2623,9 +2602,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       socket.off("chat:message_unsent", handleMessageUnsent);
       socket.off("chat:message_status_update", handleStatusUpdate);
       socket.off("chat:conversation_status_update", handleConversationStatusUpdate);
-      socket.off("chat:reaction_updated", handleReactionsUpdated);
-      socket.off("chat:typing_start", handleTypingStart);
-      socket.off("chat:typing_stop", handleTypingStop);
       socket.off("chat:error", handleChatError);
       socket.off("e2ee:peer_key_updated", handlePeerKeyUpdated);
       socket.off("e2ee:process_retry", handleProcessRetry);
@@ -2762,16 +2738,11 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         let mediaType: string | undefined;
         
         if (file) {
-          setIsUploading(true);
-          let finalFile = file;
-          if (file.type.startsWith('image/') && !file.type.includes('svg')) {
-            finalFile = await compressImage(file, 1920, 0.8);
-          }
-          const uploadRes = await chatService.uploadMedia(conversationId, finalFile);
-          if (uploadRes.success) {
-            mediaUrl = uploadRes.data.mediaUrl;
-            mediaType = uploadRes.data.mediaType || (file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'document');
-            
+          const uploadRes = await uploadMedia(conversationId, file);
+          if (uploadRes.success && uploadRes.mediaUrl) {
+            mediaUrl = uploadRes.mediaUrl;
+            mediaType = uploadRes.mediaType;
+
             // Update optimistic message with real uploaded mediaUrl
             setMessages((prev) =>
               prev.map((m) =>
@@ -2779,12 +2750,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               )
             );
           } else {
-            toast.error(uploadRes.error || "Failed to upload file");
             setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-            setIsUploading(false);
             return;
           }
-          setIsUploading(false);
         } else if (text) {
           const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
           if (urlMatch && urlMatch[0]) {
@@ -3114,7 +3082,6 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         toast.error(errMsg);
         // Roll back optimistic update on failure
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        setIsUploading(false);
       }
     },
     [socket, isConnected, conversationId, myPrivateKey, myPublicKey, recipientPublicKey, activePeerId]
@@ -3143,75 +3110,12 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [socket, isConnected, conversationId, myPrivateKey, recipientPublicKey, activePeerId]
   );
 
-  const pinnedMessages = useMemo(() => {
-    const map = new Map<string, PinnedMessage>();
-    const now = Date.now();
-
-    for (const msg of messages) {
-      if (msg.text && msg.text.startsWith("__PIN_EVENT__:")) {
-        try {
-          const payload = JSON.parse(msg.text.substring("__PIN_EVENT__:".length));
-          if (payload && payload.messageId && payload.action) {
-            if (payload.action === "pin") {
-              const timestamp = payload.timestamp || new Date(msg.createdAt).getTime();
-              const pinnedUntil = payload.durationSeconds ? timestamp + payload.durationSeconds * 1000 : null;
-              
-              if (!pinnedUntil || pinnedUntil > now) {
-                map.set(payload.messageId, {
-                  messageId: payload.messageId,
-                  pinnedAt: timestamp,
-                  pinnedUntil,
-                  pinnerName: payload.pinnerName || "You",
-                  previewText: payload.previewText,
-                  previewMedia: payload.previewMedia,
-                });
-              } else {
-                map.delete(payload.messageId);
-              }
-            } else if (payload.action === "unpin") {
-              map.delete(payload.messageId);
-            }
-          }
-        } catch (e) {
-          // Ignore malformed pin events
-        }
-      }
-    }
-
-    const result: PinnedMessage[] = [];
-    for (const pin of map.values()) {
-      const orig = messages.find((m) => m.id === pin.messageId);
-      result.push({
-        ...pin,
-        originalMessage: orig,
-      });
-    }
-
-    return result.sort((a, b) => b.pinnedAt - a.pinnedAt);
-  }, [messages]);
-
-  const pinMessage = useCallback(
-    (
-      messageId: string,
-      action: "pin" | "unpin",
-      durationSeconds?: number,
-      previewText?: string,
-      previewMedia?: string,
-      pinnerName: string = "You"
-    ) => {
-      const payload = {
-        messageId,
-        action,
-        durationSeconds: durationSeconds || null,
-        timestamp: Date.now(),
-        pinnerName,
-        previewText: previewText || "",
-        previewMedia: previewMedia || "",
-      };
-      sendMessage(`__PIN_EVENT__:${JSON.stringify(payload)}`, currentUserIdRef.current);
-    },
-    [sendMessage]
-  );
+  // Sub-hooks: pinned messages
+  const { pinnedMessages, pinMessage } = useChatPinned({
+    messages,
+    sendMessage,
+    currentUserId,
+  });
 
   const unsendMessage = useCallback(
     async (messageId: string) => {
@@ -3232,23 +3136,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [conversationId]
   );
 
-  const handleTyping = useCallback(() => {
-    if (!socket || !isConnected || !conversationId) return;
 
-    if (!isTypingLocallyRef.current) {
-      isTypingLocallyRef.current = true;
-      socket.emit("chat:typing_start", { conversationId });
-    }
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    typingTimeoutRef.current = setTimeout(() => {
-      isTypingLocallyRef.current = false;
-      socket.emit("chat:typing_stop", { conversationId });
-    }, 3000);
-  }, [socket, isConnected, conversationId]);
 
   const requestManualResend = useCallback(
     (messageId: string) => {
@@ -3264,57 +3152,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     [socket, conversationId]
   );
 
-  const toggleReaction = useCallback(
-    async (messageId: string, emoji: string) => {
-      if (!conversationId) return;
-      const msg = messages.find((m) => m.id === messageId);
-      const currentUserId = currentUserIdRef.current;
-      const existing = msg?.reactions?.find(
-        (r) => r.userId === currentUserId && r.emoji === emoji
-      );
 
-      // Optimistic update
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== messageId) return m;
-          const currentReactions = m.reactions || [];
-          if (existing) {
-            return {
-              ...m,
-              reactions: currentReactions.filter(
-                (r) => !(r.userId === currentUserId && r.emoji === emoji)
-              ),
-            };
-          } else {
-            const filtered = currentReactions.filter((r) => r.userId !== currentUserId);
-            return {
-              ...m,
-              reactions: [
-                ...filtered,
-                {
-                  id: `optimistic-${Date.now()}`,
-                  emoji,
-                  userId: currentUserId || "",
-                  createdAt: new Date().toISOString(),
-                },
-              ],
-            };
-          }
-        })
-      );
-
-      try {
-        if (existing) {
-          await chatService.removeReaction(conversationId, messageId);
-        } else {
-          await chatService.addReaction(conversationId, messageId, emoji);
-        }
-      } catch (err) {
-        console.error("Failed to toggle reaction", err);
-      }
-    },
-    [conversationId, messages]
-  );
 
   return {
     messages,

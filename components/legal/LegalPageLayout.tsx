@@ -16,7 +16,7 @@ interface LegalPageLayoutProps {
  * Fully aligned with CallsChat / WhatsApp design tokens (PRIVACY_POLICY/DESIGN.md).
  *
  * Supports comprehensive Dark & Light themes:
- * - Light: Cream/white surfaces (#FFFFFF / #FCF5EB), WhatsApp emerald accents (#00A884 / #00803E), dark slate headings (#1C1E21).
+ * - Light: Crisp pure white (#FFFFFF) canvas with subtle emerald ambient hero (#F0FDF4), cool slate cards (#F8FAFC), WhatsApp emerald accents (#00A884 / #00803E), dark slate headings (#1C1E21).
  * - Dark: High-contrast night surfaces (#0C1317 / #111B21 / #202C33), vibrant emerald (#25D366 / #00A884), light text (#E9EDEF).
  * - Meets WCAG 2.2 AA accessibility standards with full keyboard and focus indicators.
  */
@@ -64,9 +64,9 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
     const siblings = legalPages.filter((page) => page.slug !== data.slug);
 
     return (
-        <div className="w-full bg-[#FCF5EB]/30 dark:bg-[#0C1317] text-[#1C1E21] dark:text-[#E9EDEF] transition-colors duration-200">
+        <div className="w-full min-h-screen bg-white dark:bg-[#0C1317] text-[#1C1E21] dark:text-[#E9EDEF] transition-colors duration-200">
             {/* ── Branded Header Hero Band ─────────────────────────────────── */}
-            <section className="relative w-full border-b border-[#E2E8F0] dark:border-[#222D34] bg-linear-to-b from-[#F0FDF4]/70 via-[#FCF5EB]/20 to-transparent dark:from-[#111B21] dark:via-[#0E171C] dark:to-[#0C1317] px-4 py-14 sm:py-20 sm:px-6 lg:px-8">
+            <section className="relative w-full border-b border-[#E2E8F0] dark:border-[#222D34] bg-linear-to-b from-[#F0FDF4] via-emerald-50/20 to-white dark:from-[#111B21] dark:via-[#0E171C] dark:to-[#0C1317] px-4 py-14 sm:py-20 sm:px-6 lg:px-8">
                 <motion.div
                     initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -147,7 +147,7 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
                     </aside>
 
                     {/* Mobile "Jump to section" Drawer */}
-                    <details className="group mb-8 rounded-2xl border border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-4 lg:hidden shadow-xs transition-colors">
+                    <details className="group mb-8 rounded-2xl border border-[#E2E8F0] dark:border-[#222D34] bg-[#F8FAFC] dark:bg-[#111B21] p-4 lg:hidden shadow-xs transition-colors">
                         <summary className="flex cursor-pointer list-none items-center justify-between text-[14.5px] font-bold text-[#00803E] dark:text-[#25D366] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] rounded-lg">
                             <span className="flex items-center gap-2">
                                 <FileText className="h-4 w-4" />
@@ -203,7 +203,7 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
                         </div>
 
                         {/* Contact Information Card */}
-                        <div className="mt-12 rounded-3xl border border-[#00A884]/20 dark:border-[#2A3942] bg-white dark:bg-[#111B21] p-6 sm:p-8 shadow-xs transition-colors">
+                        <div className="mt-12 rounded-3xl border border-[#00A884]/20 dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#111B21] p-6 sm:p-8 shadow-xs transition-colors">
                             <div className="flex items-center gap-2 text-[#00803E] dark:text-[#25D366] mb-3">
                                 <Mail className="h-5 w-5" />
                                 <h2 className="text-lg font-bold text-[#1C1E21] dark:text-[#E9EDEF]">
@@ -222,7 +222,7 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
                                     <a
                                         key={email.address}
                                         href={`mailto:${email.address}`}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-[#E2E8F0] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33] px-3.5 py-2 text-xs font-semibold text-[#1C1E21] dark:text-[#E9EDEF] transition-all hover:border-[#00A884] dark:hover:border-[#25D366] hover:text-[#00803E] dark:hover:text-[#25D366]"
+                                        className="inline-flex items-center gap-2 rounded-xl border border-[#E2E8F0] dark:border-[#2A3942] bg-white dark:bg-[#202C33] px-3.5 py-2 text-xs font-semibold text-[#1C1E21] dark:text-[#E9EDEF] transition-all hover:border-[#00A884] dark:hover:border-[#25D366] hover:text-[#00803E] dark:hover:text-[#25D366]"
                                     >
                                         <Mail className="h-3.5 w-3.5 text-[#00A884] dark:text-[#25D366]" />
                                         <span className="text-[#667781] dark:text-[#8696A0]">{email.label}:</span>
@@ -234,7 +234,7 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
                                         href={`https://${data.contact.website.replace(/^https?:\/\//, "")}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 rounded-xl border border-[#E2E8F0] dark:border-[#2A3942] bg-[#F8FAFC] dark:bg-[#202C33] px-3.5 py-2 text-xs font-semibold text-[#1C1E21] dark:text-[#E9EDEF] transition-all hover:border-[#00A884] dark:hover:border-[#25D366] hover:text-[#00803E] dark:hover:text-[#25D366]"
+                                        className="inline-flex items-center gap-2 rounded-xl border border-[#E2E8F0] dark:border-[#2A3942] bg-white dark:bg-[#202C33] px-3.5 py-2 text-xs font-semibold text-[#1C1E21] dark:text-[#E9EDEF] transition-all hover:border-[#00A884] dark:hover:border-[#25D366] hover:text-[#00803E] dark:hover:text-[#25D366]"
                                     >
                                         <Globe className="h-3.5 w-3.5 text-[#00A884] dark:text-[#25D366]" />
                                         <span>{data.contact.website}</span>
@@ -245,7 +245,7 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
 
                         {/* Consent Note */}
                         {data.consent && (
-                            <div className="mt-6 rounded-2xl border border-dashed border-[#E2E8F0] dark:border-[#2A3942] p-4 bg-[#F8FAFC]/60 dark:bg-[#111B21]/50 text-xs italic leading-relaxed text-[#667781] dark:text-[#8696A0]">
+                            <div className="mt-6 rounded-2xl border border-dashed border-[#E2E8F0] dark:border-[#2A3942] p-4 bg-[#F8FAFC] dark:bg-[#111B21]/50 text-xs italic leading-relaxed text-[#667781] dark:text-[#8696A0]">
                                 {data.consent}
                             </div>
                         )}
@@ -260,7 +260,7 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
                                     <Link
                                         key={page.slug}
                                         href={`/${page.slug}`}
-                                        className="group flex items-center justify-between rounded-2xl border border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#111B21] px-5 py-4 text-[14.5px] font-semibold text-[#1C1E21] dark:text-[#E9EDEF] transition-all hover:border-[#00A884]/40 hover:bg-[#00A884]/5 dark:hover:border-[#00A884]/40 dark:hover:bg-[#00A884]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                                        className="group flex items-center justify-between rounded-2xl border border-[#E2E8F0] dark:border-[#222D34] bg-[#F8FAFC] dark:bg-[#111B21] px-5 py-4 text-[14.5px] font-semibold text-[#1C1E21] dark:text-[#E9EDEF] transition-all hover:border-[#00A884]/40 hover:bg-[#00A884]/5 dark:hover:border-[#00A884]/40 dark:hover:bg-[#00A884]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
                                     >
                                         <span>{page.title}</span>
                                         <ChevronRight className="h-4 w-4 text-[#8696A0] transition-transform group-hover:translate-x-1 group-hover:text-[#00A884] dark:group-hover:text-[#25D366]" />

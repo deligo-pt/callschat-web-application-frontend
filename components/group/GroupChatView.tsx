@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallContext } from "@/components/providers/CallContext";
 import {
   ArrowLeft,
@@ -98,6 +99,7 @@ import { useTranslations } from "next-intl";
 import { useGroupStore } from "@/hooks/useGroupStore";
 import { useUser } from "@/context/UserContext";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
+import { AvatarImage } from "@/components/ui/AvatarImage";
 
 function parseJwt(token: string) {
   try {
@@ -240,6 +242,13 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     hasMoreMessages,
     isLoadingMore,
   } = useGroupChat(groupId, currentUserId);
+
+  const rowVirtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => timelineRef.current,
+    estimateSize: () => 72,
+    overscan: 8,
+  });
 
   const canEditGroupInfo = isAdmin || groupDetails?.editGroupInfoScope !== "ONLY_ADMINS";
   const isOwner = groupDetails?.createdBy === currentUserId;
@@ -420,13 +429,18 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   };
 
   const scrollToMessage = (messageId: string) => {
-    const el = document.getElementById(`msg-${messageId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.remove("highlight-pulse");
-      void el.offsetWidth;
-      el.classList.add("highlight-pulse");
-      setTimeout(() => el.classList.remove("highlight-pulse"), 2500);
+    const targetIdx = messages.findIndex((m) => m.id === messageId);
+    if (targetIdx !== -1) {
+      rowVirtualizer.scrollToIndex(targetIdx, { align: "center", behavior: "smooth" });
+      setTimeout(() => {
+        const el = document.getElementById(`msg-${messageId}`);
+        if (el) {
+          el.classList.remove("highlight-pulse");
+          void el.offsetWidth;
+          el.classList.add("highlight-pulse");
+          setTimeout(() => el.classList.remove("highlight-pulse"), 2500);
+        }
+      }, 200);
     } else {
       toast.info("Original message is further up in history");
     }
@@ -679,7 +693,11 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     if (!messages || messages.length === 0) return;
 
     if (!isInitialScrollDoneRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      if (messages.length > 0) {
+        rowVirtualizer.scrollToIndex(messages.length - 1, { align: "end", behavior: "auto" });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      }
       isInitialScrollDoneRef.current = true;
       prevMessagesLengthRef.current = messages.length;
       return;
@@ -703,7 +721,11 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
       const isNearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 150 : true;
 
       if (isMe || isNearBottom) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (messages.length > 0) {
+          rowVirtualizer.scrollToIndex(messages.length - 1, { align: "end", behavior: "smooth" });
+        } else {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
         setNewMessagesBelow(0);
       } else {
         const countAdded = messages.length - prevMessagesLengthRef.current;
@@ -712,7 +734,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     }
 
     prevMessagesLengthRef.current = messages.length;
-  }, [messages, currentUserId]);
+  }, [messages, currentUserId, rowVirtualizer]);
 
   const handleTimelineScroll = () => {
     const el = timelineRef.current;
@@ -736,7 +758,11 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0) {
+      rowVirtualizer.scrollToIndex(messages.length - 1, { align: "end", behavior: "smooth" });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
     setNewMessagesBelow(0);
     setIsScrolledUp(false);
   };
@@ -1009,10 +1035,12 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
 
             <div className="flex items-center gap-3 min-w-0">
               <div className="relative shrink-0">
-                <img
-                  src={getOptimizedImageUrl(avatarImage)}
-                  alt={groupName}
-                  className="h-10 w-10 rounded-full object-cover bg-gray-100 dark:bg-gray-800"
+                <AvatarImage
+                  src={avatarImage ? getOptimizedImageUrl(avatarImage, 80, 80) : null}
+                  alt={groupName || "Group"}
+                  size={40}
+                  isGroup={true}
+                  className="bg-gray-100 dark:bg-gray-800"
                 />
               </div>
               <div className="flex flex-col min-w-0">
@@ -1267,78 +1295,116 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
           <div
             ref={timelineRef}
             onScroll={handleTimelineScroll}
-            className="flex-1 overflow-y-auto p-4 space-y-1 bg-[#efeae2] dark:bg-[#0b141a]"
+            className="flex-1 overflow-y-auto p-4 bg-[#efeae2] dark:bg-[#0b141a] custom-scrollbar relative"
           >
             {isLoadingMore && (
               <div className="flex justify-center py-2">
                 <Loader2 className="h-5 w-5 animate-spin text-[#00A884]" />
               </div>
             )}
-            {messages.map((msg, index) => {
-              if (msg.isSystem || msg.systemEventType) {
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const index = virtualRow.index;
+                const msg = messages[index];
+                if (!msg) return null;
+
+                if (msg.isSystem || msg.systemEventType) {
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      ref={rowVirtualizer.measureElement}
+                      data-index={virtualRow.index}
+                      className="pb-1"
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <GroupMessageBubble
+                        msg={msg}
+                        isMe={false}
+                        showAvatar={false}
+                        isFirstFromSender={false}
+                        isNextSameSender={false}
+                        groupId={groupId}
+                        currentUserId={currentUserId}
+                      />
+                    </div>
+                  );
+                }
+
+                const isMe = msg.senderId === currentUserId;
+
+                // Find previous non-system chat message
+                let prevMsg: any = null;
+                for (let i = index - 1; i >= 0; i--) {
+                  if (!messages[i].isSystem && !messages[i].systemEventType) {
+                    prevMsg = messages[i];
+                    break;
+                  }
+                }
+
+                // Find next non-system chat message
+                let nextMsg: any = null;
+                for (let i = index + 1; i < messages.length; i++) {
+                  if (!messages[i].isSystem && !messages[i].systemEventType) {
+                    nextMsg = messages[i];
+                    break;
+                  }
+                }
+
+                const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
+                const isNextSameSender = nextMsg?.senderId === msg.senderId;
+
                 return (
-                  <GroupMessageBubble
-                    key={msg.id}
-                    msg={msg}
-                    isMe={false}
-                    showAvatar={false}
-                    isFirstFromSender={false}
-                    isNextSameSender={false}
-                    groupId={groupId}
-                    currentUserId={currentUserId}
-                  />
+                  <div
+                    key={virtualRow.key}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className="pb-1"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <GroupMessageBubble
+                      msg={msg}
+                      isMe={isMe}
+                      isAdmin={isAdmin}
+                      showAvatar={!isMe && isFirstFromSender}
+                      isFirstFromSender={isFirstFromSender}
+                      isNextSameSender={isNextSameSender}
+                      members={groupMembers}
+                      groupId={groupId}
+                      currentUserId={currentUserId}
+                      groupMembersCount={memberCount}
+                      isPinned={pinnedMessages.some((p) => p.groupMessageId === msg.id)}
+                      onPin={(duration) => pinMessage(msg.id, duration)}
+                      onUnpin={() => unpinMessage(msg.id)}
+                      onReply={(m) => setReplyingTo(m)}
+                      onScrollToMessage={scrollToMessage}
+                      onShowMessageInfo={(m) => setMessageInfoMsg(m)}
+                      onReact={(mId, emoji) => toggleReaction(mId, emoji)}
+                      onVotePoll={(optId, allowMulti) => votePoll(optId, allowMulti)}
+                      onUnsend={(mId) => unsendMessage(mId)}
+                      onEdit={(mId, newText) => editMessage(mId, newText)}
+                    />
+                  </div>
                 );
-              }
-
-              const isMe = msg.senderId === currentUserId;
-
-              // Find previous non-system chat message
-              let prevMsg: any = null;
-              for (let i = index - 1; i >= 0; i--) {
-                if (!messages[i].isSystem && !messages[i].systemEventType) {
-                  prevMsg = messages[i];
-                  break;
-                }
-              }
-
-              // Find next non-system chat message
-              let nextMsg: any = null;
-              for (let i = index + 1; i < messages.length; i++) {
-                if (!messages[i].isSystem && !messages[i].systemEventType) {
-                  nextMsg = messages[i];
-                  break;
-                }
-              }
-
-              const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
-              const isNextSameSender = nextMsg?.senderId === msg.senderId;
-
-              return (
-                <GroupMessageBubble
-                  key={msg.id}
-                  msg={msg}
-                  isMe={isMe}
-                  isAdmin={isAdmin}
-                  showAvatar={!isMe && isFirstFromSender}
-                  isFirstFromSender={isFirstFromSender}
-                  isNextSameSender={isNextSameSender}
-                  members={groupMembers}
-                  groupId={groupId}
-                  currentUserId={currentUserId}
-                  groupMembersCount={memberCount}
-                  isPinned={pinnedMessages.some((p) => p.groupMessageId === msg.id)}
-                  onPin={(duration) => pinMessage(msg.id, duration)}
-                  onUnpin={() => unpinMessage(msg.id)}
-                  onReply={(m) => setReplyingTo(m)}
-                  onScrollToMessage={scrollToMessage}
-                  onShowMessageInfo={(m) => setMessageInfoMsg(m)}
-                  onReact={(mId, emoji) => toggleReaction(mId, emoji)}
-                  onVotePoll={(optId, allowMulti) => votePoll(optId, allowMulti)}
-                  onUnsend={(mId) => unsendMessage(mId)}
-                  onEdit={(mId, newText) => editMessage(mId, newText)}
-                />
-              );
-            })}
+              })}
+            </div>
             <div ref={messagesEndRef} />
           </div>
 

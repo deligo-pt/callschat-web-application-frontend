@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "@noble/curves": "^2.3.0",
     "@noble/hashes": "^2.3.0",
     "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
+    "@tanstack/react-virtual": "^3.14.26",
     "axios": "^1.18.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -49,13 +51,18 @@
   "devDependencies": {
     "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "glob": "^13.0.6",
+    "jsdom": "^31.0.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }
