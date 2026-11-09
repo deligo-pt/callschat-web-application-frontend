@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
+import { useGroupTyping } from "./chat/useGroupTyping";
+import { useGroupReactions } from "./chat/useGroupReactions";
 import { useE2EE } from "@/context/E2EEContext";
 import { groupService, GroupItem } from "@/services/group.service";
 import { chatService } from "@/services/chat.service";
@@ -271,7 +273,6 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
   }, [messages]);
   const [pinnedMessages, setPinnedMessages] = useState<PinnedMessage[]>([]);
   const [groupDetails, setGroupDetails] = useState<any>(null);
-  const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -279,11 +280,27 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const markedDeliveredSetRef = useRef<Set<string>>(new Set());
 
+  // Sub-hooks: typing indicators
+  const { typingUsers, typingText, startTyping, stopTyping } = useGroupTyping({
+    groupId,
+    currentUserId,
+    socket,
+    isConnected,
+  });
+
+  // Sub-hooks: group reactions
+  const { toggleReaction } = useGroupReactions({
+    groupId,
+    currentUserId,
+    messages,
+    setMessages,
+    socket,
+  });
+
   const groupKeyRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string>(currentUserId);
   const groupDetailsRef = useRef<any>(null);
   const pendingReceiptsRef = useRef<Map<string, any[]>>(new Map());
-  const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const isRekeyingRef = useRef<boolean>(false);
   const rekeyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sentPlaintextCacheRef = useRef<Map<string, string>>(new Map());
@@ -1287,12 +1304,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       );
     };
 
-    const handleReactionsUpdated = (payload: any) => {
-      if (payload.groupId !== groupId) return;
-      setMessages((prev) =>
-        prev.map((m) => (m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m))
-      );
-    };
+
 
     const handlePinUpdated = async (payload: any) => {
       if (payload.groupId !== groupId) return;
@@ -1349,37 +1361,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       }
     };
 
-    const handleTypingStart = (payload: any) => {
-      if (payload.groupId !== groupId || payload.userId === currentUserIdRef.current) return;
-      setTypingUsers((prev) => {
-        const next = new Map(prev);
-        next.set(payload.userId, payload.userName || "Someone");
-        return next;
-      });
 
-      const existingTimeout = typingTimeoutsRef.current.get(payload.userId);
-      if (existingTimeout) clearTimeout(existingTimeout);
-
-      const timeout = setTimeout(() => {
-        setTypingUsers((prev) => {
-          const next = new Map(prev);
-          next.delete(payload.userId);
-          return next;
-        });
-      }, 4000);
-      typingTimeoutsRef.current.set(payload.userId, timeout);
-    };
-
-    const handleTypingStop = (payload: any) => {
-      if (payload.groupId !== groupId) return;
-      setTypingUsers((prev) => {
-        const next = new Map(prev);
-        next.delete(payload.userId);
-        return next;
-      });
-      const existingTimeout = typingTimeoutsRef.current.get(payload.userId);
-      if (existingTimeout) clearTimeout(existingTimeout);
-    };
 
     const handleMessageUnsent = (payload: any) => {
       if (payload.groupId !== groupId) return;
@@ -1779,14 +1761,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     socket.on("group:receive_message", handleReceiveMessage);
     socket.on("group:message_status_update", handleStatusUpdate);
     socket.on("group:batch_status_update", handleBatchStatusUpdate);
-    socket.on("group:reaction_updated", handleReactionsUpdated);
     socket.on("group:pin_updated", handlePinUpdated);
     socket.on("group:poll_updated", handlePollUpdated);
     socket.on("group:settings_updated", handleSettingsUpdated);
     socket.on("group:info_updated", handleInfoUpdated);
     socket.on("group:role_updated", handleRoleUpdated);
-    socket.on("group:typing_start", handleTypingStart);
-    socket.on("group:typing_stop", handleTypingStop);
     socket.on("group:message_unsent", handleMessageUnsent);
     socket.on("group:message_edited", handleMessageEdited);
     socket.on("group:request_rekey", handleRequestRekey);
@@ -1807,14 +1786,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       socket.off("group:receive_message", handleReceiveMessage);
       socket.off("group:message_status_update", handleStatusUpdate);
       socket.off("group:batch_status_update", handleBatchStatusUpdate);
-      socket.off("group:reaction_updated", handleReactionsUpdated);
       socket.off("group:pin_updated", handlePinUpdated);
       socket.off("group:poll_updated", handlePollUpdated);
       socket.off("group:settings_updated", handleSettingsUpdated);
       socket.off("group:info_updated", handleInfoUpdated);
       socket.off("group:role_updated", handleRoleUpdated);
-      socket.off("group:typing_start", handleTypingStart);
-      socket.off("group:typing_stop", handleTypingStop);
       socket.off("group:message_unsent", handleMessageUnsent);
       socket.off("group:message_edited", handleMessageEdited);
       socket.off("group:request_rekey", handleRequestRekey);
@@ -2095,31 +2071,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     [socket, isConnected, groupId, currentUserId]
   );
 
-  const startTyping = useCallback(() => {
-    if (socket && isConnected) {
-      socket.emit("group:typing_start", { groupId });
-    }
-  }, [socket, isConnected, groupId]);
 
-  const stopTyping = useCallback(() => {
-    if (socket && isConnected) {
-      socket.emit("group:typing_stop", { groupId });
-    }
-  }, [socket, isConnected, groupId]);
-
-  const toggleReaction = useCallback(
-    async (messageId: string, emoji: string) => {
-      const msg = messages.find((m) => m.id === messageId);
-      const existing = msg?.reactions?.find((r) => r.userId === currentUserId && r.emoji === emoji);
-
-      if (existing) {
-        await groupService.removeReaction(groupId, messageId);
-      } else {
-        await groupService.addReaction(groupId, messageId, emoji);
-      }
-    },
-    [groupId, messages, currentUserId]
-  );
 
   const pinMessage = useCallback(
     async (messageId: string, durationSeconds?: number) => {
@@ -2296,13 +2248,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
     }
   }, [groupId, isLoadingMore, hasMoreMessages]);
 
-  const typingText = useMemo(() => {
-    const names = Array.from(typingUsers.values());
-    if (names.length === 0) return "";
-    if (names.length === 1) return `${names[0]} is typing...`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
-    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing...`;
-  }, [typingUsers]);
+
 
   const myRole = groupDetails?.myRole || "MEMBER";
   const isOwner = myRole === "OWNER" || groupDetails?.createdBy === currentUserId;

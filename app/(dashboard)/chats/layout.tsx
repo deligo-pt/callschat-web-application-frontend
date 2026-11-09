@@ -18,14 +18,18 @@ import { decryptGroupNotification } from "@/utils/notificationPreview";
 import { getUserPrivateKey, getUserPublicKey, getDecryptedMessage, storeDecryptedMessage, getStoredGroupKey, getStoredSenderKey, storeSenderKey } from "@/utils/keyStore";
 import { wrapSenderKeyForMember } from "@/utils/senderKeyEngine";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { AvatarImage } from "@/components/ui/AvatarImage";
 import { formatGroupPreviewText } from "@/lib/group-preview";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { motion } from "framer-motion";
-import { Building2, Heart, Megaphone, MessageSquare, MoreVertical, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
+import { Building2, Heart, Megaphone, MessageSquare, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { Suspense, useCallback, useEffect, useState, useRef } from "react";
 import { announcementService } from "@/services/announcement.service";
+import { ConversationContextMenu } from "@/components/chat/ConversationContextMenu";
+import { ContactService } from "@/services/contact.service";
+import { toast } from "sonner";
 
 interface Conversation {
   id: string;
@@ -40,6 +44,9 @@ interface Conversation {
   groupName?: string | null;
   groupAvatar?: string | null;
   memberCount?: number;
+  myRole?: string;
+  isMuted?: boolean;
+  isFavourite?: boolean;
   context?: string;
   workspaceId?: string | null;
   unreadCount?: number;
@@ -71,9 +78,13 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [menuOpenForId, setMenuOpenForId] = useState<string | null>(null);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [conversationToLeave, setConversationToLeave] = useState<string | null>(null);
+  const [conversationToClear, setConversationToClear] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [favoriteUserIds, setFavoriteUserIds] = useState<Set<string>>(new Set());
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [decryptedPreviews, setDecryptedPreviews] = useState<Record<string, string>>({});
@@ -156,7 +167,12 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         setUnreadOfficialCount(unreadAnnRes.data.unreadCount);
       }
 
-      const directConvs: Conversation[] = (convsRes?.success && Array.isArray(convsRes?.data)) ? convsRes.data : [];
+      const directConvs: Conversation[] = (convsRes?.success && Array.isArray(convsRes?.data))
+        ? convsRes.data.map((c: any) => ({
+            ...c,
+            isMuted: c.isMuted ?? false,
+          }))
+        : [];
       const groupConvs: Conversation[] = (groupsRes?.success && Array.isArray(groupsRes?.data))
         ? groupsRes.data.map((g: GroupItem) => ({
             id: g.id,
@@ -169,6 +185,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             groupName: g.name,
             groupAvatar: g.avatarUrl,
             memberCount: g.memberCount,
+            myRole: g.myRole,
+            isFavourite: g.isFavourite,
+            isMuted: g.isMuted,
             lastMessage: g.lastMessage
               ? {
                   id: g.lastMessage.id,
@@ -837,6 +856,146 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
 
 
+  // Load favorite contacts so direct conversations accurately show isFavourite
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const res = await ContactService.fetchContacts();
+        const list = Array.isArray(res) ? res : (res as any)?.data || [];
+        const favs = new Set<string>();
+        list.forEach((c: any) => {
+          if (c.isFavourite) {
+            const uid = c.userId || c.contact?.userId || c.addresseeId;
+            if (uid) favs.add(uid);
+          }
+        });
+        setFavoriteUserIds(favs);
+      } catch {}
+    };
+    loadFavorites();
+
+    const handleUpdate = () => { loadFavorites(); };
+    window.addEventListener("contactsUpdated", handleUpdate);
+    return () => window.removeEventListener("contactsUpdated", handleUpdate);
+  }, []);
+
+  const handleToggleRead = (conv: Conversation) => {
+    const isCurrentlyUnread = hasUnread(conv);
+    if (isCurrentlyUnread) {
+      setRealtimeUnreadCounts((prev) => ({ ...prev, [conv.id]: 0 }));
+      const now = new Date().toISOString();
+      setLastReadMap((prev) => {
+        const next = { ...prev, [conv.id]: now };
+        try { localStorage.setItem("lastReadMap", JSON.stringify(next)); } catch {}
+        return next;
+      });
+      void chatService.markConversationAsRead(conv.id);
+    } else {
+      setRealtimeUnreadCounts((prev) => ({ ...prev, [conv.id]: 1 }));
+      setLastReadMap((prev) => {
+        const next = { ...prev };
+        delete next[conv.id];
+        try { localStorage.setItem("lastReadMap", JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
+  };
+
+  const handleToggleMute = async (conv: Conversation) => {
+    const newMuted = !conv.isMuted;
+    try {
+      if (conv.isGroup) {
+        const res = await groupService.toggleMute(conv.id, newMuted);
+        if (res.success) {
+          setConversations((prev) =>
+            prev.map((c) => (c.id === conv.id ? { ...c, isMuted: newMuted } : c))
+          );
+          toast.success(newMuted ? "Group notifications muted" : "Group notifications unmuted");
+        }
+      } else {
+        await chatService.muteConversation(conv.id, newMuted);
+        setConversations((prev) =>
+          prev.map((c) => (c.id === conv.id ? { ...c, isMuted: newMuted } : c))
+        );
+        toast.success(newMuted ? "Notifications muted" : "Notifications unmuted");
+      }
+    } catch {
+      toast.error("Failed to update notification settings");
+    }
+  };
+
+  const handleToggleFavourite = async (conv: Conversation) => {
+    if (conv.isGroup) {
+      const currentFav = !!conv.isFavourite;
+      try {
+        const res = await groupService.toggleFavourite(conv.id, !currentFav);
+        if (res.success) {
+          setConversations((prev) =>
+            prev.map((c) => (c.id === conv.id ? { ...c, isFavourite: !currentFav } : c))
+          );
+          useGroupStore.getState().toggleFavouriteInStore(conv.id, !currentFav);
+          toast.success(!currentFav ? "Added to favorites" : "Removed from favorites");
+        }
+      } catch {
+        toast.error("Failed to update favorite status");
+      }
+    } else if (conv.otherUserId) {
+      const isFav = favoriteUserIds.has(conv.otherUserId);
+      try {
+        await ContactService.toggleFavouriteByUser(conv.otherUserId, !isFav);
+        setFavoriteUserIds((prev) => {
+          const next = new Set(prev);
+          if (isFav) next.delete(conv.otherUserId!);
+          else next.add(conv.otherUserId!);
+          return next;
+        });
+        window.dispatchEvent(new CustomEvent("contactsUpdated"));
+        toast.success(!isFav ? "Added to favorites" : "Removed from favorites");
+      } catch {
+        toast.error("Failed to update favorite status");
+      }
+    }
+  };
+
+  const handleLeaveGroup = async (groupId: string) => {
+    setIsLeaving(true);
+    try {
+      const res = await groupService.removeMember(groupId, currentUserId);
+      if (res.success) {
+        setConversations((prev) => prev.filter((c) => c.id !== groupId));
+        if (pathname === `${basePath}/${groupId}` || pathname === `/groups/${groupId}`) {
+          router.push(basePath);
+        }
+        toast.success("Left group successfully");
+      } else {
+        toast.error(res.error || "Failed to leave group");
+      }
+    } catch (err) {
+      console.error("Failed to leave group", err);
+      toast.error("Failed to leave group");
+    } finally {
+      setIsLeaving(false);
+      setConversationToLeave(null);
+    }
+  };
+
+  const handleClearChat = async (conversationId: string) => {
+    setIsClearing(true);
+    try {
+      await chatService.clearChat(conversationId);
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conversationId ? { ...c, lastMessage: null } : c))
+      );
+      toast.success("Chat history cleared");
+    } catch (err) {
+      console.error("Failed to clear chat", err);
+      toast.error("Failed to clear chat");
+    } finally {
+      setIsClearing(false);
+      setConversationToClear(null);
+    }
+  };
+
   const handleDeleteConversation = async (conversationId: string) => {
     setIsDeleting(true);
     try {
@@ -860,9 +1019,11 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
         if (pathname === `${basePath}/${conversationId}` || pathname === `/groups/${conversationId}`) {
           router.push(basePath);
         }
+        toast.success(isGroup ? "Group deleted" : "Conversation deleted");
       }
     } catch (err) {
       console.error("Failed to delete conversation", err);
+      toast.error("Failed to delete conversation");
     } finally {
       setIsDeleting(false);
       setConversationToDelete(null);
@@ -1392,13 +1553,14 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                       const isActive = pathname === `${basePath}/${conv.id}`;
 
                       const displayName = isGroup ? (conv.groupName || "Group") : conv.otherUserName;
-                      const avatarUrl = isGroup
-                        ? (conv.groupAvatar ? getOptimizedImageUrl(conv.groupAvatar, 48, 48) : null)
-                        : (getOptimizedImageUrl(conv.otherUserAvatar, 48, 48) ||
-                           `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUserName)}&background=E0F2FE&color=0284C7&bold=true`);
+                      const rawAvatar = isGroup ? conv.groupAvatar : conv.otherUserAvatar;
+                      const avatarUrl = rawAvatar ? getOptimizedImageUrl(rawAvatar, 96, 96) : null;
 
                       const isOnline = !isGroup && (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline);
                       const isTyping = typingConvIds.has(conv.id);
+                      const isFav = isGroup
+                        ? !!conv.isFavourite
+                        : (conv.otherUserId ? favoriteUserIds.has(conv.otherUserId) : false);
 
                       return (
                         <motion.div
@@ -1406,9 +1568,21 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                           initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.02 }}
-                          className="relative group"
-                          onMouseLeave={() => setMenuOpenForId(null)}
+                          className="relative"
                         >
+                          <ConversationContextMenu
+                            isGroup={isGroup}
+                            myRole={conv.myRole}
+                            isMuted={conv.isMuted}
+                            isFavourite={isFav}
+                            hasUnread={hasUnread(conv)}
+                            onToggleRead={() => handleToggleRead(conv)}
+                            onToggleMute={() => handleToggleMute(conv)}
+                            onToggleFavourite={() => handleToggleFavourite(conv)}
+                            onClearChat={!isGroup ? () => setConversationToClear(conv.id) : undefined}
+                            onLeaveGroup={isGroup ? () => setConversationToLeave(conv.id) : undefined}
+                            onDelete={() => setConversationToDelete(conv.id)}
+                          >
                           <Link
                             href={chatHref}
                             prefetch={false}
@@ -1421,25 +1595,13 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                           >
                             {/* Avatar with subtle online dot pip or Group Icon */}
                             <div className="relative shrink-0">
-                              <div className="h-12 w-12 rounded-full overflow-hidden bg-[#F0F2F5] dark:bg-[#202C33] shadow-xs flex items-center justify-center">
-                                {avatarUrl ? (
-                                  <img
-                                    src={getOptimizedImageUrl(avatarUrl)}
-                                    alt={displayName}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : isGroup ? (
-                                  <div className="h-full w-full bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                                    <Users className="h-6 w-6" />
-                                  </div>
-                                ) : (
-                                  <img
-                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=E0F2FE&color=0284C7&bold=true`}
-                                    alt={displayName}
-                                    className="h-full w-full object-cover"
-                                  />
-                                )}
-                              </div>
+                              <AvatarImage
+                                src={avatarUrl}
+                                alt={displayName}
+                                size={48}
+                                isGroup={isGroup}
+                                className="shadow-xs"
+                              />
                               {isOnline && (
                                 <span
                                   aria-hidden="true"
@@ -1521,38 +1683,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                             </div>
                           </Link>
 
-                          {/* Context Menu Trigger */}
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                            <button 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setMenuOpenForId(menuOpenForId === conv.id ? null : conv.id);
-                              }}
-                              className="p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-[#667781] hover:text-[#111B21] dark:hover:text-white transition-colors"
-                              title="More options"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </button>
-
-                            {/* Dropdown Menu */}
-                            {menuOpenForId === conv.id && (
-                              <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#202C33] rounded-xl shadow-xl border border-[#E2E8F0] dark:border-[#2A3942] py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setConversationToDelete(conv.id);
-                                    setMenuOpenForId(null);
-                                  }}
-                                  className="w-full px-3.5 py-2 text-left text-[13px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 transition-colors"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  {conv.isGroup ? "Leave group" : "Delete chat"}
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          </ConversationContextMenu>
                         </motion.div>
                       );
                     })}
@@ -1583,11 +1714,11 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
             className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#202C33] border border-black/10 dark:border-white/10 p-6 shadow-2xl"
           >
             <h2 className="text-[18px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-2">
-              {conversations.find((c) => c.id === conversationToDelete)?.isGroup ? "Leave Group" : "Delete Conversation"}
+              {conversations.find((c) => c.id === conversationToDelete)?.isGroup ? "Delete Group" : "Delete Conversation"}
             </h2>
             <p className="text-[14px] font-medium text-[#54656F] dark:text-[#8696A0] mb-6">
               {conversations.find((c) => c.id === conversationToDelete)?.isGroup
-                ? "Are you sure you want to leave this group? You will need an invite to rejoin."
+                ? "Are you sure you want to delete this group? All group data and messages will be permanently deleted."
                 : "Are you sure you want to delete this conversation? This action cannot be undone."}
             </p>
             <div className="flex gap-3">
@@ -1605,7 +1736,81 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 {isDeleting ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 ) : (
-                  conversations.find((c) => c.id === conversationToDelete)?.isGroup ? "Leave" : "Delete"
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Leave Group Confirmation Modal */}
+      {conversationToLeave && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#202C33] border border-black/10 dark:border-white/10 p-6 shadow-2xl"
+          >
+            <h2 className="text-[18px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-2">
+              Leave Group
+            </h2>
+            <p className="text-[14px] font-medium text-[#54656F] dark:text-[#8696A0] mb-6">
+              Are you sure you want to leave this group? You will need an invite link to rejoin.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConversationToLeave(null)}
+                className="flex-1 rounded-xl bg-[#F0F2F5] dark:bg-[#182229] py-3 text-[14px] font-bold text-[#111B21] dark:text-[#E9EDEF] transition-colors hover:bg-[#E9EDEF] dark:hover:bg-[#222D34] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isLeaving}
+                onClick={() => handleLeaveGroup(conversationToLeave)}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-[14px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-70 cursor-pointer"
+              >
+                {isLeaving ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                ) : (
+                  "Leave"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Clear Chat Confirmation Modal */}
+      {conversationToClear && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#202C33] border border-black/10 dark:border-white/10 p-6 shadow-2xl"
+          >
+            <h2 className="text-[18px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-2">
+              Clear Chat
+            </h2>
+            <p className="text-[14px] font-medium text-[#54656F] dark:text-[#8696A0] mb-6">
+              Are you sure you want to clear this chat history? Messages will be cleared from your view.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConversationToClear(null)}
+                className="flex-1 rounded-xl bg-[#F0F2F5] dark:bg-[#182229] py-3 text-[14px] font-bold text-[#111B21] dark:text-[#E9EDEF] transition-colors hover:bg-[#E9EDEF] dark:hover:bg-[#222D34] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isClearing}
+                onClick={() => handleClearChat(conversationToClear)}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-[14px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-70 cursor-pointer"
+              >
+                {isClearing ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                ) : (
+                  "Clear"
                 )}
               </button>
             </div>

@@ -144,12 +144,22 @@
   border: 2px solid #EEF0F5;
   background-color: #F7F9FC;
   padding: 0 12px;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background-color 0.2s;
   position: relative;
 }
 
 .PhoneInputCountry:focus-within {
-  border-color: #3B58F5;
+  border-color: #00A884;
+}
+
+.dark .PhoneInputCountry {
+  border-color: #2A3942;
+  background-color: #202C33;
+  color: #E9EDEF;
+}
+
+.dark .PhoneInputCountry:focus-within {
+  border-color: #00A884;
 }
 
 .PhoneInputCountrySelect {
@@ -162,6 +172,16 @@
   border: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.dark .PhoneInputCountrySelect {
+  background-color: #202C33;
+  color: #E9EDEF;
+}
+
+.dark .PhoneInputCountrySelect option {
+  background-color: #202C33;
+  color: #E9EDEF;
 }
 
 .PhoneInputCountryIcon {
@@ -190,6 +210,10 @@
   opacity: 1 !important;
 }
 
+.dark .PhoneInputCountrySelectArrow {
+  border-color: #8696A0;
+}
+
 .PhoneInputInput {
   flex: 1;
   height: 52px;
@@ -202,7 +226,7 @@
   letter-spacing: 0.025em;
   color: #11142D;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
 
 .PhoneInputInput::placeholder {
@@ -211,7 +235,91 @@
 }
 
 .PhoneInputInput:focus {
-  border-color: #3B58F5;
+  border-color: #00A884;
+}
+
+.dark .PhoneInputInput {
+  border-color: #2A3942;
+  background-color: #202C33;
+  color: #E9EDEF;
+}
+
+.dark .PhoneInputInput::placeholder {
+  color: #8696A0;
+}
+
+.dark .PhoneInputInput:focus {
+  border-color: #00A884;
+}
+
+/* ── WhatsApp Phone Input Variant for Modals & Slide-over Panels ─────────────── */
+.whatsapp-phone-input .PhoneInput {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.whatsapp-phone-input .PhoneInputCountry {
+  height: 42px;
+  min-height: 42px;
+  width: 92px;
+  border-radius: 0.75rem; /* rounded-xl to match other inputs */
+  border: 1px solid transparent;
+  background-color: #F0F2F5;
+  padding: 0 12px;
+  transition: all 0.2s ease;
+}
+
+.whatsapp-phone-input .PhoneInputCountry:focus-within {
+  border-color: #00A884;
+}
+
+.dark .whatsapp-phone-input .PhoneInputCountry {
+  background-color: #202C33;
+  border-color: transparent;
+  color: #E9EDEF;
+}
+
+.dark .whatsapp-phone-input .PhoneInputCountry:focus-within {
+  border-color: #00A884;
+}
+
+.dark .whatsapp-phone-input .PhoneInputCountrySelect option {
+  background-color: #202C33;
+  color: #E9EDEF;
+}
+
+.whatsapp-phone-input .PhoneInputInput {
+  height: 42px;
+  min-height: 42px;
+  border-radius: 0.75rem; /* rounded-xl */
+  border: 1px solid transparent;
+  background-color: #F0F2F5;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111B21;
+  transition: all 0.2s ease;
+}
+
+.whatsapp-phone-input .PhoneInputInput::placeholder {
+  color: #8696A0;
+  font-weight: 400;
+}
+
+.whatsapp-phone-input .PhoneInputInput:focus {
+  border-color: #00A884;
+}
+
+.dark .whatsapp-phone-input .PhoneInputInput {
+  background-color: #202C33;
+  border-color: transparent;
+  color: #E9EDEF;
+}
+
+.dark .whatsapp-phone-input .PhoneInputInput:focus {
+  border-color: #00A884;
 }
 
 /* ── Typing Indicator ──────────────────────────────────────────────────────── */

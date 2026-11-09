@@ -1,32 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Mail } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Play, Mail, ShieldCheck, Globe, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import Modal from "./Modal";
 
 export default function Footer() {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const [email, setEmail] = useState("");
+    const [isSubscribed, setIsSubscribed] = useState(false);
 
     const openModal = () => setIsDownloadModalOpen(true);
     const closeModal = () => setIsDownloadModalOpen(false);
 
-    // Newsletter is presentational (no backend yet) — prevent a full page reload.
     const handleSubscribe = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (!email || !email.includes("@")) {
+            toast.error("Please enter a valid email address.");
+            return;
+        }
+        setIsSubscribed(true);
+        toast.success("Thank you for subscribing to CallsChat updates!");
+        setEmail("");
     };
 
     return (
-        <footer className="w-full bg-white dark:bg-[#111B21] pt-16 pb-8 border-t border-gray-100 dark:border-[#222D34] overflow-hidden transition-colors duration-200">
+        <footer className="w-full bg-[#111B21] border-t border-[#222D34] pt-16 pb-12 text-[#E9EDEF] overflow-hidden transition-colors duration-200">
             <div className="container mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8">
 
-                {/* Upper Two-Column Matrix: Branding (left) + Newsletter & Social (right) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 pb-14 items-start">
+                {/* ── Upper Grid: Brand & Description (left) + 4-Column Sitemap (right) ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 pb-12">
 
-                    {/* Left Block: Branding Description & App Store Downloads */}
-                    <div className="flex flex-col items-start max-w-md">
-                        {/* Logo Section — click returns to the homepage */}
+                    {/* Brand & App Downloads Column (4 cols) */}
+                    <div className="lg:col-span-4 flex flex-col items-start space-y-6">
+                        {/* Logo */}
                         <Link
                             href="/"
                             className="flex items-center group transition-transform duration-200 hover:scale-[1.02] focus:outline-none select-none -ml-3"
@@ -35,53 +44,60 @@ export default function Footer() {
                             <Image
                                 src="/call_chats_logo.png"
                                 alt="CallsChat Logo"
-                                width={79}
-                                height={57}
-                                className="object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-xs dark:drop-shadow-[0_0_14px_rgba(3,124,253,0.4)]"
+                                width={75}
+                                height={54}
+                                className="object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-[0_0_14px_rgba(0,168,132,0.4)]"
                                 priority
                             />
                             <span
                                 className="inline-block tracking-tight"
                                 style={{
-                                    fontFamily: "Inter",
-                                    fontWeight: 700,
-                                    fontSize: 23.75,
+                                    fontFamily: "Inter, sans-serif",
+                                    fontWeight: 800,
+                                    fontSize: 23,
                                     lineHeight: 1,
-                                    marginLeft: -12,
+                                    marginLeft: -10,
                                 }}
                             >
-                                <span className="text-[#02235F] dark:text-white transition-colors duration-200">Calls</span>
-                                <span className="text-[#037CFD] dark:text-[#38BDF8] transition-colors duration-200">Chat</span>
+                                <span className="text-white transition-colors duration-200">Calls</span>
+                                <span className="text-[#25D366] transition-colors duration-200">Chat</span>
                             </span>
                         </Link>
 
-                        <p className="mt-5 text-[15px] font-semibold leading-relaxed text-[#0A2540] dark:text-[#8696A0]">
-                            The future of secure messaging with AI-powered intelligence, real-time translation, and enterprise-grade privacy.
+                        <p className="text-[14.5px] leading-relaxed text-[#8696A0] max-w-sm">
+                            Next-generation secure communication with end-to-end encryption, ultra-low latency voice & video calls, and privacy-first CallsChat IDs.
                         </p>
 
-                        {/* App Badges — open the "Coming Soon" download modal, same as the navbar */}
-                        <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-4 w-full sm:w-auto">
+                        {/* Security Assurance Badge */}
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#00A884]/30 bg-[#00A884]/15 px-3.5 py-1 text-xs font-semibold text-[#25D366]">
+                            <ShieldCheck className="h-4 w-4 shrink-0" />
+                            <span>End-to-End Cryptographically Encrypted</span>
+                        </div>
+
+                        {/* App Download Buttons */}
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto pt-2">
                             {/* App Store */}
                             <button
+                                type="button"
                                 onClick={openModal}
-                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl border border-[#1A62E8] dark:border-[#222D34] bg-transparent dark:bg-[#202C33] px-5 py-2.5 text-left text-gray-800 dark:text-[#E9EDEF] transition-colors duration-200 hover:bg-blue-50 dark:hover:bg-[#2A3942] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-[#00A884] w-full sm:w-auto cursor-pointer"
+                                className="flex items-center justify-center sm:justify-start gap-3 rounded-2xl border border-[#2A3942] bg-[#1A2730] px-4 py-2.5 text-left text-[#E9EDEF] transition-all duration-200 hover:border-[#25D366] hover:bg-[#202C33] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] shadow-xs cursor-pointer group"
                             >
-                                {/* Outlined Apple Logo Icon */}
-                                <svg fill="#2563EB" width="24px" height="24px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="dark:fill-[#38BDF8]">
+                                <svg fill="currentColor" width="22px" height="22px" viewBox="0 0 24 24" className="text-white group-hover:text-[#25D366] transition-colors">
                                     <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z" />
                                 </svg>
                                 <div className="flex flex-col leading-none">
-                                    <span className="text-[10px] text-gray-500 dark:text-[#8696A0] font-medium">Download on the</span>
-                                    <span className="text-[13px] font-bold tracking-tight mt-0.5 text-[#1A62E8] dark:text-[#38BDF8]">App Store</span>
+                                    <span className="text-[10px] text-[#8696A0] font-medium">Download on the</span>
+                                    <span className="text-[13px] font-bold tracking-tight mt-0.5 text-white">App Store</span>
                                 </div>
                             </button>
 
                             {/* Google Play */}
                             <button
+                                type="button"
                                 onClick={openModal}
-                                className="flex items-center justify-center sm:justify-start gap-2.5 rounded-xl bg-[#1A62E8] px-5 py-2.5 text-left text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 w-full sm:w-auto cursor-pointer"
+                                className="flex items-center justify-center sm:justify-start gap-3 rounded-2xl bg-[#202C33] border border-[#2A3942] px-4 py-2.5 text-left text-white shadow-xs transition-all duration-200 hover:bg-[#00A884] hover:border-[#00A884] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] cursor-pointer group"
                             >
-                                <Play className="h-4 w-4 shrink-0 fill-white text-white" />
+                                <Play className="h-4 w-4 shrink-0 fill-white text-white group-hover:scale-110 transition-transform" />
                                 <div className="flex flex-col leading-none">
                                     <span className="text-[10px] text-white/70 font-medium">Get it on</span>
                                     <span className="text-[13px] font-bold tracking-tight mt-0.5 text-white">Google Play</span>
@@ -90,80 +106,251 @@ export default function Footer() {
                         </div>
                     </div>
 
-                    {/* Right Block: Newsletter Subscription Card + Social Handles */}
-                    <div className="flex flex-col items-center w-full">
-                        {/* Newsletter Subscription Banner Box */}
-                        <div className="w-full rounded-3xl bg-[#1A62E8] dark:bg-gradient-to-r dark:from-[#1E3A8A] dark:to-[#1D4ED8] dark:border dark:border-blue-500/30 px-6 py-10 sm:py-12 sm:px-12 text-center text-white shadow-lg shadow-blue-600/10">
-                            <h3 className="text-3xl sm:text-4xl font-bold tracking-tight">Stay Updated</h3>
-                            <p className="mt-3 text-xs sm:text-sm text-white/80 font-medium">
-                                Get the latest updates, features, and news delivered to your inbox.
-                            </p>
+                    {/* 4-Column Structured Navigation Sitemap (8 cols) */}
+                    <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-8">
 
-                            <form onSubmit={handleSubscribe} className="mt-7 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-md mx-auto w-full">
-                                <div className="relative flex-1 flex items-center rounded-full bg-white/20 border border-white/30 px-4 py-2.5 focus-within:border-white/60 transition-colors">
-                                    <Mail className="h-4 w-4 text-white/90 shrink-0" />
-                                    <input
-                                        type="email"
-                                        placeholder="Enter your mail"
-                                        className="w-full bg-transparent pl-2.5 text-sm font-semibold text-white placeholder-white/70 caret-white focus:outline-none border-none outline-none autofill:[-webkit-text-fill-color:#ffffff] autofill:[transition:background-color_9999s_ease-in-out_0s]"
-                                        required
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="w-full sm:w-auto shrink-0 rounded-full bg-white px-6 py-3 sm:py-2.5 text-sm font-bold text-[#1A62E8] shadow-sm transition-transform duration-200 hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
-                                >
-                                    Subscribe
-                                </button>
-                            </form>
+                        {/* Column 1: Features */}
+                        <div className="flex flex-col space-y-3.5">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
+                                Features
+                            </h3>
+                            <ul className="space-y-2.5 text-[14px]">
+                                <li>
+                                    <Link href="/chats" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Private Chat
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/calls" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Voice & Video Calls
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/live/rooms" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Live Audio Rooms
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/communities" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Group Communities
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/mall" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Diamond Economy
+                                    </Link>
+                                </li>
+                            </ul>
                         </div>
 
-                        {/* Social Handle Connections Row */}
-                        <div className="mt-8 flex items-center gap-4">
-                            {/* Facebook */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="Facebook">
-                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8.02 9.57v-6.77H7.56v-2.8h2.46V9.86c0-2.43 1.44-3.78 3.66-3.78 1.06 0 2.18.19 2.18.19v2.4h-1.23c-1.21 0-1.58.75-1.58 1.52v1.83h2.7l-.43 2.8h-2.27V21.57C18.56 20.87 22 16.84 22 12z" />
-                                </svg>
-                            </a>
+                        {/* Column 2: Company */}
+                        <div className="flex flex-col space-y-3.5">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
+                                Company
+                            </h3>
+                            <ul className="space-y-2.5 text-[14px]">
+                                <li>
+                                    <Link href="/" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        About CallsChat
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/privacy-policy#security-measures" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Security & Cryptography
+                                    </Link>
+                                </li>
+                                <li>
+                                    <button type="button" onClick={openModal} className="text-left text-[#8696A0] hover:text-[#25D366] transition-colors cursor-pointer">
+                                        Web Desktop App
+                                    </button>
+                                </li>
+                                <li>
+                                    <a href="mailto:press@callschat.com" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Press & Media
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
 
-                            {/* Website Global / Network */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="Website">
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="2" x2="22" y1="12" y2="12" />
-                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                                </svg>
-                            </a>
+                        {/* Column 3: Support & Help */}
+                        <div className="flex flex-col space-y-3.5">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
+                                Support
+                            </h3>
+                            <ul className="space-y-2.5 text-[14px]">
+                                <li>
+                                    <a href="mailto:support@callschat.com" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Help Center
+                                    </a>
+                                </li>
+                                <li>
+                                    <Link href="/privacy-policy#phone-number-privacy" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Phone Number Privacy
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/privacy-policy#ai-moderation-and-abuse-prevention" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Safety & Moderation
+                                    </Link>
+                                </li>
+                                <li>
+                                    <a href="mailto:abuse@callschat.com" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Report Abuse
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
 
-                            {/* LinkedIn */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="LinkedIn">
-                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+                        {/* Column 4: Legal & Compliance */}
+                        <div className="flex flex-col space-y-3.5">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
+                                Legal
+                            </h3>
+                            <ul className="space-y-2.5 text-[14px]">
+                                <li>
+                                    <Link href="/privacy-policy" className="text-[#8696A0] hover:text-[#25D366] transition-colors font-medium">
+                                        Privacy Policy
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/terms-of-service" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Terms of Service
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/cookie-policy" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        Cookie Policy
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/privacy-policy#gdpr-privacy-rights" className="text-[#8696A0] hover:text-[#25D366] transition-colors">
+                                        GDPR & CCPA Rights
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                {/* ── Middle Band: Sleek Minimalist Newsletter Subscription Bar (Option A) ── */}
+                <div className="border-t border-b border-[#222D34] py-8 my-4">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-3.5 text-center md:text-left">
+                            <div className="h-10 w-10 shrink-0 rounded-2xl bg-[#00A884]/20 flex items-center justify-center text-[#25D366]">
+                                <Mail className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h4 className="text-[15px] font-bold text-white">
+                                    Stay informed with CallsChat
+                                </h4>
+                                <p className="text-xs text-[#8696A0]">
+                                    Subscribe to product updates, security advisories, and feature releases.
+                                </p>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleSubscribe} className="flex items-center gap-2 max-w-md w-full">
+                            <div className="relative flex-1">
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="Enter your email"
+                                    className="w-full rounded-full border border-[#2A3942] bg-[#1A2730] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8696A0] focus:border-[#25D366] focus:outline-none focus:ring-1 focus:ring-[#25D366] transition-colors shadow-2xs"
+                                    required
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="shrink-0 rounded-full bg-[#00A884] hover:bg-[#00803E] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs transition-transform duration-200 active:scale-95 cursor-pointer"
+                            >
+                                {isSubscribed ? "Subscribed!" : "Subscribe"}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {/* ── Bottom Sub-Footer: Copyright, Status, Socials & Language ── */}
+                <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-medium text-[#8696A0]">
+
+                    {/* Left: Copyright & Operational Status */}
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                        <span>© 2026 CallsChat LLC. All rights reserved.</span>
+                        <span className="hidden sm:inline text-gray-700">•</span>
+                        <div className="inline-flex items-center gap-1.5 text-emerald-400">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span className="font-semibold">All Systems Operational</span>
+                        </div>
+                    </div>
+
+                    {/* Right: Modern Social Handles & Region Selector */}
+                    <div className="flex items-center gap-5">
+                        {/* Social Icons (Muted hover) */}
+                        <div className="flex items-center gap-3">
+                            {/* X (formerly Twitter) */}
+                            <a
+                                href="https://x.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
+                                aria-label="X (Twitter)"
+                            >
+                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                                 </svg>
                             </a>
 
                             {/* Instagram */}
-                            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1A62E8] text-white transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" aria-label="Instagram">
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                            <a
+                                href="https://instagram.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
+                                aria-label="Instagram"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                                     <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
                                     <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
                                     <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
                                 </svg>
                             </a>
+
+                            {/* LinkedIn */}
+                            <a
+                                href="https://linkedin.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
+                                aria-label="LinkedIn"
+                            >
+                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+                                </svg>
+                            </a>
+
+                            {/* GitHub */}
+                            <a
+                                href="https://github.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-full text-[#8696A0] hover:text-[#25D366] hover:bg-white/10 transition-colors"
+                                aria-label="GitHub"
+                            >
+                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                                </svg>
+                            </a>
+                        </div>
+
+                        {/* Region & Language Selector Pill */}
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[#2A3942] bg-[#1A2730] px-3 py-1 text-[11.5px] font-semibold text-[#E9EDEF] shadow-2xs">
+                            <Globe className="h-3.5 w-3.5 text-[#25D366]" />
+                            <span>English (US)</span>
                         </div>
                     </div>
 
-                </div>
-
-                {/* Global Structural Copyright Bar Asset Line */}
-                <div className="pt-6 border-t border-[#1A62E8]/30 dark:border-[#222D34] flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-medium text-[#0A2540] dark:text-[#8696A0] text-center sm:text-left">
-                    <span>© 2026 CallsChat. All rights reserved.</span>
-                    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-center">
-                        <Link href="/privacy-policy" className="text-slate-600 dark:text-[#8696A0] hover:text-blue-600 dark:hover:text-[#00A884] transition-colors">Privacy Policy</Link>
-                        <Link href="/terms-of-service" className="text-slate-600 dark:text-[#8696A0] hover:text-blue-600 dark:hover:text-[#00A884] transition-colors">Terms of Service</Link>
-                        <Link href="/cookie-policy" className="text-slate-600 dark:text-[#8696A0] hover:text-blue-600 dark:hover:text-[#00A884] transition-colors">Cookie Policy</Link>
-                    </div>
                 </div>
 
             </div>
