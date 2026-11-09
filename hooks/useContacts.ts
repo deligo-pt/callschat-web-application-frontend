@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ContactService } from '@/services/contact.service';
 import { toast } from 'sonner';
 import { getOptimizedImageUrl } from '@/utils/image';
@@ -16,6 +16,60 @@ export interface Contact {
   isUnregistered?: boolean;
 }
 
+interface UserProfileLike {
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+  username?: string | null;
+  avatarUrl?: string | null;
+  isOnline?: boolean | null;
+}
+
+interface RawContactItem {
+  id?: string;
+  _id?: string;
+  requesterId?: string;
+  addresseeId?: string;
+  userId?: string;
+  contactId?: string;
+  customName?: string;
+  name?: string;
+  phone?: string;
+  phoneNumber?: string;
+  avatarUrl?: string | null;
+  isFavourite?: boolean;
+  isVerified?: boolean;
+  accountType?: string;
+  addressee?: {
+    id?: string;
+    phone?: string;
+    profile?: UserProfileLike;
+    isVerified?: boolean;
+    accountType?: string;
+  };
+  contact?: {
+    id?: string;
+    phone?: string;
+    profile?: UserProfileLike;
+    userId?: string;
+    isVerified?: boolean;
+    accountType?: string;
+  };
+  user?: {
+    id?: string;
+    phone?: string;
+    profile?: UserProfileLike;
+  };
+  profile?: UserProfileLike;
+}
+
+interface RawUnregisteredContactItem {
+  id?: string;
+  name?: string;
+  phone?: string;
+  phoneNumber?: string;
+}
+
 export function useContacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,30 +83,34 @@ export function useContacts() {
         ContactService.listUnregisteredContacts({ limit: 100 }).catch(() => ({ success: false, data: { contacts: [] } }))
       ]);
 
-      let contactsArray = [];
+      let contactsArray: RawContactItem[] = [];
       if (Array.isArray(data)) {
         contactsArray = data;
-      } else if (data && Array.isArray(data.data)) {
-        contactsArray = data.data;
-      } else if (data && data.data && Array.isArray(data.data.contacts)) {
-        contactsArray = data.data.contacts;
-      } else if (data && data.data && Array.isArray(data.data.items)) {
-        contactsArray = data.data.items;
-      } else if (data && data.data && Array.isArray(data.data.list)) {
-        contactsArray = data.data.list;
-      } else if (data && data.data && Array.isArray(data.data.users)) {
-        contactsArray = data.data.users;
-      } else if (data && Array.isArray(data.contacts)) {
-        contactsArray = data.contacts;
-      } else if (data && Array.isArray(data.items)) {
-        contactsArray = data.items;
-      } else if (data && Array.isArray(data.list)) {
-        contactsArray = data.list;
-      } else if (data && Array.isArray(data.users)) {
-        contactsArray = data.users;
+      } else if (data && typeof data === 'object') {
+        const record = data as Record<string, unknown>;
+        const innerData = record.data as Record<string, unknown> | undefined;
+        if (Array.isArray(record.data)) {
+          contactsArray = record.data as RawContactItem[];
+        } else if (innerData && Array.isArray(innerData.contacts)) {
+          contactsArray = innerData.contacts as RawContactItem[];
+        } else if (innerData && Array.isArray(innerData.items)) {
+          contactsArray = innerData.items as RawContactItem[];
+        } else if (innerData && Array.isArray(innerData.list)) {
+          contactsArray = innerData.list as RawContactItem[];
+        } else if (innerData && Array.isArray(innerData.users)) {
+          contactsArray = innerData.users as RawContactItem[];
+        } else if (Array.isArray(record.contacts)) {
+          contactsArray = record.contacts as RawContactItem[];
+        } else if (Array.isArray(record.items)) {
+          contactsArray = record.items as RawContactItem[];
+        } else if (Array.isArray(record.list)) {
+          contactsArray = record.list as RawContactItem[];
+        } else if (Array.isArray(record.users)) {
+          contactsArray = record.users as RawContactItem[];
+        }
       }
 
-      const getFullName = (profile: any) => {
+      const getFullName = (profile?: UserProfileLike | null) => {
         if (!profile) return "";
         if (profile.firstName || profile.lastName) {
           return `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
@@ -60,11 +118,11 @@ export function useContacts() {
         return profile.displayName || profile.username || "";
       };
 
-      const mappedContacts = contactsArray.map((u: any, idx: number) => {
+      const mappedContacts: Contact[] = contactsArray.map((u, idx: number) => {
         const id = u.id || u._id || u.addressee?.id || u.contact?.id || `contact-${idx}`;
         
         let targetUserId = "";
-        let targetProfile = null;
+        let targetProfile: UserProfileLike | null | undefined = null;
         let targetPhone = "";
         
         // Find the user ID from token
@@ -75,7 +133,9 @@ export function useContacts() {
             try {
               const payload = JSON.parse(atob(token.split('.')[1]));
               myId = payload.sub || payload.id || "";
-            } catch (e) {}
+            } catch {
+              // Ignore decoding error
+            }
           }
         }
 
@@ -83,20 +143,20 @@ export function useContacts() {
           if (myId && u.requesterId === myId) {
             targetUserId = u.addresseeId;
             targetProfile = u.addressee?.profile;
-            targetPhone = u.addressee?.phone;
+            targetPhone = u.addressee?.phone || "";
           } else if (myId && u.addresseeId === myId) {
             targetUserId = u.requesterId;
             targetProfile = u.contact?.profile;
-            targetPhone = u.contact?.phone;
+            targetPhone = u.contact?.phone || "";
           } else {
             targetUserId = u.addresseeId;
             targetProfile = u.addressee?.profile;
-            targetPhone = u.addressee?.phone;
+            targetPhone = u.addressee?.phone || "";
           }
         } else {
           targetUserId = u.addressee?.id || u.addresseeId || u.userId || u.user?.id || u.contact?.userId || u.contact?.id || u.contactId || u.id || id;
           targetProfile = u.addressee?.profile || u.contact?.profile || u.profile || u.user?.profile;
-          targetPhone = u.contact?.phone || u.phoneNumber || u.phone || u.user?.phone || u.addressee?.phone;
+          targetPhone = u.contact?.phone || u.phoneNumber || u.phone || u.user?.phone || u.addressee?.phone || "";
         }
 
         const userId = targetUserId;
@@ -123,8 +183,10 @@ export function useContacts() {
         };
       });
 
-      const unregArray = unregResponse?.data?.contacts || (unregResponse as any)?.contacts || [];
-      const mappedUnreg = unregArray.map((u: any, idx: number) => ({
+      const unregResponseData = unregResponse?.data;
+      const unregArray: RawUnregisteredContactItem[] = 
+        (Array.isArray(unregResponseData?.contacts) ? unregResponseData.contacts : []) as RawUnregisteredContactItem[];
+      const mappedUnreg: Contact[] = unregArray.map((u, idx: number) => ({
         id: u.id || `unreg-${idx}`,
         userId: "",
         name: u.name || "Unknown",
@@ -168,10 +230,12 @@ export function useContacts() {
   }, []);
 
   useEffect(() => {
-    fetchContacts();
+    queueMicrotask(() => {
+      void fetchContacts();
+    });
     
     const handleUpdate = () => {
-      fetchContacts();
+      void fetchContacts();
     };
 
     window.addEventListener('contactsUpdated', handleUpdate);
@@ -186,20 +250,42 @@ export function useContacts() {
     
     try {
       await ContactService.toggleFavourite(contactId, newStatus);
-    } catch (error) {
+    } catch {
       // Rollback on Error
       setContacts(prev => prev.map(c => c.id === contactId ? { ...c, isFavourite: currentStatus } : c));
       toast.error("Failed to update favorite status");
     }
   };
 
+  const registeredContacts = useMemo(
+    () => contacts.filter((c) => !c.isUnregistered && Boolean(c.userId)),
+    [contacts]
+  );
+
+  const unregisteredContacts = useMemo(
+    () => contacts.filter((c) => Boolean(c.isUnregistered)),
+    [contacts]
+  );
+
+  const registeredCount = registeredContacts.length;
+  const unregisteredCount = unregisteredContacts.length;
+  const favoritesCount = useMemo(
+    () => contacts.filter((c) => c.isFavourite).length,
+    [contacts]
+  );
+
   return {
     contacts,
     setContacts,
+    registeredContacts,
+    unregisteredContacts,
+    registeredCount,
+    unregisteredCount,
+    favoritesCount,
     isLoading,
     searchQuery,
     setSearchQuery,
     fetchContacts,
-    handleToggleFavourite
+    handleToggleFavourite,
   };
 }

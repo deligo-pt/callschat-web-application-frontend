@@ -31,9 +31,9 @@ import { useTranslations } from "next-intl";
 import { ContactService } from "@/services/contact.service";
 import { UserService, type SearchUserItem } from "@/services/user.service";
 import { toast } from "sonner";
-import { getOptimizedImageUrl } from "@/utils/image";
 import { useCallContext } from "@/components/providers/CallContext";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { AvatarImage } from "@/components/ui/AvatarImage";
 
 export default function ContactsPage() {
   const t = useTranslations("contacts");
@@ -41,10 +41,22 @@ export default function ContactsPage() {
   const tNav = useTranslations("nav");
   const router = useRouter();
   const { initiateCall } = useCallContext();
-  const { contacts, isLoading, searchQuery, setSearchQuery, fetchContacts, handleToggleFavourite } = useContacts();
+  const {
+    contacts,
+    registeredContacts,
+    unregisteredContacts,
+    registeredCount,
+    unregisteredCount,
+    favoritesCount,
+    isLoading,
+    searchQuery,
+    setSearchQuery,
+    fetchContacts,
+    handleToggleFavourite,
+  } = useContacts();
 
-  // Filter tab state
-  const [filterTab, setFilterTab] = useState<"all" | "favorites" | "invitable">("all");
+  // Filter tab state: "on_callschat" by default to surface active CallsChat users first
+  const [filterTab, setFilterTab] = useState<"on_callschat" | "all" | "favorites" | "invitable">("on_callschat");
 
   // Search by Name, Username, Phone API state
   const [searchResults, setSearchResults] = useState<SearchUserItem[]>([]);
@@ -65,14 +77,16 @@ export default function ContactsPage() {
   useEffect(() => {
     const query = searchQuery.trim();
     if (!query) {
-      setSearchResults([]);
-      setUnregisteredSearchResults([]);
-      setIsSearching(false);
-      return;
+      const resetTimer = setTimeout(() => {
+        setSearchResults([]);
+        setUnregisteredSearchResults([]);
+        setIsSearching(false);
+      }, 0);
+      return () => clearTimeout(resetTimer);
     }
 
-    setIsSearching(true);
     const timer = setTimeout(async () => {
+      setIsSearching(true);
       try {
         const [userSearchRes, unregRes] = await Promise.all([
           UserService.searchUsers(query, 30).catch(() => ({ success: false, data: [] })),
@@ -85,9 +99,16 @@ export default function ContactsPage() {
           setSearchResults([]);
         }
 
-        const unregList = unregRes?.data?.contacts || (unregRes as any)?.contacts || [];
+        interface UnregSearchItem {
+          id?: string;
+          name?: string;
+          phoneNumber?: string;
+          phone?: string;
+        }
+
+        const unregList = ((unregRes?.data?.contacts || []) as unknown) as UnregSearchItem[];
         setUnregisteredSearchResults(
-          unregList.map((u: any, idx: number) => ({
+          unregList.map((u, idx: number) => ({
             id: u.id || `unreg-${idx}`,
             userId: "",
             name: u.name || "Unknown",
@@ -142,8 +163,9 @@ export default function ContactsPage() {
           prev.map((u) => (u.id === user.id ? { ...u, isContact: true, relationship: "CONTACT" } : u))
         );
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add contact");
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to add contact";
+      toast.error(errorMsg);
     } finally {
       setAddingContactId(null);
     }
@@ -211,7 +233,7 @@ export default function ContactsPage() {
         }
         setAddContactError(errorMessage);
       }
-    } catch (error) {
+    } catch {
       setAddContactError(t("err_network"));
     } finally {
       setIsAddingContact(false);
@@ -221,13 +243,14 @@ export default function ContactsPage() {
   // Filtered contacts based on active filter tab
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
+      if (filterTab === "on_callschat") return !contact.isUnregistered && Boolean(contact.userId);
       if (filterTab === "favorites") return contact.isFavourite;
       if (filterTab === "invitable") return contact.isUnregistered;
       return true;
     });
   }, [contacts, filterTab]);
 
-  // Group filtered contacts by first letter
+  // Group filtered contacts by first letter for single-category tabs
   const groupedContacts = useMemo(() => {
     return filteredContacts.reduce((acc, contact) => {
       const letter = (contact.name || "Unknown").charAt(0).toUpperCase();
@@ -248,9 +271,44 @@ export default function ContactsPage() {
     });
   }, [groupedContacts]);
 
+  // Two-tier section groupings for the "All" tab (WhatsApp Style)
+  const allRegisteredGrouped = useMemo(() => {
+    return registeredContacts.reduce((acc, contact) => {
+      const letter = (contact.name || "Unknown").charAt(0).toUpperCase();
+      const safeLetter = /[A-Z]/.test(letter) ? letter : "#";
+      if (!acc[safeLetter]) acc[safeLetter] = [];
+      acc[safeLetter].push(contact);
+      return acc;
+    }, {} as Record<string, Contact[]>);
+  }, [registeredContacts]);
+
+  const allRegisteredLetters = useMemo(() => {
+    return Object.keys(allRegisteredGrouped).sort((a, b) => {
+      if (a === "#") return 1;
+      if (b === "#") return -1;
+      return a.localeCompare(b);
+    });
+  }, [allRegisteredGrouped]);
+
+  const allUnregisteredGrouped = useMemo(() => {
+    return unregisteredContacts.reduce((acc, contact) => {
+      const letter = (contact.name || "Unknown").charAt(0).toUpperCase();
+      const safeLetter = /[A-Z]/.test(letter) ? letter : "#";
+      if (!acc[safeLetter]) acc[safeLetter] = [];
+      acc[safeLetter].push(contact);
+      return acc;
+    }, {} as Record<string, Contact[]>);
+  }, [unregisteredContacts]);
+
+  const allUnregisteredLetters = useMemo(() => {
+    return Object.keys(allUnregisteredGrouped).sort((a, b) => {
+      if (a === "#") return 1;
+      if (b === "#") return -1;
+      return a.localeCompare(b);
+    });
+  }, [allUnregisteredGrouped]);
+
   const isQuerying = Boolean(searchQuery.trim());
-  const favoriteCount = useMemo(() => contacts.filter((c) => c.isFavourite).length, [contacts]);
-  const invitableCount = useMemo(() => contacts.filter((c) => c.isUnregistered).length, [contacts]);
 
   return (
     <div className="flex h-full w-full bg-white dark:bg-[#111B21] overflow-hidden">
@@ -309,6 +367,18 @@ export default function ContactsPage() {
           {!isQuerying && (
             <div className="flex items-center gap-1.5 mt-3 pb-1 overflow-x-auto scrollbar-hide">
               <button
+                onClick={() => setFilterTab("on_callschat")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-full text-[12.5px] font-medium transition-all cursor-pointer shrink-0",
+                  filterTab === "on_callschat"
+                    ? "bg-[#00A884] text-white shadow-xs font-semibold"
+                    : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
+                )}
+              >
+                <span>On CallsChat</span>
+                {registeredCount > 0 && <span className="opacity-90">({registeredCount})</span>}
+              </button>
+              <button
                 onClick={() => setFilterTab("all")}
                 className={cn(
                   "px-3 py-1 rounded-full text-[12.5px] font-medium transition-all cursor-pointer shrink-0",
@@ -330,9 +400,9 @@ export default function ContactsPage() {
               >
                 <Heart className={cn("h-3 w-3", filterTab === "favorites" ? "fill-white text-white" : "fill-red-500 text-red-500")} />
                 <span>Favorites</span>
-                {favoriteCount > 0 && <span className="opacity-80">({favoriteCount})</span>}
+                {favoritesCount > 0 && <span className="opacity-80">({favoritesCount})</span>}
               </button>
-              {invitableCount > 0 && (
+              {unregisteredCount > 0 && (
                 <button
                   onClick={() => setFilterTab("invitable")}
                   className={cn(
@@ -342,7 +412,7 @@ export default function ContactsPage() {
                       : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
                   )}
                 >
-                  Invitable ({invitableCount})
+                  Invite Friends ({unregisteredCount})
                 </button>
               )}
             </div>
@@ -352,8 +422,8 @@ export default function ContactsPage() {
         {/* Scrollable Contacts List Area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 md:pb-6">
           
-          {/* Quick Action Rows (Shown when not searching and on 'All' tab) */}
-          {!isQuerying && filterTab === "all" && (
+          {/* Quick Action Rows (Shown when not searching and on 'On CallsChat' or 'All' tab) */}
+          {!isQuerying && (filterTab === "on_callschat" || filterTab === "all") && (
             <div className="flex flex-col border-b border-[#E2E8F0]/60 dark:border-[#222D34]">
               {/* New Contact Action */}
               <div
@@ -428,14 +498,10 @@ export default function ContactsPage() {
                         >
                           <div className="flex items-center gap-3.5 min-w-0 pr-2">
                             <div className="relative shrink-0">
-                              <img
-                                src={getOptimizedImageUrl(
-                                  user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName)}&background=00A884&color=fff`,
-                                  52,
-                                  52
-                                )}
+                              <AvatarImage
+                                src={user.avatarUrl}
                                 alt={user.displayName}
-                                className="h-[44px] w-[44px] rounded-full object-cover bg-gray-100 dark:bg-gray-800"
+                                size={44}
                               />
                               {user.isOnline && (
                                 <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21]" />
@@ -552,7 +618,7 @@ export default function ContactsPage() {
                               try {
                                 await ContactService.inviteContact({ phoneNumber: contact.phone });
                                 toast.success(`Invitation SMS sent to ${contact.name}!`);
-                              } catch (err) {
+                              } catch {
                                 toast.error("Failed to send invitation SMS");
                               }
                             }}
@@ -577,20 +643,213 @@ export default function ContactsPage() {
                 <Users className="h-6 w-6" />
               </div>
               <p className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
-                {filterTab === "favorites" ? "No favorite contacts" : t("no_contacts")}
+                {filterTab === "on_callschat"
+                  ? "No contacts on CallsChat yet"
+                  : filterTab === "favorites"
+                  ? "No favorite contacts"
+                  : filterTab === "invitable"
+                  ? "No invitable contacts"
+                  : t("no_contacts")}
               </p>
               <p className="text-[12.5px] text-[#8696A0] mt-1 max-w-xs">
-                {filterTab === "favorites"
+                {filterTab === "on_callschat"
+                  ? "Search for users above or add a new contact by phone number or username."
+                  : filterTab === "favorites"
                   ? "Star your most frequent contacts to easily access them here."
+                  : filterTab === "invitable"
+                  ? "All your synced contacts are already using CallsChat!"
                   : "Add phone numbers or search users to start connecting."}
               </p>
-              {filterTab === "all" && (
+              {(filterTab === "on_callschat" || filterTab === "all") && (
                 <button
                   onClick={() => setIsAddContactPanelOpen(true)}
                   className="mt-4 px-4 py-2 rounded-full bg-[#00A884] hover:bg-[#008069] text-white text-[13px] font-semibold transition-colors cursor-pointer"
                 >
                   Add Contact
                 </button>
+              )}
+            </div>
+          ) : filterTab === "all" ? (
+            <div className="flex flex-col">
+              {/* Section 1: Contacts on CallsChat */}
+              {registeredCount > 0 && (
+                <div>
+                  <div className="sticky top-0 z-10 bg-[#F0F2F5] dark:bg-[#182229] px-4 py-1.5 text-[11.5px] font-bold uppercase tracking-wider text-[#008069] dark:text-[#25D366] border-y border-[#E2E8F0]/60 dark:border-[#222D34] flex items-center justify-between">
+                    <span>Contacts on CallsChat</span>
+                    <span className="text-[11px] font-semibold opacity-80">({registeredCount})</span>
+                  </div>
+                  {allRegisteredLetters.map((letter) => (
+                    <div key={`reg-${letter}`}>
+                      <div className="bg-[#F0F2F5]/60 dark:bg-[#111B21]/60 px-4 py-0.5 text-[11px] font-bold text-[#8696A0]">
+                        {letter}
+                      </div>
+                      <div className="flex flex-col">
+                        {allRegisteredGrouped[letter].map((contact) => (
+                          <div
+                            key={contact.id}
+                            onClick={() => {
+                              if (!contact.isUnregistered && contact.userId) {
+                                handleStartChat(contact.userId);
+                              }
+                            }}
+                            className="group relative flex w-full items-center justify-between px-4 py-2.5 transition-colors hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0 pr-2">
+                              <div className="relative shrink-0">
+                                <AvatarImage
+                                  src={contact.avatarUrl}
+                                  alt={contact.name}
+                                  size={44}
+                                />
+                                {contact.isOnline && (
+                                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21]" />
+                                )}
+                              </div>
+
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
+                                    {contact.name}
+                                  </h3>
+                                  {contact.isVerified && (
+                                    <VerifiedBadge
+                                      type={contact.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                                      size="xs"
+                                    />
+                                  )}
+                                  <span className="shrink-0 px-1.5 py-0.5 text-[9.5px] font-semibold rounded bg-[#00A884]/15 text-[#008069] dark:text-[#25D366]">
+                                    CallsChat
+                                  </span>
+                                  {contact.isFavourite && (
+                                    <Heart className="h-3 w-3 fill-red-500 text-red-500 shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
+                                  {contact.phone}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavourite(contact.id, contact.isFavourite);
+                                }}
+                                title={contact.isFavourite ? "Remove from Favorites" : "Add to Favorites"}
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-red-500 transition-colors cursor-pointer"
+                              >
+                                <Heart
+                                  className={cn(
+                                    "h-4 w-4",
+                                    contact.isFavourite
+                                      ? "fill-red-500 text-red-500"
+                                      : "text-[#8696A0] group-hover:opacity-100 opacity-60"
+                                  )}
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartChat(contact.userId);
+                                }}
+                                title="Message"
+                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  initiateCall(contact.userId, "AUDIO", contact.name, contact.avatarUrl || undefined);
+                                }}
+                                title="Voice Call"
+                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
+                              >
+                                <Phone className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  initiateCall(contact.userId, "VIDEO", contact.name, contact.avatarUrl || undefined);
+                                }}
+                                title="Video Call"
+                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
+                              >
+                                <Video className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Section 2: Invite to CallsChat */}
+              {unregisteredCount > 0 && (
+                <div className={cn(registeredCount > 0 && "mt-3")}>
+                  <div className="sticky top-0 z-10 bg-[#F0F2F5] dark:bg-[#182229] px-4 py-1.5 text-[11.5px] font-bold uppercase tracking-wider text-[#54656F] dark:text-[#8696A0] border-y border-[#E2E8F0]/60 dark:border-[#222D34] flex items-center justify-between">
+                    <span>Invite to CallsChat</span>
+                    <span className="text-[11px] font-semibold opacity-80">({unregisteredCount})</span>
+                  </div>
+                  {allUnregisteredLetters.map((letter) => (
+                    <div key={`unreg-${letter}`}>
+                      <div className="bg-[#F0F2F5]/60 dark:bg-[#111B21]/60 px-4 py-0.5 text-[11px] font-bold text-[#8696A0]">
+                        {letter}
+                      </div>
+                      <div className="flex flex-col">
+                        {allUnregisteredGrouped[letter].map((contact) => (
+                          <div
+                            key={contact.id}
+                            className="group relative flex w-full items-center justify-between px-4 py-2.5 transition-colors hover:bg-[#F0F2F5] dark:hover:bg-[#202C33]"
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0 pr-2">
+                              <div className="relative shrink-0">
+                                <AvatarImage
+                                  src={null}
+                                  alt={contact.name}
+                                  size={44}
+                                />
+                              </div>
+
+                              <div className="flex flex-col min-w-0">
+                                <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
+                                  {contact.name}
+                                </h3>
+                                <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
+                                  {contact.phone}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await ContactService.inviteContact({ phoneNumber: contact.phone });
+                                  toast.success(`Invitation SMS sent to ${contact.name}!`);
+                                } catch {
+                                  toast.error("Failed to send invitation SMS");
+                                }
+                              }}
+                              className="px-3 py-1 rounded-full bg-[#00A884]/15 hover:bg-[#00A884] text-[#008069] dark:text-[#25D366] hover:text-white text-[11.5px] font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
+                            >
+                              <span>Invite</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ) : (
@@ -604,131 +863,130 @@ export default function ContactsPage() {
 
                   {/* Contacts under this letter */}
                   <div className="flex flex-col">
-                    {groupedContacts[letter].map((contact) => {
-                      const avatarUrl =
-                        contact.avatarUrl ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=00A884&color=fff`;
-
-                      return (
-                        <div
-                          key={contact.id}
-                          onClick={() => {
-                            if (!contact.isUnregistered && contact.userId) {
-                              handleStartChat(contact.userId);
-                            }
-                          }}
-                          className="group relative flex w-full items-center justify-between px-4 py-2.5 transition-colors hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0 pr-2">
-                            <div className="relative shrink-0">
-                              <img
-                                src={getOptimizedImageUrl(avatarUrl, 52, 52)}
-                                alt={contact.name}
-                                className="h-[44px] w-[44px] rounded-full object-cover bg-gray-100 dark:bg-gray-800"
-                              />
-                              {contact.isOnline && (
-                                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21]" />
-                              )}
-                            </div>
-
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
-                                  {contact.name}
-                                </h3>
-                                {contact.isVerified && (
-                                  <VerifiedBadge
-                                    type={contact.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
-                                    size="xs"
-                                  />
-                                )}
-                                {contact.isFavourite && (
-                                  <Heart className="h-3 w-3 fill-red-500 text-red-500 shrink-0" />
-                                )}
-                              </div>
-                              <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
-                                {contact.phone}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex items-center gap-1 shrink-0">
-                            {!contact.isUnregistered ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleFavourite(contact.id, contact.isFavourite);
-                                  }}
-                                  title={contact.isFavourite ? "Remove from Favorites" : "Add to Favorites"}
-                                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-red-500 transition-colors cursor-pointer"
-                                >
-                                  <Heart
-                                    className={cn(
-                                      "h-4 w-4",
-                                      contact.isFavourite
-                                        ? "fill-red-500 text-red-500"
-                                        : "text-[#8696A0] group-hover:opacity-100 opacity-60"
-                                    )}
-                                  />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStartChat(contact.userId);
-                                  }}
-                                  title="Message"
-                                  className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
-                                >
-                                  <MessageSquare className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    initiateCall(contact.userId, "AUDIO", contact.name, contact.avatarUrl || undefined);
-                                  }}
-                                  title="Voice Call"
-                                  className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
-                                >
-                                  <Phone className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    initiateCall(contact.userId, "VIDEO", contact.name, contact.avatarUrl || undefined);
-                                  }}
-                                  title="Video Call"
-                                  className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
-                                >
-                                  <Video className="h-4 w-4" />
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  try {
-                                    await ContactService.inviteContact({ phoneNumber: contact.phone });
-                                    toast.success(`Invitation SMS sent to ${contact.name}!`);
-                                  } catch (err) {
-                                    toast.error("Failed to send invitation SMS");
-                                  }
-                                }}
-                                className="px-3 py-1 rounded-full bg-[#00A884]/15 hover:bg-[#00A884] text-[#008069] dark:text-[#25D366] hover:text-white text-[11.5px] font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
-                              >
-                                <span>Invite</span>
-                              </button>
+                    {groupedContacts[letter].map((contact) => (
+                      <div
+                        key={contact.id}
+                        onClick={() => {
+                          if (!contact.isUnregistered && contact.userId) {
+                            handleStartChat(contact.userId);
+                          }
+                        }}
+                        className="group relative flex w-full items-center justify-between px-4 py-2.5 transition-colors hover:bg-[#F0F2F5] dark:hover:bg-[#202C33] cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0 pr-2">
+                          <div className="relative shrink-0">
+                            <AvatarImage
+                              src={contact.avatarUrl}
+                              alt={contact.name}
+                              size={44}
+                            />
+                            {contact.isOnline && (
+                              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21]" />
                             )}
                           </div>
+
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="text-[14.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF] truncate">
+                                {contact.name}
+                              </h3>
+                              {contact.isVerified && (
+                                <VerifiedBadge
+                                  type={contact.accountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                                  size="xs"
+                                />
+                              )}
+                              {!contact.isUnregistered && (
+                                <span className="shrink-0 px-1.5 py-0.5 text-[9.5px] font-semibold rounded bg-[#00A884]/15 text-[#008069] dark:text-[#25D366]">
+                                  CallsChat
+                                </span>
+                              )}
+                              {contact.isFavourite && (
+                                <Heart className="h-3 w-3 fill-red-500 text-red-500 shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-[12px] font-normal text-[#667781] dark:text-[#8696A0] truncate">
+                              {contact.phone}
+                            </p>
+                          </div>
                         </div>
-                      );
-                    })}
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {!contact.isUnregistered ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavourite(contact.id, contact.isFavourite);
+                                }}
+                                title={contact.isFavourite ? "Remove from Favorites" : "Add to Favorites"}
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-red-500 transition-colors cursor-pointer"
+                              >
+                                <Heart
+                                  className={cn(
+                                    "h-4 w-4",
+                                    contact.isFavourite
+                                      ? "fill-red-500 text-red-500"
+                                      : "text-[#8696A0] group-hover:opacity-100 opacity-60"
+                                  )}
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartChat(contact.userId);
+                                }}
+                                title="Message"
+                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  initiateCall(contact.userId, "AUDIO", contact.name, contact.avatarUrl || undefined);
+                                }}
+                                title="Voice Call"
+                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
+                              >
+                                <Phone className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  initiateCall(contact.userId, "VIDEO", contact.name, contact.avatarUrl || undefined);
+                                }}
+                                title="Video Call"
+                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-[#54656F] dark:text-[#AEBAC1] hover:bg-[#00A884]/15 hover:text-[#008069] dark:hover:text-[#25D366] transition-colors cursor-pointer"
+                              >
+                                <Video className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await ContactService.inviteContact({ phoneNumber: contact.phone });
+                                  toast.success(`Invitation SMS sent to ${contact.name}!`);
+                                } catch {
+                                  toast.error("Failed to send invitation SMS");
+                                }
+                              }}
+                              className="px-3 py-1 rounded-full bg-[#00A884]/15 hover:bg-[#00A884] text-[#008069] dark:text-[#25D366] hover:text-white text-[11.5px] font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
+                            >
+                              <span>Invite</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
