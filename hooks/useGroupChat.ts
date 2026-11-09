@@ -519,7 +519,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           // 2. Also load user's own sender key for self-sent history replay if available
           try {
             const mySK = await getStoredSenderKey(groupId, currentUserId, currentUserId);
-            if (mySK) {
+            if (mySK && !skMap.has(currentUserId)) {
               skMap.set(currentUserId, {
                 chainKey: mySK.initialChainKey || mySK.chainKey,
                 iteration: 0,
@@ -549,7 +549,6 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             for (const msg of historyRes.data) {
               if (
                 msg.senderId &&
-                msg.senderId !== currentUserId &&
                 !skMap.has(msg.senderId) &&
                 (msg.senderKeyIteration != null || msg.messageType === 7)
               ) {
@@ -632,28 +631,26 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 }
               }
 
-              // Fallback to stored sender key in IndexedDB for incoming messages
-              if (msg.senderId !== currentUserId) {
-                try {
-                  const decResult = await decryptGroupSenderMessage(
-                    groupId,
-                    msg.senderId,
-                    msg.ciphertext,
-                    msg.nonce,
-                    targetIter,
-                    currentUserId
-                  );
-                  const t = parseEditedText(decResult.plaintext).text;
-                  decryptedTextsMap.set(msg.id, t);
-                  sentPlaintextCacheRef.current.set(msg.id, t);
-                  if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
-                  if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, t);
-                  void storeDecryptedMessage(currentUserId, msg.id, t);
-                  if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
-                  if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, t);
-                  continue;
-                } catch {}
-              }
+              // Fallback to stored sender key in IndexedDB for incoming or multi-device messages
+              try {
+                const decResult = await decryptGroupSenderMessage(
+                  groupId,
+                  msg.senderId,
+                  msg.ciphertext,
+                  msg.nonce,
+                  targetIter,
+                  currentUserId
+                );
+                const t = parseEditedText(decResult.plaintext).text;
+                decryptedTextsMap.set(msg.id, t);
+                sentPlaintextCacheRef.current.set(msg.id, t);
+                if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
+                if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, t);
+                void storeDecryptedMessage(currentUserId, msg.id, t);
+                if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
+                if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, t);
+                continue;
+              } catch {}
             }
 
             // Fallback to symmetric group key or unencrypted ciphertext
@@ -1185,7 +1182,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       // If text is still unresolved on an encrypted wire payload, show encrypted placeholder and request key
       if (!text && payload.ciphertext) {
         text = "🔒 Encrypted group message";
-        if (socket && senderId && senderId !== effectiveUserId) {
+        if (socket && senderId) {
           socket.emit("group:request_sender_key", {
             groupId,
             senderId,

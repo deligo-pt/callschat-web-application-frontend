@@ -91,21 +91,55 @@ export function resolveDisplayName(
     }
   }
 
-  // 1. Saved Contact Priority (Only if custom nickname actually exists and is non-empty)
-  if (matchedContact && matchedContact.customName && matchedContact.customName.trim()) {
-    const savedName = matchedContact.customName.trim();
+  // 1. Saved Contact Priority
+  if (matchedContact) {
+    if (matchedContact.customName && matchedContact.customName.trim()) {
+      const savedName = matchedContact.customName.trim();
+      return {
+        title: savedName,
+        subtitle: null,
+        formattedName: savedName,
+        isSaved: true,
+        customName: savedName,
+      };
+    }
+
+    // Saved in contacts, using profile display name
+    const savedDisplayName = matchedContact.displayName?.trim() || profileDisplayName?.trim();
+    if (savedDisplayName) {
+      return {
+        title: savedDisplayName,
+        subtitle: null,
+        formattedName: savedDisplayName,
+        isSaved: true,
+        customName: null,
+      };
+    }
+
+    const savedPhone = formatPhoneNumber(phone || matchedContact.phoneNumber);
+    if (savedPhone) {
+      return {
+        title: savedPhone,
+        subtitle: null,
+        formattedName: savedPhone,
+        isSaved: true,
+        customName: null,
+      };
+    }
+
+    const savedUsername = matchedContact.username ? `@${matchedContact.username}` : fallback;
     return {
-      title: savedName,
+      title: savedUsername,
       subtitle: null,
-      formattedName: savedName,
+      formattedName: savedUsername,
       isSaved: true,
-      customName: savedName,
+      customName: null,
     };
   }
 
-  const rawPushName = profileDisplayName || matchedContact?.displayName;
+  const rawPushName = profileDisplayName;
   const pushName = formatPushName(rawPushName);
-  const formattedPhone = formatPhoneNumber(phone || matchedContact?.phoneNumber);
+  const formattedPhone = formatPhoneNumber(phone);
 
   // 2. Unsaved with Phone Number
   if (formattedPhone) {
