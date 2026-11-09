@@ -2578,6 +2578,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
     };
 
+    socket.on("chat:receive_message", handleReceiveMessage);
+    socket.on("NEW_MESSAGE", handleReceiveMessage);
+    // Internal replay channel: the drain effect emits this locally when the
+    // private key becomes available, replaying queued pre-key messages.
+    socket.on("__e2ee_internal_replay__", handleReceiveMessage);
+    socket.on("chat:message_edited", handleMessageEdited);
+    socket.on("chat:message_unsent", handleMessageUnsent);
+    socket.on("chat:message_status_update", handleStatusUpdate);
     socket.on("chat:conversation_status_update", handleConversationStatusUpdate);
     socket.on("chat:error", handleChatError);
     socket.on("e2ee:peer_key_updated", handlePeerKeyUpdated);
