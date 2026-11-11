@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Pin,
   PinOff,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -286,6 +287,7 @@ function ChatRoomPageContent() {
   const [isMounted, setIsMounted] = useState(false);
   const [isRecipientInContacts, setIsRecipientInContacts] = useState(true);
   const [isAddingContact, setIsAddingContact] = useState(false);
+  const [isAddContactDismissed, setIsAddContactDismissed] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -398,7 +400,7 @@ function ChatRoomPageContent() {
                 contact
               );
 
-              setIsRecipientInContacts(resolved.isSaved);
+              setIsRecipientInContacts(Boolean(contact || resolved.isSaved));
 
               const recipientName = resolved.title || conv.otherUserName || "Unknown";
               setRecipient({
@@ -434,7 +436,7 @@ function ChatRoomPageContent() {
             contact
           );
 
-          setIsRecipientInContacts(resolved.isSaved);
+          setIsRecipientInContacts(Boolean(contact || resolved.isSaved));
 
           const displayName = resolved.title || "Chat";
           setRecipient({
@@ -963,7 +965,7 @@ function ChatRoomPageContent() {
       )}
 
       {/* ── Add to Contact Banner ──────────────────────────────────────────── */}
-      {!isBizChat && !isRecipientInContacts && !isInitializing && !blockStatus?.isBlocked && (
+      {!isBizChat && !isRecipientInContacts && !isAddContactDismissed && !isInitializing && !blockStatus?.isBlocked && (
         <div className="shrink-0 border-b border-[#E2E8F0] dark:border-[#222D34] bg-white dark:bg-[#182229] px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xs z-10">
           <div className="flex flex-col">
             <span className="text-[12.5px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">
@@ -973,19 +975,28 @@ function ChatRoomPageContent() {
               Save this contact to find them easily in chats and calls.
             </span>
           </div>
-          <button
-            onClick={handleAddContact}
-            disabled={isAddingContact}
-            className="shrink-0 rounded-full bg-[#00A884] hover:bg-[#008069] px-3.5 py-1 text-xs font-bold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
-          >
-            {isAddingContact ? (
-              <span className="flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" /> Adding...
-              </span>
-            ) : (
-              "Add Contact"
-            )}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleAddContact}
+              disabled={isAddingContact}
+              className="shrink-0 rounded-full bg-[#00A884] hover:bg-[#008069] px-3.5 py-1 text-xs font-bold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            >
+              {isAddingContact ? (
+                <span className="flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Adding...
+                </span>
+              ) : (
+                "Add Contact"
+              )}
+            </button>
+            <button
+              onClick={() => setIsAddContactDismissed(true)}
+              aria-label="Dismiss banner"
+              className="p-1 rounded-full text-[#667781] hover:text-[#111B21] dark:text-[#8696A0] dark:hover:text-[#E9EDEF] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 
