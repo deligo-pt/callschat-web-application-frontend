@@ -1301,14 +1301,43 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (prev.some((m) => m.id === newMsg.id)) return prev;
 
         if (isMyMessage) {
+          // Robust multi-criteria optimistic message correlation (ID, nonce, media, or pending status)
           const optIdx = prev.findIndex(
             (m) =>
-              m.id.startsWith("optimistic-") &&
-              (m.text === text || (payload.mediaUrl && m.mediaUrl === payload.mediaUrl))
+              m.id === payload.id ||
+              (payload.nonce && m.nonce === payload.nonce) ||
+              (m.id.startsWith("optimistic-") && (m.text === text || (payload.mediaUrl && m.mediaUrl === payload.mediaUrl))) ||
+              (m.id.startsWith("optimistic-") && (!m.receipts || m.receipts.length === 0))
           );
           if (optIdx !== -1) {
+            const existing = prev[optIdx];
+            const existingPlaintext = existing.text;
+            const hasValidExisting =
+              existingPlaintext &&
+              existingPlaintext !== "🔒 Encrypted group message" &&
+              existingPlaintext !== "🔒 Encrypted message";
+            const resolvedFinalText = hasValidExisting
+              ? existingPlaintext
+              : (text && text !== "🔒 Encrypted group message" && text !== "🔒 Encrypted message"
+                  ? text
+                  : (existingPlaintext || text || ""));
+
+            const confirmedMsg: GroupMessage = {
+              ...newMsg,
+              text: resolvedFinalText,
+              id: payload.id || existing.id,
+              nonce: payload.nonce || existing.nonce,
+            };
+
+            if (payload.id && resolvedFinalText && !resolvedFinalText.startsWith("🔒 Encrypted")) {
+              sentPlaintextCacheRef.current.set(payload.id, resolvedFinalText);
+              if (effectiveUserId) {
+                void storeDecryptedMessage(effectiveUserId, payload.id, resolvedFinalText);
+              }
+            }
+
             const next = [...prev];
-            next[optIdx] = newMsg;
+            next[optIdx] = confirmedMsg;
             return next;
           }
         }
@@ -2123,6 +2152,9 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
         // Register ciphertext and nonce directly into sent message cache and IndexedDB
         if (nonce) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === optimisticId ? { ...m, nonce: nonce! } : m))
+          );
           sentPlaintextCacheRef.current.set(nonce, text);
           void storeDecryptedMessage(currentUserId, `nonce_${nonce}`, text);
         }
