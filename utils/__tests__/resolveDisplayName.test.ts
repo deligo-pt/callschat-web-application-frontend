@@ -41,13 +41,12 @@ describe("resolveDisplayName utilities", () => {
   describe("resolveDisplayName", () => {
     const mockSavedContact: ContactItem = {
       id: "contact-1",
-      contactUserId: "user-123",
+      userId: "user-123",
       customName: "Alex Colleague",
       displayName: "Alexander Graham",
       phoneNumber: "+8801712345678",
       username: "alexg",
-      isRegistered: true,
-      createdAt: "2026-01-01T00:00:00Z",
+      avatarUrl: null,
     };
 
     it("prioritizes saved contact custom nickname", () => {
@@ -65,7 +64,7 @@ describe("resolveDisplayName utilities", () => {
     it("resolves saved contact via profile displayName when custom nickname is empty", () => {
       const contactWithoutNickname: ContactItem = {
         ...mockSavedContact,
-        customName: undefined,
+        customName: null,
       };
 
       const result = resolveDisplayName(
