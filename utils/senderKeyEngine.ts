@@ -11,8 +11,13 @@ import {
 } from './keyStore';
 
 // Domain separation labels for HMAC-SHA256 Sender Key ratchets
-const SENDER_KEY_MESSAGE_INFO = new TextEncoder().encode('signal_group_msg_key');
-const SENDER_KEY_RATCHET_STEP_INFO = new TextEncoder().encode('signal_group_ratchet_step');
+// Primary: Matches Android Mobile App ('group_msg_key' / 'group_ratchet_step')
+const SENDER_KEY_MESSAGE_INFO = new TextEncoder().encode('group_msg_key');
+const SENDER_KEY_RATCHET_STEP_INFO = new TextEncoder().encode('group_ratchet_step');
+
+// Legacy fallback: For messages previously encrypted by older web builds ('signal_group_msg_key')
+const LEGACY_SENDER_KEY_MESSAGE_INFO = new TextEncoder().encode('signal_group_msg_key');
+const LEGACY_SENDER_KEY_RATCHET_STEP_INFO = new TextEncoder().encode('signal_group_ratchet_step');
 
 const MAX_CATCHUP_STEPS = 2000;
 
@@ -64,13 +69,18 @@ export function generateSenderKey(groupId: string, senderId: string): StoredSend
 
 /**
  * Derives a single message key (MK) from current chain key (CK) and advances ratchet.
+ * Defaults to the mobile-compatible labels ('group_msg_key' / 'group_ratchet_step').
+ * Can also derive using legacy labels ('signal_group_msg_key' / 'signal_group_ratchet_step').
  */
 export function ratchetSenderKey(
-  chainKeyBase64: string
+  chainKeyBase64: string,
+  useLegacy: boolean = false
 ): { messageKey: Uint8Array; nextChainKey: string } {
   const chainKeyBytes = base64ToBytes(chainKeyBase64);
-  const messageKey = hmac(sha256, chainKeyBytes, SENDER_KEY_MESSAGE_INFO);
-  const nextChainKeyBytes = hmac(sha256, chainKeyBytes, SENDER_KEY_RATCHET_STEP_INFO);
+  const msgInfo = useLegacy ? LEGACY_SENDER_KEY_MESSAGE_INFO : SENDER_KEY_MESSAGE_INFO;
+  const stepInfo = useLegacy ? LEGACY_SENDER_KEY_RATCHET_STEP_INFO : SENDER_KEY_RATCHET_STEP_INFO;
+  const messageKey = hmac(sha256, chainKeyBytes, msgInfo);
+  const nextChainKeyBytes = hmac(sha256, chainKeyBytes, stepInfo);
 
   return {
     messageKey,
@@ -90,6 +100,7 @@ export function normalizeCurve25519Key(bytes: Uint8Array): Uint8Array {
 
 /**
  * Wraps a Sender Key for a specific member using pairwise Diffie-Hellman + authenticated cipher.
+ * Uses raw 32-byte shared secret directly (matching Mobile app unwrap expectations).
  */
 export function wrapSenderKeyForMember(
   chainKeyBase64: string,
@@ -99,10 +110,9 @@ export function wrapSenderKeyForMember(
   const memberPub = normalizeCurve25519Key(base64ToBytes(memberPublicKeyBase64));
   const myPriv = normalizeCurve25519Key(base64ToBytes(myPrivateKeyBase64));
   const sharedSecret = x25519.getSharedSecret(myPriv, memberPub);
-  const wrappingKey = sha256(sharedSecret);
 
   const nonce = randomBytes(24);
-  const cipher = xchacha20poly1305(wrappingKey, nonce);
+  const cipher = xchacha20poly1305(sharedSecret, nonce);
   const encrypted = cipher.encrypt(utf8ToBytes(chainKeyBase64));
 
   return {
@@ -114,6 +124,7 @@ export function wrapSenderKeyForMember(
 /**
  * Unwraps a received Sender Key from a member.
  * Supports passing candidate public or private keys to gracefully handle rotations/transitions.
+ * Tries direct sharedSecret first (mobile standard), falling back to SHA-256 derived wrapping key.
  */
 export function unwrapSenderKeyFromMember(
   encryptedKeyBase64: string,
@@ -138,17 +149,17 @@ export function unwrapSenderKeyFromMember(
         }
         const sharedSecret = x25519.getSharedSecret(myPriv, senderPub);
 
-        // 1. Standard SHA-256 wrapping key derivation
+        // 1. Direct shared secret (matching Android mobile app standard)
         try {
-          const wrappingKey = sha256(sharedSecret);
-          const cipher = xchacha20poly1305(wrappingKey, nonce);
+          const cipher = xchacha20poly1305(sharedSecret, nonce);
           const decryptedBytes = cipher.decrypt(encryptedBytes);
           return bytesToUtf8(decryptedBytes);
         } catch {}
 
-        // 2. Direct shared secret fallback (compatibility with pairwise cipher secret)
+        // 2. Standard SHA-256 wrapping key derivation (legacy web compatibility)
         try {
-          const cipher = xchacha20poly1305(sharedSecret, nonce);
+          const wrappingKey = sha256(sharedSecret);
+          const cipher = xchacha20poly1305(wrappingKey, nonce);
           const decryptedBytes = cipher.decrypt(encryptedBytes);
           return bytesToUtf8(decryptedBytes);
         } catch (directErr) {
@@ -256,48 +267,92 @@ export async function decryptGroupSenderMessage(
     );
   }
 
-  let curCK = record.chainKey;
-  let curIter = record.iteration;
-  let targetMK: Uint8Array | null = null;
-
-  while (curIter <= targetIteration) {
-    const { messageKey, nextChainKey } = ratchetSenderKey(curCK);
-    if (curIter === targetIteration) {
-      targetMK = messageKey;
-      curCK = nextChainKey;
-      curIter++;
-      break;
-    }
-    curCK = nextChainKey;
-    curIter++;
-  }
-
-  if (!targetMK) {
-    throw new Error('Failed to derive message key for target iteration');
-  }
-
   const nonceBytes = base64ToBytes(nonceBase64);
   const ciphertextBytes = base64ToBytes(ciphertextBase64);
-  const cipher = xchacha20poly1305(targetMK, nonceBytes);
-  const decryptedBytes = cipher.decrypt(ciphertextBytes);
 
-  const updatedRecord: StoredSenderKey = {
-    ...record,
-    chainKey: curCK,
-    iteration: curIter,
-    updatedAt: new Date().toISOString(),
-  };
-  await storeSenderKey(groupId, senderId, updatedRecord, myUserId);
+  // Attempt 1: Standard mobile-compatible KDF ('group_msg_key' / 'group_ratchet_step')
+  try {
+    let curCK = record.chainKey;
+    let curIter = record.iteration;
+    let targetMK: Uint8Array | null = null;
 
-  return {
-    plaintext: bytesToUtf8(decryptedBytes),
-    iteration: targetIteration,
-  };
+    while (curIter <= targetIteration) {
+      const { messageKey, nextChainKey } = ratchetSenderKey(curCK, false);
+      if (curIter === targetIteration) {
+        targetMK = messageKey;
+        curCK = nextChainKey;
+        curIter++;
+        break;
+      }
+      curCK = nextChainKey;
+      curIter++;
+    }
+
+    if (!targetMK) {
+      throw new Error('Failed to derive message key for target iteration');
+    }
+
+    const cipher = xchacha20poly1305(targetMK, nonceBytes);
+    const decryptedBytes = cipher.decrypt(ciphertextBytes);
+
+    const updatedRecord: StoredSenderKey = {
+      ...record,
+      chainKey: curCK,
+      iteration: curIter,
+      updatedAt: new Date().toISOString(),
+    };
+    await storeSenderKey(groupId, senderId, updatedRecord, myUserId);
+
+    return {
+      plaintext: bytesToUtf8(decryptedBytes),
+      iteration: targetIteration,
+    };
+  } catch (primaryErr) {
+    // Attempt 2: Legacy fallback ('signal_group_msg_key' / 'signal_group_ratchet_step')
+    try {
+      let curCK = record.chainKey;
+      let curIter = record.iteration;
+      let targetMK: Uint8Array | null = null;
+
+      while (curIter <= targetIteration) {
+        const { messageKey, nextChainKey } = ratchetSenderKey(curCK, true);
+        if (curIter === targetIteration) {
+          targetMK = messageKey;
+          curCK = nextChainKey;
+          curIter++;
+          break;
+        }
+        curCK = nextChainKey;
+        curIter++;
+      }
+
+      if (!targetMK) throw primaryErr;
+
+      const cipher = xchacha20poly1305(targetMK, nonceBytes);
+      const decryptedBytes = cipher.decrypt(ciphertextBytes);
+
+      const updatedRecord: StoredSenderKey = {
+        ...record,
+        chainKey: curCK,
+        iteration: curIter,
+        updatedAt: new Date().toISOString(),
+      };
+      await storeSenderKey(groupId, senderId, updatedRecord, myUserId);
+
+      return {
+        plaintext: bytesToUtf8(decryptedBytes),
+        iteration: targetIteration,
+      };
+    } catch {
+      throw primaryErr;
+    }
+  }
 }
 
 /**
  * Decrypts a Sender Key message using an in-memory chain key state (for history replay across reloads).
  * Advances the chain key forward and returns the new chain key state without corrupting storage.
+ * Gracefully attempts standard mobile labels first, falling back to legacy web labels.
  */
 export function decryptSenderMessageWithChainKey(
   initialChainKey: string,
@@ -313,36 +368,72 @@ export function decryptSenderMessageWithChainKey(
     throw new Error(`Ratchet gap too large (${targetIteration - currentIteration} > ${MAX_CATCHUP_STEPS})`);
   }
 
-  let curCK = initialChainKey;
-  let curIter = currentIteration;
-  let targetMK: Uint8Array | null = null;
-
-  while (curIter <= targetIteration) {
-    const { messageKey, nextChainKey } = ratchetSenderKey(curCK);
-    if (curIter === targetIteration) {
-      targetMK = messageKey;
-      curCK = nextChainKey;
-      curIter++;
-      break;
-    }
-    curCK = nextChainKey;
-    curIter++;
-  }
-
-  if (!targetMK) {
-    throw new Error('Failed to derive message key for target iteration');
-  }
-
   const nonceBytes = base64ToBytes(nonceBase64);
   const ciphertextBytes = base64ToBytes(ciphertextBase64);
-  const cipher = xchacha20poly1305(targetMK, nonceBytes);
-  const decryptedBytes = cipher.decrypt(ciphertextBytes);
 
-  return {
-    plaintext: bytesToUtf8(decryptedBytes),
-    nextChainKey: curCK,
-    nextIteration: curIter,
-  };
+  // Attempt 1: Standard mobile-compatible KDF labels
+  try {
+    let curCK = initialChainKey;
+    let curIter = currentIteration;
+    let targetMK: Uint8Array | null = null;
+
+    while (curIter <= targetIteration) {
+      const { messageKey, nextChainKey } = ratchetSenderKey(curCK, false);
+      if (curIter === targetIteration) {
+        targetMK = messageKey;
+        curCK = nextChainKey;
+        curIter++;
+        break;
+      }
+      curCK = nextChainKey;
+      curIter++;
+    }
+
+    if (!targetMK) {
+      throw new Error('Failed to derive message key for target iteration');
+    }
+
+    const cipher = xchacha20poly1305(targetMK, nonceBytes);
+    const decryptedBytes = cipher.decrypt(ciphertextBytes);
+
+    return {
+      plaintext: bytesToUtf8(decryptedBytes),
+      nextChainKey: curCK,
+      nextIteration: curIter,
+    };
+  } catch (primaryErr) {
+    // Attempt 2: Legacy web KDF labels fallback
+    try {
+      let curCK = initialChainKey;
+      let curIter = currentIteration;
+      let targetMK: Uint8Array | null = null;
+
+      while (curIter <= targetIteration) {
+        const { messageKey, nextChainKey } = ratchetSenderKey(curCK, true);
+        if (curIter === targetIteration) {
+          targetMK = messageKey;
+          curCK = nextChainKey;
+          curIter++;
+          break;
+        }
+        curCK = nextChainKey;
+        curIter++;
+      }
+
+      if (!targetMK) throw primaryErr;
+
+      const cipher = xchacha20poly1305(targetMK, nonceBytes);
+      const decryptedBytes = cipher.decrypt(ciphertextBytes);
+
+      return {
+        plaintext: bytesToUtf8(decryptedBytes),
+        nextChainKey: curCK,
+        nextIteration: curIter,
+      };
+    } catch {
+      throw primaryErr;
+    }
+  }
 }
 
 /**
@@ -351,7 +442,8 @@ export function decryptSenderMessageWithChainKey(
 export function advanceChainKey(
   initialChainKey: string,
   currentIteration: number,
-  targetIteration: number
+  targetIteration: number,
+  useLegacy: boolean = false
 ): { nextChainKey: string; nextIteration: number } {
   if (targetIteration < currentIteration) {
     return { nextChainKey: initialChainKey, nextIteration: currentIteration };
@@ -363,7 +455,7 @@ export function advanceChainKey(
   let curCK = initialChainKey;
   let curIter = currentIteration;
   while (curIter <= targetIteration) {
-    const { nextChainKey } = ratchetSenderKey(curCK);
+    const { nextChainKey } = ratchetSenderKey(curCK, useLegacy);
     curCK = nextChainKey;
     curIter++;
   }

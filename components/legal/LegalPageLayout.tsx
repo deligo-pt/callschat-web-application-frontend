@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUp, ChevronRight, FileText, Mail, Globe, ShieldCheck } from "lucide-react";
+import {
+    ArrowUp,
+    Building2,
+    ChevronRight,
+    FileText,
+    Globe,
+    Mail,
+    ShieldCheck,
+    User,
+} from "lucide-react";
 import type { LegalDocument } from "@/lib/legal/types";
 import { legalPages } from "@/lib/legal/registry";
 
@@ -24,6 +33,9 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
     const prefersReducedMotion = useReducedMotion();
     const [activeId, setActiveId] = useState<string>(data.sections[0]?.id ?? "");
     const [showTopButton, setShowTopButton] = useState(false);
+
+    const isPrivacyPolicy = data.slug.includes("privacy") || data.appType !== undefined;
+    const currentApp = data.appType || (data.slug.includes("business") ? "BUSINESS" : "PERSONAL");
 
     // Highlight the section currently in view within the Table of Contents.
     useEffect(() => {
@@ -61,7 +73,10 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
         visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" as const } },
     };
 
-    const siblings = legalPages.filter((page) => page.slug !== data.slug);
+    const normalizedCurrent = currentApp === "BUSINESS" ? "privacy-policy/business" : data.slug;
+    const siblings = legalPages.filter(
+        (page) => page.slug !== normalizedCurrent && page.slug !== data.slug
+    );
 
     return (
         <div className="w-full min-h-screen bg-white dark:bg-[#0C1317] text-[#1C1E21] dark:text-[#E9EDEF] transition-colors duration-200">
@@ -85,6 +100,38 @@ export default function LegalPageLayout({ data }: LegalPageLayoutProps) {
                     <p className="mt-3 text-sm font-medium text-[#667781] dark:text-[#8696A0]">
                         {data.subtitle}
                     </p>
+
+                    {/* Dual-App Tab Toggle (Personal vs Business) */}
+                    {isPrivacyPolicy && (
+                        <div className="mt-7 flex justify-center">
+                            <div className="inline-flex items-center p-1 rounded-2xl bg-white dark:bg-[#111B21] border border-[#E2E8F0] dark:border-[#2A3942] shadow-xs">
+                                <Link
+                                    href="/privacy-policy"
+                                    aria-current={currentApp === "PERSONAL" ? "page" : undefined}
+                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] ${
+                                        currentApp === "PERSONAL"
+                                            ? "bg-[#00A884] text-white shadow-xs"
+                                            : "text-[#54656F] dark:text-[#8696A0] hover:text-[#1C1E21] dark:hover:text-[#E9EDEF]"
+                                    }`}
+                                >
+                                    <User className="h-4 w-4" />
+                                    <span>Personal App</span>
+                                </Link>
+                                <Link
+                                    href="/privacy-policy/business"
+                                    aria-current={currentApp === "BUSINESS" ? "page" : undefined}
+                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] ${
+                                        currentApp === "BUSINESS"
+                                            ? "bg-[#00A884] text-white shadow-xs"
+                                            : "text-[#54656F] dark:text-[#8696A0] hover:text-[#1C1E21] dark:hover:text-[#E9EDEF]"
+                                    }`}
+                                >
+                                    <Building2 className="h-4 w-4" />
+                                    <span>Business App</span>
+                                </Link>
+                            </div>
+                        </div>
+                    )}
 
                     {data.intro && (
                         <p className="mx-auto mt-6 max-w-2xl text-[15px] sm:text-base leading-relaxed text-[#3B4A54] dark:text-[#D1D7DB]">
