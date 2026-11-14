@@ -630,9 +630,9 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               sentPlaintextCacheRef.current.set(msg.id, parsed);
               if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, parsed);
               if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, parsed);
-              // Advance in-memory sender key ratchet if this message used sender key (other members only)
+              // Advance in-memory sender key ratchet if this message used sender key
               const targetIter = msg.senderKeyIteration;
-              if (targetIter != null && msg.senderId !== currentUserId && skMap.has(msg.senderId)) {
+              if (targetIter != null && skMap.has(msg.senderId)) {
                 const skState = skMap.get(msg.senderId)!;
                 if (skState.iteration <= targetIter) {
                   const adv = advanceChainKey(skState.chainKey, skState.iteration, targetIter);
@@ -660,8 +660,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               } catch {}
             }
 
-            // Incoming or sender-keyed messages from other members: decrypt with in-memory chain key
-            if (msg.senderId !== currentUserId && msg.ciphertext && msg.nonce && (msg.senderKeyIteration != null || msg.messageType === 7)) {
+            // Sender-keyed messages (both peer members and multi-device self-sent messages): decrypt with in-memory chain key
+            if (msg.ciphertext && msg.nonce && (msg.senderKeyIteration != null || msg.messageType === 7)) {
               const targetIter = msg.senderKeyIteration ?? 0;
               const skState = skMap.get(msg.senderId);
 
@@ -734,23 +734,21 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
           // 4. Save the final ratcheted state of skMap into IndexedDB
           for (const [sId, skState] of skMap.entries()) {
-            if (sId !== currentUserId) {
-              const existingSk = await getStoredSenderKey(groupId, sId, currentUserId);
-              await storeSenderKey(
+            const existingSk = await getStoredSenderKey(groupId, sId, currentUserId);
+            await storeSenderKey(
+              groupId,
+              sId,
+              {
                 groupId,
-                sId,
-                {
-                  groupId,
-                  senderId: sId,
-                  chainKey: skState.chainKey,
-                  iteration: skState.iteration,
-                  initialChainKey: existingSk?.initialChainKey || skState.chainKey,
-                  senderKeyId: existingSk?.senderKeyId || `sk_${sId}`,
-                  updatedAt: new Date().toISOString(),
-                },
-                currentUserId
-              );
-            }
+                senderId: sId,
+                chainKey: skState.chainKey,
+                iteration: skState.iteration,
+                initialChainKey: existingSk?.initialChainKey || skState.chainKey,
+                senderKeyId: existingSk?.senderKeyId || `sk_${sId}`,
+                updatedAt: new Date().toISOString(),
+              },
+              currentUserId
+            );
           }
 
           const decryptedHistory = await Promise.all(
@@ -1128,8 +1126,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
-      // Stage B: Sender Key Protocol Decryption for peer members
-      if (!text && payload.ciphertext && payload.nonce && !isMyMessage) {
+      // Stage B: Sender Key Protocol Decryption (Both peer members and multi-device self-sent messages)
+      if (!text && payload.ciphertext && payload.nonce) {
         try {
           let sk = await getStoredSenderKey(groupId, senderId, effectiveUserId);
           if (!sk) {
@@ -2080,12 +2078,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               mySK.distributedTo = [];
             }
 
-            // Dynamic member check: ensure ALL current group members have this sender's key
+            // Dynamic member check: ensure ALL current group members (including self-device) have this sender's key
             const membersRes = await groupService.fetchGroupMembers(groupId);
             const membersList = (membersRes.data as any)?.members || [];
-            const otherMembers = membersList.filter((m: any) => m.userId !== currentUserId);
+            const targetMembers = membersList;
 
-            const missingMembers = otherMembers.filter(
+            const missingMembers = targetMembers.filter(
               (m: any) => !mySK!.distributedTo?.includes(m.userId)
             );
 
@@ -2099,7 +2097,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
                 const myPubKey = await getUserPublicKey(currentUserId);
                 for (const m of missingMembers) {
-                  const pubKey = batchMap[m.userId]?.[0]?.publicKey || m.publicKey;
+                  const pubKey = batchMap[m.userId]?.[0]?.publicKey || m.publicKey || (m.userId === currentUserId ? myPubKey : null);
                   if (pubKey) {
                     const wrapped = wrapSenderKeyForMember(chainKeyToDistribute, pubKey, myPrivKey);
                     distributions.push({
