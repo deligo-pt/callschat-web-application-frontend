@@ -589,13 +589,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             }
           } catch {}
 
-          // On-demand sender key recovery for any history message senders whose keys are missing
+          // On-demand sender key recovery for any history message senders whose keys are missing (both peers and multi-device self)
           if (socket) {
             const missingSenders = new Set<string>();
             for (const msg of historyRes.data) {
               if (
                 msg.senderId &&
-                msg.senderId !== currentUserId &&
                 !skMap.has(msg.senderId) &&
                 (msg.senderKeyIteration != null || msg.messageType === 7)
               ) {
@@ -1283,10 +1282,10 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
-      // If text is still unresolved on an encrypted wire payload, show encrypted placeholder and request key (other members only)
+      // If text is still unresolved on an encrypted wire payload, show encrypted placeholder and request key (both peers and multi-device self)
       if (!text && payload.ciphertext) {
         text = "🔒 Encrypted group message";
-        if (socket && senderId && senderId !== effectiveUserId) {
+        if (socket && senderId) {
           socket.emit("group:request_sender_key", {
             groupId,
             senderId,
@@ -1697,7 +1696,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
       if (data.groupId !== groupId) return;
       const requesterId = data.requesterId;
       const myId = currentUserIdRef.current;
-      if (!requesterId || requesterId === myId) return;
+      if (!requesterId) return;
 
       try {
         const mySK = await getStoredSenderKey(groupId, myId, myId);
@@ -1708,7 +1707,13 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (!myPrivKey) return;
 
         const batchMap = await chatService.fetchBatchKeys([requesterId]);
-        const requesterPub = batchMap[requesterId]?.[0]?.publicKey;
+        const keysList = batchMap[requesterId];
+        // If requester is self, choose companion device public key different from myPubKey if available
+        const requesterPub = Array.isArray(keysList)
+          ? (requesterId === myId
+              ? keysList.find((k: any) => k.publicKey !== myPubKey)?.publicKey || keysList[0]?.publicKey
+              : keysList[0]?.publicKey)
+          : (keysList as any)?.publicKey;
         if (!requesterPub) return;
 
         const chainKey = mySK.initialChainKey || mySK.chainKey;
@@ -2333,7 +2338,47 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             const parsed = parseEditedText(text).text;
             sentPlaintextCacheRef.current.set(msg.id, parsed);
             text = parsed;
-          } else if (msg.ciphertext && msg.nonce && currentKey) {
+          } else if (msg.ciphertext && msg.nonce && (msg.senderKeyIteration != null || msg.messageType === 7)) {
+            // Priority: Sender Key Protocol Decryption for paginated history (both peers and multi-device self)
+            try {
+              const targetIter = msg.senderKeyIteration ?? 0;
+              const decResult = await decryptGroupSenderMessage(
+                groupId,
+                msg.senderId,
+                msg.ciphertext,
+                msg.nonce,
+                targetIter,
+                effectiveUserId
+              );
+              text = parseEditedText(decResult.plaintext).text;
+              if (text) {
+                sentPlaintextCacheRef.current.set(msg.id, text);
+                if (effectiveUserId) void storeDecryptedMessage(effectiveUserId, msg.id, text);
+              }
+            } catch {
+              // Fail-safe: try replay derivation with initial chain key
+              try {
+                const storedSK = await getStoredSenderKey(groupId, msg.senderId, effectiveUserId);
+                if (storedSK?.initialChainKey) {
+                  const fallbackDec = decryptSenderMessageWithChainKey(
+                    storedSK.initialChainKey,
+                    0,
+                    msg.senderKeyIteration ?? 0,
+                    msg.ciphertext,
+                    msg.nonce
+                  );
+                  text = parseEditedText(fallbackDec.plaintext).text;
+                  if (text) {
+                    sentPlaintextCacheRef.current.set(msg.id, text);
+                    if (effectiveUserId) void storeDecryptedMessage(effectiveUserId, msg.id, text);
+                  }
+                }
+              } catch {}
+            }
+          }
+
+          // Universal fallback to symmetric group key
+          if (!text && msg.ciphertext && msg.nonce && currentKey) {
             try {
               const dec = await decryptGroupMessage(msg.ciphertext, msg.nonce, currentKey);
               text = parseEditedText(dec).text;
@@ -2342,7 +2387,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             } catch {
               text = "🔒 Encrypted group message";
             }
-          } else if (msg.ciphertext && !msg.nonce) {
+          } else if (!text && msg.ciphertext && !msg.nonce) {
             text = parseEditedText(msg.ciphertext).text;
           }
 
