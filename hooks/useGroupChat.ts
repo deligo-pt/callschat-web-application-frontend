@@ -140,6 +140,18 @@ const parseEditedText = (rawText: string) => {
   return { text: rawText, isEdited: false };
 };
 
+const isValidPlaintext = (text: string | null | undefined): boolean => {
+  if (!text || typeof text !== "string") return false;
+  const trimmed = text.trim();
+  if (trimmed === "") return false;
+  if (trimmed.includes("🔒 Encrypted group message")) return false;
+  if (trimmed.includes("🔒 Encrypted message")) return false;
+  if (trimmed.includes("Decryption failed. Tap to re-sync security keys.")) return false;
+  if (trimmed.includes("🔒 Encrypted Message")) return false;
+  if (trimmed.includes("Waiting for this message")) return false;
+  return true;
+};
+
 const resolveGroupQuotedMessage = async (
   replyToRaw: any,
   currentUid: string,
@@ -601,35 +613,42 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           // 3. Process history messages in chronological order
           for (const msg of historyRes.data) {
             // Check local decrypted cache first (Zero-latency, replay-immune across page reloads)
-            let text =
+            let text: string | null =
               (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
               (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
-              (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
+              (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null) ||
+              null;
 
-            if (!text && msg.id) {
-              text = await getDecryptedMessage(currentUserId, msg.id);
+            if ((!text || !isValidPlaintext(text)) && msg.id) {
+              const cached = await getDecryptedMessage(currentUserId, msg.id);
+              if (cached && isValidPlaintext(cached)) text = cached;
             }
-            if (!text && msg.nonce) {
-              text = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
+            if ((!text || !isValidPlaintext(text)) && msg.nonce) {
+              const cached = await getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`);
+              if (cached && isValidPlaintext(cached)) text = cached;
             }
-            if (!text && msg.ciphertext) {
-              text = await getDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`);
+            if ((!text || !isValidPlaintext(text)) && msg.ciphertext) {
+              const cached = await getDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`);
+              if (cached && isValidPlaintext(cached)) text = cached;
             }
 
             // Multi-device self-sent message recovery: check previewText or content from payload
-            if (!text && msg.senderId === currentUserId) {
+            if ((!text || !isValidPlaintext(text)) && msg.senderId === currentUserId) {
               const preview = msg.previewText || (msg as any).content || msg.encryptedKeys?.previewText;
-              if (preview) {
+              if (preview && isValidPlaintext(preview)) {
                 text = preview;
               }
             }
 
-            if (text) {
+            if (text && isValidPlaintext(text)) {
               const parsed = parseEditedText(text).text;
               decryptedTextsMap.set(msg.id, parsed);
               sentPlaintextCacheRef.current.set(msg.id, parsed);
               if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, parsed);
               if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, parsed);
+              void storeDecryptedMessage(currentUserId, msg.id, parsed);
+              if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, parsed);
+              if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, parsed);
               // Advance in-memory sender key ratchet if this message used sender key
               const targetIter = msg.senderKeyIteration;
               if (targetIter != null && skMap.has(msg.senderId)) {
@@ -760,7 +779,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 decryptedTextsMap
               );
 
-              let text = decryptedTextsMap.get(msg.id) ?? "";
+              let text =
+                decryptedTextsMap.get(msg.id) ||
+                (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+                (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null) ||
+                "";
               if (!text && msg.ciphertext && !msg.mediaUrl) {
                 text = "🔒 Encrypted message";
               }
