@@ -20,7 +20,16 @@ export const metadata: Metadata = {
     },
 };
 
-export default async function PrivacyPolicyPage() {
-    const document = await fetchLegalDocument("privacy-policy");
+interface PrivacyPolicyPageProps {
+    searchParams?: Promise<{ app?: string }>;
+}
+
+export default async function PrivacyPolicyPage({ searchParams }: PrivacyPolicyPageProps) {
+    const params = await searchParams;
+    const isBusiness = params?.app?.toLowerCase() === "business";
+    const document = await fetchLegalDocument(
+        isBusiness ? "business-privacy-policy" : "privacy-policy",
+        isBusiness ? "BUSINESS" : "PERSONAL"
+    );
     return <LegalPageLayout data={document} />;
 }

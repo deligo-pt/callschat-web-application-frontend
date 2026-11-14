@@ -6,10 +6,12 @@
 export interface LegalPageRef {
     slug: string;
     title: string;
+    category?: "personal" | "business" | "general";
 }
 
 export const legalPages: LegalPageRef[] = [
-    { slug: "privacy-policy", title: "Privacy Policy" },
-    { slug: "terms-of-service", title: "Terms of Service" },
-    { slug: "cookie-policy", title: "Cookie Policy" },
+    { slug: "privacy-policy", title: "Personal Privacy Policy", category: "personal" },
+    { slug: "privacy-policy/business", title: "Business Privacy Policy", category: "business" },
+    { slug: "terms-of-service", title: "Terms of Service", category: "general" },
+    { slug: "cookie-policy", title: "Cookie Policy", category: "general" },
 ];
