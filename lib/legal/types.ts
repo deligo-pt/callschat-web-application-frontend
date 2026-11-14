@@ -34,6 +34,8 @@ export interface LegalContact {
 export interface LegalDocument {
     /** Route segment, e.g. "privacy-policy" (matches app/<slug>/). */
     slug: string;
+    /** Target application scope: "PERSONAL" | "BUSINESS" */
+    appType?: "PERSONAL" | "BUSINESS";
     /** Display title, e.g. "Privacy Policy". */
     title: string;
     /** Sub-line under the title, e.g. "CallsChat LLC • United States". */

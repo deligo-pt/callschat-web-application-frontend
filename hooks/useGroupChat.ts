@@ -549,6 +549,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             for (const msg of historyRes.data) {
               if (
                 msg.senderId &&
+                msg.senderId !== currentUserId &&
                 !skMap.has(msg.senderId) &&
                 (msg.senderKeyIteration != null || msg.messageType === 7)
               ) {
@@ -579,6 +580,14 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             }
             if (!text && msg.ciphertext) {
               text = await getDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`);
+            }
+
+            // Multi-device self-sent message recovery: check previewText or content from payload
+            if (!text && msg.senderId === currentUserId) {
+              const preview = msg.previewText || (msg as any).content || msg.encryptedKeys?.previewText;
+              if (preview) {
+                text = preview;
+              }
             }
 
             if (text) {
@@ -631,26 +640,28 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 }
               }
 
-              // Fallback to stored sender key in IndexedDB for incoming or multi-device messages
-              try {
-                const decResult = await decryptGroupSenderMessage(
-                  groupId,
-                  msg.senderId,
-                  msg.ciphertext,
-                  msg.nonce,
-                  targetIter,
-                  currentUserId
-                );
-                const t = parseEditedText(decResult.plaintext).text;
-                decryptedTextsMap.set(msg.id, t);
-                sentPlaintextCacheRef.current.set(msg.id, t);
-                if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
-                if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, t);
-                void storeDecryptedMessage(currentUserId, msg.id, t);
-                if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
-                if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, t);
-                continue;
-              } catch {}
+              // Fallback to stored sender key in IndexedDB for incoming messages (other members only)
+              if (msg.senderId !== currentUserId) {
+                try {
+                  const decResult = await decryptGroupSenderMessage(
+                    groupId,
+                    msg.senderId,
+                    msg.ciphertext,
+                    msg.nonce,
+                    targetIter,
+                    currentUserId
+                  );
+                  const t = parseEditedText(decResult.plaintext).text;
+                  decryptedTextsMap.set(msg.id, t);
+                  sentPlaintextCacheRef.current.set(msg.id, t);
+                  if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, t);
+                  if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, t);
+                  void storeDecryptedMessage(currentUserId, msg.id, t);
+                  if (msg.nonce) void storeDecryptedMessage(currentUserId, `nonce_${msg.nonce}`, t);
+                  if (msg.ciphertext) void storeDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`, t);
+                  continue;
+                } catch {}
+              }
             }
 
             // Fallback to symmetric group key or unencrypted ciphertext
@@ -792,7 +803,13 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (!text && msg.nonce) text = await getDecryptedMessage(myId, `nonce_${msg.nonce}`);
         if (!text && msg.ciphertext) text = await getDecryptedMessage(myId, `cipher_${msg.ciphertext}`);
 
-        if (!text && msg.ciphertext && msg.nonce) {
+        // Multi-device self-sent message recovery
+        if (!text && msg.senderId === myId) {
+          const preview = msg.previewText || (msg as any).content || msg.encryptedKeys?.previewText;
+          if (preview) text = preview;
+        }
+
+        if (!text && msg.ciphertext && msg.nonce && msg.senderId !== myId) {
           try {
             const targetIter = msg.senderKeyIteration ?? 0;
             const decResult = await decryptGroupSenderMessage(
@@ -1028,6 +1045,14 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
+      // Multi-device self-sent message recovery: check previewText or content from payload
+      if (!cached && isMyMessage) {
+        const preview = payload.previewText || payload.content || payload.encryptedKeys?.previewText;
+        if (preview) {
+          cached = preview;
+        }
+      }
+
       if (cached) {
         text = parseEditedText(cached).text;
         if (payload.id) sentPlaintextCacheRef.current.set(payload.id, text);
@@ -1040,8 +1065,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
-      // If not resolved from cache, proceed with sender key or group key decryption
-      if (!text && payload.ciphertext && payload.nonce) {
+      // If not resolved from cache, proceed with sender key or group key decryption (other members only)
+      if (!text && payload.ciphertext && payload.nonce && !isMyMessage) {
         try {
           let sk = await getStoredSenderKey(groupId, senderId, effectiveUserId);
           if (!sk) {
@@ -1179,10 +1204,10 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         text = parseEditedText(payload.ciphertext).text;
       }
 
-      // If text is still unresolved on an encrypted wire payload, show encrypted placeholder and request key
+      // If text is still unresolved on an encrypted wire payload, show encrypted placeholder and request key (other members only)
       if (!text && payload.ciphertext) {
         text = "🔒 Encrypted group message";
-        if (socket && senderId) {
+        if (socket && senderId && senderId !== effectiveUserId) {
           socket.emit("group:request_sender_key", {
             groupId,
             senderId,
@@ -1390,6 +1415,9 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         plainText = parseEditedText(ciphertext).text;
       }
 
+      if (!plainText) {
+        plainText = payload.previewText || (payload as any).content || null;
+      }
       if (!plainText) {
         plainText = sentPlaintextCacheRef.current.get(messageId) || null;
       }
@@ -2043,6 +2071,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
           nonce,
           messageType: messageType || 7,
           senderKeyIteration,
+          previewText: text ? text.substring(0, 100) : null,
           mediaUrl: mediaUrl || null,
           mediaType: mediaType || null,
           replyToId: replyToId || null,

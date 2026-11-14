@@ -204,7 +204,77 @@ async function runTests() {
   assert.strictEqual(replaySK.iteration, 2);
   console.log('✓ In-memory history replay across reloads functions with ZERO expired iteration errors');
 
-  console.log('\n✅ ALL 11 GROUP SENDER KEY PROTOCOL TESTS PASSED!\n');
+  // =========================================================================
+  // 12. Flutter / Android Mobile App Interoperability & Backward Compatibility
+  // =========================================================================
+  const { hmac } = await import('@noble/hashes/hmac.js');
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const { xchacha20poly1305 } = await import('@noble/ciphers/chacha.js');
+  const { randomBytes } = await import('@noble/hashes/utils.js');
+  const { base64ToBytes, utf8ToBytes } = await import('../../utils/senderKeyEngine');
+
+  // Test 12a: Mobile wraps with raw sharedSecret -> Web unwraps cleanly
+  const mobileSharedSecret = x25519.getSharedSecret(bobPriv, alicePub);
+  const mobileNonce = randomBytes(24);
+  const mobileCipher = xchacha20poly1305(mobileSharedSecret, mobileNonce);
+  const testCK = bytesToBase64(randomBytes(32));
+  const mobileWrapped = mobileCipher.encrypt(utf8ToBytes(testCK));
+
+  const webUnwrappedFromMobile = unwrapSenderKeyFromMember(
+    bytesToBase64(mobileWrapped),
+    bytesToBase64(mobileNonce),
+    alicePubB64,
+    bobPrivB64
+  );
+  assert.strictEqual(webUnwrappedFromMobile, testCK, 'Web must cleanly unwrap Mobile raw sharedSecret wrapped key');
+  console.log('✓ Flutter Android raw sharedSecret key distribution unwrapped by Web cleanly');
+
+  // Test 12b: Web wraps with raw sharedSecret -> Mobile unwraps cleanly
+  const webWrapped = wrapSenderKeyForMember(testCK, bobPubB64, alicePrivB64);
+  const mobileUnwrapCipher = xchacha20poly1305(mobileSharedSecret, base64ToBytes(webWrapped.nonce));
+  const mobileDecryptedCK = new TextDecoder().decode(mobileUnwrapCipher.decrypt(base64ToBytes(webWrapped.encryptedKey)));
+  assert.strictEqual(mobileDecryptedCK, testCK, 'Mobile unwrap must match Web wrap');
+  console.log('✓ Web distributed sender key unwrapped by Flutter Android unwrap logic cleanly');
+
+  // Test 12c: Flutter Mobile encrypts with 'group_msg_key' -> Web decrypts cleanly
+  const mobileCKBytes = randomBytes(32);
+  const mobileCKB64 = bytesToBase64(mobileCKBytes);
+  const mobileMK = hmac(sha256, mobileCKBytes, new TextEncoder().encode('group_msg_key'));
+  const mobileMsgNonce = randomBytes(24);
+  const mobileMsgCipher = xchacha20poly1305(mobileMK, mobileMsgNonce);
+  const mobilePlaintext = 'Hello from Flutter Android App E2EE!';
+  const mobileCiphertext = mobileMsgCipher.encrypt(utf8ToBytes(mobilePlaintext));
+
+  const webDecryptedMobileMsg = decryptSenderMessageWithChainKey(
+    mobileCKB64,
+    0,
+    0,
+    bytesToBase64(mobileCiphertext),
+    bytesToBase64(mobileMsgNonce)
+  );
+  assert.strictEqual(webDecryptedMobileMsg.plaintext, mobilePlaintext, 'Web must decrypt mobile message');
+  console.log('✓ Flutter Android message encrypted with group_msg_key decrypted by Web cleanly');
+
+  // Test 12d: Legacy Web encrypts with 'signal_group_msg_key' -> Web fallback decrypts cleanly
+  const legacyCKBytes = randomBytes(32);
+  const legacyCKB64 = bytesToBase64(legacyCKBytes);
+  const legacyMK = hmac(sha256, legacyCKBytes, new TextEncoder().encode('signal_group_msg_key'));
+  const legacyMsgNonce = randomBytes(24);
+  const legacyMsgCipher = xchacha20poly1305(legacyMK, legacyMsgNonce);
+  const legacyPlaintext = 'Hello from Legacy Web Frontend!';
+  const legacyCiphertext = legacyMsgCipher.encrypt(utf8ToBytes(legacyPlaintext));
+
+  const webDecryptedLegacyMsg = decryptSenderMessageWithChainKey(
+    legacyCKB64,
+    0,
+    0,
+    bytesToBase64(legacyCiphertext),
+    bytesToBase64(legacyMsgNonce)
+  );
+  assert.strictEqual(webDecryptedLegacyMsg.plaintext, legacyPlaintext, 'Web must decrypt legacy web message via fallback');
+  console.log('✓ Legacy Web message encrypted with signal_group_msg_key decrypted via fallback cleanly');
+
+  console.log('\n✅ ALL 15 GROUP SENDER KEY PROTOCOL & INTEROP TESTS PASSED!\n');
 }
 
 runTests().catch((err) => {
