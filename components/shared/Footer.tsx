@@ -227,6 +227,11 @@ export default function Footer() {
                                         GDPR & CCPA Rights
                                     </Link>
                                 </li>
+                                <li>
+                                    <Link href="/delete-account" className="text-[#8696A0] hover:text-[#25D366] transition-colors font-medium">
+                                        Delete Your Account
+                                    </Link>
+                                </li>
                             </ul>
                         </div>
 
