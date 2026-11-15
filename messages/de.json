@@ -58,7 +58,11 @@
     "save_change": "Änderungen speichern",
     "personal": "Persönlich",
     "business": "Geschäftlich",
-    "add_contact_desc": "Fügen Sie Kontakte hinzu und chatten oder telefonieren Sie sofort."
+    "add_contact_desc": "Fügen Sie Kontakte hinzu und chatten oder telefonieren Sie sofort.",
+    "delete_account": "Konto löschen",
+    "delete_account_subtitle": "Deaktivieren und Löschung planen",
+    "cancel_deletion": "Löschanforderung abbrechen",
+    "reactivate_account": "Konto reaktivieren"
   },
   "language": {
     "title": "Sprache",

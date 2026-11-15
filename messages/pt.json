@@ -58,7 +58,11 @@
     "save_change": "Salvar Alteração",
     "personal": "Pessoal",
     "business": "Empresarial",
-    "add_contact_desc": "Adicione contatos e comece a conversar ou ligar instantaneamente."
+    "add_contact_desc": "Adicione contatos e comece a conversar ou ligar instantaneamente.",
+    "delete_account": "Excluir conta",
+    "delete_account_subtitle": "Desativar e agendar exclusão",
+    "cancel_deletion": "Cancelar solicitação de exclusão",
+    "reactivate_account": "Reativar conta"
   },
   "language": {
     "title": "Idioma",

@@ -58,7 +58,11 @@
     "save_change": "बदलाव सहेजें",
     "personal": "व्यक्तिगत",
     "business": "व्यवसाय",
-    "add_contact_desc": "संपर्क जोड़ें और तुरंत उनसे चैट या कॉल करना शुरू करें।"
+    "add_contact_desc": "संपर्क जोड़ें और तुरंत उनसे चैट या कॉल करना शुरू करें।",
+    "delete_account": "खाता हटाएं",
+    "delete_account_subtitle": "निष्क्रिय करें और हटाना शेड्यूल करें",
+    "cancel_deletion": "हटाने का अनुरोध रद्द करें",
+    "reactivate_account": "खाता पुनः सक्रिय करें"
   },
   "language": {
     "title": "भाषा",

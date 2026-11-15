@@ -58,7 +58,11 @@
     "save_change": "Save Change",
     "personal": "Personal",
     "business": "Business",
-    "add_contact_desc": "Add contacts and start chatting or calling them instantly."
+    "add_contact_desc": "Add contacts and start chatting or calling them instantly.",
+    "delete_account": "Delete Account",
+    "delete_account_subtitle": "Deactivate & schedule deletion",
+    "cancel_deletion": "Cancel Deletion Request",
+    "reactivate_account": "Reactivate Account"
   },
   "language": {
     "title": "Language",
