@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useProfile } from "@/context/ProfileContext";
-import { Camera, Loader2, Edit2, UserCircle2, ArrowLeft, ShieldCheck, Pencil, ChevronDown } from "lucide-react";
+import { Camera, Loader2, Edit2, UserCircle2, ArrowLeft, ShieldCheck, Pencil, ChevronDown, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function ProfileEditPage() {
@@ -164,13 +164,29 @@ export default function ProfileEditPage() {
             </div>
 
             {/* Save Button */}
-            <div className="w-full pb-12 flex justify-center">
+            <div className="w-full pb-6 flex justify-center">
               <button
                 onClick={handleSaveProfile}
                 disabled={isPending || isLoading}
                 className="flex h-[48px] w-full items-center justify-center rounded-xl bg-[#2563EB] dark:bg-[#00A884] text-[14px] font-bold text-white shadow-lg shadow-blue-500/25 dark:shadow-none transition-all hover:bg-blue-700 dark:hover:bg-[#008f6f] disabled:opacity-50 cursor-pointer"
               >
                 {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save Change"}
+              </button>
+            </div>
+
+            {/* Danger Zone: Account Deletion */}
+            <div className="w-full mb-12 rounded-[20px] border border-red-200 dark:border-red-950/40 bg-red-50/50 dark:bg-red-950/20 p-5 flex items-center justify-between shadow-xs">
+              <div className="flex flex-col">
+                <span className="text-[13px] font-bold text-red-600 dark:text-red-400">Delete Account</span>
+                <span className="text-[11px] text-slate-500 dark:text-[#8696A0] mt-0.5">Deactivate and schedule permanent removal</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/profile/delete-account")}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 dark:border-red-900/50 bg-white dark:bg-[#182229] text-[12px] font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
               </button>
             </div>
           </div>
@@ -257,6 +273,22 @@ export default function ProfileEditPage() {
               className="flex h-10 w-36 items-center justify-center rounded-full bg-[#2563EB] dark:bg-[#00A884] text-[13px] font-bold text-white shadow-sm hover:bg-blue-700 dark:hover:bg-[#008f6f] transition-all cursor-pointer disabled:opacity-50"
             >
               {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Change"}
+            </button>
+          </div>
+
+          {/* Danger Zone: Account Deletion */}
+          <div className="w-full mt-10 rounded-[20px] border border-red-200 dark:border-red-950/40 bg-red-50/50 dark:bg-red-950/20 p-4 flex items-center justify-between shadow-xs">
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-red-600 dark:text-red-400">Delete Account</span>
+              <span className="text-[11px] text-slate-500 dark:text-[#8696A0] mt-0.5">Deactivate with 30-day grace period</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/profile/delete-account")}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 dark:border-red-900/50 bg-white dark:bg-[#182229] text-[12px] font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
             </button>
           </div>
         </div>
