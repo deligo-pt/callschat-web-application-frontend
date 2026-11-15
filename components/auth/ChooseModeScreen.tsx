@@ -69,7 +69,11 @@ export default function ChooseModeScreen({ authType = "signup" }: ChooseModeScre
           <div className="w-full mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex items-start gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-amber-900">Session Ended</p>
+              <p className="font-semibold text-amber-900">
+                {messageParam?.toLowerCase().includes("deletion") || messageParam?.toLowerCase().includes("delete")
+                  ? "Account Scheduled for Deletion"
+                  : "Session Ended"}
+              </p>
               <p className="text-amber-800 text-xs sm:text-sm mt-0.5 leading-relaxed">
                 {messageParam || "You were logged out because your account was logged in on another device or browser."}
               </p>

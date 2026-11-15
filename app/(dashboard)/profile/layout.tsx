@@ -11,8 +11,9 @@ import { NotificationDropdown } from "@/components/notifications/NotificationDro
 import { ThemeModal } from "@/components/theme/ThemeModal";
 import {
   Star, Search, UserCircle2, Check, ShieldCheck, Building2,
-  ChevronRight, AtSign, CreditCard, Globe, Send, Bell, Briefcase, Clock, LogOut
-, Heart, MonitorSmartphone, KeyRound, LifeBuoy, Sun, Moon, Radio} from "lucide-react";
+  ChevronRight, AtSign, CreditCard, Globe, Send, Bell, Briefcase, Clock, LogOut,
+  Heart, MonitorSmartphone, KeyRound, LifeBuoy, Sun, Moon, Radio, Trash2
+} from "lucide-react";
 import { Locale } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<Locale, string> = {
@@ -513,6 +514,32 @@ function ProfileSidebarNavigation() {
                     isRouteActive("/profile/backup") ? "text-[#2563EB] dark:text-[#38BDF8]" : "text-[#0F172A] dark:text-[#E9EDEF]"
                   )}>E2EE Key Backup</span>
                   <span className="text-[11px] font-medium text-slate-500 dark:text-[#8696A0] mt-0.5">Protect & restore chats</span>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-400 dark:text-[#8696A0]" />
+            </button>
+
+            <button
+              onClick={() => router.push("/profile/delete-account")}
+              className={cn(
+                "flex items-center justify-between rounded-xl border p-3 transition-colors",
+                isRouteActive("/profile/delete-account")
+                  ? "border-red-200 bg-red-50 dark:border-red-950/40 dark:bg-red-950/20"
+                  : "border-slate-100 dark:border-[#222D34] bg-white dark:bg-[#182229] hover:bg-slate-50 dark:hover:bg-[#202C33]"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                )}>
+                  <Trash2 className="h-4.5 w-4.5" />
+                </div>
+                <div className="flex flex-col items-start leading-tight">
+                  <span className={cn(
+                    "text-[13px] font-bold",
+                    isRouteActive("/profile/delete-account") ? "text-red-600 dark:text-red-400" : "text-[#0F172A] dark:text-[#E9EDEF]"
+                  )}>{t("delete_account") || "Delete Account"}</span>
+                  <span className="text-[11px] font-medium text-slate-500 dark:text-[#8696A0] mt-0.5">{t("delete_account_subtitle") || "Deactivate & schedule deletion"}</span>
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-slate-400 dark:text-[#8696A0]" />
