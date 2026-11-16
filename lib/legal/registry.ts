@@ -14,4 +14,5 @@ export const legalPages: LegalPageRef[] = [
     { slug: "privacy-policy/business", title: "Business Privacy Policy", category: "business" },
     { slug: "terms-of-service", title: "Terms of Service", category: "general" },
     { slug: "cookie-policy", title: "Cookie Policy", category: "general" },
+    { slug: "delete-account", title: "Delete Your Account", category: "general" },
 ];
