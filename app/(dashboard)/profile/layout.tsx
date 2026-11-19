@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { ProfileProvider, useProfile } from "@/context/ProfileContext";
+import { useUser } from "@/context/UserContext";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTranslations, useLocale } from "next-intl";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -38,6 +40,7 @@ function ProfileSidebarNavigation() {
   const t = useTranslations("profile");
   const tCommon = useTranslations("common");
 
+  const { isCurrentVerified } = useUser();
   const {
     userData,
     formData,
@@ -48,6 +51,9 @@ function ProfileSidebarNavigation() {
     handleLogout,
     businessProfile,
   } = useProfile();
+
+  const isVerified = isCurrentVerified ?? (activeMode === "BUSINESS" ? Boolean(businessProfile?.isVerified) : Boolean(userData?.isVerified));
+  const badgeType = activeMode === "BUSINESS" ? "BUSINESS" : "USER";
 
   const isRouteActive = (route: string) => {
     if (route === "/profile/edit" && (pathname === "/profile" || pathname === "/profile/edit")) {
@@ -95,12 +101,13 @@ function ProfileSidebarNavigation() {
         </div>
         <div className="flex items-center gap-1.5 justify-center">
           <h2 className="text-[16px] font-bold text-[#0F172A] dark:text-[#E9EDEF]">
-            {userData?.profile?.displayName || formData.displayName || "Fandy Eve"}
+            {userData?.profile?.displayName || formData.displayName || "User"}
           </h2>
-          {activeMode === "BUSINESS" && businessProfile?.isVerified && (
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-xs" title="Verified Business Account">
-              <Check className="h-2.5 w-2.5" strokeWidth={3} />
-            </span>
+          {isVerified && (
+            <VerifiedBadge
+              type={badgeType}
+              size="sm"
+            />
           )}
         </div>
         <p className="text-[12px] font-medium text-slate-500 dark:text-[#8696A0] mt-1">{formData.phone || "+111 xxx 2345"}</p>
@@ -112,10 +119,13 @@ function ProfileSidebarNavigation() {
             {businessProfile?.companyName || formData.companyName || "techzone"}
           </span>
         )}
-        {activeMode === "BUSINESS" && businessProfile?.isVerified ? (
-          <div className="mt-1.5 rounded-full bg-[#2563EB] px-3 py-1 text-[10px] font-bold text-white flex items-center gap-1 shadow-xs">
+        {isVerified ? (
+          <div className={cn(
+            "mt-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-white flex items-center gap-1 shadow-xs",
+            activeMode === "BUSINESS" ? "bg-emerald-600" : "bg-[#2563EB]"
+          )}>
             <ShieldCheck className="h-3 w-3" />
-            Verified Business
+            {activeMode === "BUSINESS" ? "Verified Business (KYB)" : "Verified Identity (KYC)"}
           </div>
         ) : (
           <div className="mt-1.5 rounded-full bg-[#EEF2FF] dark:bg-[#202C33] px-3 py-1 text-[10px] font-bold text-[#2563EB] dark:text-[#38BDF8]">

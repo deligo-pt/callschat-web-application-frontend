@@ -403,6 +403,9 @@ function ChatRoomPageContent() {
               setIsRecipientInContacts(Boolean(contact || resolved.isSaved));
 
               const recipientName = resolved.title || conv.otherUserName || "Unknown";
+              const isVerifiedPeer = Boolean((conv as any).isVerified || contact?.isVerified);
+              const peerAccountType = (conv as any).accountType || (contact as any)?.accountType || "USER";
+
               setRecipient({
                 id: conv.otherUserId,
                 name: recipientName,
@@ -411,8 +414,8 @@ function ChatRoomPageContent() {
                   contact?.avatarUrl ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(recipientName)}&background=F4F6FC&color=3B58F5`,
                 isOnline: conv.otherUserOnline || false,
-                isVerified: (conv as any).isVerified,
-                accountType: (conv as any).accountType,
+                isVerified: isVerifiedPeer,
+                accountType: peerAccountType,
                 phone: contact?.phoneNumber || undefined,
               });
               setIsInitializing(false);
@@ -439,6 +442,9 @@ function ChatRoomPageContent() {
           setIsRecipientInContacts(Boolean(contact || resolved.isSaved));
 
           const displayName = resolved.title || "Chat";
+          const isVerifiedPeer = Boolean(contact?.isVerified);
+          const peerAccountType = (contact as any)?.accountType || "USER";
+
           setRecipient({
             id: finalRecipientId,
             name: displayName,
@@ -446,8 +452,8 @@ function ChatRoomPageContent() {
               contact?.avatarUrl ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=F4F6FC&color=3B58F5`,
             isOnline: false,
-            isVerified: contact?.isVerified || false,
-            accountType: "USER",
+            isVerified: isVerifiedPeer,
+            accountType: peerAccountType,
             phone: contact?.phoneNumber || undefined,
           });
 
@@ -505,10 +511,14 @@ function ChatRoomPageContent() {
       setRecipient((prev) => {
         if (!prev) return prev;
         const newName = resolved.title || prev.name;
+        const newVerified = Boolean(contact.isVerified || prev.isVerified);
+        const newAccountType = (contact as any).accountType || prev.accountType;
         if (
           prev.name === newName &&
           prev.phone === contact.phoneNumber &&
-          (prev.avatarUrl === contact.avatarUrl || !contact.avatarUrl)
+          (prev.avatarUrl === contact.avatarUrl || !contact.avatarUrl) &&
+          prev.isVerified === newVerified &&
+          prev.accountType === newAccountType
         ) {
           return prev;
         }
@@ -517,6 +527,8 @@ function ChatRoomPageContent() {
           name: newName,
           phone: contact.phoneNumber || prev.phone,
           avatarUrl: contact.avatarUrl || prev.avatarUrl,
+          isVerified: newVerified,
+          accountType: newAccountType,
         };
       });
     }
@@ -1288,6 +1300,8 @@ function ChatRoomPageContent() {
           avatarUrl={recipient.avatarUrl}
           isOnline={recipient.isOnline}
           phone={recipient.phone}
+          isVerified={recipient.isVerified}
+          accountType={recipient.accountType}
           isBlocked={blockStatus?.isBlocked}
           isBlockedByMe={blockStatus?.isBlockedByMe}
           onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
 import { Briefcase, CheckCircle2, Contact, Folder, MessageSquare, PhoneCall, Share2, UserCircle2, Users, UsersRound } from "lucide-react";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -187,9 +188,9 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
               <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white dark:bg-[#111B21] text-[8px] font-extrabold text-purple-600 dark:text-purple-400 shadow-xs ring-2 ring-white dark:ring-[#111B21]">
                 B
               </span>
-              {businessProfile?.isVerified && (
+              {(businessProfile?.isVerified || workspace?.isVerified) && (
                 <span title="Verified Business" className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white dark:bg-[#111B21] shadow-xs ring-2 ring-white dark:ring-[#111B21]">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[#3B58F5] dark:text-[#53BDEB] fill-[#3B58F5] dark:fill-[#53BDEB]" />
+                  <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
                 </span>
               )}
             </div>
@@ -255,9 +256,13 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
                 : "bg-[#F8FAFC] border border-transparent text-[#64748B] hover:bg-[#EEF2FF]/60 hover:text-[#2563EB] dark:bg-[#1E293B]/60 dark:text-[#94A3B8] dark:hover:bg-[#2563EB]/20 dark:hover:text-[#38BDF8]"
             )}>
               <UserCircle2 className="h-5 w-5" strokeWidth={pathname.startsWith("/profile") ? 2.3 : 1.8} />
-              {isBusiness && (
+              {isBusiness ? (
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#2563EB] ring-2 ring-white dark:ring-[#111B21]" />
-              )}
+              ) : user?.isVerified ? (
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-[#111B21] shadow-xs ring-2 ring-white dark:ring-[#111B21]">
+                  <VerifiedBadge type="USER" size="xs" showTooltip={false} />
+                </span>
+              ) : null}
             </div>
             <span className={cn(
               "text-[11px] font-semibold mt-1.5 transition-colors",

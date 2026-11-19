@@ -9,6 +9,7 @@ import { useCallContext } from "@/components/providers/CallContext";
 import { useContacts } from "@/context/ContactsContext";
 import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 export interface ContactProfileModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export interface ContactProfileModalProps {
   avatarUrl?: string;
   isOnline?: boolean;
   phone?: string;
+  isVerified?: boolean;
+  accountType?: string;
   isBlocked?: boolean;
   isBlockedByMe?: boolean;
   onBlockUser?: () => void;
@@ -32,6 +35,8 @@ export function ContactProfileModal({
   avatarUrl,
   isOnline,
   phone,
+  isVerified,
+  accountType,
   isBlocked,
   isBlockedByMe,
   onBlockUser,
@@ -42,6 +47,9 @@ export function ContactProfileModal({
   const { getContact } = useContacts();
 
   const contact = peerId ? getContact(peerId) : undefined;
+  const isPeerVerified = Boolean(isVerified || contact?.isVerified);
+  const peerAccountType = accountType || (contact as any)?.accountType || "USER";
+
   const resolved = resolveDisplayName(
     {
       userId: peerId,
@@ -86,7 +94,15 @@ export function ContactProfileModal({
             )}
           </div>
           
-          <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-[#E9EDEF]">{displayTitle}</h2>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-[#E9EDEF]">{displayTitle}</h2>
+            {isPeerVerified && (
+              <VerifiedBadge
+                type={peerAccountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                size="md"
+              />
+            )}
+          </div>
           {resolved.subtitle && (
             <p className="mt-0.5 text-slate-500 dark:text-[#8696A0] font-medium text-[15px]">{resolved.subtitle}</p>
           )}

@@ -9,6 +9,8 @@ import { NotificationDropdown } from "@/components/notifications/NotificationDro
 import { useSocket } from "@/components/providers/SocketProvider";
 import { usePresence } from "@/context/PresenceContext";
 import { useUser } from "@/context/UserContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { cn } from "@/lib/utils";
 import { chatService } from "@/services/chat.service";
 import { groupService, GroupItem } from "@/services/group.service";
@@ -114,6 +116,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   // Real-time presence — comes from the global PresenceProvider.
   const { isUserOnline } = usePresence();
   const { currentMode } = useUser();
+  const { getContact } = useContacts();
   const { socket } = useSocket();
   const currentUserIdRef = React.useRef(currentUserId);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
@@ -1552,9 +1555,20 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                         : `${basePath}/${conv.id}`;
                       const isActive = pathname === `${basePath}/${conv.id}`;
 
-                      const displayName = isGroup ? (conv.groupName || "Group") : conv.otherUserName;
-                      const rawAvatar = isGroup ? conv.groupAvatar : conv.otherUserAvatar;
+                      const contact = conv.otherUserId ? getContact(conv.otherUserId) : undefined;
+                      const resolved = !isGroup && conv.otherUserId ? resolveDisplayName(
+                        {
+                          userId: conv.otherUserId,
+                          phone: contact?.phoneNumber,
+                          profileDisplayName: contact?.displayName || conv.otherUserName,
+                        },
+                        contact
+                      ) : null;
+                      const displayName = isGroup ? (conv.groupName || "Group") : (resolved?.title || conv.otherUserName);
+                      const rawAvatar = isGroup ? conv.groupAvatar : (contact?.avatarUrl || conv.otherUserAvatar);
                       const avatarUrl = rawAvatar ? getOptimizedImageUrl(rawAvatar, 96, 96) : null;
+                      const isVerified = !isGroup && Boolean(conv.isVerified || contact?.isVerified);
+                      const accountType = conv.accountType || (contact as any)?.accountType || (conv.workspaceId ? "BUSINESS" : "USER");
 
                       const isOnline = !isGroup && (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline);
                       const isTyping = typingConvIds.has(conv.id);
@@ -1622,9 +1636,9 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                   )}>
                                     {displayName}
                                   </h3>
-                                  {!isGroup && conv.isVerified && (
+                                  {!isGroup && isVerified && (
                                     <VerifiedBadge
-                                      type={conv.accountType === "BUSINESS" || conv.workspaceId ? "BUSINESS" : "USER"}
+                                      type={accountType === "BUSINESS" ? "BUSINESS" : "USER"}
                                       size="xs"
                                       showTooltip={false}
                                     />

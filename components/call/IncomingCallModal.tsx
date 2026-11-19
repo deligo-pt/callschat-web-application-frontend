@@ -8,6 +8,7 @@ import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { stopRingtoneSound } from "@/utils/sounds";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 export const IncomingCallModal = () => {
   const {
@@ -47,6 +48,12 @@ export const IncomingCallModal = () => {
 
   const isEscalated = Boolean(incomingCall.isEscalatedCall);
   const contact = incomingCall.callerId ? getContact(incomingCall.callerId) : undefined;
+  const isCallerVerified = Boolean(
+    (incomingCall as any)?.isVerified ||
+    contact?.isVerified
+  );
+  const callerAccountType = (incomingCall as any)?.accountType || (contact as any)?.accountType || "USER";
+
   const resolved = resolveDisplayName(
     {
       userId: incomingCall.callerId,
@@ -170,9 +177,17 @@ export const IncomingCallModal = () => {
 
         {/* Caller Info */}
         <div className="flex flex-col items-center text-center z-10 mb-10 w-full">
-          <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
-            {displayName}
-          </h2>
+          <div className="flex items-center justify-center gap-1.5 w-full px-4">
+            <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate">
+              {displayName}
+            </h2>
+            {isCallerVerified && (
+              <VerifiedBadge
+                type={callerAccountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                size="sm"
+              />
+            )}
+          </div>
           {resolved.subtitle && (
             <span className="text-[13.5px] font-medium text-[#8696A0]">
               {resolved.subtitle}
