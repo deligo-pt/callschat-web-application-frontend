@@ -3,66 +3,91 @@
 export function getOptimizedImageUrl(key?: string | null, width = 0, height = 0): string {
   // If no key is provided, return a default avatar
   if (!key) return '/default-avatar.png';
-  
+
+  // Optimistic upload previews and base64 strings
+  if (key.startsWith('blob:') || key.startsWith('data:')) {
+    return key;
+  }
+
   const rustFsUrl = process.env.NEXT_PUBLIC_RUSTFS_URL || 'http://localhost:9100';
   const bucket = process.env.NEXT_PUBLIC_S3_BUCKET || 'calls-chat-media';
-  const baseUrl = process.env.NEXT_PUBLIC_IMGPROXY_URL || 'http://localhost:8080';
+  const imgproxyUrl = process.env.NEXT_PUBLIC_IMGPROXY_URL;
+  const useImgproxy = process.env.NEXT_PUBLIC_USE_IMGPROXY === 'true';
 
   let rawKey = key;
 
-  // Intercept RustFs full URLs and extract the key for imgproxy
+  // Intercept RustFs full URLs and extract the key
   if (key.startsWith(rustFsUrl)) {
     const prefix = `${rustFsUrl}/${bucket}/`;
     if (key.startsWith(prefix)) {
       rawKey = key.slice(prefix.length);
     }
-  } else if (key.startsWith('http')) {
-    // If it's already a full HTTP URL (e.g. Google OAuth photo or external), return it directly
-    return key;
-  } else if (key.startsWith('blob:')) {
+  } else if (key.startsWith('http://') || key.startsWith('https://')) {
+    // Already an absolute HTTP/HTTPS URL (e.g. Google OAuth photo or UI avatars)
     return key;
   }
 
-  // If width/height are 0, serve the original raw size
-  if (width === 0 && height === 0) {
-    return `${baseUrl}/insecure/plain/s3://${bucket}/${rawKey}`;
+  // Strip leading slash if any
+  rawKey = rawKey.replace(/^\/+/, '');
+
+  // If imgproxy is explicitly enabled and configured, and rawKey is valid
+  if (useImgproxy && imgproxyUrl && !imgproxyUrl.includes('test-img.callschat.com')) {
+    if (width === 0 && height === 0) {
+      return `${imgproxyUrl}/insecure/plain/s3://${bucket}/${rawKey}`;
+    }
+    return `${imgproxyUrl}/insecure/rs:fill:${width}:${height}/plain/s3://${bucket}/${rawKey}`;
   }
 
-  // Otherwise, use imgproxy to resize and crop it dynamically
-  return `${baseUrl}/insecure/rs:fill:${width}:${height}/plain/s3://${bucket}/${rawKey}`;
+  // Production-grade resilient resolution: route via the backend streaming proxy endpoint
+  // (/api/v1/media/download/*). This guarantees CORS, Range support, and token authentication.
+  return getRawMediaUrl(rawKey);
 }
 
 export function getRawMediaUrl(key?: string | null): string {
   if (!key) return '';
 
+  if (key.startsWith('blob:') || key.startsWith('data:')) {
+    return key;
+  }
+
   const rustFsUrl = process.env.NEXT_PUBLIC_RUSTFS_URL || 'http://localhost:9100';
   const bucket = process.env.NEXT_PUBLIC_S3_BUCKET || 'calls-chat-media';
 
   let rawKey = key;
-  
+
   // Intercept RustFs full URLs and extract the key for backend proxy
   if (key.startsWith(rustFsUrl)) {
     const prefix = `${rustFsUrl}/${bucket}/`;
     if (key.startsWith(prefix)) {
       rawKey = key.slice(prefix.length);
     }
-  } else if (key.startsWith('http')) {
-    return key;
-  } else if (key.startsWith('blob:')) {
+  } else if (key.startsWith('http://') || key.startsWith('https://')) {
     return key;
   }
-  
-  // Use the backend proxy endpoint for raw media to handle presigned URLs and authentication
-  const backendUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+  // Strip leading slash if any
+  rawKey = rawKey.replace(/^\/+/, '');
+
+  // Use the backend proxy endpoint for media streaming
+  const backendUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:8000/api/v1';
   let url = `${backendUrl}/media/download/${rawKey}`;
-  
-  if (typeof window !== 'undefined') {
+
+  // Public catalog assets and avatars do not require an authorization token.
+  // Private assets (e.g. chats/...) receive ?token= for browser img/audio/video elements.
+  if (
+    typeof window !== 'undefined' &&
+    !rawKey.startsWith('avatars/') &&
+    !rawKey.startsWith('catalog/')
+  ) {
     const token = localStorage.getItem('accessToken');
     if (token) {
-      url += `?token=${token}`;
+      url += `?token=${encodeURIComponent(token)}`;
     }
   }
-  
+
   return url;
 }
 

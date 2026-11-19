@@ -84,7 +84,7 @@ export default function GroupInvitePage() {
 
     if (!isAuthenticated) {
       const returnUrl = encodeURIComponent(`/groups/invite/${inviteCode}`);
-      router.push(`/login?returnUrl=${returnUrl}`);
+      router.push(`/connect?returnUrl=${returnUrl}`);
       return;
     }
 
@@ -130,7 +130,7 @@ export default function GroupInvitePage() {
 
   const handleGoToLogin = () => {
     const returnUrl = encodeURIComponent(`/groups/invite/${inviteCode}`);
-    router.push(`/login?returnUrl=${returnUrl}`);
+    router.push(`/connect?returnUrl=${returnUrl}`);
   };
 
   return (

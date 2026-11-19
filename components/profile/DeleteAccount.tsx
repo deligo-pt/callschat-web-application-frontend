@@ -116,7 +116,7 @@ export function DeleteAccount({ onBack }: DeleteAccountProps) {
       document.cookie = "refreshToken=; path=/; max-age=0";
 
       const encodedMessage = encodeURIComponent(message);
-      window.location.href = `/login?reason=session_revoked&message=${encodedMessage}`;
+      window.location.href = `/connect?reason=session_revoked&message=${encodedMessage}`;
     }
   };
 

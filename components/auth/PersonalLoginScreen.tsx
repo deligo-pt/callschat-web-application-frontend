@@ -156,7 +156,7 @@ export default function PersonalLoginScreen() {
           } else {
             toast.info("No account found. Let's get you signed up!");
             sessionStorage.setItem("auth_account_mode", "PERSONAL");
-            router.push("/auth/personal/signup");
+            router.push("/auth/personal/signup?test=true");
           }
         } else {
           toast.error(
@@ -433,7 +433,7 @@ export default function PersonalLoginScreen() {
               <p className="text-center text-sm font-medium text-slate-500">
                 Don&apos;t have a Personal account?{" "}
                 <Link
-                  href="/auth/personal/signup"
+                  href="/auth/personal/signup?test=true"
                   className="font-bold text-[#2563EB] hover:underline"
                 >
                   Sign up

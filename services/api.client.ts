@@ -61,8 +61,13 @@ const handleLogout = () => {
 
     // Avoid infinite redirect loop if already on authentication screens
     const currentPath = window.location.pathname;
-    if (!currentPath.startsWith('/login') && !currentPath.startsWith('/signup') && !currentPath.startsWith('/auth')) {
-      window.location.href = '/login';
+    if (
+      !currentPath.startsWith('/login') &&
+      !currentPath.startsWith('/signup') &&
+      !currentPath.startsWith('/auth') &&
+      !currentPath.startsWith('/connect')
+    ) {
+      window.location.href = '/connect';
     }
   }
 };

@@ -254,7 +254,7 @@ function ChatRoomPageContent() {
   const basePath = pathname.startsWith("/business") ? "/business/chats" : "/chats";
   const { initiateCall } = useCallContext();
   const { isUserOnline } = usePresence();
-  const { getContact, refetchContacts } = useContacts();
+  const { contacts, getContact, refetchContacts } = useContacts();
 
   // The route param is the CONVERSATION ID
   const conversationId = params.chatId as string;
@@ -480,6 +480,48 @@ function ChatRoomPageContent() {
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
 
+  // ── Reactive Contact & Recipient Sync ─────────────────────────────────────
+  // Reactively re-evaluates contact status and display name when ContactsContext
+  // finishes loading or updating asynchronously over the network.
+  useEffect(() => {
+    if (!recipientId || isBizChat) return;
+
+    const contact = getContact(recipientId);
+    // A user is a saved contact if a formal contact record exists (not a synthetic direct conversation)
+    const isSaved = Boolean(contact && (!contact.id || !contact.id.startsWith("conv_")));
+
+    setIsRecipientInContacts(isSaved);
+
+    if (contact) {
+      const resolved = resolveDisplayName(
+        {
+          userId: recipientId,
+          phone: contact.phoneNumber,
+          profileDisplayName: contact.displayName || recipient?.name?.replace(/^~/, ""),
+        },
+        contact
+      );
+
+      setRecipient((prev) => {
+        if (!prev) return prev;
+        const newName = resolved.title || prev.name;
+        if (
+          prev.name === newName &&
+          prev.phone === contact.phoneNumber &&
+          (prev.avatarUrl === contact.avatarUrl || !contact.avatarUrl)
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          name: newName,
+          phone: contact.phoneNumber || prev.phone,
+          avatarUrl: contact.avatarUrl || prev.avatarUrl,
+        };
+      });
+    }
+  }, [recipientId, contacts, getContact, isBizChat]);
+
   const {
     messages,
     sendMessage,
@@ -622,12 +664,12 @@ function ChatRoomPageContent() {
       setIsAddingContact(true);
       await ContactService.addMutualContact(recipientId);
       setIsRecipientInContacts(true);
-      void refetchContacts();
+      await refetchContacts();
       toast.success("Added to contacts");
     } catch (err: any) {
       if (err?.response?.status === 409) {
         setIsRecipientInContacts(true);
-        void refetchContacts();
+        await refetchContacts();
         toast.info("User is already in your contacts");
       } else {
         toast.error("Failed to add contact");

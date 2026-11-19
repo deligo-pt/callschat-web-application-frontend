@@ -97,8 +97,12 @@ export const ContactsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     for (const c of contacts) {
       if (c.userId) {
         const existing = map.get(c.userId);
-        // Prioritize entry that contains custom nickname
-        if (!existing || (!existing.customName && c.customName)) {
+        // Prioritize formal contact over synthetic conv_ contact, and prioritize entries with nicknames
+        if (!existing) {
+          map.set(c.userId, c);
+        } else if (existing.id?.startsWith("conv_") && !c.id?.startsWith("conv_")) {
+          map.set(c.userId, c);
+        } else if (!existing.customName && c.customName) {
           map.set(c.userId, c);
         }
       }

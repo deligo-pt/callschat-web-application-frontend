@@ -289,7 +289,7 @@ export default function DownloadCTA() {
                                 </div>
 
                                 <Link
-                                    href="/auth/login"
+                                    href="/connect"
                                     className="shrink-0 flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold px-4 py-2.5 text-xs shadow-lg shadow-emerald-500/20 transition-all hover:scale-105"
                                 >
                                     <span>{t("web_app_btn")}</span>
