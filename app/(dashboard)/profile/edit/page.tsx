@@ -2,12 +2,15 @@
 
 import React from "react";
 import { useProfile } from "@/context/ProfileContext";
+import { useUser } from "@/context/UserContext";
 import { Camera, Loader2, Edit2, UserCircle2, ArrowLeft, ShieldCheck, Pencil, ChevronDown, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function ProfileEditPage() {
   const router = useRouter();
+  const { isCurrentVerified } = useUser();
   const {
+    userData,
     formData,
     setFormData,
     avatarPreview,
@@ -69,9 +72,9 @@ export default function ProfileEditPage() {
             <div className="w-full rounded-[24px] border border-[#E6EAFA] dark:border-[#222D34] bg-white dark:bg-[#111B21] p-6 md:p-8 shadow-xs flex flex-col gap-5 mb-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-[11px] font-bold tracking-wider text-[#8F95B2] dark:text-[#8696A0] uppercase">BASIC INFORMATION</h3>
-                {activeMode === "BUSINESS" && businessProfile?.isVerified && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#2563EB] text-white px-2.5 py-0.5 text-[10px] font-bold shadow-xs">
-                    <ShieldCheck className="h-3 w-3" /> Verified Badge Active
+                {(businessProfile?.isVerified || isCurrentVerified) && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold shadow-xs">
+                    <ShieldCheck className="h-3 w-3" /> Verified Business Active
                   </span>
                 )}
               </div>
@@ -225,6 +228,19 @@ export default function ProfileEditPage() {
             className="hidden"
           />
         </div>
+
+        {/* Verification Status Banner if Personal Verified */}
+        {(userData?.isVerified || isCurrentVerified) && (
+          <div className="w-full mb-6 rounded-2xl bg-[#EEF2FF] dark:bg-[#1E293B] border border-[#E0E7FF] dark:border-[#2563EB]/30 p-4 flex items-center gap-3 shadow-xs">
+            <div className="h-9 w-9 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-[#0F172A] dark:text-[#E9EDEF]">Identity Verified</span>
+              <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">Government-issued identification (KYC) confirmed.</span>
+            </div>
+          </div>
+        )}
 
         {/* Form Fields */}
         <div className="flex flex-col gap-5 w-full">

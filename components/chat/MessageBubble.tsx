@@ -638,14 +638,30 @@ export function MessageBubble({
     }
 
     if (msg.mediaType?.startsWith("image")) {
+      const rawUrl = getRawMediaUrl(msg.mediaUrl);
+      const displayUrl = getOptimizedImageUrl(msg.mediaUrl);
+
       return (
         <div className="relative mb-1">
-          <img
-            key={mediaKey}
-            src={getOptimizedImageUrl(msg.mediaUrl)}
-            alt="Attached Image"
-            className={cn("rounded-lg max-w-sm w-full cursor-pointer object-cover", isOptimistic && "opacity-70 blur-[2px]")}
-          />
+          <a
+            href={isOptimistic ? undefined : rawUrl}
+            target={isOptimistic ? undefined : "_blank"}
+            rel="noopener noreferrer"
+            className={cn("block", isOptimistic && "pointer-events-none")}
+          >
+            <img
+              key={mediaKey}
+              src={displayUrl}
+              alt="Attached Image"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (rawUrl && target.src !== rawUrl) {
+                  target.src = rawUrl;
+                }
+              }}
+              className={cn("rounded-lg max-w-sm w-full cursor-pointer object-cover transition-opacity hover:opacity-95", isOptimistic && "opacity-70 blur-[2px]")}
+            />
+          </a>
           {isOptimistic && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-black/50 p-3 rounded-full text-white shadow-lg backdrop-blur-sm">

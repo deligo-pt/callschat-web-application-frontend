@@ -581,7 +581,7 @@ export default function PersonalSignUpScreen() {
               <p className="text-center text-sm font-medium text-slate-500">
                 Already have an account?{" "}
                 <Link
-                  href="/auth/personal/login"
+                  href="/auth/personal/login?test=true"
                   className="font-bold text-[#2563EB] hover:underline"
                 >
                   Log in

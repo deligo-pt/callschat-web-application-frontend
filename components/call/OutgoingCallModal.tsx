@@ -6,6 +6,7 @@ import { useCallContext } from "@/components/providers/CallContext";
 import { useContacts } from "@/context/ContactsContext";
 import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { getOptimizedImageUrl } from "@/utils/image";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 export const OutgoingCallModal = () => {
   const { outgoingCall, activeCall, isCallPoppedOut, outgoingCallStatus, cancelOutgoingCall } = useCallContext();
@@ -14,6 +15,12 @@ export const OutgoingCallModal = () => {
   if (!outgoingCall || activeCall || isCallPoppedOut) return null;
 
   const contact = outgoingCall.receiverId ? getContact(outgoingCall.receiverId) : undefined;
+  const isReceiverVerified = Boolean(
+    (outgoingCall as any)?.isVerified ||
+    contact?.isVerified
+  );
+  const receiverAccountType = (outgoingCall as any)?.accountType || (contact as any)?.accountType || "USER";
+
   const resolved = resolveDisplayName(
     {
       userId: outgoingCall.receiverId,
@@ -138,9 +145,17 @@ export const OutgoingCallModal = () => {
         
         {/* Receiver Info */}
         <div className="flex flex-col items-center text-center z-10 mb-10 w-full">
-          <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate w-full px-4">
-            {displayName}
-          </h2>
+          <div className="flex items-center justify-center gap-1.5 w-full px-4">
+            <h2 className="text-[24px] font-bold text-[#E9EDEF] tracking-tight truncate">
+              {displayName}
+            </h2>
+            {isReceiverVerified && (
+              <VerifiedBadge
+                type={receiverAccountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                size="sm"
+              />
+            )}
+          </div>
           {resolved.subtitle && (
             <span className="text-[13.5px] font-medium text-[#8696A0]">
               {resolved.subtitle}

@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
-import { User, Briefcase, CheckCircle2 } from "lucide-react";
+import { User, Briefcase } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 interface WorkspaceSwitcherProps {
   className?: string;
@@ -11,9 +12,10 @@ interface WorkspaceSwitcherProps {
 }
 
 export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitcherProps) {
-  const { currentMode, businessProfile, workspace } = useUser();
+  const { currentMode, businessProfile, workspace, user, isCurrentVerified } = useUser();
   const isBusiness = currentMode === "BUSINESS";
-  const isVerified = businessProfile?.isVerified;
+  const isVerified = isCurrentVerified ?? (isBusiness ? Boolean(businessProfile?.isVerified || workspace?.isVerified) : Boolean(user?.isVerified));
+  const badgeType = isBusiness ? "BUSINESS" : "USER";
 
   return (
     <div
@@ -25,7 +27,7 @@ export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitch
           : "bg-[#EEF2FB] text-[#2563EB] border border-blue-100 shadow-sm dark:bg-[#202C33] dark:text-[#53BDEB] dark:border-[#2A3942] dark:shadow-none",
         className
       )}
-      title={`Account Type: ${isBusiness ? (businessProfile?.companyName || workspace?.name || "Business Account") + (isVerified ? " (Verified)" : "") : "Personal Account"}`}
+      title={`Account Type: ${isBusiness ? (businessProfile?.companyName || workspace?.name || "Business Account") : "Personal Account"}${isVerified ? " (Verified)" : ""}`}
     >
       {isBusiness ? (
         <Briefcase className="h-5 w-5 shrink-0" strokeWidth={2.2} />
@@ -35,9 +37,15 @@ export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitch
 
       {!compact && (
         <div className="flex flex-col items-start overflow-hidden text-left">
-          <span className="text-[12px] font-bold tracking-tight truncate leading-tight flex items-center gap-1 text-[#111B21] dark:text-[#E9EDEF]">
-            {isBusiness ? businessProfile?.companyName || workspace?.name || "Business Account" : "Personal Account"}
-            {isBusiness && isVerified && <CheckCircle2 className="h-3 w-3 text-[#3B58F5] dark:text-[#53BDEB] fill-[#3B58F5] dark:fill-[#53BDEB]" />}
+          <span className="text-[12px] font-bold tracking-tight truncate leading-tight flex items-center gap-1.5 text-[#111B21] dark:text-[#E9EDEF]">
+            <span>{isBusiness ? businessProfile?.companyName || workspace?.name || "Business Account" : "Personal Account"}</span>
+            {isVerified && (
+              <VerifiedBadge
+                type={badgeType}
+                size="xs"
+                showTooltip={false}
+              />
+            )}
           </span>
           <span className="text-[10px] font-medium opacity-75 truncate leading-tight text-[#54656F] dark:text-[#8696A0]">
             {isBusiness ? "Business Mode" : "Personal Mode"}
@@ -57,9 +65,13 @@ export function WorkspaceSwitcher({ className, compact = true }: WorkspaceSwitch
         </span>
       )}
 
-      {compact && isBusiness && isVerified && (
-        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-[#111B21] shadow-xs ring-2 ring-white dark:ring-[#111B21]">
-          <CheckCircle2 className="h-3 w-3 text-[#3B58F5] dark:text-[#53BDEB] fill-[#3B58F5] dark:fill-[#53BDEB]" />
+      {compact && isVerified && (
+        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white dark:bg-[#111B21] shadow-xs ring-2 ring-white dark:ring-[#111B21]">
+          <VerifiedBadge
+            type={badgeType}
+            size="xs"
+            showTooltip={false}
+          />
         </span>
       )}
     </div>

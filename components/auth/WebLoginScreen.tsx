@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import * as React from "react";
 import QRCode from "react-qr-code";
@@ -44,6 +44,8 @@ const LANGUAGE_LABELS: Record<Locale, { label: string; flag: string }> = {
 
 export default function WebLoginScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isTestMode = searchParams.get("test") === "true" || process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH === "true";
   const [stayLoggedIn, setStayLoggedIn] = React.useState(true);
   const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false);
@@ -680,29 +682,32 @@ export default function WebLoginScreen() {
                 </span>
               </label>
 
-              {/* Log in with phone number link with slide animation */}
-              <button
-                type="button"
-                onClick={() => router.push("/login")}
-                className="text-xs sm:text-sm font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline inline-flex items-center gap-0.5 cursor-pointer group focus:outline-none"
-              >
-                <span>Log in with phone number</span>
-                <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
-              </button>
+              {/* Log in with phone number link (Testing only) */}
+              {isTestMode && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/auth/personal/login?test=true")}
+                  className="text-xs sm:text-sm font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline inline-flex items-center gap-0.5 cursor-pointer group focus:outline-none"
+                >
+                  <span>Log in with phone number (Test)</span>
+                  <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* ── BELOW THE SCAN CARD: Sign Up Link & Prominent High-Visibility E2EE Security Banner ── */}
+          {/* ── BELOW THE SCAN CARD: App Download Link & Prominent High-Visibility E2EE Security Banner ── */}
           <div className="w-full flex flex-col items-center gap-2.5 mt-5 text-center">
             <div className="text-xs sm:text-[13px] font-medium text-[#3B4A54] dark:text-[#8696A0]">
               Don&apos;t have a CallsChat account?{" "}
-              <Link
-                href="/signup"
-                className="font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline inline-flex items-center gap-0.5 ml-0.5 group"
+              <button
+                type="button"
+                onClick={() => setIsDownloadModalOpen(true)}
+                className="font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline inline-flex items-center gap-0.5 ml-0.5 group cursor-pointer"
               >
-                <span>Get started</span>
+                <span>Get the mobile app</span>
                 <ArrowUpRight size={13} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </Link>
+              </button>
             </div>
 
             {/* Prominent High-Visibility E2EE Lock Banner */}

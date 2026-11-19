@@ -1,5 +1,37 @@
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PersonalLoginScreen from "@/components/auth/PersonalLoginScreen";
 
-export default function PersonalLoginPage() {
+function LoginContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isAllowed, setIsAllowed] = useState(false);
+
+  useEffect(() => {
+    const isTestParam = searchParams.get("test") === "true";
+    const isTestEnv = process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH === "true";
+    const isDev = process.env.NODE_ENV !== "production";
+
+    if (!isTestParam && !isTestEnv && !isDev) {
+      router.replace("/connect");
+    } else {
+      setIsAllowed(true);
+    }
+  }, [router, searchParams]);
+
+  if (!isAllowed) {
+    return null;
+  }
+
   return <PersonalLoginScreen />;
+}
+
+export default function PersonalLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#EEF2F9]" />}>
+      <LoginContent />
+    </Suspense>
+  );
 }

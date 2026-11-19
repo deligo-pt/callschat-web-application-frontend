@@ -126,7 +126,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         const reasonMsg = encodeURIComponent(
           data?.message || "You have been logged out because CallsChat Web was opened in another browser or window."
         );
-        window.location.href = `/login?reason=session_revoked&message=${reasonMsg}`;
+        window.location.href = `/connect?reason=session_revoked&message=${reasonMsg}`;
       }
     });
 

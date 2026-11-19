@@ -33,10 +33,19 @@ export default function ChooseModeScreen({ authType = "signup" }: ChooseModeScre
     localStorage.setItem("auth_account_mode", selectedMode);
     localStorage.setItem("currentMode", selectedMode);
     
-    if (isLogin) {
-      router.push(selectedMode === "BUSINESS" ? "/auth/business/login" : "/auth/personal/login");
+    const isTestParam = searchParams.get("test") === "true";
+    const isTestEnv = process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH === "true";
+    const isTest = isTestParam || isTestEnv;
+
+    if (selectedMode === "BUSINESS") {
+      router.push(isLogin ? "/auth/business/login" : "/auth/business/signup");
     } else {
-      router.push(selectedMode === "BUSINESS" ? "/auth/business/signup" : "/auth/personal/signup");
+      // Personal mode: Testing routes are protected. Real users are routed to /connect QR scan.
+      if (isTest) {
+        router.push(isLogin ? "/auth/personal/login?test=true" : "/auth/personal/signup?test=true");
+      } else {
+        router.push("/connect");
+      }
     }
   };
 

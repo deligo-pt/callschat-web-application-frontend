@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useCallContext } from "@/components/providers/CallContext";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 const SENDER_COLORS = [
   "text-[#00A884] dark:text-[#25D366]",
@@ -272,6 +273,15 @@ export function GroupMessageBubble({
   const senderName = isMe ? "You" : resolvedSender.formattedName;
   const senderColorClass = getSenderColor(msg.senderId);
 
+  const contact = getContact(msg.senderId);
+  const isSenderVerified = !isMe && Boolean(
+    (msg.sender as any)?.isVerified ||
+    (member as any)?.isVerified ||
+    (member?.user as any)?.isVerified ||
+    contact?.isVerified
+  );
+  const senderAccountType = (msg.sender as any)?.accountType || (member?.user as any)?.accountType || (contact as any)?.accountType || "USER";
+
   const getMessageStatus = () => {
     if (msg.id.startsWith("optimistic-") && (!msg.receipts || msg.receipts.length === 0)) {
       return "SENDING";
@@ -463,8 +473,15 @@ export function GroupMessageBubble({
       <div className={cn("flex w-full mb-3 group/bubble relative items-center", isMe ? "justify-end" : "justify-start")}>
         <div className={cn("flex flex-col max-w-[70%]", isMe ? "items-end" : "items-start")}>
           {!isMe && (isFirstFromSender || showAvatar) && (
-            <span className={cn("text-[12.5px] font-semibold mb-1 pl-1", senderColorClass)}>
-              {senderName}
+            <span className={cn("inline-flex items-center gap-1 text-[12.5px] font-semibold mb-1 pl-1", senderColorClass)}>
+              <span>{senderName}</span>
+              {isSenderVerified && (
+                <VerifiedBadge
+                  type={senderAccountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                  size="xs"
+                  showTooltip={false}
+                />
+              )}
             </span>
           )}
           <div
@@ -685,8 +702,15 @@ export function GroupMessageBubble({
         {/* Sender Name in group */}
         {!isMe && (isFirstFromSender || showAvatar) && (
           <div className="px-3 pt-2">
-            <span className={cn("text-[12px] font-semibold tracking-wide", senderColorClass)}>
-              {senderName}
+            <span className={cn("inline-flex items-center gap-1 text-[12px] font-semibold tracking-wide", senderColorClass)}>
+              <span>{senderName}</span>
+              {isSenderVerified && (
+                <VerifiedBadge
+                  type={senderAccountType === "BUSINESS" ? "BUSINESS" : "USER"}
+                  size="xs"
+                  showTooltip={false}
+                />
+              )}
             </span>
           </div>
         )}

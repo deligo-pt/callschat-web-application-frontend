@@ -254,7 +254,7 @@ function ChatRoomPageContent() {
   const basePath = pathname.startsWith("/business") ? "/business/chats" : "/chats";
   const { initiateCall } = useCallContext();
   const { isUserOnline } = usePresence();
-  const { getContact, refetchContacts } = useContacts();
+  const { contacts, getContact, refetchContacts } = useContacts();
 
   // The route param is the CONVERSATION ID
   const conversationId = params.chatId as string;
@@ -403,6 +403,9 @@ function ChatRoomPageContent() {
               setIsRecipientInContacts(Boolean(contact || resolved.isSaved));
 
               const recipientName = resolved.title || conv.otherUserName || "Unknown";
+              const isVerifiedPeer = Boolean((conv as any).isVerified || contact?.isVerified);
+              const peerAccountType = (conv as any).accountType || (contact as any)?.accountType || "USER";
+
               setRecipient({
                 id: conv.otherUserId,
                 name: recipientName,
@@ -411,8 +414,8 @@ function ChatRoomPageContent() {
                   contact?.avatarUrl ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(recipientName)}&background=F4F6FC&color=3B58F5`,
                 isOnline: conv.otherUserOnline || false,
-                isVerified: (conv as any).isVerified,
-                accountType: (conv as any).accountType,
+                isVerified: isVerifiedPeer,
+                accountType: peerAccountType,
                 phone: contact?.phoneNumber || undefined,
               });
               setIsInitializing(false);
@@ -439,6 +442,9 @@ function ChatRoomPageContent() {
           setIsRecipientInContacts(Boolean(contact || resolved.isSaved));
 
           const displayName = resolved.title || "Chat";
+          const isVerifiedPeer = Boolean(contact?.isVerified);
+          const peerAccountType = (contact as any)?.accountType || "USER";
+
           setRecipient({
             id: finalRecipientId,
             name: displayName,
@@ -446,8 +452,8 @@ function ChatRoomPageContent() {
               contact?.avatarUrl ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=F4F6FC&color=3B58F5`,
             isOnline: false,
-            isVerified: contact?.isVerified || false,
-            accountType: "USER",
+            isVerified: isVerifiedPeer,
+            accountType: peerAccountType,
             phone: contact?.phoneNumber || undefined,
           });
 
@@ -479,6 +485,54 @@ function ChatRoomPageContent() {
 
     init();
   }, [conversationId, recipientIdFromQuery, isBizChat]);
+
+  // ── Reactive Contact & Recipient Sync ─────────────────────────────────────
+  // Reactively re-evaluates contact status and display name when ContactsContext
+  // finishes loading or updating asynchronously over the network.
+  useEffect(() => {
+    if (!recipientId || isBizChat) return;
+
+    const contact = getContact(recipientId);
+    // A user is a saved contact if a formal contact record exists (not a synthetic direct conversation)
+    const isSaved = Boolean(contact && (!contact.id || !contact.id.startsWith("conv_")));
+
+    setIsRecipientInContacts(isSaved);
+
+    if (contact) {
+      const resolved = resolveDisplayName(
+        {
+          userId: recipientId,
+          phone: contact.phoneNumber,
+          profileDisplayName: contact.displayName || recipient?.name?.replace(/^~/, ""),
+        },
+        contact
+      );
+
+      setRecipient((prev) => {
+        if (!prev) return prev;
+        const newName = resolved.title || prev.name;
+        const newVerified = Boolean(contact.isVerified || prev.isVerified);
+        const newAccountType = (contact as any).accountType || prev.accountType;
+        if (
+          prev.name === newName &&
+          prev.phone === contact.phoneNumber &&
+          (prev.avatarUrl === contact.avatarUrl || !contact.avatarUrl) &&
+          prev.isVerified === newVerified &&
+          prev.accountType === newAccountType
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          name: newName,
+          phone: contact.phoneNumber || prev.phone,
+          avatarUrl: contact.avatarUrl || prev.avatarUrl,
+          isVerified: newVerified,
+          accountType: newAccountType,
+        };
+      });
+    }
+  }, [recipientId, contacts, getContact, isBizChat]);
 
   const {
     messages,
@@ -622,12 +676,12 @@ function ChatRoomPageContent() {
       setIsAddingContact(true);
       await ContactService.addMutualContact(recipientId);
       setIsRecipientInContacts(true);
-      void refetchContacts();
+      await refetchContacts();
       toast.success("Added to contacts");
     } catch (err: any) {
       if (err?.response?.status === 409) {
         setIsRecipientInContacts(true);
-        void refetchContacts();
+        await refetchContacts();
         toast.info("User is already in your contacts");
       } else {
         toast.error("Failed to add contact");
@@ -1246,6 +1300,8 @@ function ChatRoomPageContent() {
           avatarUrl={recipient.avatarUrl}
           isOnline={recipient.isOnline}
           phone={recipient.phone}
+          isVerified={recipient.isVerified}
+          accountType={recipient.accountType}
           isBlocked={blockStatus?.isBlocked}
           isBlockedByMe={blockStatus?.isBlockedByMe}
           onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}
