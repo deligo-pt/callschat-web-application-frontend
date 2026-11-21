@@ -15,7 +15,17 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/business/channels/:path*",
-        destination: "/business/dashboard",
+        destination: "/business/chats",
+        permanent: false,
+      },
+      {
+        source: "/business/dashboard",
+        destination: "/business/chats",
+        permanent: false,
+      },
+      {
+        source: "/profile/dashboard",
+        destination: "/profile/edit",
         permanent: false,
       },
     ];

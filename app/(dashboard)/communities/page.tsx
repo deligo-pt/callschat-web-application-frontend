@@ -16,7 +16,7 @@ export default function CommunitiesPage() {
 
   useEffect(() => {
     if (mounted && currentMode === "BUSINESS") {
-      router.replace("/business/dashboard");
+      router.replace("/business/chats");
     }
   }, [mounted, currentMode, router]);
 

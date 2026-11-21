@@ -133,7 +133,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleWorkspaceChange = (e: any) => {
       if (e?.detail?.mode === 'BUSINESS') {
-        router.push('/business/dashboard');
+        router.push('/business/chats');
       } else if (e?.detail?.mode === 'PERSONAL') {
         router.push('/chats');
       }

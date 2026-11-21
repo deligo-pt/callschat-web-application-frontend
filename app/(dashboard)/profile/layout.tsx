@@ -167,10 +167,10 @@ function ProfileSidebarNavigation() {
             {activeMode === "BUSINESS" ? (
               <>
                 <button
-                  onClick={() => router.push("/business/verification")}
+                  onClick={() => router.push("/profile/verification")}
                   className={cn(
                     "flex items-center justify-between rounded-xl border p-3 transition-colors",
-                    isRouteActive("/business/verification")
+                    isRouteActive("/profile/verification")
                       ? "border-blue-200 bg-[#EEF2FF] dark:border-[#2563EB]/40 dark:bg-[#2563EB]/20"
                       : "border-slate-100 dark:border-[#222D34] bg-white dark:bg-[#182229] hover:bg-slate-50 dark:hover:bg-[#202C33]"
                   )}
@@ -183,7 +183,7 @@ function ProfileSidebarNavigation() {
                       <div className="flex items-center gap-1.5">
                         <span className={cn(
                           "text-[13px] font-bold",
-                          isRouteActive("/business/verification") ? "text-[#2563EB] dark:text-[#38BDF8]" : "text-[#0F172A] dark:text-[#E9EDEF]"
+                          isRouteActive("/profile/verification") ? "text-[#2563EB] dark:text-[#38BDF8]" : "text-[#0F172A] dark:text-[#E9EDEF]"
                         )}>Verified Business Account</span>
                         {businessProfile?.isVerified && (
                           <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-xs">
@@ -418,34 +418,6 @@ function ProfileSidebarNavigation() {
                 )} />
               </div>
             </div>
-
-            {activeMode === "BUSINESS" && (
-              <button
-                onClick={() => router.push("/profile/dashboard")}
-                className={cn(
-                  "flex items-center justify-between rounded-xl border p-3 transition-colors",
-                  isRouteActive("/profile/dashboard")
-                    ? "border-blue-200 bg-[#EEF2FF] dark:border-[#2563EB]/40 dark:bg-[#2563EB]/20"
-                    : "border-slate-100 dark:border-[#222D34] bg-white dark:bg-[#182229] hover:bg-slate-50 dark:hover:bg-[#202C33]"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF2FF] dark:bg-[#2563EB]/20 text-[#2563EB] dark:text-[#38BDF8]"
-                  )}>
-                    <Briefcase className="h-4.5 w-4.5" />
-                  </div>
-                  <div className="flex flex-col items-start leading-tight">
-                    <span className={cn(
-                      "text-[13px] font-bold",
-                      isRouteActive("/profile/dashboard") ? "text-[#2563EB] dark:text-[#38BDF8]" : "text-[#0F172A] dark:text-[#E9EDEF]"
-                    )}>{tCommon("business_dashboard")}</span>
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-[#8696A0] mt-0.5">{t("analytical_insight")}</span>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-slate-400 dark:text-[#8696A0]" />
-              </button>
-            )}
           </div>
         </div>
 

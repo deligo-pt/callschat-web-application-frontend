@@ -78,7 +78,7 @@ export function NotificationItem({ notification, onMarkAsRead, onCloseDropdown, 
       case "CHANNEL_INVITATION":
       case "CHANNEL_MESSAGE":
       case "CHANNEL_UPDATE":
-        router.push("/business/dashboard");
+        router.push("/business/chats");
         break;
       case "VERIFICATION_UPDATE":
         router.push(notification.routeId || "/profile/verification");

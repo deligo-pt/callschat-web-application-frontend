@@ -61,7 +61,7 @@ export default function BusinessOnboardingPage() {
       if (response && response.success) {
         setWorkspace(response.data);
         toast.success("Workspace created successfully! Welcome aboard.");
-        router.push("/business/dashboard");
+        router.push("/business/chats");
       }
     } catch (error: any) {
       const status = error?.response?.status;

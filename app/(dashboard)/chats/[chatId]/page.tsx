@@ -395,7 +395,7 @@ function ChatRoomPageContent() {
                 {
                   userId: conv.otherUserId,
                   phone: contact?.phoneNumber,
-                  profileDisplayName: conv.otherUserName,
+                  profileDisplayName: contact?.customName || contact?.displayName || conv.otherUserName,
                 },
                 contact
               );
@@ -434,7 +434,7 @@ function ChatRoomPageContent() {
             {
               userId: finalRecipientId,
               phone: contact?.phoneNumber,
-              profileDisplayName: contact?.displayName,
+              profileDisplayName: contact?.customName || contact?.displayName,
             },
             contact
           );
@@ -503,17 +503,17 @@ function ChatRoomPageContent() {
         {
           userId: recipientId,
           phone: contact.phoneNumber,
-          profileDisplayName: contact.displayName || recipient?.name?.replace(/^~/, ""),
+          profileDisplayName: contact.customName || contact.displayName || recipient?.name?.replace(/^~/, ""),
         },
         contact
       );
 
       setRecipient((prev) => {
-        if (!prev) return prev;
-        const newName = resolved.title || prev.name;
-        const newVerified = Boolean(contact.isVerified || prev.isVerified);
-        const newAccountType = (contact as any).accountType || prev.accountType;
+        const newName = resolved.title || prev?.name || contact.customName || contact.displayName || "Unknown";
+        const newVerified = Boolean(contact.isVerified || prev?.isVerified);
+        const newAccountType = (contact as any).accountType || prev?.accountType;
         if (
+          prev &&
           prev.name === newName &&
           prev.phone === contact.phoneNumber &&
           (prev.avatarUrl === contact.avatarUrl || !contact.avatarUrl) &&
@@ -521,6 +521,17 @@ function ChatRoomPageContent() {
           prev.accountType === newAccountType
         ) {
           return prev;
+        }
+        if (!prev) {
+          return {
+            id: recipientId,
+            name: newName,
+            phone: contact.phoneNumber || undefined,
+            avatarUrl: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newName)}&background=F4F6FC&color=3B58F5`,
+            isOnline: false,
+            isVerified: newVerified,
+            accountType: newAccountType,
+          };
         }
         return {
           ...prev,
@@ -532,7 +543,7 @@ function ChatRoomPageContent() {
         };
       });
     }
-  }, [recipientId, contacts, getContact, isBizChat]);
+  }, [recipientId, contacts, getContact, isBizChat, recipient?.name]);
 
   const {
     messages,

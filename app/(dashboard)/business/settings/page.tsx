@@ -26,7 +26,7 @@ export default function BusinessSettingsPage() {
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={() => router.push("/business/dashboard")}
+          onClick={() => router.push("/business/chats")}
           className="rounded-full p-2 bg-white border border-[#E6EAFA] hover:bg-gray-50 transition-colors shadow-xs"
         >
           <ArrowLeft className="h-5 w-5 text-[#1D2A54]" />
