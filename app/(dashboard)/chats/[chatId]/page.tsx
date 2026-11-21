@@ -278,7 +278,14 @@ function ChatRoomPageContent() {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [recipientId, setRecipientId] = useState<string>(recipientIdFromQuery);
+  const [recipientId, setRecipientId] = useState<string>(() => {
+    if (recipientIdFromQuery) return recipientIdFromQuery;
+    if (typeof window !== "undefined" && conversationId) {
+      const cached = sessionStorage.getItem(`active_peer_${conversationId}`);
+      if (cached && cached !== "null" && cached !== "undefined") return cached;
+    }
+    return "";
+  });
   const [isInitializing, setIsInitializing] = useState(true);
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -292,6 +299,14 @@ function ChatRoomPageContent() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (recipientId && recipientId !== "null" && recipientId !== "undefined" && typeof window !== "undefined" && conversationId) {
+      try {
+        sessionStorage.setItem(`active_peer_${conversationId}`, recipientId);
+      } catch {}
+    }
+  }, [conversationId, recipientId]);
 
   // B2C: track whether we know the bizHandle for this conversation
   // (needed to route ALL subsequent messages through contactBusiness REST API).
@@ -389,6 +404,11 @@ function ChatRoomPageContent() {
             if (conv?.otherUserId) {
               finalRecipientId = conv.otherUserId;
               setRecipientId(finalRecipientId);
+              if (typeof window !== "undefined" && conversationId) {
+                try {
+                  sessionStorage.setItem(`active_peer_${conversationId}`, finalRecipientId);
+                } catch {}
+              }
 
               const contact = getContact(conv.otherUserId);
               const resolved = resolveDisplayName(
@@ -428,6 +448,11 @@ function ChatRoomPageContent() {
 
         if (finalRecipientId && finalRecipientId !== "null" && finalRecipientId !== "undefined") {
           setRecipientId(finalRecipientId);
+          if (typeof window !== "undefined" && conversationId) {
+            try {
+              sessionStorage.setItem(`active_peer_${conversationId}`, finalRecipientId);
+            } catch {}
+          }
 
           const contact = getContact(finalRecipientId);
           const resolved = resolveDisplayName(
@@ -563,6 +588,7 @@ function ChatRoomPageContent() {
     loadMoreMessages,
     hasMoreMessages,
     isLoadingMore,
+    retryMessage,
   } = useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -1222,6 +1248,7 @@ function ChatRoomPageContent() {
                     peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
                     onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}
                     onManualResend={(msgId) => requestManualResend(msgId)}
+                    onRetry={(msgId) => retryMessage(msgId)}
                     disappearAfterSeconds={(msg as any).disappearAfterSeconds ?? disappearAfterSeconds ?? null}
                     onEdit={(msgId, newText) => editMessage(msgId, newText)}
                     isPinned={isPinned}

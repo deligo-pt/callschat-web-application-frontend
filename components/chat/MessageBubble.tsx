@@ -143,6 +143,7 @@ interface MessageBubbleProps {
     isSystem?: boolean;
     systemType?: string;
     isRetryExpired?: boolean;
+    status?: string;
   };
   isMe: boolean;
   showTail: boolean;
@@ -159,6 +160,7 @@ interface MessageBubbleProps {
   onScrollToMessage?: (messageId: string) => void;
   onOpenSecurityCode?: () => void;
   onManualResend?: (messageId: string) => void;
+  onRetry?: (messageId: string) => void;
   /** Per-message disappear timer in seconds, or null if not set. */
   disappearAfterSeconds?: number | null;
   currentUserId?: string;
@@ -181,6 +183,7 @@ export function MessageBubble({
   onScrollToMessage,
   onOpenSecurityCode,
   onManualResend,
+  onRetry,
   disappearAfterSeconds,
   currentUserId,
 }: MessageBubbleProps) {
@@ -244,6 +247,12 @@ export function MessageBubble({
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   const getMessageStatus = () => {
+    if (msg.status === "WAITING_FOR_PEER_KEY") {
+      return "WAITING_FOR_PEER_KEY";
+    }
+    if (msg.status === "FAILED") {
+      return "FAILED";
+    }
     if (msg.id.startsWith("optimistic-") && (!msg.receipts || msg.receipts.length === 0)) {
       return "SENDING";
     }
@@ -1133,6 +1142,27 @@ export function MessageBubble({
             {formatTime(msg.createdAt)}
             {isMe && (
               <span className="ml-0.5 inline-flex items-center">
+                {status === "WAITING_FOR_PEER_KEY" && (
+                  <span
+                    className="inline-flex items-center gap-0.5 text-amber-500 dark:text-amber-400"
+                    title="Waiting for recipient device to wake up..."
+                  >
+                    <Clock className="w-3.5 h-3.5 animate-pulse" />
+                  </span>
+                )}
+                {status === "FAILED" && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetry?.(msg.id);
+                    }}
+                    className="inline-flex items-center gap-0.5 text-red-500 hover:text-red-600 transition-colors cursor-pointer"
+                    title="Message delivery failed. Tap to retry."
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 {status === "SENDING" && <Clock className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 animate-pulse" />}
                 {status === "SENT" && <Check className="w-4 h-4 text-gray-400 dark:text-gray-400" strokeWidth={2.2} />}
                 {status === "DELIVERED" && <CheckCheck className="w-4 h-4 text-gray-400 dark:text-gray-400" strokeWidth={2.2} />}
