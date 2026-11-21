@@ -106,8 +106,11 @@ export const chatService = {
     return response.data;
   },
 
-  fetchHistory: async (conversationId: string) => {
-    const response = await apiClient.get(`/conversations/${conversationId}/messages`);
+  fetchHistory: async (conversationId: string, cursor?: string, limit?: number) => {
+    const params: Record<string, any> = {};
+    if (cursor) params.cursor = cursor;
+    if (limit) params.limit = limit;
+    const response = await apiClient.get(`/conversations/${conversationId}/messages`, { params });
     return response.data;
   },
 

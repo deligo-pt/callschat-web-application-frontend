@@ -389,9 +389,20 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
         // 2. Fetch group details & permissions
         const groupRes = await groupService.fetchGroupDetails(groupId);
-        if (groupRes.success && groupRes.data) {
-          setGroupDetails(groupRes.data);
+        if (!groupRes.success) {
+          // The group does not exist in the database (deleted, never created,
+          // or stale cached ID). Abort setup entirely to prevent a waterfall
+          // of 404s from fetchGroupKey / fetchGroupMessages on a phantom group.
+          console.warn(
+            `[useGroupChat] Group ${groupId} not found (404). ` +
+            `This is likely a stale groupId in the frontend cache. ` +
+            `Clear IndexedDB / localStorage if this persists.`
+          );
+          setError('Group not found');
+          setIsReady(true);
+          return;
         }
+        setGroupDetails(groupRes.data);
         const creatorId = groupRes.data?.createdBy;
 
         // 3. If symmetric key is not in cache, fetch envelope and decrypt

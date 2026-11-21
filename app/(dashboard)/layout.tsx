@@ -11,7 +11,7 @@ import { UserProvider, useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { chatService } from "@/services/chat.service";
-import { Briefcase, CheckCircle2, Contact, Folder, MessageSquare, PhoneCall, Share2, UserCircle2, Users, UsersRound } from "lucide-react";
+import { Briefcase, CheckCircle2, Contact, Folder, MessageSquare, PhoneCall, UserCircle2, Users } from "lucide-react";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -151,14 +151,7 @@ function DashboardNavContent({ children }: { children: React.ReactNode }) {
     { name: tNav("group"), href: "/groups", icon: Users },
     { name: tNav("contacts"), href: "/contacts", icon: Contact },
     { name: tNav("media"), href: "/media", icon: Folder },
-    { name: tNav("channel"), href: "/channels", icon: Share2 },
-    { name: tNav("communities"), href: "/communities", icon: UsersRound },
-  ].filter(item => {
-    if (!isBusiness && (item.href === "/channels" || item.href === "/communities")) {
-      return false;
-    }
-    return true;
-  });
+  ];
 
   if (isOnboarding) {
     return (

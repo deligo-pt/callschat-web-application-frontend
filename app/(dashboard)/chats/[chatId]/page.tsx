@@ -549,6 +549,9 @@ function ChatRoomPageContent() {
     handleTyping,
     requestManualResend,
     recipientPublicKey,
+    loadMoreMessages,
+    hasMoreMessages,
+    isLoadingMore,
   } = useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -595,12 +598,23 @@ function ChatRoomPageContent() {
 
   const isAtBottomRef = useRef(true);
   const prevCountRef = useRef(0);
+  const isPaginatingRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
 
   const handleScroll = useCallback(() => {
     if (!parentRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = parentRef.current;
     isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 120;
-  }, []);
+
+    // Trigger loading older messages when user scrolls near the top
+    if (scrollTop < 80 && hasMoreMessages && !isLoadingMore && !isPaginatingRef.current) {
+      isPaginatingRef.current = true;
+      prevScrollHeightRef.current = scrollHeight;
+      loadMoreMessages().finally(() => {
+        isPaginatingRef.current = false;
+      });
+    }
+  }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
 
   const scrollToBottom = useCallback(
     (behavior: "smooth" | "auto" = "smooth") => {
@@ -637,6 +651,18 @@ function ChatRoomPageContent() {
   useEffect(() => {
     if (visibleMsgs.length === 0) return;
     const isInitial = prevCountRef.current === 0;
+
+    if (isPaginatingRef.current) {
+      if (parentRef.current && prevScrollHeightRef.current > 0) {
+        const heightDiff = parentRef.current.scrollHeight - prevScrollHeightRef.current;
+        parentRef.current.scrollTop = heightDiff;
+        prevScrollHeightRef.current = 0;
+      }
+      isPaginatingRef.current = false;
+      prevCountRef.current = visibleMsgs.length;
+      return;
+    }
+
     prevCountRef.current = visibleMsgs.length;
 
     if (isInitial || isAtBottomRef.current) {
@@ -1114,6 +1140,11 @@ function ChatRoomPageContent() {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 sm:p-5 chat-canvas-bg custom-scrollbar relative"
       >
+        {isLoadingMore && (
+          <div className="flex items-center justify-center py-2 shrink-0">
+            <Loader2 className="h-5 w-5 animate-spin text-[#00A884]" />
+          </div>
+        )}
         {visibleMsgs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2]">
             {isReady || isBizChat ? (

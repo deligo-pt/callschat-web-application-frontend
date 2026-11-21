@@ -16,7 +16,7 @@ export default function ChannelsPage() {
 
   React.useEffect(() => {
     if (mounted && currentMode === "BUSINESS") {
-      router.replace("/business/channels");
+      router.replace("/business/dashboard");
     }
   }, [mounted, currentMode, router]);
 

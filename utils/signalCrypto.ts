@@ -36,6 +36,17 @@ export function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
 }
 
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  // Guard: reject strings that are not valid Base64 before calling atob().
+  // This converts the cryptic browser "InvalidCharacterError" into a clear,
+  // actionable TypeError that shows the actual offending value — making it
+  // easy to identify protocol mismatches (e.g. hex or AES-GCM payloads
+  // accidentally routed through the Signal decryption path).
+  if (!base64 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+    throw new TypeError(
+      `base64ToArrayBuffer: invalid Base64 string ` +
+      `(length=${base64?.length ?? 0}, preview="${(base64 ?? '').slice(0, 32)}…")`
+    );
+  }
   const binary = atob(base64);
   const len = binary.length;
   const bytes = new Uint8Array(len);

@@ -1,8 +1,7 @@
 "use client";
 
-import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
-import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
+import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
 import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
 import { NewMessageModal } from "@/components/chat/NewMessageModal";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
@@ -111,7 +110,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   // Using useSearchParams() is SSR-safe; useState initializer freezes the value so
   // subsequent query-param changes (e.g. ?recipientId=xxx) don't re-render this layout.
   const searchParams = useSearchParams();
-  const [viewParam] = useState(() => searchParams.get("view") || "");
 
   // Real-time presence — comes from the global PresenceProvider.
   const { isUserOnline } = usePresence();
@@ -1331,12 +1329,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           !isRootChatsPage && "hidden md:flex"
         )}
       >
-        {currentMode === "BUSINESS" && viewParam === "channels" ? (
-          <BusinessSidebar />
-        ) : (
-          <>
-            {/* Header Area */}
-            <div className="flex flex-col px-4 pt-5 pb-3 border-b border-[#F0F2F5] dark:border-[#202C33]">
+        {/* Header Area */}
+        <div className="flex flex-col px-4 pt-5 pb-3 border-b border-[#F0F2F5] dark:border-[#202C33]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <h1 className="text-[20px] font-extrabold tracking-tight text-[#111B21] dark:text-[#E9EDEF]">
@@ -1363,9 +1357,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                   </Link>
 
                   <NotificationDropdown />
-                  {currentMode === "BUSINESS" && (
-                    <BusinessFeaturesMenu />
-                  )}
                 </div>
               </div>
 
@@ -1705,8 +1696,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             </div>
-          </>
-        )}
       </div>
 
       {/* Main Content Area */}
