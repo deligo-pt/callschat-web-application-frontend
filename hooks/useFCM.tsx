@@ -81,6 +81,12 @@ export const useFCM = () => {
         
         const data = payload.data || {};
         const type = data.type; // 'CHAT' | 'GROUP' | 'CALL' | 'incoming_call'
+
+        // E2EE silent key refresh requests must never show toasts or play notification sounds
+        if (type === 'E2EE_KEY_REFRESH_REQUEST') {
+          console.log('[FCM] Silently handled E2EE_KEY_REFRESH_REQUEST in foreground.');
+          return;
+        }
         const routeId = data.routeId;
 
         // Call Interception: bypass the standard toast and trigger our full-screen Ringing UI

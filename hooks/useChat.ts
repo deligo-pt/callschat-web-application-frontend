@@ -37,6 +37,7 @@ import {
 import { compressImage } from "@/utils/image";
 import { queueVaultSync } from "@/utils/vaultSync";
 import { toast } from "sonner";
+import { e2eeOutboxService, PendingOutboxMessage } from "@/services/e2eeOutbox.service";
 import { useChatTyping } from "./chat/useChatTyping";
 import { useChatPinned } from "./chat/useChatPinned";
 import { useChatReactions } from "./chat/useChatReactions";
@@ -98,6 +99,7 @@ export interface ChatMessage {
   systemType?: string;
   isRetryExpired?: boolean;
   previewText?: string | null;
+  status?: "SENDING" | "WAITING_FOR_PEER_KEY" | "SENT" | "DELIVERED" | "SEEN" | "FAILED" | string;
 }
 
 export interface PinnedMessage {
@@ -117,12 +119,22 @@ const parseEditedText = (rawText: string) => {
   return { text: rawText, isEdited: false };
 };
 
-const isValidPlaintext = (text: string | null | undefined): boolean => {
+export const looksLikeCiphertext = (text: string | null | undefined): boolean => {
+  if (!text || typeof text !== "string") return false;
+  // A Base64 ciphertext is at least 40 characters of continuous Base64 without whitespace
+  if (text.length >= 40 && !/\s/.test(text) && /^[A-Za-z0-9+/]+={0,2}$/.test(text)) {
+    return true;
+  }
+  return false;
+};
+
+export const isValidPlaintext = (text: string | null | undefined): boolean => {
   if (!text || typeof text !== "string") return false;
   if (text.includes("Waiting for this message")) return false;
   if (text.includes("Message sent before key update")) return false;
   if (text.includes("Message unavailable")) return false;
   if (text.includes("Decryption timed out")) return false;
+  if (looksLikeCiphertext(text)) return false;
   return true;
 };
 
@@ -182,8 +194,25 @@ const resolveQuotedMessage = async (
     } catch {}
   }
 
-  // 2. Libsignal decryption if messageType is 2 or 3 (only for peer messages, skip self)
-  const isSignalMsg = replyToRaw.messageType === 3 || replyToRaw.messageType === 2 || rawEncKeys?.protocol === 'libsignal';
+  // 2. Direct plaintext extraction if message is marked or formatted as plaintext
+  const isPlaintext =
+    rawEncKeys?.protocol === 'plaintext' ||
+    replyToRaw.messageType === 0 ||
+    (!replyToRaw.nonce && rawEncKeys?.protocol !== 'libsignal' && isValidPlaintext(replyToRaw.ciphertext));
+
+  if (!text && replyToRaw.ciphertext && (isPlaintext || isBiz || !replyToRaw.nonce)) {
+    text = parseEditedText(replyToRaw.ciphertext).text;
+  }
+
+  // 3. Libsignal decryption if message is an authentic Signal message (only for peer messages, skip self)
+  const isSignalMsg =
+    !isPlaintext &&
+    !replyToRaw.nonce &&
+    (
+      rawEncKeys?.protocol === 'libsignal' ||
+      replyToRaw.messageType === 3 ||
+      (replyToRaw.messageType === 2 && Boolean(rawEncKeys?.recipientRegistrationId))
+    );
   const isSelf = replyToRaw.senderId === currentUid;
   if (!text && replyToRaw.ciphertext && isSignalMsg && replyToRaw.senderId && !isSelf) {
     try {
@@ -196,11 +225,6 @@ const resolveQuotedMessage = async (
       );
       if (dec) text = parseEditedText(dec).text;
     } catch {}
-  }
-
-  // 3. If plaintext (B2C or missing nonce without being Signal ciphertext), extract directly
-  if (!text && replyToRaw.ciphertext && (!replyToRaw.nonce || isBiz) && !isSignalMsg) {
-    text = parseEditedText(replyToRaw.ciphertext).text;
   }
 
   // 4. If legacy E2EE ciphertext, decrypt with candidate keys
@@ -255,6 +279,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const { keysReady } = useE2EE();
   const [keysRestoredVersion, setKeysRestoredVersion] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(true);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
   const [myPrivateKey, setMyPrivateKey] = useState<string | null>(null);
   const [myPublicKey, setMyPublicKey] = useState<string | null>(null);
@@ -295,6 +321,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   const sentPlaintextCacheRef = useRef<Map<string, string>>(new Map());
   const recentSentPlaintextsRef = useRef<{ text: string; nonce?: string | null; ciphertext?: string | null; timestamp: number }[]>([]);
   const retryRequestedMessagesRef = useRef<Set<string>>(new Set());
+  const executeEncryptAndSendRef = useRef<((optimisticId: string, text: string, mediaUrl?: string, mediaType?: string | null, replyToId?: string | null, customPeerId?: string) => Promise<void>) | null>(null);
 
   // â”€â”€ Pending Decrypt Queue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Messages that arrived via socket BEFORE the private key was ready are held
@@ -316,8 +343,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   }, [currentUserId]);
 
   useEffect(() => {
-    activePeerIdRef.current = activePeerId;
-  }, [activePeerId]);
+    if (activePeerId && activePeerId !== "null" && activePeerId !== "undefined") {
+      activePeerIdRef.current = activePeerId;
+      if (typeof window !== "undefined" && conversationId) {
+        sessionStorage.setItem(`active_peer_${conversationId}`, activePeerId);
+      }
+    }
+  }, [activePeerId, conversationId]);
 
   useEffect(() => {
     myPrivateKeyRef.current = myPrivateKey;
@@ -404,7 +436,28 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           }
         }
 
-        const isSignal = m.rawMessageType === 2 || m.rawMessageType === 3 || m.rawEncryptedKeys?.protocol === 'libsignal';
+        // 1c. Fast-path: direct plaintext if marked or unencrypted
+        const isPlaintext =
+          m.rawEncryptedKeys?.protocol === 'plaintext' ||
+          m.rawMessageType === 0 ||
+          (!m.rawNonce && m.rawEncryptedKeys?.protocol !== 'libsignal' && isValidPlaintext(m.rawCiphertext));
+
+        if (isPlaintext && m.rawCiphertext) {
+          const t = parseEditedText(m.rawCiphertext).text;
+          decryptedMap.set(m.id, t);
+          void storeDecryptedMessage(currentUserIdRef.current, m.id, t);
+          continue;
+        }
+
+        const isSignal =
+          !isPlaintext &&
+          !m.rawNonce &&
+          (
+            m.rawEncryptedKeys?.protocol === 'libsignal' ||
+            m.rawMessageType === 3 ||
+            m.rawMessageType === 2 ||
+            looksLikeCiphertext(m.rawCiphertext)
+          );
 
         // 2. If self-sent message with selfEncryptedSessionKey
         if (m.senderId === currentUserIdRef.current && m.rawEncryptedKeys?.selfEncryptedSessionKey) {
@@ -607,7 +660,476 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     fetchRecipientKey();
   }, [activePeerId, isBizChat, currentUserId, conversationId]);
 
-  // ── Load Message History ──────────────────────────────────────────────────
+  // ── Decrypt Message Batch (Reusable for History & Infinite Pagination) ───────
+  const decryptMessagesBatch = useCallback(
+    async (rawMessages: any[]): Promise<ChatMessage[]> => {
+      if (!Array.isArray(rawMessages) || rawMessages.length === 0) return [];
+
+      // Resolve ALL public keys for this peer
+      const resolvePeerKeys = async (uid: string): Promise<string[]> => {
+        try {
+          const res = await chatService.fetchRecipientKey(uid);
+          if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+            return res.data.map((d: { publicKey: string }) => d.publicKey);
+          } else if (res?.success && res?.data?.publicKey) {
+            return [res.data.publicKey];
+          }
+        } catch { /* ignore */ }
+        return [];
+      };
+
+      const peerKeys = activePeerIdRef.current ? await resolvePeerKeys(activePeerIdRef.current) : [];
+      const myPrivateKeyRing = await getUserPrivateKeyRing(currentUserIdRef.current);
+
+      // Sort rawMessages chronologically (oldest first) BEFORE ANY DECRYPTION
+      // Signal Protocol's Double Ratchet requires messages to be processed in strict chronological order.
+      const sortedMessages = [...rawMessages].sort(
+        (a: any, b: any) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+
+      // Step 1: Pre-decrypt messages.
+      // Pass 1: Fast cache, IndexedDB, plaintext, and self preview lookup
+      const decryptedTextsMap = new Map<string, string>();
+      await Promise.all(
+        sortedMessages.map(async (msg: any) => {
+          const isTicketMessage = !!msg.ticketId;
+          let rawEncKeys = msg.encryptedKeys as any;
+          if (typeof rawEncKeys === "string") {
+            try { rawEncKeys = JSON.parse(rawEncKeys); } catch {}
+          }
+          const isLibsignal =
+            !msg.nonce &&
+            (
+              msg.messageType === 3 ||
+              msg.messageType === 2 ||
+              rawEncKeys?.protocol === 'libsignal' ||
+              looksLikeCiphertext(msg.ciphertext)
+            ) &&
+            rawEncKeys?.protocol !== 'pairwise' &&
+            rawEncKeys?.protocol !== 'x3dh' &&
+            rawEncKeys?.protocol !== 'multi-device';
+
+          const isPlaintext =
+            !looksLikeCiphertext(msg.ciphertext) &&
+            (
+              rawEncKeys?.protocol === 'plaintext' ||
+              msg.messageType === 0 ||
+              (!msg.nonce && !isLibsignal && isValidPlaintext(msg.ciphertext))
+            );
+
+          if (!msg.ciphertext || isPlaintext || isBizChatRef.current || isTicketMessage) {
+            if (msg.ciphertext && !looksLikeCiphertext(msg.ciphertext)) {
+              decryptedTextsMap.set(msg.id, parseEditedText(msg.ciphertext).text);
+            }
+            return;
+          }
+
+          // Check persistent cache first (by message ID, nonce, or ciphertext)
+          let locallyStored =
+            (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
+            (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
+            (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
+
+          if (locallyStored && !isValidPlaintext(locallyStored)) {
+            locallyStored = null;
+          }
+
+          // Check messagesRef.current
+          if (!locallyStored) {
+            const existingInMemory = messagesRef.current.find(
+              (m) =>
+                m.id === msg.id ||
+                (m.rawNonce && msg.nonce && m.rawNonce === msg.nonce) ||
+                (m.rawCiphertext && msg.ciphertext && m.rawCiphertext === msg.ciphertext)
+            );
+            if (existingInMemory?.text && isValidPlaintext(existingInMemory.text)) {
+              locallyStored = existingInMemory.text;
+            }
+          }
+
+          // Check IndexedDB
+          if (!locallyStored) {
+            const [byId, byNonce] = await Promise.all([
+              msg.id ? getDecryptedMessage(currentUserIdRef.current, msg.id) : Promise.resolve(null),
+              msg.nonce ? getDecryptedMessage(currentUserIdRef.current, `nonce_${msg.nonce}`) : Promise.resolve(null),
+            ]);
+            locallyStored = byId || byNonce;
+            if (!locallyStored && msg.ciphertext) {
+              locallyStored =
+                (await getDecryptedMessage(currentUserIdRef.current, msg.ciphertext)) ||
+                (await getDecryptedMessage(currentUserIdRef.current, `cipher_${msg.ciphertext}`));
+            }
+          }
+
+          if (locallyStored && isValidPlaintext(locallyStored)) {
+            decryptedTextsMap.set(msg.id, locallyStored);
+            sentPlaintextCacheRef.current.set(msg.id, locallyStored);
+            if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, locallyStored);
+            if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, locallyStored);
+            return;
+          }
+
+          // Fast path for sender's own message: previewText
+          if (msg.senderId === currentUserIdRef.current) {
+            const preview = msg.previewText || rawEncKeys?.previewText;
+            if (preview && isValidPlaintext(preview)) {
+              decryptedTextsMap.set(msg.id, preview);
+              sentPlaintextCacheRef.current.set(msg.id, preview);
+              void storeDecryptedMessage(currentUserIdRef.current, msg.id, preview);
+            }
+          }
+        })
+      );
+
+      // Pass 2: Decrypt remaining messages in chronological sequence
+      for (const msg of sortedMessages) {
+        if (decryptedTextsMap.has(msg.id)) continue;
+        if (!myPrivateKeyRef.current) break;
+
+        let encKeys = msg.encryptedKeys as any;
+        if (typeof encKeys === "string") {
+          try { encKeys = JSON.parse(encKeys); } catch {}
+        }
+
+        let effectivePeerKeys = peerKeys;
+        if (encKeys?.senderPublicKey && typeof encKeys.senderPublicKey === 'string') {
+          effectivePeerKeys = [
+            encKeys.senderPublicKey,
+            ...peerKeys.filter(k => k !== encKeys.senderPublicKey),
+          ];
+        }
+
+        const activeMyPubKey = myPublicKeyRef.current;
+        const activeMyPrivKey = myPrivateKeyRef.current;
+
+        if (msg.senderId === currentUserIdRef.current) {
+          // Sender own message recovery
+          let resolvedText: string | null = null;
+
+          // 1. Try decrypting selfEncryptedSessionKey using active key and historical key ring
+          if (!resolvedText && encKeys?.selfEncryptedSessionKey) {
+            const pubCandidates = [
+              encKeys.senderPublicKey,
+              activeMyPubKey,
+              myPublicKeyRef.current,
+            ].filter(Boolean) as string[];
+
+            const privCandidates = Array.from(new Set([
+              activeMyPrivKey,
+              myPrivateKeyRef.current,
+              ...myPrivateKeyRing,
+            ])).filter(Boolean) as string[];
+
+            for (const privCandidate of privCandidates) {
+              for (const pubCandidate of pubCandidates) {
+                try {
+                  const decRaw = await decryptMessage(
+                    encKeys.selfEncryptedSessionKey.ciphertext,
+                    encKeys.selfEncryptedSessionKey.nonce,
+                    pubCandidate,
+                    privCandidate
+                  );
+                  if (decRaw) {
+                    if (encKeys.selfEncryptedSessionKey.type === 'plaintext') {
+                      resolvedText = parseEditedText(decRaw).text;
+                    } else {
+                      const sessionKey = base64ToBytes(decRaw);
+                      const dec = await decryptWithSessionKey(msg.ciphertext, msg.nonce, sessionKey);
+                      resolvedText = parseEditedText(dec).text;
+                    }
+                    break;
+                  }
+                } catch {}
+              }
+              if (resolvedText) break;
+            }
+          }
+
+          // 2. Try Multi-Device envelope
+          if (!resolvedText && encKeys?.devices && myPrivateKeyRef.current) {
+            const myDeviceId = localStorage.getItem("deviceId");
+            const keysToTry = activeMyPubKey ? [activeMyPubKey, ...effectivePeerKeys] : effectivePeerKeys;
+            for (const candidateKey of keysToTry) {
+              try {
+                const dec = await decryptMultiDeviceMessage(
+                  msg.ciphertext,
+                  msg.nonce,
+                  encKeys.devices,
+                  candidateKey,
+                  myPrivateKeyRef.current,
+                  myDeviceId
+                );
+                if (dec) {
+                  resolvedText = parseEditedText(dec).text;
+                  break;
+                }
+              } catch {}
+            }
+          }
+
+          // 3. Try legacy pairwise fallback
+          if (!resolvedText && effectivePeerKeys.length > 0 && myPrivateKeyRef.current) {
+            for (const candidateKey of effectivePeerKeys) {
+              try {
+                const dec = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKeyRef.current);
+                resolvedText = parseEditedText(dec).text;
+                break;
+              } catch {}
+            }
+          }
+
+          // 4. Sender previewText fallback
+          if (!resolvedText && (msg.previewText || encKeys?.previewText)) {
+            resolvedText = msg.previewText || encKeys.previewText;
+          }
+
+          if (!resolvedText) {
+            resolvedText = "🔒 Message sent before key update";
+          }
+
+          if (resolvedText) {
+            decryptedTextsMap.set(msg.id, resolvedText);
+            if (isValidPlaintext(resolvedText)) {
+              sentPlaintextCacheRef.current.set(msg.id, resolvedText);
+              if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, resolvedText);
+              if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, resolvedText);
+              void storeDecryptedMessage(currentUserIdRef.current, msg.id, resolvedText);
+            }
+          }
+        } else {
+          // Peer message recovery
+          // 0. Direct plaintext fast-path if marked or unencrypted
+          const isPlaintext =
+            !looksLikeCiphertext(msg.ciphertext) &&
+            (
+              encKeys?.protocol === 'plaintext' ||
+              msg.messageType === 0 ||
+              (!msg.nonce && encKeys?.protocol !== 'libsignal' && isValidPlaintext(msg.ciphertext))
+            );
+
+          if (isPlaintext && msg.ciphertext) {
+            const t = parseEditedText(msg.ciphertext).text;
+            decryptedTextsMap.set(msg.id, t);
+            sentPlaintextCacheRef.current.set(msg.id, t);
+            void storeDecryptedMessage(currentUserIdRef.current, msg.id, t);
+            continue;
+          }
+
+          // 1. Multi-Device envelope
+          if (encKeys?.devices && myPrivateKeyRef.current && effectivePeerKeys.length > 0) {
+            const myDeviceId = localStorage.getItem("deviceId");
+            for (const senderKey of effectivePeerKeys) {
+              try {
+                const dec = await decryptMultiDeviceMessage(
+                  msg.ciphertext,
+                  msg.nonce,
+                  encKeys.devices,
+                  senderKey,
+                  myPrivateKeyRef.current,
+                  myDeviceId
+                );
+                if (dec) {
+                  const t = parseEditedText(dec).text;
+                  decryptedTextsMap.set(msg.id, t);
+                  sentPlaintextCacheRef.current.set(msg.id, t);
+                  void storeDecryptedMessage(currentUserIdRef.current, msg.id, t);
+                  break;
+                }
+              } catch {}
+            }
+          }
+
+          const isSignal =
+            !isPlaintext &&
+            !msg.nonce &&
+            (
+              encKeys?.protocol === 'libsignal' ||
+              msg.messageType === 3 ||
+              msg.messageType === 2 ||
+              looksLikeCiphertext(msg.ciphertext)
+            );
+
+          // 2. Libsignal history decryption (Double Ratchet SessionCipher) in strict chronological sequence
+          if (!decryptedTextsMap.has(msg.id) && isSignal && msg.senderId) {
+            try {
+              const dec = await decrypt1to1Message(
+                currentUserIdRef.current,
+                msg.senderId,
+                msg.ciphertext,
+                msg.messageType ?? (msg.ciphertext.startsWith('Myi') ? 3 : 2),
+                1
+              );
+              if (dec) {
+                const t = parseEditedText(dec).text;
+                decryptedTextsMap.set(msg.id, t);
+                sentPlaintextCacheRef.current.set(msg.id, t);
+                void storeDecryptedMessage(currentUserIdRef.current, msg.id, t);
+              }
+            } catch (signalErr) {
+              console.debug("[E2EE] Sequential Libsignal decryption failed for message:", msg.id, signalErr);
+            }
+          }
+
+          // 3. X3DH Receiver fallback
+          if (!decryptedTextsMap.has(msg.id) && encKeys?.ephemeralPublicKey && myPrivateKeyRef.current) {
+            try {
+              const spkPriv = await getSignedPreKeyPrivate(currentUserIdRef.current, encKeys.signedPreKeyId || 1);
+              const opkPriv = encKeys.oneTimePreKeyId
+                ? await getPreKeyPrivate(currentUserIdRef.current, encKeys.oneTimePreKeyId)
+                : null;
+              if (spkPriv) {
+                for (const senderKey of effectivePeerKeys) {
+                  try {
+                    const sessionKey = await performX3DHReceiver(
+                      myPrivateKeyRef.current,
+                      spkPriv,
+                      opkPriv,
+                      senderKey,
+                      encKeys.ephemeralPublicKey
+                    );
+                    const dec = await decryptWithSessionKey(msg.ciphertext, msg.nonce, sessionKey);
+                    const t = parseEditedText(dec).text;
+                    decryptedTextsMap.set(msg.id, t);
+                    sentPlaintextCacheRef.current.set(msg.id, t);
+                    void storeDecryptedMessage(currentUserIdRef.current, msg.id, t);
+                    break;
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
+
+          // 4. Pairwise Diffie-Hellman fallback
+          if (!decryptedTextsMap.has(msg.id) && effectivePeerKeys.length > 0 && myPrivateKeyRef.current) {
+            for (const candidateKey of effectivePeerKeys) {
+              try {
+                const dec = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKeyRef.current);
+                const t = parseEditedText(dec).text;
+                decryptedTextsMap.set(msg.id, t);
+                sentPlaintextCacheRef.current.set(msg.id, t);
+                void storeDecryptedMessage(currentUserIdRef.current, msg.id, t);
+                break;
+              } catch {}
+            }
+          }
+
+          // 5. Peer preview fallback if available (prevents lock-out or premature retry expiration)
+          if (!decryptedTextsMap.has(msg.id)) {
+            const peerPreview = msg.previewText || encKeys?.previewText;
+            if (peerPreview && isValidPlaintext(peerPreview)) {
+              decryptedTextsMap.set(msg.id, peerPreview);
+              sentPlaintextCacheRef.current.set(msg.id, peerPreview);
+              void storeDecryptedMessage(currentUserIdRef.current, msg.id, peerPreview);
+            }
+          }
+        }
+      }
+
+      // Step 2: Build final decrypted messages with fully resolved quoted replies
+      const decryptedResult: ChatMessage[] = await Promise.all(
+        sortedMessages.map(async (msg: any) => {
+          const isTicketMessage = !!msg.ticketId;
+          const replyTo = await resolveQuotedMessage(
+            msg.replyTo,
+            currentUserIdRef.current,
+            myPrivateKeyRef.current,
+            peerKeys,
+            myPublicKeyRef.current,
+            isBizChatRef.current || isTicketMessage,
+            decryptedTextsMap
+          );
+
+          let msgEncKeys = msg.encryptedKeys as any;
+          if (typeof msgEncKeys === "string") {
+            try { msgEncKeys = JSON.parse(msgEncKeys); } catch {}
+          }
+          const isSignalMsg =
+            msg.messageType === 2 ||
+            msg.messageType === 3 ||
+            msgEncKeys?.protocol === 'libsignal' ||
+            looksLikeCiphertext(msg.ciphertext);
+
+          const isMyMsg = msg.senderId === currentUserIdRef.current;
+          const mappedText = decryptedTextsMap.get(msg.id);
+          const hasValidMapped = isValidPlaintext(mappedText);
+          const previewFallback =
+            msg.previewText ||
+            (msgEncKeys && typeof msgEncKeys === 'object' && msgEncKeys.previewText
+              ? msgEncKeys.previewText
+              : null);
+          const hasValidPreview = previewFallback && isValidPlaintext(previewFallback);
+
+          const isPlaintext =
+            !looksLikeCiphertext(msg.ciphertext) &&
+            (isBizChatRef.current || isTicketMessage || (!msg.nonce && !isSignalMsg));
+
+          const isPendingDecryption =
+            !isMyMsg &&
+            !hasValidMapped &&
+            !hasValidPreview &&
+            !!msg.ciphertext &&
+            !isPlaintext;
+
+          const text =
+            (hasValidMapped ? mappedText : null) ??
+            (hasValidPreview ? previewFallback : null) ??
+            (msg.ciphertext
+              ? isPlaintext
+                ? parseEditedText(msg.ciphertext).text
+                : isMyMsg
+                  ? "🔒 Message sent before key update"
+                  : "⏳ Waiting for this message. This may take a while."
+              : "");
+
+          return {
+            id: msg.id,
+            conversationId: msg.conversationId,
+            senderId: msg.senderId,
+            text: text,
+            isEdited: msg.isEdited ?? false,
+            createdAt: msg.createdAt,
+            mediaUrl: msg.mediaUrl,
+            mediaType: msg.mediaType,
+            isDeleted: msg.isDeleted,
+            disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
+            replyToId: msg.replyToId ?? null,
+            replyTo,
+            receipts: msg.receipts || [],
+            reactions: msg.reactions || [],
+            isDecryptionPending: isPendingDecryption,
+            rawCiphertext: msg.ciphertext,
+            rawNonce: msg.nonce,
+            rawMessageType: (msg.messageType as number | null) ?? null,
+            rawEncryptedKeys: (msg.encryptedKeys as any) ?? null,
+            recipientRegistrationId: (msg.encryptedKeys as any)?.recipientRegistrationId ?? null,
+            senderRegistrationId: (msg.encryptedKeys as any)?.senderRegistrationId ?? null,
+            previewText: previewFallback,
+            isRetryExpired: false,
+          };
+        })
+      );
+
+      // Populate sent plaintext cache and dispatch silent retries for genuinely pending items
+      decryptedResult.forEach((m) => {
+        if (m.senderId === currentUserIdRef.current && m.text && !m.isDecryptionPending && isValidPlaintext(m.text)) {
+          sentPlaintextCacheRef.current.set(m.id, m.text);
+        }
+        if (m.senderId !== currentUserIdRef.current && m.isDecryptionPending && !m.isRetryExpired) {
+          const ageMs = Date.now() - new Date(m.createdAt).getTime();
+          // Avoid spamming retries on every reload for ancient messages (> 24 hours) to preserve retry budget
+          if (ageMs < 24 * 60 * 60 * 1000) {
+            requestRetryForMessage(m.id, m.conversationId);
+          }
+        }
+      });
+
+      return decryptedResult;
+    },
+    [requestRetryForMessage]
+  );
+
+  // ── Load Initial Message History ──────────────────────────────────────────
   // Gated on keysReady (from E2EEContext) so we never attempt to decrypt history
   // before E2EEProvider has finished initialising keys — prevents partial-state
   // decryption failures on fresh-login page loads.
@@ -616,432 +1138,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
     const loadHistory = async () => {
       try {
-        const historyRes = await chatService.fetchHistory(conversationId);
+        const historyRes = await chatService.fetchHistory(conversationId, undefined, 30);
         if (historyRes?.success && historyRes?.data) {
           const rawMessages = Array.isArray(historyRes.data)
             ? historyRes.data
             : historyRes.data.messages;
 
           if (Array.isArray(rawMessages)) {
-            // Resolve ALL public keys for this peer
-            const resolvePeerKeys = async (uid: string): Promise<string[]> => {
-              try {
-                const res = await chatService.fetchRecipientKey(uid);
-                if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
-                  return res.data.map((d: { publicKey: string }) => d.publicKey);
-                } else if (res?.success && res?.data?.publicKey) {
-                  return [res.data.publicKey];
-                }
-              } catch { /* ignore */ }
-              return [];
-            };
-
-            const peerKeys = activePeerId ? await resolvePeerKeys(activePeerId) : [];
-            const myPrivateKeyRing = await getUserPrivateKeyRing(currentUserId);
-
-// Sort rawMessages chronologically (oldest first) BEFORE ANY DECRYPTION
-            // Signal Protocol's Double Ratchet requires messages to be processed in strict chronological order.
-            const sortedMessages = [...rawMessages].sort(
-              (a: any, b: any) =>
-                new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            );
-
-            // Step 1: Pre-decrypt messages.
-            // Pass 1: Fast cache, IndexedDB, plaintext, and self preview lookup
-            const decryptedTextsMap = new Map<string, string>();
-            await Promise.all(
-              sortedMessages.map(async (msg: any) => {
-                const isTicketMessage = !!msg.ticketId;
-                let rawEncKeys = msg.encryptedKeys as any;
-                if (typeof rawEncKeys === "string") {
-                  try { rawEncKeys = JSON.parse(rawEncKeys); } catch {}
-                }
-                const isLibsignal =
-                  (msg.messageType === 3 || msg.messageType === 2 || rawEncKeys?.protocol === 'libsignal') &&
-                  rawEncKeys?.protocol !== 'pairwise' &&
-                  rawEncKeys?.protocol !== 'x3dh' &&
-                  rawEncKeys?.protocol !== 'multi-device' &&
-                  !msg.nonce;
-
-                if (!msg.ciphertext || (!msg.nonce && !isLibsignal) || isBizChat || isTicketMessage) {
-                  if (msg.ciphertext) {
-                    decryptedTextsMap.set(msg.id, parseEditedText(msg.ciphertext).text);
-                  }
-                  return;
-                }
-
-                // Check persistent cache first (by message ID, nonce, or ciphertext)
-                let locallyStored =
-                  (msg.id ? sentPlaintextCacheRef.current.get(msg.id) : null) ||
-                  (msg.nonce ? sentPlaintextCacheRef.current.get(msg.nonce) : null) ||
-                  (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null);
-
-                if (locallyStored && !isValidPlaintext(locallyStored)) {
-                  locallyStored = null;
-                }
-
-                // Check messagesRef.current
-                if (!locallyStored) {
-                  const existingInMemory = messagesRef.current.find(
-                    (m) =>
-                      m.id === msg.id ||
-                      (m.rawNonce && msg.nonce && m.rawNonce === msg.nonce) ||
-                      (m.rawCiphertext && msg.ciphertext && m.rawCiphertext === msg.ciphertext)
-                  );
-                  if (existingInMemory?.text && isValidPlaintext(existingInMemory.text)) {
-                    locallyStored = existingInMemory.text;
-                  }
-                }
-
-                // Check IndexedDB
-                if (!locallyStored) {
-                  const [byId, byNonce] = await Promise.all([
-                    msg.id ? getDecryptedMessage(currentUserId, msg.id) : Promise.resolve(null),
-                    msg.nonce ? getDecryptedMessage(currentUserId, `nonce_${msg.nonce}`) : Promise.resolve(null),
-                  ]);
-                  locallyStored = byId || byNonce;
-                  if (!locallyStored && msg.ciphertext) {
-                    locallyStored =
-                      (await getDecryptedMessage(currentUserId, msg.ciphertext)) ||
-                      (await getDecryptedMessage(currentUserId, `cipher_${msg.ciphertext}`));
-                  }
-                }
-
-                if (locallyStored && isValidPlaintext(locallyStored)) {
-                  decryptedTextsMap.set(msg.id, locallyStored);
-                  sentPlaintextCacheRef.current.set(msg.id, locallyStored);
-                  if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, locallyStored);
-                  if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, locallyStored);
-                  return;
-                }
-
-                // Fast path for sender's own message: previewText
-                if (msg.senderId === currentUserId) {
-                  const preview = msg.previewText || rawEncKeys?.previewText;
-                  if (preview && isValidPlaintext(preview)) {
-                    decryptedTextsMap.set(msg.id, preview);
-                    sentPlaintextCacheRef.current.set(msg.id, preview);
-                    void storeDecryptedMessage(currentUserId, msg.id, preview);
-                  }
-                }
-              })
-            );
-
-            // Pass 2: Decrypt remaining messages in chronological sequence
-            for (const msg of sortedMessages) {
-              if (decryptedTextsMap.has(msg.id)) continue;
-              if (!myPrivateKey) break;
-
-              let encKeys = msg.encryptedKeys as any;
-              if (typeof encKeys === "string") {
-                try { encKeys = JSON.parse(encKeys); } catch {}
-              }
-
-              let effectivePeerKeys = peerKeys;
-              if (encKeys?.senderPublicKey && typeof encKeys.senderPublicKey === 'string') {
-                effectivePeerKeys = [
-                  encKeys.senderPublicKey,
-                  ...peerKeys.filter(k => k !== encKeys.senderPublicKey),
-                ];
-              }
-
-              const activeMyPubKey = myPublicKeyRef.current || myPublicKey;
-              const activeMyPrivKey = myPrivateKeyRef.current || myPrivateKey;
-
-              if (msg.senderId === currentUserId) {
-                // Sender own message recovery
-                let resolvedText: string | null = null;
-
-                // 1. Try decrypting selfEncryptedSessionKey using active key and historical key ring
-                if (!resolvedText && encKeys?.selfEncryptedSessionKey) {
-                  const pubCandidates = [
-                    encKeys.senderPublicKey,
-                    activeMyPubKey,
-                    myPublicKeyRef.current,
-                    myPublicKey,
-                  ].filter(Boolean) as string[];
-
-                  const privCandidates = Array.from(new Set([
-                    activeMyPrivKey,
-                    myPrivateKeyRef.current,
-                    myPrivateKey,
-                    ...myPrivateKeyRing,
-                  ])).filter(Boolean) as string[];
-
-                  for (const privCandidate of privCandidates) {
-                    for (const pubCandidate of pubCandidates) {
-                      try {
-                        const decRaw = await decryptMessage(
-                          encKeys.selfEncryptedSessionKey.ciphertext,
-                          encKeys.selfEncryptedSessionKey.nonce,
-                          pubCandidate,
-                          privCandidate
-                        );
-                        if (decRaw) {
-                          if (encKeys.selfEncryptedSessionKey.type === 'plaintext') {
-                            resolvedText = parseEditedText(decRaw).text;
-                          } else {
-                            const sessionKey = base64ToBytes(decRaw);
-                            const dec = await decryptWithSessionKey(msg.ciphertext, msg.nonce, sessionKey);
-                            resolvedText = parseEditedText(dec).text;
-                          }
-                          break;
-                        }
-                      } catch {}
-                    }
-                    if (resolvedText) break;
-                  }
-                }
-
-                // 2. Try Multi-Device envelope
-                if (!resolvedText && encKeys?.devices && myPrivateKey) {
-                  const myDeviceId = localStorage.getItem("deviceId");
-                  const keysToTry = activeMyPubKey ? [activeMyPubKey, ...effectivePeerKeys] : effectivePeerKeys;
-                  for (const candidateKey of keysToTry) {
-                    try {
-                      const dec = await decryptMultiDeviceMessage(
-                        msg.ciphertext,
-                        msg.nonce,
-                        encKeys.devices,
-                        candidateKey,
-                        myPrivateKey,
-                        myDeviceId
-                      );
-                      if (dec) {
-                        resolvedText = parseEditedText(dec).text;
-                        break;
-                      }
-                    } catch {}
-                  }
-                }
-
-                // 3. Try legacy pairwise fallback
-                if (!resolvedText && effectivePeerKeys.length > 0) {
-                  for (const candidateKey of effectivePeerKeys) {
-                    try {
-                      const dec = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKey);
-                      resolvedText = parseEditedText(dec).text;
-                      break;
-                    } catch {}
-                  }
-                }
-
-                // 4. Sender previewText fallback
-                if (!resolvedText && (msg.previewText || encKeys?.previewText)) {
-                  resolvedText = msg.previewText || encKeys.previewText;
-                }
-
-                if (!resolvedText) {
-                  resolvedText = "🔒 Message sent before key update";
-                }
-
-                if (resolvedText) {
-                  decryptedTextsMap.set(msg.id, resolvedText);
-                  if (isValidPlaintext(resolvedText)) {
-                    sentPlaintextCacheRef.current.set(msg.id, resolvedText);
-                    if (msg.nonce) sentPlaintextCacheRef.current.set(msg.nonce, resolvedText);
-                    if (msg.ciphertext) sentPlaintextCacheRef.current.set(msg.ciphertext, resolvedText);
-                    void storeDecryptedMessage(currentUserId, msg.id, resolvedText);
-                  }
-                }
-              } else {
-                // Peer message recovery
-                // 1. Multi-Device envelope
-                if (encKeys?.devices && myPrivateKey && effectivePeerKeys.length > 0) {
-                  const myDeviceId = localStorage.getItem("deviceId");
-                  for (const senderKey of effectivePeerKeys) {
-                    try {
-                      const dec = await decryptMultiDeviceMessage(
-                        msg.ciphertext,
-                        msg.nonce,
-                        encKeys.devices,
-                        senderKey,
-                        myPrivateKey,
-                        myDeviceId
-                      );
-                      if (dec) {
-                        const t = parseEditedText(dec).text;
-                        decryptedTextsMap.set(msg.id, t);
-                        sentPlaintextCacheRef.current.set(msg.id, t);
-                        void storeDecryptedMessage(currentUserId, msg.id, t);
-                        break;
-                      }
-                    } catch {}
-                  }
-                }
-
-                // 2. Libsignal history decryption (Double Ratchet SessionCipher) in strict chronological sequence
-                if (!decryptedTextsMap.has(msg.id) && (msg.messageType === 3 || msg.messageType === 2 || encKeys?.protocol === 'libsignal') && msg.senderId) {
-                  try {
-                    const dec = await decrypt1to1Message(
-                      currentUserId,
-                      msg.senderId,
-                      msg.ciphertext,
-                      msg.messageType ?? 2,
-                      1
-                    );
-                    if (dec) {
-                      const t = parseEditedText(dec).text;
-                      decryptedTextsMap.set(msg.id, t);
-                      sentPlaintextCacheRef.current.set(msg.id, t);
-                      void storeDecryptedMessage(currentUserId, msg.id, t);
-                    }
-                  } catch (signalErr) {
-                    console.debug("[E2EE] Sequential Libsignal decryption failed for message:", msg.id, signalErr);
-                  }
-                }
-
-                // 3. X3DH Receiver fallback
-                if (!decryptedTextsMap.has(msg.id) && encKeys?.ephemeralPublicKey) {
-                  try {
-                    const spkPriv = await getSignedPreKeyPrivate(currentUserId, encKeys.signedPreKeyId || 1);
-                    const opkPriv = encKeys.oneTimePreKeyId
-                      ? await getPreKeyPrivate(currentUserId, encKeys.oneTimePreKeyId)
-                      : null;
-                    if (spkPriv) {
-                      for (const senderKey of effectivePeerKeys) {
-                        try {
-                          const sessionKey = await performX3DHReceiver(
-                            myPrivateKey,
-                            spkPriv,
-                            opkPriv,
-                            senderKey,
-                            encKeys.ephemeralPublicKey
-                          );
-                          const dec = await decryptWithSessionKey(msg.ciphertext, msg.nonce, sessionKey);
-                          const t = parseEditedText(dec).text;
-                          decryptedTextsMap.set(msg.id, t);
-                          sentPlaintextCacheRef.current.set(msg.id, t);
-                          void storeDecryptedMessage(currentUserId, msg.id, t);
-                          break;
-                        } catch {}
-                      }
-                    }
-                  } catch {}
-                }
-
-                // 4. Pairwise Diffie-Hellman fallback
-                if (!decryptedTextsMap.has(msg.id) && effectivePeerKeys.length > 0) {
-                  for (const candidateKey of effectivePeerKeys) {
-                    try {
-                      const dec = await decryptMessage(msg.ciphertext, msg.nonce, candidateKey, myPrivateKey);
-                      const t = parseEditedText(dec).text;
-                      decryptedTextsMap.set(msg.id, t);
-                      sentPlaintextCacheRef.current.set(msg.id, t);
-                      void storeDecryptedMessage(currentUserId, msg.id, t);
-                      break;
-                    } catch {}
-                  }
-                }
-
-                // 5. Peer preview fallback if available (prevents lock-out or premature retry expiration)
-                if (!decryptedTextsMap.has(msg.id)) {
-                  const peerPreview = msg.previewText || encKeys?.previewText;
-                  if (peerPreview && isValidPlaintext(peerPreview)) {
-                    decryptedTextsMap.set(msg.id, peerPreview);
-                    sentPlaintextCacheRef.current.set(msg.id, peerPreview);
-                    void storeDecryptedMessage(currentUserId, msg.id, peerPreview);
-                  }
-                }
-              }
+            if (historyRes.data.hasMore !== undefined) {
+              setHasMoreMessages(historyRes.data.hasMore);
+            } else {
+              setHasMoreMessages(rawMessages.length >= 30);
             }
 
-            // Step 2: Build final decrypted messages with fully resolved quoted replies
-            const decryptedHistory = await Promise.all(
-              sortedMessages.map(async (msg: any) => {
-                const isTicketMessage = !!msg.ticketId;
-                const replyTo = await resolveQuotedMessage(
-                  msg.replyTo,
-                  currentUserId,
-                  myPrivateKey,
-                  peerKeys,
-                  myPublicKey,
-                  isBizChat || isTicketMessage,
-                  decryptedTextsMap
-                );
-
-                let msgEncKeys = msg.encryptedKeys as any;
-                if (typeof msgEncKeys === "string") {
-                  try { msgEncKeys = JSON.parse(msgEncKeys); } catch {}
-                }
-                const isSignalMsg =
-                  msg.messageType === 2 ||
-                  msg.messageType === 3 ||
-                  msgEncKeys?.protocol === 'libsignal';
-
-                const isMyMsg = msg.senderId === currentUserId;
-                const mappedText = decryptedTextsMap.get(msg.id);
-                const hasValidMapped = isValidPlaintext(mappedText);
-                const previewFallback =
-                  msg.previewText ||
-                  (msgEncKeys && typeof msgEncKeys === 'object' && msgEncKeys.previewText
-                    ? msgEncKeys.previewText
-                    : null);
-                const hasValidPreview = previewFallback && isValidPlaintext(previewFallback);
-
-                const isPendingDecryption =
-                  !isMyMsg &&
-                  !hasValidMapped &&
-                  !hasValidPreview &&
-                  !!msg.ciphertext &&
-                  !isBizChat &&
-                  !isTicketMessage &&
-                  (!!msg.nonce || isSignalMsg);
-
-                const text =
-                  (hasValidMapped ? mappedText : null) ??
-                  (hasValidPreview ? previewFallback : null) ??
-                  (msg.ciphertext
-                    ? isBizChat || (!msg.nonce && !isSignalMsg)
-                      ? parseEditedText(msg.ciphertext).text
-                      : isMyMsg
-                        ? "🔒 Message sent before key update"
-                        : "⏳ Waiting for this message. This may take a while."
-                    : "");
-
-                return {
-                  id: msg.id,
-                  conversationId: msg.conversationId,
-                  senderId: msg.senderId,
-                  text: text,
-                  isEdited: msg.isEdited ?? false,
-                  createdAt: msg.createdAt,
-                  mediaUrl: msg.mediaUrl,
-                  mediaType: msg.mediaType,
-                  isDeleted: msg.isDeleted,
-                  disappearAfterSeconds: msg.disappearAfterSeconds ?? null,
-                  replyToId: msg.replyToId ?? null,
-                  replyTo,
-                  receipts: msg.receipts || [],
-                  reactions: msg.reactions || [],
-                  isDecryptionPending: isPendingDecryption,
-                  rawCiphertext: msg.ciphertext,
-                  rawNonce: msg.nonce,
-                  rawMessageType: (msg.messageType as number | null) ?? null,
-                  rawEncryptedKeys: (msg.encryptedKeys as any) ?? null,
-                  recipientRegistrationId: (msg.encryptedKeys as any)?.recipientRegistrationId ?? null,
-                  senderRegistrationId: (msg.encryptedKeys as any)?.senderRegistrationId ?? null,
-                  previewText: previewFallback,
-                  isRetryExpired: false,
-                };
-              })
-            );
-
+            const decryptedHistory = await decryptMessagesBatch(rawMessages);
             setMessages(decryptedHistory);
-
-            // Populate sent plaintext cache and dispatch silent retries for genuinely pending items
-            decryptedHistory.forEach((m) => {
-              if (m.senderId === currentUserId && m.text && !m.isDecryptionPending && isValidPlaintext(m.text)) {
-                sentPlaintextCacheRef.current.set(m.id, m.text);
-              }
-              if (m.senderId !== currentUserId && m.isDecryptionPending && !m.isRetryExpired) {
-                const ageMs = Date.now() - new Date(m.createdAt).getTime();
-                // Avoid spamming retries on every reload for ancient messages (> 24 hours) to preserve retry budget
-                if (ageMs < 24 * 60 * 60 * 1000) {
-                  requestRetryForMessage(m.id, m.conversationId);
-                }
-              }
-            });
 
             // Proactively acknowledge delivery for any messages not yet marked as delivered
             if (socket && isConnected) {
@@ -1068,7 +1179,51 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     };
 
     loadHistory();
-  }, [conversationId, myPrivateKey, myPublicKey, currentUserId, activePeerId, keysReady, keysRestoredVersion]);
+  }, [conversationId, myPrivateKey, myPublicKey, currentUserId, activePeerId, keysReady, keysRestoredVersion, decryptMessagesBatch, socket, isConnected]);
+
+  // ── Load More Messages (Infinite Reverse Pagination) ──────────────────────
+  const loadMoreMessages = useCallback(async () => {
+    if (isLoadingMore || !hasMoreMessages || !conversationId) return;
+    const oldest = messagesRef.current.find((m) => !m.id.startsWith("optimistic-"));
+    if (!oldest) return;
+
+    setIsLoadingMore(true);
+    try {
+      const historyRes = await chatService.fetchHistory(conversationId, oldest.id, 30);
+      if (historyRes?.success && historyRes?.data) {
+        const rawMessages = Array.isArray(historyRes.data)
+          ? historyRes.data
+          : historyRes.data.messages;
+
+        if (Array.isArray(rawMessages)) {
+          if (rawMessages.length === 0) {
+            setHasMoreMessages(false);
+            return;
+          }
+
+          if (historyRes.data.hasMore !== undefined) {
+            setHasMoreMessages(historyRes.data.hasMore);
+          } else {
+            setHasMoreMessages(rawMessages.length >= 30);
+          }
+
+          const decryptedOlderBatch = await decryptMessagesBatch(rawMessages);
+
+          setMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            const newUnique = decryptedOlderBatch.filter((m) => !existingIds.has(m.id));
+            return [...newUnique, ...prev];
+          });
+        }
+      } else {
+        setHasMoreMessages(false);
+      }
+    } catch (err) {
+      console.error("[useChat] Error loading more messages:", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [conversationId, isLoadingMore, hasMoreMessages, decryptMessagesBatch]);
 
   // â”€â”€ Socket: Join Room â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Separate effect so room join doesn't re-fire when keys change
@@ -1168,8 +1323,19 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       }
 
       const currentUser = currentUserIdRef.current;
-      const peerUser = activePeerIdRef.current;
+      let peerUser = activePeerIdRef.current;
       const senderId = payload.senderId || payload.sender?.id;
+
+      // Self-heal activePeerIdRef if empty and this is an incoming peer message
+      if (!peerUser && senderId && senderId !== currentUser) {
+        activePeerIdRef.current = senderId;
+        peerUser = senderId;
+        if (typeof window !== "undefined" && conversationId) {
+          try {
+            sessionStorage.setItem(`active_peer_${conversationId}`, senderId);
+          } catch {}
+        }
+      }
 
       const privKey = myPrivateKeyRef.current;
       const pubKey = recipientPublicKeyRef.current;
@@ -1189,14 +1355,26 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           encKeys = JSON.parse(encKeys);
         } catch {}
       }
-      const isLibsignalMsg =
-        (payload.messageType === 3 || payload.messageType === 2 || encKeys?.protocol === 'libsignal') &&
-        encKeys?.protocol !== 'pairwise' &&
-        encKeys?.protocol !== 'x3dh' &&
-        encKeys?.protocol !== 'multi-device' &&
-        !payload.nonce;
 
-      if (!isBiz && !noPeer && !isTicket && payload.ciphertext && (payload.nonce || isLibsignalMsg)) {
+      const isValidBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(payload.ciphertext ?? '');
+
+      const isPlaintextMsg =
+        encKeys?.protocol === 'plaintext' ||
+        payload.messageType === 0 ||
+        (!payload.nonce && encKeys?.protocol !== 'libsignal' && isValidPlaintext(payload.ciphertext));
+
+      const isLibsignalMsg =
+        !isPlaintextMsg &&
+        !payload.nonce &&
+        isValidBase64 &&
+        (
+          encKeys?.protocol === 'libsignal' ||
+          payload.messageType === 3 ||
+          payload.messageType === 2 ||
+          looksLikeCiphertext(payload.ciphertext)
+        );
+
+      if (!isBiz && !isTicket && !isPlaintextMsg && payload.ciphertext && (payload.nonce || isLibsignalMsg || looksLikeCiphertext(payload.ciphertext))) {
         if (!privKey) {
           // Key not yet ready (fresh login / new session). Queue the message and
           // replay it once myPrivateKey / keysReady becomes available.
@@ -1426,20 +1604,35 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           } else {
             // Message sent by peer: Libsignal (Double Ratchet), Multi-Device, X3DH receiver, or pairwise fallback
             if (!decryptedRealtime && isLibsignalMsg && senderId) {
-              try {
-                const dec = await decrypt1to1Message(
-                  currentUser,
-                  senderId,
-                  payload.ciphertext,
-                  payload.messageType ?? 2,
-                  1
+              // Pre-flight: Signal wire messages are always Base64-encoded protobuf
+              // binaries. If the ciphertext contains non-Base64 characters it is a
+              // pairwise / AES-GCM payload misclassified as a Signal message (usually
+              // because messageType===2 coincides with a non-Signal sender). Skip the
+              // Signal path entirely so the pairwise fallbacks can run cleanly.
+              const isValidBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(payload.ciphertext ?? '');
+              if (!isValidBase64) {
+                console.warn(
+                  '[useChat] Skipping Libsignal decrypt: ciphertext is not valid Base64. ' +
+                  'Protocol mismatch? (messageType=' + payload.messageType +
+                  ', protocol=' + (payload.encryptedKeys?.protocol ?? 'undefined') +
+                  ', preview="' + (payload.ciphertext ?? '').slice(0, 32) + '…")'
                 );
-                if (dec) {
-                  text = parseEditedText(dec).text;
-                  decryptedRealtime = true;
+              } else {
+                try {
+                  const dec = await decrypt1to1Message(
+                    currentUser,
+                    senderId,
+                    payload.ciphertext,
+                    payload.messageType ?? 2,
+                    1
+                  );
+                  if (dec) {
+                    text = parseEditedText(dec).text;
+                    decryptedRealtime = true;
+                  }
+                } catch (signalErr) {
+                  console.warn('[useChat] Libsignal real-time decrypt attempt failed, falling back:', signalErr);
                 }
-              } catch (signalErr) {
-                console.warn('[useChat] Libsignal real-time decrypt attempt failed, falling back:', signalErr);
               }
             }
 
@@ -1558,7 +1751,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
           if (!decryptedRealtime) {
             console.error("âŒ [Socket] All decryption paths exhausted", { senderId, currentUser, isMyMessage: (!!senderId && !!currentUser && senderId === currentUser), cachedNonce: !!payload.nonce && sentPlaintextCacheRef.current.has(payload.nonce), keys: allPeerKeys.length });
-            throw new Error("All decryption attempts exhausted");
+            // Fallback recovery before abandoning real-time decryption:
+            if (!payload.nonce && payload.ciphertext && isValidPlaintext(payload.ciphertext) && (!isValidBase64 || payload.ciphertext.includes(' '))) {
+              text = parseEditedText(payload.ciphertext).text;
+              decryptedRealtime = true;
+              console.log("✅ [Socket] Recovered raw plaintext ciphertext");
+            } else if ((payload.previewText || encKeys?.previewText) && isValidPlaintext(payload.previewText || encKeys?.previewText)) {
+              text = payload.previewText || encKeys.previewText;
+              decryptedRealtime = true;
+              console.log("✅ [Socket] Recovered via previewText fallback");
+            } else {
+              text = "⏳ Waiting for this message. This may take a while.";
+              if (payload.id && senderId && senderId !== currentUser) {
+                requestRetryForMessage(payload.id, payload.conversationId);
+              }
+            }
           }
 
           console.log("âœ… [Socket] Decrypted message:", text);
@@ -1676,6 +1883,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 senderId: payload.senderId,
                 text: parsed.text,
                 isEdited: parsed.isEdited,
+                isDecryptionPending: !decryptedRealtime,
+                rawCiphertext: payload.ciphertext,
+                rawNonce: payload.nonce,
+                rawMessageType: payload.messageType ?? null,
+                rawEncryptedKeys: payload.encryptedKeys ?? null,
+                recipientRegistrationId: payload.recipientRegistrationId,
+                senderRegistrationId: payload.senderRegistrationId,
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
@@ -1697,6 +1911,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 senderId: senderId,
                 text: parsed.text,
                 isEdited: parsed.isEdited,
+                isDecryptionPending: !decryptedRealtime,
+                rawCiphertext: payload.ciphertext,
+                rawNonce: payload.nonce,
+                rawMessageType: payload.messageType ?? null,
+                rawEncryptedKeys: payload.encryptedKeys ?? null,
+                recipientRegistrationId: payload.recipientRegistrationId,
+                senderRegistrationId: payload.senderRegistrationId,
                 createdAt: payload.createdAt || new Date().toISOString(),
                 mediaUrl: payload.mediaUrl,
                 mediaType: payload.mediaType,
@@ -1864,8 +2085,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             requestRetryForMessage(payload.id, payload.conversationId);
           }
         }
-      } else if (payload.ciphertext && (!payload.nonce || isBiz || noPeer || isTicket)) {
-        // Plaintext: no nonce, B2C chat, peer not resolved, or ticket message
+      } else if (payload.ciphertext && !looksLikeCiphertext(payload.ciphertext) && (!payload.nonce || isBiz || isTicket || isPlaintextMsg)) {
+        // Plaintext: human readable message with no nonce, B2C chat, or ticket message (strictly never ciphertext)
         console.log("â„¹ï¸ [Socket] Plaintext message received");
         const parsed = parseEditedText(payload.ciphertext || "");
         const resolvedReplyTo = await resolveQuotedMessage(
@@ -1876,8 +2097,53 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           null,
           true
         );
+
+        if (parsed.text && isValidPlaintext(parsed.text)) {
+          if (payload.id) {
+            sentPlaintextCacheRef.current.set(payload.id, parsed.text);
+            void storeDecryptedMessage(currentUserIdRef.current, payload.id, parsed.text);
+          }
+          if (payload.ciphertext) {
+            sentPlaintextCacheRef.current.set(payload.ciphertext, parsed.text);
+            void storeDecryptedMessage(currentUserIdRef.current, payload.ciphertext, parsed.text);
+          }
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("chat:message_decrypted", {
+                detail: { messageId: payload.id, conversationId, text: parsed.text },
+              })
+            );
+          }
+        }
+
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
+
+          const optimisticIdx = prev.map((m) => m.id).lastIndexOf(
+            prev.slice().reverse().find((m) => m.id.startsWith("optimistic-"))?.id ?? ""
+          );
+
+          if (optimisticIdx !== -1) {
+            const updated = [...prev];
+            const existingOpt = prev[optimisticIdx];
+            updated[optimisticIdx] = {
+              id: payload.id,
+              conversationId: payload.conversationId,
+              senderId: senderId || existingOpt.senderId || "unknown",
+              text: parsed.text,
+              isEdited: parsed.isEdited,
+              createdAt: payload.createdAt || existingOpt.createdAt || new Date().toISOString(),
+              mediaUrl: payload.mediaUrl || existingOpt.mediaUrl,
+              mediaType: payload.mediaType || existingOpt.mediaType,
+              disappearAfterSeconds: payload.disappearAfterSeconds ?? existingOpt.disappearAfterSeconds,
+              receipts: payload.receipts || existingOpt.receipts || [],
+              reactions: payload.reactions || existingOpt.reactions || [],
+              replyToId: payload.replyToId ?? existingOpt.replyToId,
+              replyTo: resolvedReplyTo || existingOpt.replyTo,
+            };
+            return updated;
+          }
+
           return [
             ...prev,
             {
@@ -1897,6 +2163,41 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             },
           ];
         });
+      } else if (payload.ciphertext && looksLikeCiphertext(payload.ciphertext)) {
+        // Defensive safety: Message looks like ciphertext but did not meet standard Signal conditions
+        console.warn("[Socket] Received unclassified ciphertext message. Displaying waiting placeholder.");
+        const fallbackSenderId = senderId || "unknown";
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === payload.id)) return prev;
+          return [
+            ...prev,
+            {
+              id: payload.id || Date.now().toString(),
+              conversationId: payload.conversationId,
+              senderId: fallbackSenderId,
+              text: "⏳ Waiting for this message. This may take a while.",
+              isEdited: false,
+              isDecryptionPending: true,
+              rawCiphertext: payload.ciphertext,
+              rawNonce: payload.nonce,
+              rawMessageType: payload.messageType ?? null,
+              rawEncryptedKeys: payload.encryptedKeys ?? null,
+              recipientRegistrationId: payload.recipientRegistrationId,
+              senderRegistrationId: payload.senderRegistrationId,
+              createdAt: payload.createdAt || new Date().toISOString(),
+              mediaUrl: payload.mediaUrl,
+              mediaType: payload.mediaType,
+              disappearAfterSeconds: payload.disappearAfterSeconds,
+              receipts: payload.receipts || [],
+              reactions: payload.reactions || [],
+              replyToId: payload.replyToId ?? null,
+              replyTo: null,
+            },
+          ];
+        });
+        if (payload.id && fallbackSenderId !== currentUserIdRef.current) {
+          requestRetryForMessage(payload.id, payload.conversationId);
+        }
       } else if (payload.mediaType || payload.mediaUrl) {
         // Media-only messages (no text)
         const resolvedReplyTo = await resolveQuotedMessage(
@@ -2083,6 +2384,24 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
             return prev;
           });
+        }
+
+        // ── Auto-flush pending E2EE outbox messages for this peer ────────────
+        const pendingOutbox = e2eeOutboxService.getPendingForPeer(payload.userId);
+        if (pendingOutbox.length > 0) {
+          console.log(`⚡ [useChat] Peer key received for ${payload.userId}. Auto-flushing ${pendingOutbox.length} outbox message(s).`);
+          void (async () => {
+            for (const item of pendingOutbox) {
+              await executeEncryptAndSendRef.current?.(
+                item.optimisticId,
+                item.text || "",
+                item.mediaUrl || undefined,
+                item.mediaType,
+                item.replyToId,
+                payload.userId
+              );
+            }
+          })();
         }
       }
     };
@@ -2602,6 +2921,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     };
     window.addEventListener("e2ee:peer_key_updated", handleWindowPeerKeyUpdated);
 
+    const handleOutboxStatusChanged = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const detail = customEvent.detail;
+      if (!detail || !detail.optimisticId) return;
+
+      if (!detail.conversationId || detail.conversationId === conversationId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === detail.optimisticId ? { ...m, status: detail.status } : m
+          )
+        );
+      }
+    };
+    window.addEventListener("e2ee:outbox_status_changed", handleOutboxStatusChanged);
+
     return () => {
       socket.off("chat:receive_message", handleReceiveMessage);
       socket.off("NEW_MESSAGE", handleReceiveMessage);
@@ -2617,8 +2951,38 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
       socket.off("e2ee:retry_expired", handleRetryExpired);
       socket.off("e2ee:manual_resend_initiated", handleManualResendInitiated);
       window.removeEventListener("e2ee:peer_key_updated", handleWindowPeerKeyUpdated);
+      window.removeEventListener("e2ee:outbox_status_changed", handleOutboxStatusChanged);
     };
   }, [socket, isConnected, conversationId]);
+
+  // ── Hydrate pending outbox messages for this conversation ───────────────────
+  useEffect(() => {
+    if (!conversationId) return;
+    const pending = e2eeOutboxService.getPendingForConversation(conversationId);
+    if (pending.length > 0) {
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id));
+        const missing = pending
+          .filter((p) => !existingIds.has(p.optimisticId))
+          .map(
+            (p) =>
+              ({
+                id: p.optimisticId,
+                conversationId: p.conversationId,
+                senderId: currentUserIdRef.current || currentUserId,
+                text: p.text || "",
+                createdAt: new Date(p.queuedAt).toISOString(),
+                mediaUrl: p.mediaUrl || undefined,
+                mediaType: p.mediaType,
+                replyToId: p.replyToId,
+                status: p.status,
+                reactions: [],
+              } as ChatMessage)
+          );
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+    }
+  }, [conversationId, currentUserId]);
 
   // â”€â”€ Mark Messages as Seen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
@@ -2674,139 +3038,73 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
   // (markPendingMessagesDeliveredForUser) which fires on every socket connection.
   // No client-side polling loop is needed here.
 
-  // â”€â”€ Send Message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const sendMessage = useCallback(
+  // ── Execute Encrypt and Send ────────────────────────────────────────────────
+  const executeEncryptAndSend = useCallback(
     async (
+      optimisticId: string,
       text: string,
-      currentUserId: string,
-      file: File | null = null,
-      skipEncryption: boolean = false,
-      replyToMessage: QuotedMessage | null = null
+      mediaUrl?: string,
+      mediaType?: string | null,
+      replyToId?: string | null,
+      customPeerId?: string
     ) => {
-      if (!socket || !isConnected || !conversationId) {
-        console.error("Cannot send: missing socket or conversationId");
+      if (!socket || !isConnected) {
+        console.warn("[useChat] Socket not connected. Message deferred in outbox.");
         return;
       }
-      
-      // If there is no resolved peer, this is a B2C-style plaintext send regardless
-      // of what the caller requested — never encrypt without a real peer identity.
-      const isValidPeer = Boolean(activePeerId && activePeerId !== "null" && activePeerId !== "undefined");
-      const effectiveSkipEncryption = skipEncryption || !isValidPeer || isBizChatRef.current;
-
-      // If we are encrypting but missing our own keys, abort
-      if (!effectiveSkipEncryption && !myPrivateKey) {
-        console.error("Cannot encrypt send: missing myPrivateKey");
-        toast.error("Security setup incomplete. Please refresh the page.");
-        return;
-      }
-
-      // Optimistic local update with a temporary ID
-      const optimisticId = `optimistic-${Date.now()}`;
-      const replyToId = replyToMessage?.id || null;
-      if (text) {
-        sentPlaintextCacheRef.current.set(optimisticId, text);
-        void storeDecryptedMessage(currentUserId, optimisticId, text);
-      }
-      
-      let optimisticMediaType: string | undefined = undefined;
-      let optimisticMediaUrl: string | undefined = undefined;
-      if (file) {
-        optimisticMediaUrl = URL.createObjectURL(file);
-        if (file.type.startsWith("image")) optimisticMediaType = "image";
-        else if (file.type.startsWith("video")) optimisticMediaType = "video";
-        else if (file.type.startsWith("audio")) optimisticMediaType = "audio";
-        else optimisticMediaType = "document";
-      } else if (text) {
-        const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
-        if (urlMatch && urlMatch[0]) {
-          optimisticMediaUrl = urlMatch[0];
-          optimisticMediaType = "link";
-        }
-      }
-
-      const optimisticMsg: ChatMessage = {
-        id: optimisticId,
-        conversationId,
-        senderId: currentUserId,
-        text: text,
-        createdAt: new Date().toISOString(),
-        mediaUrl: optimisticMediaUrl,
-        mediaType: optimisticMediaType,
-        replyToId,
-        replyTo: replyToMessage,
-        reactions: [],
-      };
-
-      // Synchronously record optimistic message into messagesRef so immediate socket echoes match without waiting on React render cycles
-      messagesRef.current = [...messagesRef.current, optimisticMsg];
-      setMessages((prev) => [...prev, optimisticMsg]);
 
       try {
-        let mediaUrl: string | undefined;
-        let mediaType: string | undefined;
-        
-        if (file) {
-          const uploadRes = await uploadMedia(conversationId, file);
-          if (uploadRes.success && uploadRes.mediaUrl) {
-            mediaUrl = uploadRes.mediaUrl;
-            mediaType = uploadRes.mediaType;
-
-            // Update optimistic message with real uploaded mediaUrl
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === optimisticId ? { ...m, mediaUrl, mediaType } : m
-              )
-            );
-          } else {
-            setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-            return;
-          }
-        } else if (text) {
-          const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
-          if (urlMatch && urlMatch[0]) {
-            mediaUrl = urlMatch[0];
-            mediaType = 'link';
-          }
-        }
+        const targetPeerId =
+          customPeerId ||
+          activePeerIdRef.current ||
+          activePeerId ||
+          (typeof window !== "undefined" && conversationId ? sessionStorage.getItem(`active_peer_${conversationId}`) : null) ||
+          "";
+        const isValidPeer = Boolean(targetPeerId && targetPeerId !== "null" && targetPeerId !== "undefined");
+        const effectiveSkipEncryption = !isValidPeer || isBizChatRef.current;
 
         let ciphertext, nonce;
         let recipientRegId: string | null = null;
         let encryptedKeysPayload: any = undefined;
         let wireMsgType: number = 2;
 
-        if (text) {
-          if (effectiveSkipEncryption) {
-            // B2C or no-peer: send as plaintext (stored in ciphertext column, nonce stays null)
-            ciphertext = text;
-            nonce = null;
-          } else {
+        if (effectiveSkipEncryption) {
+          // B2C, support ticket, or unencrypted chat: send as plaintext with explicit wire markers
+          ciphertext = text || null;
+          nonce = null;
+          wireMsgType = 0;
+          encryptedKeysPayload = {
+            protocol: 'plaintext',
+            previewText: text ? text.substring(0, 100) : null,
+          };
+        } else if (text) {
             const activeMyPriv = myPrivateKeyRef.current || myPrivateKey;
             const activeMyPub = myPublicKeyRef.current || myPublicKey;
             let signalDone = false;
 
             // 1. Primary: Official Signal Protocol (Double Ratchet + X3DH)
             try {
-              const hasSession = await hasActiveSignalSession(currentUserId, activePeerId, 1);
+              const hasSession = await hasActiveSignalSession(currentUserId, targetPeerId, 1);
               if (!hasSession) {
-                const bundleRes = await chatService.fetchPreKeyBundle(activePeerId);
+                const bundleRes = await chatService.fetchPreKeyBundle(targetPeerId);
                 const bundle = bundleRes?.data;
                 if (bundle?.identityKey && bundle?.signedPreKey?.publicKey) {
-                  await buildSessionFromBundle(currentUserId, activePeerId, bundle, 1);
+                  await buildSessionFromBundle(currentUserId, targetPeerId, bundle, 1);
                 }
               }
 
               let signalEnc: any;
               try {
-                signalEnc = await encrypt1to1Message(currentUserId, activePeerId, text, 1);
+                signalEnc = await encrypt1to1Message(currentUserId, targetPeerId, text, 1);
               } catch (encErr) {
                 console.warn('[useChat] Initial encrypt1to1Message failed, re-establishing session:', encErr);
                 const store = getSignalProtocolStore(currentUserId);
-                await store.removeSession(createSignalAddress(activePeerId, 1).toString());
-                const bundleRes = await chatService.fetchPreKeyBundle(activePeerId);
+                await store.removeSession(createSignalAddress(targetPeerId, 1).toString());
+                const bundleRes = await chatService.fetchPreKeyBundle(targetPeerId);
                 const bundle = bundleRes?.data;
                 if (bundle?.identityKey && bundle?.signedPreKey?.publicKey) {
-                  await buildSessionFromBundle(currentUserId, activePeerId, bundle, 1);
-                  signalEnc = await encrypt1to1Message(currentUserId, activePeerId, text, 1);
+                  await buildSessionFromBundle(currentUserId, targetPeerId, bundle, 1);
+                  signalEnc = await encrypt1to1Message(currentUserId, targetPeerId, text, 1);
                 } else {
                   throw encErr;
                 }
@@ -2817,8 +3115,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               wireMsgType = signalEnc.messageType; // 3 or 2
               recipientRegId = signalEnc.registrationId ? String(signalEnc.registrationId) : null;
 
-              // Self-encrypt the plaintext so the sender can decrypt their own sent
-              // messages on any new device/browser (new private key, empty IndexedDB).
+              // Self-encrypt the plaintext so the sender can decrypt their own sent messages
               let selfEncryptedSessionKey = null;
               try {
                 if (activeMyPub && activeMyPriv) {
@@ -2851,8 +3148,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               try {
                 const myDeviceId = localStorage.getItem("deviceId") || `web-${currentUserId}`;
                 const myRegId = localStorage.getItem("registrationId") || null;
-                const batchKeys = await chatService.fetchBatchKeys([activePeerId, currentUserId]);
-                const recipientDevices = (batchKeys[activePeerId] || []).filter(
+                const batchKeys = await chatService.fetchBatchKeys([targetPeerId, currentUserId]);
+                const recipientDevices = (batchKeys[targetPeerId] || []).filter(
                   (d: any) => d.deviceId && d.publicKey
                 );
                 const myOtherDevices = (batchKeys[currentUserId] || []).filter(
@@ -2912,7 +3209,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               let x3dhDone = false;
               if (!multiDeviceDone) {
                 try {
-                  const bundleRes = await chatService.fetchPreKeyBundle(activePeerId);
+                  const bundleRes = await chatService.fetchPreKeyBundle(targetPeerId);
                   const bundle = bundleRes?.data;
 
                   if (bundle?.identityKey && bundle?.signedPreKey?.publicKey && activeMyPriv) {
@@ -2964,14 +3261,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
               if (!multiDeviceDone && !x3dhDone) {
                 let pubKeyToUse = recipientPublicKeyRef.current || recipientPublicKey;
 
-                if (!pubKeyToUse && typeof window !== "undefined" && activePeerId) {
-                  pubKeyToUse = sessionStorage.getItem(`peer_key_${activePeerId}`);
+                if (!pubKeyToUse && typeof window !== "undefined" && targetPeerId) {
+                  pubKeyToUse = sessionStorage.getItem(`peer_key_${targetPeerId}`);
                 }
 
-                if (!pubKeyToUse && currentUserId && activePeerId) {
+                if (!pubKeyToUse && currentUserId && targetPeerId) {
                   try {
                     const store = getSignalProtocolStore(currentUserId);
-                    const remoteAddress = createSignalAddress(activePeerId, 1);
+                    const remoteAddress = createSignalAddress(targetPeerId, 1);
                     const storedIdentity = await store.loadIdentity(remoteAddress.toString());
                     if (storedIdentity) {
                       pubKeyToUse = bytesToBase64(new Uint8Array(storedIdentity));
@@ -2982,21 +3279,21 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 }
 
                 try {
-                  const res = await chatService.fetchRecipientKey(activePeerId);
+                  const res = await chatService.fetchRecipientKey(targetPeerId);
                   if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
                     const newest = res.data[0];
                     pubKeyToUse = newest.publicKey;
                     recipientRegId = newest.registrationId || null;
                     recipientPublicKeyRef.current = newest.publicKey;
-                    if (typeof window !== "undefined" && activePeerId) {
-                      sessionStorage.setItem(`peer_key_${activePeerId}`, newest.publicKey);
+                    if (typeof window !== "undefined" && targetPeerId) {
+                      sessionStorage.setItem(`peer_key_${targetPeerId}`, newest.publicKey);
                     }
                   } else if (res?.success && res?.data?.publicKey) {
                     pubKeyToUse = res.data.publicKey;
                     recipientRegId = res.data.registrationId || null;
                     recipientPublicKeyRef.current = res.data.publicKey;
-                    if (typeof window !== "undefined" && activePeerId) {
-                      sessionStorage.setItem(`peer_key_${activePeerId}`, res.data.publicKey);
+                    if (typeof window !== "undefined" && targetPeerId) {
+                      sessionStorage.setItem(`peer_key_${targetPeerId}`, res.data.publicKey);
                     }
                   }
                 } catch (e) {
@@ -3004,9 +3301,23 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                 }
 
                 if (!pubKeyToUse) {
-                  console.warn("[useChat] Cannot encrypt: no recipient public key available. Aborting send.");
-                  toast.error("Recipient has not set up secure messaging yet.");
-                  setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+                  console.info("[useChat] No recipient public key available yet. Queuing message in E2EE outbox while peer wakes up.");
+                  e2eeOutboxService.enqueue({
+                    optimisticId,
+                    conversationId,
+                    peerId: targetPeerId,
+                    text,
+                    mediaUrl,
+                    mediaType,
+                    replyToId,
+                  });
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === optimisticId
+                        ? { ...m, status: "WAITING_FOR_PEER_KEY" }
+                        : m
+                    )
+                  );
                   return;
                 }
 
@@ -3041,7 +3352,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             }
           }
 
-          // Register ciphertext and nonce directly into sent message cache and ring buffer
+        // Register ciphertext and nonce directly into sent message cache and ring buffer
+        if (text) {
           if (nonce) {
             sentPlaintextCacheRef.current.set(nonce, text);
             void storeDecryptedMessage(currentUserId, `nonce_${nonce}`, text);
@@ -3079,6 +3391,14 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           encryptedKeys: encryptedKeysPayload,
         };
         socket.emit("chat:send_message", payload);
+
+        // Success: remove from pending outbox and update message status to SENT
+        e2eeOutboxService.remove(optimisticId);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === optimisticId ? { ...m, status: "SENT" } : m
+          )
+        );
       } catch (err: any) {
         console.error("Failed to encrypt and send message:", err);
         const errMsg =
@@ -3088,18 +3408,166 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
             ? "File size exceeds server upload limit."
             : err?.message || "Failed to send message.");
         toast.error(errMsg);
-        // Roll back optimistic update on failure
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+
+        // If message was queued in outbox, mark as FAILED instead of deleting
+        if (e2eeOutboxService.getMessage(optimisticId)) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === optimisticId ? { ...m, status: "FAILED" } : m))
+          );
+        } else {
+          // Roll back optimistic update on unrecoverable failure
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        }
       }
     },
-    [socket, isConnected, conversationId, myPrivateKey, myPublicKey, recipientPublicKey, activePeerId]
+    [socket, isConnected, conversationId, myPrivateKey, myPublicKey, recipientPublicKey, activePeerId, currentUserId]
+  );
+
+  useEffect(() => {
+    executeEncryptAndSendRef.current = executeEncryptAndSend;
+  }, [executeEncryptAndSend]);
+
+  // ── Send Message ────────────────────────────────────────────────────────────
+  const sendMessage = useCallback(
+    async (
+      text: string,
+      currentUserId: string,
+      file: File | null = null,
+      skipEncryption: boolean = false,
+      replyToMessage: QuotedMessage | null = null
+    ) => {
+      if (!socket || !isConnected || !conversationId) {
+        console.error("Cannot send: missing socket or conversationId");
+        return;
+      }
+      
+      const isValidPeer = Boolean(activePeerId && activePeerId !== "null" && activePeerId !== "undefined");
+      const effectiveSkipEncryption = skipEncryption || !isValidPeer || isBizChatRef.current;
+
+      // If we are encrypting but missing our own keys, abort
+      if (!effectiveSkipEncryption && !myPrivateKey) {
+        console.error("Cannot encrypt send: missing myPrivateKey");
+        toast.error("Security setup incomplete. Please refresh the page.");
+        return;
+      }
+
+      // Optimistic local update with a temporary ID
+      const optimisticId = `optimistic-${Date.now()}`;
+      const replyToId = replyToMessage?.id || null;
+      if (text) {
+        sentPlaintextCacheRef.current.set(optimisticId, text);
+        void storeDecryptedMessage(currentUserId, optimisticId, text);
+      }
+      
+      let optimisticMediaType: string | undefined = undefined;
+      let optimisticMediaUrl: string | undefined = undefined;
+      if (file) {
+        optimisticMediaUrl = URL.createObjectURL(file);
+        if (file.type.startsWith("image")) optimisticMediaType = "image";
+        else if (file.type.startsWith("video")) optimisticMediaType = "video";
+        else if (file.type.startsWith("audio")) optimisticMediaType = "audio";
+        else optimisticMediaType = "document";
+      } else if (text) {
+        const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
+        if (urlMatch && urlMatch[0]) {
+          optimisticMediaUrl = urlMatch[0];
+          optimisticMediaType = "link";
+        }
+      }
+
+      const optimisticMsg: ChatMessage = {
+        id: optimisticId,
+        conversationId,
+        senderId: currentUserId,
+        text: text,
+        createdAt: new Date().toISOString(),
+        mediaUrl: optimisticMediaUrl,
+        mediaType: optimisticMediaType,
+        replyToId,
+        replyTo: replyToMessage,
+        reactions: [],
+        status: "SENDING",
+      };
+
+      // Synchronously record optimistic message into messagesRef so immediate socket echoes match without waiting on React render cycles
+      messagesRef.current = [...messagesRef.current, optimisticMsg];
+      setMessages((prev) => [...prev, optimisticMsg]);
+
+      let mediaUrl: string | undefined;
+      let mediaType: string | undefined;
+      
+      if (file) {
+        try {
+          const uploadRes = await uploadMedia(conversationId, file);
+          if (uploadRes.success && uploadRes.mediaUrl) {
+            mediaUrl = uploadRes.mediaUrl;
+            mediaType = uploadRes.mediaType;
+
+            // Update optimistic message with real uploaded mediaUrl
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === optimisticId ? { ...m, mediaUrl, mediaType } : m
+              )
+            );
+          } else {
+            setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+            return;
+          }
+        } catch (uploadErr) {
+          console.error("Failed to upload media:", uploadErr);
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+          toast.error("Failed to upload file attachment.");
+          return;
+        }
+      } else if (text) {
+        const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
+        if (urlMatch && urlMatch[0]) {
+          mediaUrl = urlMatch[0];
+          mediaType = 'link';
+        }
+      }
+
+      await executeEncryptAndSend(optimisticId, text, mediaUrl, mediaType, replyToId);
+    },
+    [socket, isConnected, conversationId, myPrivateKey, activePeerId, executeEncryptAndSend]
+  );
+
+  // ── Retry Pending / Failed Message ──────────────────────────────────────────
+  const retryMessage = useCallback(
+    async (optimisticId: string) => {
+      const item = e2eeOutboxService.getMessage(optimisticId);
+      if (!item) return;
+
+      e2eeOutboxService.markRetrying(optimisticId);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === optimisticId ? { ...m, status: "WAITING_FOR_PEER_KEY" } : m
+        )
+      );
+
+      await executeEncryptAndSend(
+        item.optimisticId,
+        item.text || "",
+        item.mediaUrl || undefined,
+        item.mediaType,
+        item.replyToId,
+        item.peerId
+      );
+    },
+    [executeEncryptAndSend]
   );
 
   const editMessage = useCallback(
     async (messageId: string, newText: string) => {
       if (!socket || !isConnected || !conversationId) return;
       const formattedText = `__EDITED__:${newText}`;
-      const effectiveSkipEncryption = !activePeerId || isBizChatRef.current;
+      const targetPeerId =
+        activePeerIdRef.current ||
+        activePeerId ||
+        (typeof window !== "undefined" && conversationId ? sessionStorage.getItem(`active_peer_${conversationId}`) : null) ||
+        "";
+      const isValidPeer = Boolean(targetPeerId && targetPeerId !== "null" && targetPeerId !== "undefined");
+      const effectiveSkipEncryption = !isValidPeer || isBizChatRef.current;
       let ciphertext, nonce;
       if (effectiveSkipEncryption) {
         ciphertext = formattedText;
@@ -3167,6 +3635,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     setMessages,
     clearMessages: () => setMessages([]),
     sendMessage,
+    retryMessage,
     editMessage,
     toggleReaction,
     pinnedMessages,
@@ -3177,6 +3646,9 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
     handleTyping,
     requestManualResend,
     recipientPublicKey,
+    loadMoreMessages,
+    hasMoreMessages,
+    isLoadingMore,
     // UI considers the chat ready as long as we have our own keys and a valid connection
     isReady: !!(myPrivateKey && isConnected && conversationId),
   };

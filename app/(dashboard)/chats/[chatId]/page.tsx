@@ -278,7 +278,14 @@ function ChatRoomPageContent() {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [recipientId, setRecipientId] = useState<string>(recipientIdFromQuery);
+  const [recipientId, setRecipientId] = useState<string>(() => {
+    if (recipientIdFromQuery) return recipientIdFromQuery;
+    if (typeof window !== "undefined" && conversationId) {
+      const cached = sessionStorage.getItem(`active_peer_${conversationId}`);
+      if (cached && cached !== "null" && cached !== "undefined") return cached;
+    }
+    return "";
+  });
   const [isInitializing, setIsInitializing] = useState(true);
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -292,6 +299,14 @@ function ChatRoomPageContent() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (recipientId && recipientId !== "null" && recipientId !== "undefined" && typeof window !== "undefined" && conversationId) {
+      try {
+        sessionStorage.setItem(`active_peer_${conversationId}`, recipientId);
+      } catch {}
+    }
+  }, [conversationId, recipientId]);
 
   // B2C: track whether we know the bizHandle for this conversation
   // (needed to route ALL subsequent messages through contactBusiness REST API).
@@ -389,13 +404,18 @@ function ChatRoomPageContent() {
             if (conv?.otherUserId) {
               finalRecipientId = conv.otherUserId;
               setRecipientId(finalRecipientId);
+              if (typeof window !== "undefined" && conversationId) {
+                try {
+                  sessionStorage.setItem(`active_peer_${conversationId}`, finalRecipientId);
+                } catch {}
+              }
 
               const contact = getContact(conv.otherUserId);
               const resolved = resolveDisplayName(
                 {
                   userId: conv.otherUserId,
                   phone: contact?.phoneNumber,
-                  profileDisplayName: conv.otherUserName,
+                  profileDisplayName: contact?.customName || contact?.displayName || conv.otherUserName,
                 },
                 contact
               );
@@ -428,13 +448,18 @@ function ChatRoomPageContent() {
 
         if (finalRecipientId && finalRecipientId !== "null" && finalRecipientId !== "undefined") {
           setRecipientId(finalRecipientId);
+          if (typeof window !== "undefined" && conversationId) {
+            try {
+              sessionStorage.setItem(`active_peer_${conversationId}`, finalRecipientId);
+            } catch {}
+          }
 
           const contact = getContact(finalRecipientId);
           const resolved = resolveDisplayName(
             {
               userId: finalRecipientId,
               phone: contact?.phoneNumber,
-              profileDisplayName: contact?.displayName,
+              profileDisplayName: contact?.customName || contact?.displayName,
             },
             contact
           );
@@ -503,17 +528,17 @@ function ChatRoomPageContent() {
         {
           userId: recipientId,
           phone: contact.phoneNumber,
-          profileDisplayName: contact.displayName || recipient?.name?.replace(/^~/, ""),
+          profileDisplayName: contact.customName || contact.displayName || recipient?.name?.replace(/^~/, ""),
         },
         contact
       );
 
       setRecipient((prev) => {
-        if (!prev) return prev;
-        const newName = resolved.title || prev.name;
-        const newVerified = Boolean(contact.isVerified || prev.isVerified);
-        const newAccountType = (contact as any).accountType || prev.accountType;
+        const newName = resolved.title || prev?.name || contact.customName || contact.displayName || "Unknown";
+        const newVerified = Boolean(contact.isVerified || prev?.isVerified);
+        const newAccountType = (contact as any).accountType || prev?.accountType;
         if (
+          prev &&
           prev.name === newName &&
           prev.phone === contact.phoneNumber &&
           (prev.avatarUrl === contact.avatarUrl || !contact.avatarUrl) &&
@@ -521,6 +546,17 @@ function ChatRoomPageContent() {
           prev.accountType === newAccountType
         ) {
           return prev;
+        }
+        if (!prev) {
+          return {
+            id: recipientId,
+            name: newName,
+            phone: contact.phoneNumber || undefined,
+            avatarUrl: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newName)}&background=F4F6FC&color=3B58F5`,
+            isOnline: false,
+            isVerified: newVerified,
+            accountType: newAccountType,
+          };
         }
         return {
           ...prev,
@@ -532,7 +568,7 @@ function ChatRoomPageContent() {
         };
       });
     }
-  }, [recipientId, contacts, getContact, isBizChat]);
+  }, [recipientId, contacts, getContact, isBizChat, recipient?.name]);
 
   const {
     messages,
@@ -549,6 +585,10 @@ function ChatRoomPageContent() {
     handleTyping,
     requestManualResend,
     recipientPublicKey,
+    loadMoreMessages,
+    hasMoreMessages,
+    isLoadingMore,
+    retryMessage,
   } = useChat(conversationId, currentUserId, recipientId, isBizChat);
 
   // ── Disappear ticker ─────────────────────────────────────────────────────
@@ -595,12 +635,23 @@ function ChatRoomPageContent() {
 
   const isAtBottomRef = useRef(true);
   const prevCountRef = useRef(0);
+  const isPaginatingRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
 
   const handleScroll = useCallback(() => {
     if (!parentRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = parentRef.current;
     isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 120;
-  }, []);
+
+    // Trigger loading older messages when user scrolls near the top
+    if (scrollTop < 80 && hasMoreMessages && !isLoadingMore && !isPaginatingRef.current) {
+      isPaginatingRef.current = true;
+      prevScrollHeightRef.current = scrollHeight;
+      loadMoreMessages().finally(() => {
+        isPaginatingRef.current = false;
+      });
+    }
+  }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
 
   const scrollToBottom = useCallback(
     (behavior: "smooth" | "auto" = "smooth") => {
@@ -637,6 +688,18 @@ function ChatRoomPageContent() {
   useEffect(() => {
     if (visibleMsgs.length === 0) return;
     const isInitial = prevCountRef.current === 0;
+
+    if (isPaginatingRef.current) {
+      if (parentRef.current && prevScrollHeightRef.current > 0) {
+        const heightDiff = parentRef.current.scrollHeight - prevScrollHeightRef.current;
+        parentRef.current.scrollTop = heightDiff;
+        prevScrollHeightRef.current = 0;
+      }
+      isPaginatingRef.current = false;
+      prevCountRef.current = visibleMsgs.length;
+      return;
+    }
+
     prevCountRef.current = visibleMsgs.length;
 
     if (isInitial || isAtBottomRef.current) {
@@ -1114,6 +1177,11 @@ function ChatRoomPageContent() {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 sm:p-5 chat-canvas-bg custom-scrollbar relative"
       >
+        {isLoadingMore && (
+          <div className="flex items-center justify-center py-2 shrink-0">
+            <Loader2 className="h-5 w-5 animate-spin text-[#00A884]" />
+          </div>
+        )}
         {visibleMsgs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full z-10 text-[#8F95B2]">
             {isReady || isBizChat ? (
@@ -1180,6 +1248,7 @@ function ChatRoomPageContent() {
                     peerAvatar={isBizChat ? undefined : recipient?.avatarUrl}
                     onOpenSecurityCode={() => setIsSecurityCodeOpen(true)}
                     onManualResend={(msgId) => requestManualResend(msgId)}
+                    onRetry={(msgId) => retryMessage(msgId)}
                     disappearAfterSeconds={(msg as any).disappearAfterSeconds ?? disappearAfterSeconds ?? null}
                     onEdit={(msgId, newText) => editMessage(msgId, newText)}
                     isPinned={isPinned}

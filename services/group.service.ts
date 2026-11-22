@@ -76,8 +76,11 @@ export const groupService = {
     try {
       const response = await apiClient.get(`/groups/${groupId}`);
       return response.data;
-    } catch (error) {
-      console.error(`Failed to fetch group details for ${groupId}`, error);
+    } catch (error: any) {
+      // 404 is an expected response when probing whether an ID is a group or a 1-to-1 conversation
+      if (error?.response?.status !== 404) {
+        console.error(`Failed to fetch group details for ${groupId}`, error);
+      }
       return { success: false };
     }
   },

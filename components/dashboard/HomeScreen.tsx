@@ -8,7 +8,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { useRouter } from "next/navigation";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
-import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
 
 // --- Types for Real-Time Data ---
 interface ActiveUser {
@@ -126,7 +125,6 @@ export default function HomeScreen() {
               
               {/* Notification Bell */}
               <NotificationDropdown />
-              <BusinessFeaturesMenu />
             </div>
           </div>
 

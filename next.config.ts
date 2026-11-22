@@ -11,6 +11,25 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "**" },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/business/channels/:path*",
+        destination: "/business/chats",
+        permanent: false,
+      },
+      {
+        source: "/business/dashboard",
+        destination: "/business/chats",
+        permanent: false,
+      },
+      {
+        source: "/profile/dashboard",
+        destination: "/profile/edit",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);

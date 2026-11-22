@@ -36,6 +36,17 @@ export function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
 }
 
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  // Guard: reject strings that are not valid Base64 before calling atob().
+  // This converts the cryptic browser "InvalidCharacterError" into a clear,
+  // actionable TypeError that shows the actual offending value — making it
+  // easy to identify protocol mismatches (e.g. hex or AES-GCM payloads
+  // accidentally routed through the Signal decryption path).
+  if (!base64 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+    throw new TypeError(
+      `base64ToArrayBuffer: invalid Base64 string ` +
+      `(length=${base64?.length ?? 0}, preview="${(base64 ?? '').slice(0, 32)}…")`
+    );
+  }
   const binary = atob(base64);
   const len = binary.length;
   const bytes = new Uint8Array(len);
@@ -319,14 +330,36 @@ export async function decrypt1to1Message(
     let decryptedBuffer: ArrayBuffer | null = null;
     let primaryError: any = null;
 
-    const ciphertextBuffer = base64ToArrayBuffer(ciphertextBase64);
+    let ciphertextBuffer: ArrayBuffer;
+    try {
+      ciphertextBuffer = base64ToArrayBuffer(ciphertextBase64);
+    } catch (b64Err) {
+      throw new Error(`Signal decrypt: invalid wire Base64: ${(b64Err as Error).message}`);
+    }
+
+    // Minimum wire length check:
+    // A Signal WhisperMessage consists of 1 version byte, 33-byte EC ratchet public key,
+    // protobuf counter fields, ciphertext, and an 8-byte HMAC tag.
+    // Minimum valid wire buffer is at least 40 bytes.
+    if (ciphertextBuffer.byteLength < 40) {
+      throw new Error(
+        `Signal decrypt: ciphertext wire buffer too short for Signal Protocol (${ciphertextBuffer.byteLength} bytes < 40 bytes minimum). Protocol mismatch?`
+      );
+    }
+
+    const normalizeSignalError = (err: any): Error => {
+      if (err instanceof TypeError && err.message?.includes('buffer')) {
+        return new Error(`Signal decrypt: malformed Protobuf wire structure (missing ephemeral key)`);
+      }
+      return err instanceof Error ? err : new Error(String(err));
+    };
 
     if (messageType === 3) {
       // Primary: PreKeyWhisperMessage (handshake)
       try {
         decryptedBuffer = await cipher.decryptPreKeyWhisperMessage(ciphertextBuffer);
       } catch (err: any) {
-        primaryError = err;
+        primaryError = normalizeSignalError(err);
         // Fallback: It might be a regular WhisperMessage if handshake was previously processed
         try {
           decryptedBuffer = await cipher.decryptWhisperMessage(ciphertextBuffer);
@@ -339,7 +372,7 @@ export async function decrypt1to1Message(
       try {
         decryptedBuffer = await cipher.decryptWhisperMessage(ciphertextBuffer);
       } catch (err: any) {
-        primaryError = err;
+        primaryError = normalizeSignalError(err);
         // Fallback: It might be a PreKeyWhisperMessage if wire type was defaulted to 2
         try {
           decryptedBuffer = await cipher.decryptPreKeyWhisperMessage(ciphertextBuffer);

@@ -201,7 +201,7 @@ export default function BusinessAutomationsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 bg-gradient-to-r from-[#1D2A54] via-[#2E1065] to-[#4C1D95] p-8 rounded-3xl text-white shadow-xl">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push("/business/dashboard")}
+            onClick={() => router.push("/business/chats")}
             className="rounded-full p-2.5 bg-white/10 hover:bg-white/20 transition-colors border border-white/20 shrink-0 cursor-pointer"
           >
             <ArrowLeft className="h-5 w-5 text-white" />

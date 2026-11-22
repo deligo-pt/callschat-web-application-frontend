@@ -181,7 +181,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                     window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: accountType } }));
                   }
                   await new Promise(resolve => setTimeout(resolve, 50));
-                  router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
+                  router.push(accountType === "BUSINESS" ? "/business/chats" : "/chats");
                 } else {
                   toast.error(loginData.message || loginData.data?.message || "Failed to finalize login.");
                 }
@@ -228,7 +228,7 @@ export default function PhoneAuthScreen({ type }: PhoneAuthScreenProps) {
                   
                   const accountType = loginData.data?.user?.accountType ?? "PERSONAL";
                   await new Promise(resolve => setTimeout(resolve, 50));
-                  router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
+                  router.push(accountType === "BUSINESS" ? "/business/chats" : "/chats");
                 } else {
                   toast.error(`Login failed: ${loginData.message || JSON.stringify(loginData)}`);
                 }

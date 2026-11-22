@@ -92,7 +92,12 @@ export function AvatarImage({
     );
   }
 
-  const isBlobOrData = src.startsWith("blob:") || src.startsWith("data:");
+  const isUnoptimizedUrl =
+    src.startsWith("blob:") ||
+    src.startsWith("data:") ||
+    src.includes("localhost") ||
+    src.includes("127.0.0.1") ||
+    src.startsWith("/");
 
   return (
     <div
@@ -105,7 +110,7 @@ export function AvatarImage({
         width={size}
         height={size}
         priority={priority}
-        unoptimized={isBlobOrData}
+        unoptimized={isUnoptimizedUrl}
         onError={() => setHasError(true)}
         className="h-full w-full object-cover"
         sizes={`${size}px`}

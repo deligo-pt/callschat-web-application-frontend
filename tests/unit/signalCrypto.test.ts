@@ -128,7 +128,18 @@ async function runTests() {
   assert.strictEqual(decryptedFallback, 'Fallback test message');
   console.log('✓ decrypt1to1Message successfully recovered and decrypted via dual-try fallback');
 
-  console.log('\n✅ ALL 11 SIGNAL 1-TO-1 CRYPTO ENGINE TESTS PASSED!\n');
+  // 7. Test protocol shielding against short plaintext base64 (e.g. "can" or "test")
+  let shortShielded = false;
+  try {
+    await decrypt1to1Message(eveId, davidId, 'can', 2, 1);
+  } catch (err: any) {
+    assert(err.message.includes('too short for Signal Protocol'), 'Should cleanly catch short wire buffer');
+    shortShielded = true;
+  }
+  assert.strictEqual(shortShielded, true, 'Short base64 wire payload must be cleanly shielded');
+  console.log('✓ decrypt1to1Message successfully shielded against short wire payload without TypeError');
+
+  console.log('\n✅ ALL 12 SIGNAL 1-TO-1 CRYPTO ENGINE TESTS PASSED!\n');
 }
 
 runTests().catch((err) => {

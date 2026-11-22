@@ -34,6 +34,13 @@ if (firebaseConfig.apiKey) {
       console.log('[firebase-messaging-sw.js] Received background message ', payload);
       
       const type = payload.data?.type;
+
+      // E2EE silent key refresh requests are background signals for mobile key sync;
+      // never display notification banner or alert on Web.
+      if (type === 'E2EE_KEY_REFRESH_REQUEST') {
+        console.log('[firebase-messaging-sw.js] Silently ignored E2EE_KEY_REFRESH_REQUEST.');
+        return;
+      }
       const isCall =
         type === 'CALL' ||
         type === 'incoming_call' ||

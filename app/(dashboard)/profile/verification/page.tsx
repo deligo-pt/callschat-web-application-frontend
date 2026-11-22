@@ -3,10 +3,13 @@
 import React from "react";
 import { VerificationStatus } from "@/components/business/VerificationStatus";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Building2 } from "lucide-react";
+import { useProfile } from "@/context/ProfileContext";
 
 export default function ProfileVerificationRoute() {
   const router = useRouter();
+  const { activeMode } = useProfile();
+  const isBusiness = activeMode === "BUSINESS";
 
   return (
     <div className="flex-1 flex flex-col bg-[#F8FAFC] dark:bg-[#0C1317] overflow-y-auto h-full p-6 md:p-10 font-sans">
@@ -23,15 +26,26 @@ export default function ProfileVerificationRoute() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-extrabold text-[#1D2A54] dark:text-[#E9EDEF] tracking-tight">
-              Identity Verification (KYC)
+              {isBusiness
+                ? "Enterprise Compliance & Verification (KYB)"
+                : "Identity Verification (KYC)"}
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Personal
-            </span>
+            {isBusiness ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-950/40 px-2.5 py-0.5 text-xs font-bold text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800/40">
+                <Building2 className="h-3.5 w-3.5" />
+                Business
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Personal
+              </span>
+            )}
           </div>
           <p className="text-xs font-medium text-[#8F95B2] dark:text-[#8696A0] mt-0.5">
-            Verify your official government identity to unlock your verified badge across chats and calls
+            {isBusiness
+              ? "Submit official commercial documentation and monitor your verified corporate status"
+              : "Verify your official government identity to unlock your verified badge across chats and calls"}
           </p>
         </div>
       </div>
@@ -40,7 +54,7 @@ export default function ProfileVerificationRoute() {
       <div className="max-w-3xl mx-auto w-full">
         <div className="rounded-3xl bg-white dark:bg-[#111B21] p-6 md:p-8 border border-[#E6EAFA] dark:border-[#222D34] shadow-xs">
           <VerificationStatus
-            targetType="USER_IDENTITY"
+            targetType={isBusiness ? "BUSINESS_ENTITY" : "USER_IDENTITY"}
             onBack={() => router.push("/profile/edit")}
           />
         </div>

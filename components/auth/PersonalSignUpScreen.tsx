@@ -327,7 +327,7 @@ export default function PersonalSignUpScreen() {
           window.dispatchEvent(new CustomEvent('workspaceModeChanged', { detail: { mode: accountType } }));
         }
         await new Promise((r) => setTimeout(r, 50));
-        router.push(accountType === "BUSINESS" ? "/business/dashboard" : "/chats");
+        router.push(accountType === "BUSINESS" ? "/business/chats" : "/chats");
       } else {
         toast.error(
           data.error?.message ?? data.message ?? "Login failed."

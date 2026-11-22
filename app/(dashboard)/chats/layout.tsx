@@ -1,8 +1,7 @@
 "use client";
 
-import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
-import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { ExploreBusinessesModal } from "@/components/business/ExploreBusinessesModal";
+import { BusinessFeaturesMenu } from "@/components/business/BusinessFeaturesMenu";
 import { ActiveNowTray } from "@/components/chat/ActiveNowTray";
 import { NewMessageModal } from "@/components/chat/NewMessageModal";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
@@ -27,7 +26,7 @@ import { motion } from "framer-motion";
 import { Building2, Heart, Megaphone, MessageSquare, Search, Trash2, UserPlus, Check, CheckCheck, Clock, MessageSquarePlus, X, Filter, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { Suspense, useCallback, useEffect, useState, useRef } from "react";
+import React, { Suspense, useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { announcementService } from "@/services/announcement.service";
 import { ConversationContextMenu } from "@/components/chat/ConversationContextMenu";
 import { ContactService } from "@/services/contact.service";
@@ -43,6 +42,7 @@ interface Conversation {
   isVerified?: boolean;
   accountType?: string;
   isGroup?: boolean;
+  isOfficial?: boolean;
   groupName?: string | null;
   groupAvatar?: string | null;
   memberCount?: number;
@@ -111,7 +111,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   // Using useSearchParams() is SSR-safe; useState initializer freezes the value so
   // subsequent query-param changes (e.g. ?recipientId=xxx) don't re-render this layout.
   const searchParams = useSearchParams();
-  const [viewParam] = useState(() => searchParams.get("view") || "");
 
   // Real-time presence — comes from the global PresenceProvider.
   const { isUserOnline } = usePresence();
@@ -341,6 +340,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!socket || conversations.length === 0) return;
     conversations.forEach((conv) => {
+      if (conv.isOfficial) return;
       if (conv.isGroup) {
         socket.emit("group:join_room", { groupId: conv.id });
       } else {
@@ -812,6 +812,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
    * Uses real-time tracking first, falls back to API-provided count.
    */
   const getUnreadCount = useCallback((conv: Conversation): number => {
+    if (conv.isOfficial) return unreadOfficialCount;
     if (!conv.lastMessage) return 0;
     if (conv.lastMessage.senderId === currentUserId) return 0;
 
@@ -827,14 +828,15 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     if (lastReadAt && new Date(conv.lastMessage.createdAt) <= new Date(lastReadAt)) return 0;
 
     return apiCount;
-  }, [currentUserId, lastReadMap, realtimeUnreadCounts]);
+  }, [currentUserId, lastReadMap, realtimeUnreadCounts, unreadOfficialCount]);
 
   /**
    * Returns true when the conversation has an unread last message.
    */
   const hasUnread = useCallback((conv: Conversation): boolean => {
+    if (conv.isOfficial) return unreadOfficialCount > 0;
     return getUnreadCount(conv) > 0;
-  }, [getUnreadCount]);
+  }, [getUnreadCount, unreadOfficialCount]);
 
   // Sync API unread counts into realtimeUnreadCounts on initial load
   useEffect(() => {
@@ -883,6 +885,16 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleToggleRead = (conv: Conversation) => {
+    if (conv.isOfficial) {
+      if (unreadOfficialCount > 0) {
+        setUnreadOfficialCount(0);
+        void announcementService.markAllAsRead().catch(() => {});
+      } else {
+        setUnreadOfficialCount(1);
+      }
+      return;
+    }
+
     const isCurrentlyUnread = hasUnread(conv);
     if (isCurrentlyUnread) {
       setRealtimeUnreadCounts((prev) => ({ ...prev, [conv.id]: 0 }));
@@ -1200,6 +1212,13 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   const getLastMessagePreview = (conv: Conversation) => {
+    // ── Official announcements use announcement preview ───────────────
+    if (conv.isOfficial) {
+      if (conv.lastMessage?.mediaType === "video") return "🎥 Video";
+      if (conv.lastMessage?.mediaType === "image") return "📷 Photo";
+      return conv.lastMessage?.previewText || latestAnnouncement?.title || "Official platform announcements & updates";
+    }
+
     // ── Typing indicator takes highest priority (WhatsApp behaviour) ──
     if (typingConvIds.has(conv.id)) {
       return "typing…";
@@ -1293,15 +1312,85 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
 
   const [chatFilter, setChatFilter] = useState<"all" | "unread" | "groups" | "business">("all");
 
-  const filteredConversations = conversations.filter((c) => {
-    const nameToMatch = c.isGroup ? (c.groupName || "") : c.otherUserName;
-    const matchesSearch = nameToMatch.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!matchesSearch) return false;
-    if (chatFilter === "unread") return hasUnread(c);
-    if (chatFilter === "groups") return !!c.isGroup;
-    if (chatFilter === "business") return !c.isGroup && (c.workspaceId || c.context === "BUSINESS" || !c.otherUserId);
-    return true;
-  });
+  const officialConversation = useMemo<Conversation>(() => {
+    // If an announcement exists, use its published/created date.
+    // If no announcement exists yet, fallback to epoch so it naturally stays below active chats
+    // until a new broadcast arrives (which then updates its timestamp and floats it to the top).
+    const timestamp =
+      latestAnnouncement?.publishedAt ||
+      latestAnnouncement?.createdAt ||
+      "1970-01-01T00:00:00.000Z";
+
+    return {
+      id: "official",
+      updatedAt: timestamp,
+      otherUserId: null,
+      otherUserName: "CallsChat Official",
+      otherUserAvatar: null,
+      otherUserOnline: false,
+      isOfficial: true,
+      isVerified: true,
+      accountType: "BUSINESS",
+      unreadCount: unreadOfficialCount,
+      lastMessage: {
+        id: latestAnnouncement?.id || "official-latest",
+        senderId: "system",
+        senderName: "CallsChat Official",
+        ciphertext: null,
+        nonce: null,
+        previewText:
+          latestAnnouncement?.title ||
+          "Official platform announcements & updates",
+        mediaType:
+          latestAnnouncement?.mediaType === "VIDEO"
+            ? "video"
+            : latestAnnouncement?.mediaType === "IMAGE"
+            ? "image"
+            : null,
+        mediaUrl: latestAnnouncement?.mediaUrl || null,
+        createdAt: timestamp,
+      },
+    };
+  }, [latestAnnouncement, unreadOfficialCount]);
+
+  const allConversations = useMemo<Conversation[]>(() => {
+    const list = [...conversations, officialConversation];
+    return list.sort((a, b) => {
+      const timeA = new Date(
+        a.lastMessage?.createdAt || a.updatedAt
+      ).getTime();
+      const timeB = new Date(
+        b.lastMessage?.createdAt || b.updatedAt
+      ).getTime();
+      return timeB - timeA;
+    });
+  }, [conversations, officialConversation]);
+
+  const filteredConversations = useMemo(() => {
+    return allConversations.filter((c) => {
+      const nameToMatch = c.isOfficial
+        ? `CallsChat Official ${c.lastMessage?.previewText || ""}`
+        : c.isGroup
+        ? c.groupName || ""
+        : c.otherUserName;
+
+      const matchesSearch = nameToMatch
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+      if (!matchesSearch) return false;
+
+      if (chatFilter === "unread") return hasUnread(c);
+      if (chatFilter === "groups") return !c.isOfficial && !!c.isGroup;
+      if (chatFilter === "business") {
+        return (
+          !c.isOfficial &&
+          !c.isGroup &&
+          (c.workspaceId || c.context === "BUSINESS" || !c.otherUserId)
+        );
+      }
+      return true;
+    });
+  }, [allConversations, searchQuery, chatFilter, hasUnread]);
 
   const getPreviewStatusIcon = (conv: Conversation) => {
     if (!conv.lastMessage || conv.lastMessage.senderId !== currentUserId) return null;
@@ -1331,12 +1420,8 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           !isRootChatsPage && "hidden md:flex"
         )}
       >
-        {currentMode === "BUSINESS" && viewParam === "channels" ? (
-          <BusinessSidebar />
-        ) : (
-          <>
-            {/* Header Area */}
-            <div className="flex flex-col px-4 pt-5 pb-3 border-b border-[#F0F2F5] dark:border-[#202C33]">
+        {/* Header Area */}
+        <div className="flex flex-col px-4 pt-5 pb-3 border-b border-[#F0F2F5] dark:border-[#202C33]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <h1 className="text-[20px] font-extrabold tracking-tight text-[#111B21] dark:text-[#E9EDEF]">
@@ -1363,9 +1448,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                   </Link>
 
                   <NotificationDropdown />
-                  {currentMode === "BUSINESS" && (
-                    <BusinessFeaturesMenu />
-                  )}
                 </div>
               </div>
 
@@ -1490,73 +1572,23 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : (
                   <div className="flex flex-col divide-y divide-[#F0F2F5] dark:divide-[#202C33]">
-                    {/* CallsChat Official Announcement Channel Item */}
-                    {(!searchQuery && (chatFilter === "all" || (chatFilter === "unread" && unreadOfficialCount > 0))) && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="relative group border-b border-[#F0F2F5] dark:border-[#202C33]"
-                      >
-                        <Link
-                          href="/chats/official"
-                          prefetch={false}
-                          className={cn(
-                            "flex w-full items-center gap-3.5 px-4 py-3 transition-colors relative",
-                            pathname === "/chats/official" || pathname === `${basePath}/official`
-                              ? "bg-[#F0F2F5] dark:bg-[#202C33] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-[#00A884]"
-                              : "hover:bg-[#F8FAFC] dark:hover:bg-[#182229]/60"
-                          )}
-                        >
-                          {/* Official Channel Avatar */}
-                          <div className="relative shrink-0">
-                            <div className="h-12 w-12 rounded-full overflow-hidden bg-gradient-to-tr from-[#00A884] to-[#128C7E] shadow-sm flex items-center justify-center text-white">
-                              <Megaphone className="h-5 w-5 text-white" />
-                            </div>
-                          </div>
-
-                          {/* Info & Snippet */}
-                          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-[14.5px] font-bold text-[#111B21] dark:text-[#E9EDEF] truncate tracking-tight">
-                                  CallsChat Official
-                                </span>
-                                <VerifiedBadge type="BUSINESS" size="xs" showTooltip={false} />
-                              </div>
-                              <span className="text-[11px] font-semibold text-[#008069] dark:text-[#00A884] shrink-0">
-                                {latestAnnouncement?.publishedAt
-                                  ? new Date(latestAnnouncement.publishedAt).toLocaleDateString([], { month: "short", day: "numeric" })
-                                  : "Official"}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-[13px] text-[#54656F] dark:text-[#8696A0] truncate font-normal">
-                                {latestAnnouncement?.title || "Official platform announcements & updates"}
-                              </p>
-                              {unreadOfficialCount > 0 && (
-                                <span className="shrink-0 flex items-center justify-center rounded-full bg-[#00A884] text-white font-bold text-[11px] px-1.5 min-w-5 h-5 shadow-xs">
-                                  {unreadOfficialCount}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </Link>
-                      </motion.div>
-                    )}
-
                     {filteredConversations.map((conv, index) => {
-                      const isGroup = !!conv.isGroup;
-                      const hasValidPeer = conv.otherUserId && conv.otherUserId !== "null" && conv.otherUserId !== "undefined";
-                      const chatHref = isGroup
+                      const isOfficial = !!conv.isOfficial;
+                      const isGroup = !isOfficial && !!conv.isGroup;
+                      const hasValidPeer = !isOfficial && conv.otherUserId && conv.otherUserId !== "null" && conv.otherUserId !== "undefined";
+                      const chatHref = isOfficial
+                        ? (pathname.startsWith("/business") ? "/business/chats/official" : "/chats/official")
+                        : isGroup
                         ? `${basePath}/${conv.id}?type=group`
                         : hasValidPeer
                         ? `${basePath}/${conv.id}?recipientId=${conv.otherUserId}`
                         : `${basePath}/${conv.id}`;
-                      const isActive = pathname === `${basePath}/${conv.id}`;
+                      const isActive = isOfficial
+                        ? (pathname === "/chats/official" || pathname === `${basePath}/official`)
+                        : pathname === `${basePath}/${conv.id}`;
 
-                      const contact = conv.otherUserId ? getContact(conv.otherUserId) : undefined;
-                      const resolved = !isGroup && conv.otherUserId ? resolveDisplayName(
+                      const contact = (!isOfficial && conv.otherUserId) ? getContact(conv.otherUserId) : undefined;
+                      const resolved = !isOfficial && !isGroup && conv.otherUserId ? resolveDisplayName(
                         {
                           userId: conv.otherUserId,
                           phone: contact?.phoneNumber,
@@ -1564,17 +1596,27 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                         },
                         contact
                       ) : null;
-                      const displayName = isGroup ? (conv.groupName || "Group") : (resolved?.title || conv.otherUserName);
-                      const rawAvatar = isGroup ? conv.groupAvatar : (contact?.avatarUrl || conv.otherUserAvatar);
+                      const displayName = isOfficial
+                        ? "CallsChat Official"
+                        : isGroup
+                        ? (conv.groupName || "Group")
+                        : (resolved?.title || conv.otherUserName);
+                      const rawAvatar = isOfficial
+                        ? null
+                        : isGroup
+                        ? conv.groupAvatar
+                        : (contact?.avatarUrl || conv.otherUserAvatar);
                       const avatarUrl = rawAvatar ? getOptimizedImageUrl(rawAvatar, 96, 96) : null;
-                      const isVerified = !isGroup && Boolean(conv.isVerified || contact?.isVerified);
-                      const accountType = conv.accountType || (contact as any)?.accountType || (conv.workspaceId ? "BUSINESS" : "USER");
+                      const isVerified = isOfficial || (!isGroup && Boolean(conv.isVerified || contact?.isVerified));
+                      const accountType = isOfficial
+                        ? "BUSINESS"
+                        : conv.accountType || (contact as any)?.accountType || (conv.workspaceId ? "BUSINESS" : "USER");
 
-                      const isOnline = !isGroup && (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline);
-                      const isTyping = typingConvIds.has(conv.id);
-                      const isFav = isGroup
+                      const isOnline = !isOfficial && !isGroup && (isUserOnline(conv.otherUserId ?? "") || conv.otherUserOnline);
+                      const isTyping = !isOfficial && typingConvIds.has(conv.id);
+                      const isFav = !isOfficial && (isGroup
                         ? !!conv.isFavourite
-                        : (conv.otherUserId ? favoriteUserIds.has(conv.otherUserId) : false);
+                        : (conv.otherUserId ? favoriteUserIds.has(conv.otherUserId) : false));
 
                       return (
                         <motion.div
@@ -1591,11 +1633,11 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                             isFavourite={isFav}
                             hasUnread={hasUnread(conv)}
                             onToggleRead={() => handleToggleRead(conv)}
-                            onToggleMute={() => handleToggleMute(conv)}
-                            onToggleFavourite={() => handleToggleFavourite(conv)}
-                            onClearChat={!isGroup ? () => setConversationToClear(conv.id) : undefined}
-                            onLeaveGroup={isGroup ? () => setConversationToLeave(conv.id) : undefined}
-                            onDelete={() => setConversationToDelete(conv.id)}
+                            onToggleMute={!isOfficial ? () => handleToggleMute(conv) : undefined}
+                            onToggleFavourite={!isOfficial ? () => handleToggleFavourite(conv) : undefined}
+                            onClearChat={!isOfficial && !isGroup ? () => setConversationToClear(conv.id) : undefined}
+                            onLeaveGroup={!isOfficial && isGroup ? () => setConversationToLeave(conv.id) : undefined}
+                            onDelete={!isOfficial ? () => setConversationToDelete(conv.id) : undefined}
                           >
                           <Link
                             href={chatHref}
@@ -1607,20 +1649,28 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                 : "hover:bg-[#F8FAFC] dark:hover:bg-[#182229]/60"
                             )}
                           >
-                            {/* Avatar with subtle online dot pip or Group Icon */}
+                            {/* Avatar or Official Megaphone Icon */}
                             <div className="relative shrink-0">
-                              <AvatarImage
-                                src={avatarUrl}
-                                alt={displayName}
-                                size={48}
-                                isGroup={isGroup}
-                                className="shadow-xs"
-                              />
-                              {isOnline && (
-                                <span
-                                  aria-hidden="true"
-                                  className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21] shadow-xs"
-                                />
+                              {isOfficial ? (
+                                <div className="h-12 w-12 rounded-full overflow-hidden bg-gradient-to-tr from-[#00A884] to-[#128C7E] shadow-xs flex items-center justify-center text-white">
+                                  <Megaphone className="h-5 w-5 text-white" />
+                                </div>
+                              ) : (
+                                <>
+                                  <AvatarImage
+                                    src={avatarUrl}
+                                    alt={displayName}
+                                    size={48}
+                                    isGroup={isGroup}
+                                    className="shadow-xs"
+                                  />
+                                  {isOnline && (
+                                    <span
+                                      aria-hidden="true"
+                                      className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111B21] shadow-xs"
+                                    />
+                                  )}
+                                </>
                               )}
                             </div>
 
@@ -1636,7 +1686,7 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                                   )}>
                                     {displayName}
                                   </h3>
-                                  {!isGroup && isVerified && (
+                                  {(isOfficial || (!isGroup && isVerified)) && (
                                     <VerifiedBadge
                                       type={accountType === "BUSINESS" ? "BUSINESS" : "USER"}
                                       size="xs"
@@ -1705,8 +1755,6 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             </div>
-          </>
-        )}
       </div>
 
       {/* Main Content Area */}
