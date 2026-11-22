@@ -121,6 +121,7 @@ export interface GroupMessage {
   reactions?: GroupMessageReactionItem[];
   poll?: GroupPollData | null;
   mentions?: string[];
+  previewText?: string | null;
 }
 
 export interface PinnedMessage {
@@ -644,7 +645,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
             // Multi-device self-sent message recovery: check previewText or content from payload
             if ((!text || !isValidPlaintext(text)) && msg.senderId === currentUserId) {
-              const preview = msg.previewText || (msg as any).content || msg.encryptedKeys?.previewText;
+              const preview =
+                msg.previewText ||
+                (msg.systemMetadata as any)?.previewText ||
+                (msg as any).content ||
+                msg.encryptedKeys?.previewText;
               if (preview && isValidPlaintext(preview)) {
                 text = preview;
               }
@@ -819,6 +824,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 reactions: msg.reactions || [],
                 poll: msg.poll || null,
                 mentions: msg.mentions || [],
+                previewText: (msg.previewText || (msg.systemMetadata as any)?.previewText) ?? null,
               };
             })
           );
@@ -886,7 +892,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
         // Multi-device self-sent message recovery
         if (!text && msg.senderId === myId) {
-          const preview = msg.previewText || (msg as any).content || msg.encryptedKeys?.previewText;
+          const preview =
+            msg.previewText ||
+            (msg.systemMetadata as any)?.previewText ||
+            (msg as any).content ||
+            msg.encryptedKeys?.previewText;
           if (preview) text = preview;
         }
 
@@ -1128,7 +1138,11 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
       // Multi-device self-sent message recovery: check previewText or content from payload
       if (!cached && isMyMessage) {
-        const preview = payload.previewText || payload.content || payload.encryptedKeys?.previewText;
+        const preview =
+          payload.previewText ||
+          (payload.systemMetadata as any)?.previewText ||
+          payload.content ||
+          payload.encryptedKeys?.previewText;
         if (preview) {
           cached = preview;
         }
@@ -1326,6 +1340,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         replyToId: payload.replyToId ?? null,
         replyTo: resolvedReplyTo,
         mentions: payload.mentions || [],
+        previewText: (payload.previewText || (payload.systemMetadata as any)?.previewText) ?? null,
       };
 
       setMessages((prev) => {
@@ -2345,6 +2360,18 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             if (!text && msg.ciphertext) text = await getDecryptedMessage(effectiveUserId, `cipher_${msg.ciphertext}`);
           }
 
+          // Multi-device self-sent message recovery: check previewText or content from payload
+          if ((!text || !isValidPlaintext(text)) && effectiveUserId && msg.senderId === effectiveUserId) {
+            const preview =
+              msg.previewText ||
+              (msg.systemMetadata as any)?.previewText ||
+              (msg as any).content ||
+              msg.encryptedKeys?.previewText;
+            if (preview && isValidPlaintext(preview)) {
+              text = preview;
+            }
+          }
+
           if (text) {
             const parsed = parseEditedText(text).text;
             sentPlaintextCacheRef.current.set(msg.id, parsed);
@@ -2430,6 +2457,7 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             reactions: msg.reactions || [],
             poll: msg.poll || null,
             mentions: msg.mentions || [],
+            previewText: (msg.previewText || (msg.systemMetadata as any)?.previewText) ?? null,
           });
         }
 
