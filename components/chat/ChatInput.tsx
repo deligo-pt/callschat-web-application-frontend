@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Send, Paperclip, Camera, Mic, Square, X, Loader2, Image as ImageIcon, Smile, Video, FileText } from "lucide-react";
+import { Send, Paperclip, Camera, Mic, X, Loader2, Image as ImageIcon, Smile, Video, FileText, Trash2 } from "lucide-react";
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
 import { useQuickReply, QuickReplyDropdown } from "@/components/business/QuickReplyMenu";
@@ -59,12 +59,15 @@ export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, 
     recordingDuration,
     startRecording,
     stopRecording,
+    cancelRecording,
     isCameraOpen,
     videoRef,
     startCamera,
     stopCamera,
     capturePhoto,
   } = useMediaCapture();
+
+  const [isSubmittingVoice, setIsSubmittingVoice] = useState(false);
 
   const handleSend = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -149,15 +152,33 @@ export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, 
     }
   };
 
-  const handleToggleRecording = async () => {
-    if (isRecording) {
+  const handleStartRecording = async () => {
+    try {
+      await startRecording();
+    } catch (err) {
+      console.error("Failed to start voice recording:", err);
+      toast.error("Could not access microphone.");
+    }
+  };
+
+  const handleSendVoiceRecording = async () => {
+    if (!isRecording || isSubmittingVoice) return;
+    try {
+      setIsSubmittingVoice(true);
       const audioFile = await stopRecording();
       if (audioFile) {
-        setSelectedFile(audioFile);
+        onSend("", audioFile);
       }
-    } else {
-      await startRecording();
+    } catch (err) {
+      console.error("Failed to stop and send recording:", err);
+      toast.error("Failed to send voice recording.");
+    } finally {
+      setIsSubmittingVoice(false);
     }
+  };
+
+  const handleCancelRecording = () => {
+    cancelRecording();
   };
 
   const handleCapturePhoto = () => {
@@ -307,8 +328,17 @@ export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, 
           accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,.eml,.msg,*/*"
         />
 
-        {/* Attachment Buttons (hidden when recording) */}
-        {!isRecording && (
+        {/* Attachment Buttons or Discard Recording Button */}
+        {isRecording ? (
+          <button
+            type="button"
+            onClick={handleCancelRecording}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            title="Discard recording"
+          >
+            <Trash2 className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+        ) : (
           <div className="flex gap-1 items-center">
             <button
               type="button"
@@ -377,23 +407,30 @@ export function ChatInput({ onSend, isReady, isUploading, onTyping, replyingTo, 
           )}
         </div>
 
-        {/* Mic / Stop Recording Button */}
-        {inputText.trim() === "" && !selectedFile && !isUploading ? (
+        {/* Right Action Button: Direct Send Voice / Mic / Send Message */}
+        {isRecording ? (
           <button
             type="button"
-            onClick={handleToggleRecording}
-            disabled={!isReady}
-            className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-xs",
-              isRecording ? "bg-red-500 text-white animate-pulse" : "bg-[#00A884] hover:bg-[#008069] text-white"
-            )}
-            title={isRecording ? "Stop recording" : "Record voice message"}
+            onClick={handleSendVoiceRecording}
+            disabled={!isReady || isUploading || isSubmittingVoice}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00A884] hover:bg-[#008069] text-white transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-xs"
+            title="Send voice message"
           >
-            {isRecording ? (
-              <Square className="h-4.5 w-4.5 fill-current" strokeWidth={2} />
+            {isSubmittingVoice || isUploading ? (
+              <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2} />
             ) : (
-              <Mic className="h-5 w-5" strokeWidth={2} />
+              <Send className="h-4.5 w-4.5 ml-0.5" strokeWidth={2.5} />
             )}
+          </button>
+        ) : inputText.trim() === "" && !selectedFile && !isUploading ? (
+          <button
+            type="button"
+            onClick={handleStartRecording}
+            disabled={!isReady}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00A884] hover:bg-[#008069] text-white transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-xs"
+            title="Record voice message"
+          >
+            <Mic className="h-5 w-5" strokeWidth={2} />
           </button>
         ) : (
           /* Send Button */

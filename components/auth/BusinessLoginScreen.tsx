@@ -97,7 +97,7 @@ export default function BusinessLoginScreen() {
         const res = await fetch(`${BASE_URL}/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phoneNumber: phone }),
+          body: JSON.stringify({ phoneNumber: phone, appType: "BUSINESS" }),
         });
         const data = await res.json();
         if (data.success) {
@@ -176,8 +176,11 @@ export default function BusinessLoginScreen() {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "x-app-type": "business",
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          appType: "BUSINESS",
+        }),
       });
       const data = await res.json();
       const accessToken =

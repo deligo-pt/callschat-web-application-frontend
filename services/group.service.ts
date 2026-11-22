@@ -32,6 +32,7 @@ export interface GroupItem {
     isSystem?: boolean;
     systemEventType?: string | null;
     systemMetadata?: any;
+    previewText?: string | null;
     pollQuestion?: string | null;
     receipts?: Array<{ userId: string; deliveredAt?: string | null; seenAt?: string | null }>;
     createdAt: string;

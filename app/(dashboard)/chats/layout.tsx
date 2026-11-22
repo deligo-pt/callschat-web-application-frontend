@@ -176,38 +176,47 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
           }))
         : [];
       const groupConvs: Conversation[] = (groupsRes?.success && Array.isArray(groupsRes?.data))
-        ? groupsRes.data.map((g: GroupItem) => ({
-            id: g.id,
-            updatedAt: g.updatedAt,
-            otherUserId: null,
-            otherUserName: g.name,
-            otherUserAvatar: g.avatarUrl,
-            otherUserOnline: false,
-            isGroup: true,
-            groupName: g.name,
-            groupAvatar: g.avatarUrl,
-            memberCount: g.memberCount,
-            myRole: g.myRole,
-            isFavourite: g.isFavourite,
-            isMuted: g.isMuted,
-            lastMessage: g.lastMessage
-              ? {
-                  id: g.lastMessage.id,
-                  senderId: g.lastMessage.senderId,
-                  senderName: g.lastMessage.senderName,
-                  ciphertext: g.lastMessage.ciphertext,
-                  nonce: g.lastMessage.nonce,
-                  mediaType: g.lastMessage.mediaType,
-                  mediaUrl: g.lastMessage.mediaUrl,
-                  isSystem: g.lastMessage.isSystem,
-                  systemEventType: g.lastMessage.systemEventType,
-                  systemMetadata: g.lastMessage.systemMetadata,
-                  pollQuestion: g.lastMessage.pollQuestion,
-                  receipts: g.lastMessage.receipts,
-                  createdAt: g.lastMessage.createdAt,
-                }
-              : null,
-          }))
+        ? groupsRes.data.map((g: GroupItem) => {
+            const lastActivity = g.lastMessage?.createdAt
+              ? Math.max(new Date(g.updatedAt).getTime(), new Date(g.lastMessage.createdAt).getTime())
+              : new Date(g.updatedAt).getTime();
+
+            return {
+              id: g.id,
+              updatedAt: new Date(lastActivity).toISOString(),
+              otherUserId: null,
+              otherUserName: g.name,
+              otherUserAvatar: g.avatarUrl,
+              otherUserOnline: false,
+              isGroup: true,
+              groupName: g.name,
+              groupAvatar: g.avatarUrl,
+              memberCount: g.memberCount,
+              myRole: g.myRole,
+              isFavourite: g.isFavourite,
+              isMuted: g.isMuted,
+              context: (g as any).context,
+              workspaceId: (g as any).workspaceId,
+              lastMessage: g.lastMessage
+                ? {
+                    id: g.lastMessage.id,
+                    senderId: g.lastMessage.senderId,
+                    senderName: g.lastMessage.senderName,
+                    ciphertext: g.lastMessage.ciphertext,
+                    nonce: g.lastMessage.nonce,
+                    mediaType: g.lastMessage.mediaType,
+                    mediaUrl: g.lastMessage.mediaUrl,
+                    isSystem: g.lastMessage.isSystem,
+                    systemEventType: g.lastMessage.systemEventType,
+                    systemMetadata: g.lastMessage.systemMetadata,
+                    previewText: (g.lastMessage as any).previewText || (g.lastMessage.systemMetadata as any)?.previewText || null,
+                    pollQuestion: g.lastMessage.pollQuestion,
+                    receipts: g.lastMessage.receipts,
+                    createdAt: g.lastMessage.createdAt,
+                  }
+                : null,
+            };
+          })
         : [];
 
       const merged = [...directConvs, ...groupConvs].sort(
@@ -820,14 +829,17 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
     const rtCount = realtimeUnreadCounts[conv.id];
     if (rtCount !== undefined) return rtCount;
 
-    // Fall back to API count
-    const apiCount = conv.unreadCount || 0;
-
     // Validate against lastReadMap: if already read, return 0
     const lastReadAt = lastReadMap[conv.id];
     if (lastReadAt && new Date(conv.lastMessage.createdAt) <= new Date(lastReadAt)) return 0;
 
-    return apiCount;
+    // Check message receipts: if seen by current user, return 0
+    const myReceipt = conv.lastMessage.receipts?.find((r) => r.userId === currentUserId);
+    if (myReceipt?.seenAt) return 0;
+
+    // Fall back to API count if provided and > 0, otherwise count as at least 1 unread message
+    const apiCount = conv.unreadCount || 0;
+    return apiCount > 0 ? apiCount : 1;
   }, [currentUserId, lastReadMap, realtimeUnreadCounts, unreadOfficialCount]);
 
   /**
@@ -1382,15 +1394,21 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
       if (chatFilter === "unread") return hasUnread(c);
       if (chatFilter === "groups") return !c.isOfficial && !!c.isGroup;
       if (chatFilter === "business") {
-        return (
-          !c.isOfficial &&
-          !c.isGroup &&
-          (c.workspaceId || c.context === "BUSINESS" || !c.otherUserId)
+        const contact = c.otherUserId ? getContact(c.otherUserId) : null;
+        const isBiz =
+          c.accountType === "BUSINESS" ||
+          (contact as any)?.accountType === "BUSINESS" ||
+          Boolean(c.workspaceId) ||
+          c.context === "BUSINESS" ||
+          Boolean((c as any).businessHandle);
+        return !c.isOfficial && (
+          (!c.isGroup && isBiz) ||
+          (!!c.isGroup && (c.context === "BUSINESS" || Boolean(c.workspaceId)))
         );
       }
       return true;
     });
-  }, [allConversations, searchQuery, chatFilter, hasUnread]);
+  }, [allConversations, searchQuery, chatFilter, hasUnread, getContact]);
 
   const getPreviewStatusIcon = (conv: Conversation) => {
     if (!conv.lastMessage || conv.lastMessage.senderId !== currentUserId) return null;
@@ -1553,21 +1571,47 @@ function ChatsLayoutContent({ children }: { children: React.ReactNode }) {
                       <MessageSquare className="h-6 w-6" />
                     </div>
                     <h3 className="text-[15px] font-bold text-[#111B21] dark:text-[#E9EDEF] mb-1">
-                      {searchQuery ? "No conversations found" : chatFilter === "unread" ? "No unread messages" : chatFilter === "groups" ? "No groups found" : "No conversations yet"}
+                      {searchQuery
+                        ? "No conversations found"
+                        : chatFilter === "unread"
+                        ? "No unread messages"
+                        : chatFilter === "groups"
+                        ? "No groups found"
+                        : chatFilter === "business"
+                        ? "No business chats yet"
+                        : "No conversations yet"}
                     </h3>
-                    <p className="text-[12.5px] font-normal text-[#54656F] dark:text-[#8696A0] max-w-[220px] leading-relaxed mb-5">
+                    <p className="text-[12.5px] font-normal text-[#54656F] dark:text-[#8696A0] max-w-[240px] leading-relaxed mb-5">
                       {searchQuery
                         ? "Try searching for another name or keyword"
+                        : chatFilter === "unread"
+                        ? "You are all caught up! No unread messages."
+                        : chatFilter === "groups"
+                        ? "Create or join a group to start group discussions."
+                        : chatFilter === "business"
+                        ? "Connect with verified businesses or explore official services."
                         : "Connect and start encrypted chatting with your friends or team."}
                     </p>
                     {!searchQuery && (
-                      <button
-                        onClick={() => setIsNewMessageOpen(true)}
-                        className="flex items-center justify-center gap-2 rounded-full bg-[#00A884] hover:bg-[#008069] px-5 py-2 text-[12.5px] font-bold text-white transition-all shadow-xs"
-                      >
-                        <MessageSquarePlus className="h-4 w-4" />
-                        Start a Chat
-                      </button>
+                      chatFilter === "business" ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsExploreOpen(true)}
+                          className="flex items-center justify-center gap-2 rounded-full bg-[#00A884] hover:bg-[#008069] px-5 py-2 text-[12.5px] font-bold text-white transition-all shadow-xs"
+                        >
+                          <Building2 className="h-4 w-4" />
+                          Explore Businesses
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsNewMessageOpen(true)}
+                          className="flex items-center justify-center gap-2 rounded-full bg-[#00A884] hover:bg-[#008069] px-5 py-2 text-[12.5px] font-bold text-white transition-all shadow-xs"
+                        >
+                          <MessageSquarePlus className="h-4 w-4" />
+                          Start a Chat
+                        </button>
+                      )
                     )}
                   </div>
                 ) : (
