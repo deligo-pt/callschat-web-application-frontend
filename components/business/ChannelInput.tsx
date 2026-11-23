@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Send, Paperclip, Mic, Square, X, Loader2, Image as ImageIcon, Smile, Camera } from "lucide-react";
+import { Send, Paperclip, Mic, X, Loader2, Image as ImageIcon, Smile, Camera, Trash2 } from "lucide-react";
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { cn } from "@/lib/utils";
 import { ScheduleSendPopover } from "@/components/business/ScheduleSendPopover";
@@ -24,12 +24,15 @@ export function ChannelInput({ channelName, onSend, onSchedule, disabled }: Chan
     recordingDuration,
     startRecording,
     stopRecording,
+    cancelRecording,
     isCameraOpen,
     videoRef,
     startCamera,
     stopCamera,
     capturePhoto,
   } = useMediaCapture();
+
+  const [isSubmittingVoice, setIsSubmittingVoice] = useState(false);
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -71,15 +74,29 @@ export function ChannelInput({ channelName, onSend, onSchedule, disabled }: Chan
     }
   };
 
-  const handleToggleRecording = async () => {
-    if (isRecording) {
+  const handleStartRecording = async () => {
+    try {
+      await startRecording();
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+    }
+  };
+
+  const handleSendVoiceRecording = async () => {
+    if (!isRecording || isSubmittingVoice) return;
+    try {
+      setIsSubmittingVoice(true);
       const audioFile = await stopRecording();
       if (audioFile) {
-        setSelectedFile(audioFile);
+        await onSend("", audioFile);
       }
-    } else {
-      await startRecording();
+    } finally {
+      setIsSubmittingVoice(false);
     }
+  };
+
+  const handleCancelRecording = () => {
+    cancelRecording();
   };
 
   const handleCapturePhoto = () => {
@@ -163,7 +180,16 @@ export function ChannelInput({ channelName, onSend, onSchedule, disabled }: Chan
       />
 
       <form onSubmit={handleSend} className="flex items-center gap-2 rounded-2xl border border-[#E6EAFA] bg-[#F8FAFC] px-4 py-2 focus-within:border-purple-600 focus-within:ring-3 focus-within:ring-purple-600/15 transition-all">
-        {!isRecording && (
+        {isRecording ? (
+          <button
+            type="button"
+            onClick={handleCancelRecording}
+            className="p-1.5 text-[#8F95B2] hover:text-red-500 transition-colors cursor-pointer"
+            title="Discard Recording"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : (
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
@@ -206,42 +232,52 @@ export function ChannelInput({ channelName, onSend, onSchedule, disabled }: Chan
         )}
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Mic / Stop Recording Button */}
-          {!hasContent && !isUploading ? (
+          {isRecording ? (
             <button
               type="button"
-              onClick={handleToggleRecording}
-              disabled={disabled}
-              className={cn(
-                "p-2 rounded-xl transition-all cursor-pointer shadow-sm",
-                isRecording ? "bg-red-500 text-white animate-pulse" : "bg-purple-100 text-purple-600 hover:bg-purple-200"
-              )}
-              title={isRecording ? "Stop Recording" : "Record Voice Note"}
+              onClick={handleSendVoiceRecording}
+              disabled={disabled || isSubmittingVoice}
+              className="p-2 rounded-xl bg-purple-600 text-white font-bold shadow-md shadow-purple-500/20 hover:bg-purple-700 disabled:opacity-50 disabled:shadow-none transition-all cursor-pointer flex items-center justify-center min-w-[36px] min-h-[36px]"
+              title="Send voice message"
             >
-              {isRecording ? (
-                <Square className="h-4 w-4 fill-current" />
+              {isSubmittingVoice ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Mic className="h-4 w-4" />
+                <Send className="h-4 w-4" />
               )}
             </button>
-          ) : null}
+          ) : (
+            <>
+              {!hasContent && !isUploading ? (
+                <button
+                  type="button"
+                  onClick={handleStartRecording}
+                  disabled={disabled}
+                  className="p-2 rounded-xl transition-all cursor-pointer shadow-sm bg-purple-100 text-purple-600 hover:bg-purple-200"
+                  title="Record Voice Note"
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+              ) : null}
 
-          <ScheduleSendPopover
-            disabled={!hasContent || isUploading}
-            onSchedule={handleScheduleMessage}
-          />
+              <ScheduleSendPopover
+                disabled={!hasContent || isUploading}
+                onSchedule={handleScheduleMessage}
+              />
 
-          <button
-            type="submit"
-            disabled={!hasContent || isUploading || disabled}
-            className="p-2 rounded-xl bg-purple-600 text-white font-bold shadow-md shadow-purple-500/20 hover:bg-purple-700 disabled:opacity-50 disabled:shadow-none transition-all cursor-pointer flex items-center justify-center min-w-[36px] min-h-[36px]"
-          >
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
+              <button
+                type="submit"
+                disabled={!hasContent || isUploading || disabled}
+                className="p-2 rounded-xl bg-purple-600 text-white font-bold shadow-md shadow-purple-500/20 hover:bg-purple-700 disabled:opacity-50 disabled:shadow-none transition-all cursor-pointer flex items-center justify-center min-w-[36px] min-h-[36px]"
+              >
+                {isUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </div>

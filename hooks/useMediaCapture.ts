@@ -106,13 +106,39 @@ export function useMediaCapture() {
 
         setIsRecording(false);
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
         setRecordingDuration(0);
+        mediaRecorderRef.current = null;
 
         resolve(audioFile);
       };
 
       recorder.stop();
     });
+  }, []);
+
+  const cancelRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      try {
+        recorder.stop();
+      } catch (err) {
+        console.error('Error stopping recorder during cancel:', err);
+      }
+      try {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+      } catch (err) {
+        console.error('Error stopping stream tracks during cancel:', err);
+      }
+    }
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = null;
+    setRecordingDuration(0);
   }, []);
 
   // --- Camera Logic ---
@@ -192,6 +218,7 @@ export function useMediaCapture() {
     recordingDuration,
     startRecording,
     stopRecording,
+    cancelRecording,
     // Camera
     isCameraOpen,
     videoRef,

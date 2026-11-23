@@ -941,12 +941,6 @@ function ChatRoomPageContent() {
                   size={40}
                   className="shadow-xs"
                 />
-                {(!blockStatus?.isBlocked && ((isMounted && isUserOnline(recipientId)) || recipient?.isOnline)) && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white dark:border-[#202C33] bg-[#25D366]"
-                  />
-                )}
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
