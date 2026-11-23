@@ -196,11 +196,6 @@ function ChatRouter() {
 
   const [isGroup, setIsGroup] = useState<boolean>(() => {
     if (typeParam === "group") return true;
-    if (typeof window !== "undefined" && conversationId) {
-      const cached = localStorage.getItem(`is_group_${conversationId}`);
-      if (cached === "true") return true;
-      if (cached === "false") return false;
-    }
     return false;
   });
 
@@ -211,6 +206,13 @@ function ChatRouter() {
         localStorage.setItem(`is_group_${conversationId}`, "true");
       }
       return;
+    }
+    if (typeof window !== "undefined" && conversationId) {
+      const cached = localStorage.getItem(`is_group_${conversationId}`);
+      if (cached === "true") {
+        setIsGroup(true);
+        return;
+      }
     }
     // Auto-detect if this ID belongs to a group when recipientId and bizHandle are absent
     if (!recipientIdFromQuery && !bizHandle && conversationId) {
@@ -281,12 +283,7 @@ function ChatRoomPageContent() {
   // ── State ──────────────────────────────────────────────────────────────────
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [recipientId, setRecipientId] = useState<string>(() => {
-    if (recipientIdFromQuery) return recipientIdFromQuery;
-    if (typeof window !== "undefined" && conversationId) {
-      const cached = sessionStorage.getItem(`active_peer_${conversationId}`);
-      if (cached && cached !== "null" && cached !== "undefined") return cached;
-    }
-    return "";
+    return recipientIdFromQuery || "";
   });
   const [isInitializing, setIsInitializing] = useState(true);
   const [recipient, setRecipient] = useState<UserProfile | null>(null);
@@ -300,7 +297,15 @@ function ChatRoomPageContent() {
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    if (!recipientId && conversationId && typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem(`active_peer_${conversationId}`);
+        if (cached && cached !== "null" && cached !== "undefined") {
+          setRecipientId(cached);
+        }
+      } catch {}
+    }
+  }, [conversationId, recipientId]);
 
   useEffect(() => {
     if (recipientId && recipientId !== "null" && recipientId !== "undefined" && typeof window !== "undefined" && conversationId) {
@@ -987,7 +992,7 @@ function ChatRoomPageContent() {
                   recipient?.avatarUrl,
                 )
               }
-              disabled={!recipientId || blockStatus?.isBlocked}
+              disabled={!isMounted || !recipientId || blockStatus?.isBlocked}
               className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors disabled:opacity-50"
               title="Video call"
             >
@@ -1003,13 +1008,13 @@ function ChatRoomPageContent() {
                   recipient?.avatarUrl,
                 )
               }
-              disabled={!recipientId || blockStatus?.isBlocked}
+              disabled={!isMounted || !recipientId || blockStatus?.isBlocked}
               className="flex h-9 w-9 items-center justify-center rounded-full text-[#54656F] dark:text-[#8696A0] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#00A884] dark:hover:text-[#00A884] transition-colors disabled:opacity-50"
               title="Audio call"
             >
               <Phone className="h-4.5 w-4.5" strokeWidth={1.8} />
             </button>
-            {recipientId && (
+            {isMounted && recipientId && (
               <ChatOptionsMenu
                 conversationId={conversationId}
                 peerId={recipientId}

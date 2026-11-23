@@ -26,6 +26,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import * as React from "react";
 import QRCode from "react-qr-code";
+import { motion } from "framer-motion";
 import Modal from "../shared/Modal";
 import {
   DropdownMenu,
@@ -558,99 +559,137 @@ export default function WebLoginScreen() {
               </div>
             </div>
 
-            {/* ── QR CODE FRAME (With Centered CallsChat Logo & Subtle Animations) ── */}
+            {/* ── ENHANCED QR SCANNER CONTAINER (WhatsApp Web Refined Viewfinder) ── */}
             <div className="w-full flex flex-col items-center justify-center py-1">
-              <div className="relative w-full max-w-[260px] aspect-square bg-white rounded-2xl p-4 border border-slate-200/90 dark:border-[#2A3942] shadow-sm dark:shadow-[0_4px_24px_rgba(0,0,0,0.6)] flex items-center justify-center overflow-hidden transition-all duration-300">
+              
+              {/* Outer Glow Halo & Bezel Housing */}
+              <div className="relative group p-3 sm:p-3.5 rounded-[28px] bg-gradient-to-b from-slate-100/80 via-white to-slate-50 dark:from-[#182229] dark:via-[#111B21] dark:to-[#0C1317] border border-slate-200/90 dark:border-[#2A3942] shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-all duration-300">
                 
-                {/* Live QR code */}
-                {isQrReady && qrValue && (
-                  <div className="relative w-full h-full flex items-center justify-center animate-in fade-in zoom-in-95 duration-300">
-                    <QRCode
-                      value={qrValue}
-                      size={240}
-                      fgColor="#111B21"
-                      level="Q"
-                      className="w-full h-full object-contain"
-                    />
-                    {/* Centered CallsChat Logo Badge with subtle shadow */}
-                    <div className="absolute w-11 h-11 rounded-full bg-white shadow-md p-1 flex items-center justify-center border border-slate-100/90 ring-2 ring-blue-50/80">
-                      <Image
-                        src="/call_chats_logo.png"
-                        alt="CallsChat"
-                        width={30}
-                        height={30}
-                        className="object-contain"
-                      />
-                    </div>
+                {/* Inner High-Contrast QR Canvas */}
+                <div className="relative w-[240px] sm:w-[256px] aspect-square bg-white rounded-2xl p-4 shadow-inner flex items-center justify-center overflow-hidden">
+                  
+                  {/* 4 Precision Optical Corner Reticles (Viewfinder brackets) */}
+                  <div className="pointer-events-none absolute inset-2.5 z-10">
+                    <span className="absolute top-0 left-0 w-4 h-4 border-t-2.5 border-l-2.5 rounded-tl-md border-[#037CFD] dark:border-[#00A884] transition-colors" />
+                    <span className="absolute top-0 right-0 w-4 h-4 border-t-2.5 border-r-2.5 rounded-tr-md border-[#037CFD] dark:border-[#00A884] transition-colors" />
+                    <span className="absolute bottom-0 left-0 w-4 h-4 border-b-2.5 border-l-2.5 rounded-bl-md border-[#037CFD] dark:border-[#00A884] transition-colors" />
+                    <span className="absolute bottom-0 right-0 w-4 h-4 border-b-2.5 border-r-2.5 rounded-br-md border-[#037CFD] dark:border-[#00A884] transition-colors" />
                   </div>
-                )}
 
-                {/* Loading overlay */}
-                {isLoading && (
-                  <div className="flex flex-col items-center justify-center gap-2.5 text-center p-4">
-                    <div className="w-9 h-9 rounded-full border-3 border-slate-200 border-t-[#037CFD] animate-spin" />
-                    <span className="text-xs font-medium text-slate-600">
-                      {status === "connecting" ? "Connecting to server…" : "Generating QR code…"}
-                    </span>
-                  </div>
-                )}
-
-                {/* Success overlay with celebration animation */}
-                {isSuccess && (
-                  <div className="flex flex-col items-center justify-center gap-2 text-center animate-in fade-in zoom-in-95 duration-300">
-                    <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md animate-bounce">
-                      <Check className="w-7 h-7 stroke-[3]" />
-                    </div>
-                    <span className="text-sm font-bold text-emerald-600">Logged in!</span>
-                    <span className="text-xs text-slate-500 font-medium">Redirecting to chats…</span>
-                  </div>
-                )}
-
-                {/* Expired / Error overlay with soothing dark backdrop */}
-                {(isExpired || isError) && (
-                  <div className="absolute inset-0 bg-white/95 dark:bg-[#111B21]/95 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center gap-2.5 animate-in fade-in duration-200">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-[#202C33] text-slate-700 dark:text-[#E9EDEF] flex items-center justify-center shadow-xs border border-transparent dark:border-[#2A3942]">
-                      <RefreshCw size={20} className="text-slate-600 dark:text-[#8696A0]" />
-                    </div>
-                    <p className="text-xs font-semibold text-slate-800 dark:text-[#E9EDEF]">
-                      {isError ? errorMessage || "Connection failed" : "QR code expired"}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={refreshQrCode}
-                      className="px-4 py-2 rounded-xl bg-[#037CFD] dark:bg-[#00A884] hover:bg-blue-600 dark:hover:bg-[#008069] text-white text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                  {/* Ambient Laser Scan Beam */}
+                  {isQrReady && qrValue && (
+                    <motion.div
+                      initial={{ top: "0%" }}
+                      animate={{ top: ["4%", "88%", "4%"] }}
+                      transition={{ repeat: Infinity, duration: 3.2, ease: "easeInOut" }}
+                      className="pointer-events-none absolute inset-x-2.5 z-10 h-7 opacity-70"
                     >
-                      Click to reload QR
-                    </button>
-                  </div>
-                )}
+                      <div className="w-full h-full bg-gradient-to-b from-transparent via-[#037CFD]/25 dark:via-[#00A884]/30 to-transparent flex items-center">
+                        <div className="w-full h-[1.5px] bg-[#037CFD] dark:bg-[#00A884] shadow-[0_0_8px_#037CFD] dark:shadow-[0_0_8px_#00A884]" />
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Live QR Matrix */}
+                  {isQrReady && qrValue && (
+                    <div className="relative w-full h-full flex items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+                      <QRCode
+                        value={qrValue}
+                        size={224}
+                        fgColor="#111B21"
+                        level="Q"
+                        className="w-full h-full object-contain"
+                      />
+                      {/* Centered Floating Logo Shield */}
+                      <div className="absolute w-12 h-12 rounded-2xl bg-white shadow-lg p-1.5 flex items-center justify-center border border-slate-100 ring-2 ring-blue-500/15 dark:ring-emerald-500/25">
+                        <Image
+                          src="/call_chats_logo.png"
+                          alt="CallsChat"
+                          width={32}
+                          height={32}
+                          className="object-contain"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Loading overlay */}
+                  {isLoading && (
+                    <div className="flex flex-col items-center justify-center gap-2.5 text-center p-4">
+                      <div className="w-9 h-9 rounded-full border-3 border-slate-200 border-t-[#037CFD] dark:border-t-[#00A884] animate-spin" />
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {status === "connecting" ? "Connecting to server…" : "Generating QR code…"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Success overlay with celebration animation */}
+                  {isSuccess && (
+                    <div className="flex flex-col items-center justify-center gap-2 text-center animate-in fade-in zoom-in-95 duration-300">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md animate-bounce">
+                        <Check className="w-7 h-7 stroke-[3]" />
+                      </div>
+                      <span className="text-sm font-bold text-emerald-600">Logged in!</span>
+                      <span className="text-xs text-slate-500 font-medium">Redirecting to chats…</span>
+                    </div>
+                  )}
+
+                  {/* Expired / Error overlay with soothing frosted glass backdrop */}
+                  {(isExpired || isError) && (
+                    <div className="absolute inset-0 bg-white/90 dark:bg-[#111B21]/95 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center gap-3 animate-in fade-in duration-200 z-20">
+                      <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#202C33] text-slate-700 dark:text-[#E9EDEF] flex items-center justify-center shadow-xs border border-transparent dark:border-[#2A3942]">
+                        <RefreshCw size={22} className="text-slate-600 dark:text-[#8696A0]" />
+                      </div>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-[#E9EDEF]">
+                        {isError ? errorMessage || "Connection failed" : "QR code expired"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={refreshQrCode}
+                        className="px-4 py-2 rounded-xl bg-[#037CFD] dark:bg-[#00A884] hover:bg-blue-600 dark:hover:bg-[#008069] text-white text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884]"
+                      >
+                        Click to reload QR
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Subtext below QR: Live pulsing timer & manual refresh */}
-              <div className="w-full max-w-[260px] mt-3 flex items-center justify-between text-xs text-[#54656F] dark:text-[#8696A0]">
+              {/* ── CIRCULAR PROGRESS TTL TIMER & STATUS BAR ── */}
+              <div className="w-full max-w-[276px] mt-3.5 flex items-center justify-between text-xs px-1 text-[#54656F] dark:text-[#8696A0]">
+                {/* SVG Circular Progress & Time */}
                 <div className="flex items-center gap-2">
-                  {/* Pulsing status dot */}
-                  <span className="relative flex h-2 w-2">
-                    <span className={cn(
-                      "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
-                      isError || isExpired ? "bg-rose-400" : "bg-emerald-400"
-                    )} />
-                    <span className={cn(
-                      "relative inline-flex rounded-full h-2 w-2",
-                      isError || isExpired ? "bg-rose-500" : "bg-emerald-500"
-                    )} />
-                  </span>
-                  
-                  <span>
-                    Expires in <strong className="font-semibold text-[#111B21] dark:text-[#E9EDEF]">{formatTime(countdown)}</strong>
+                  <div className="relative w-4.5 h-4.5 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" fill="none" className="text-slate-200 dark:text-[#2A3942]" />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeDasharray={56.5}
+                        strokeDashoffset={56.5 * (1 - Math.max(0, countdown) / 60)}
+                        strokeLinecap="round"
+                        fill="none"
+                        className={cn(
+                          "transition-all duration-1000",
+                          countdown > 15 ? "text-[#00A884]" : countdown > 5 ? "text-amber-500" : "text-rose-500"
+                        )}
+                      />
+                    </svg>
+                  </div>
+                  <span className="font-medium text-[#111B21] dark:text-[#E9EDEF]">
+                    Expires in <strong>{formatTime(countdown)}</strong>
                   </span>
                 </div>
 
+                {/* Refresh Button with Micro-Interaction */}
                 <button
                   type="button"
                   onClick={refreshQrCode}
                   disabled={isLoading || isSuccess}
-                  className="text-xs font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer group"
+                  className="inline-flex items-center gap-1.5 font-semibold text-[#037CFD] dark:text-[#53BDEB] hover:underline disabled:opacity-50 cursor-pointer group"
                 >
                   <RefreshCw
                     size={12}

@@ -4,12 +4,15 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { chatService } from "@/services/chat.service";
 import { usePresence } from "@/context/PresenceContext";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { Loader2 } from "lucide-react";
 import { getOptimizedImageUrl } from "@/utils/image";
 
 export function ActiveNowTray() {
   const router = useRouter();
   const { activeUsers, isLoading } = usePresence();
+  const { getContact } = useContacts();
 
   // Open a 1-on-1 conversation with the tapped contact.
   const handleUserClick = async (userId: string) => {
@@ -54,12 +57,21 @@ export function ActiveNowTray() {
       {/* ── Horizontal avatar strip with clean online indicator ── */}
       <div className="flex items-center gap-3.5 overflow-x-auto px-2 pb-2 scrollbar-none">
         {activeUsers.map((user) => {
-          const avatarSrc =
-            user.avatar
-              ? getOptimizedImageUrl(user.avatar, 48, 48)
-              : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E0F2FE&color=0284C7&bold=true`;
+          const contact = getContact(user.id);
+          const resolved = resolveDisplayName(
+            {
+              userId: user.id,
+              phone: contact?.phoneNumber,
+              profileDisplayName: contact?.customName || contact?.displayName || user.name,
+            },
+            contact
+          );
 
-          const firstName = user.name?.split(" ")[0] || "User";
+          const displayName = resolved.title || user.name || "User";
+          const firstName = displayName.split(" ")[0] || "User";
+          const rawAvatar = contact?.avatarUrl || user.avatar;
+          const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=E0F2FE&color=0284C7&bold=true`;
+          const avatarSrc = rawAvatar ? getOptimizedImageUrl(rawAvatar, 48, 48) : fallbackAvatar;
 
           return (
             <button
@@ -67,19 +79,20 @@ export function ActiveNowTray() {
               type="button"
               onClick={() => handleUserClick(user.id)}
               className="flex flex-col items-center gap-1 shrink-0 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00A884] rounded-xl p-1 transition-all"
-              aria-label={`Chat with ${user.name}`}
+              aria-label={`Chat with ${displayName}`}
+              title={displayName}
             >
               <div className="relative">
                 <div className="h-[46px] w-[46px] rounded-full overflow-hidden ring-2 ring-transparent group-hover:ring-[#00A884] transition-all bg-[#F0F2F5] shadow-xs">
                   <img
                     src={getOptimizedImageUrl(avatarSrc)}
-                    alt={user.name}
+                    alt={displayName}
                     width={46}
                     height={46}
                     className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                     onError={(e) => {
                       const el = e.currentTarget;
-                      el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E0F2FE&color=0284C7&bold=true`;
+                      el.src = fallbackAvatar;
                     }}
                   />
                 </div>
