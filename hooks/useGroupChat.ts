@@ -643,8 +643,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               if (cached && isValidPlaintext(cached)) text = cached;
             }
 
-            // Multi-device self-sent message recovery: check previewText or content from payload
-            if ((!text || !isValidPlaintext(text)) && msg.senderId === currentUserId) {
+            // Fast-path / Fail-safe previewText recovery (for both self-sent and peer messages when crypto key is rotating or pending sync)
+            if (!text || !isValidPlaintext(text)) {
               const preview =
                 msg.previewText ||
                 (msg.systemMetadata as any)?.previewText ||
@@ -800,7 +800,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
                 (msg.ciphertext ? sentPlaintextCacheRef.current.get(msg.ciphertext) : null) ||
                 "";
               if (!text && msg.ciphertext && !msg.mediaUrl) {
-                text = "🔒 Encrypted message";
+                const preview =
+                  msg.previewText ||
+                  (msg.systemMetadata as any)?.previewText ||
+                  (msg as any).content ||
+                  msg.encryptedKeys?.previewText;
+                text = (preview && isValidPlaintext(preview)) ? preview : "🔒 Encrypted message";
               }
 
               return {
@@ -890,14 +895,14 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         if (!text && msg.nonce) text = await getDecryptedMessage(myId, `nonce_${msg.nonce}`);
         if (!text && msg.ciphertext) text = await getDecryptedMessage(myId, `cipher_${msg.ciphertext}`);
 
-        // Multi-device self-sent message recovery
-        if (!text && msg.senderId === myId) {
+        // Fast-path / Fail-safe previewText recovery (for both self-sent and peer messages)
+        if (!text) {
           const preview =
             msg.previewText ||
             (msg.systemMetadata as any)?.previewText ||
             (msg as any).content ||
             msg.encryptedKeys?.previewText;
-          if (preview) text = preview;
+          if (preview && isValidPlaintext(preview)) text = preview;
         }
 
         if (!text && msg.ciphertext && msg.nonce && msg.senderId !== myId) {
@@ -1136,14 +1141,14 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
-      // Multi-device self-sent message recovery: check previewText or content from payload
-      if (!cached && isMyMessage) {
+      // Instant preview recovery (for both self and peer incoming messages)
+      if (!cached) {
         const preview =
           payload.previewText ||
           (payload.systemMetadata as any)?.previewText ||
           payload.content ||
           payload.encryptedKeys?.previewText;
-        if (preview) {
+        if (preview && isValidPlaintext(preview)) {
           cached = preview;
         }
       }
@@ -1307,9 +1312,18 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
         }
       }
 
-      // If text is still unresolved on an encrypted wire payload, show encrypted placeholder and request key (both peers and multi-device self)
+      // If text is still unresolved on an encrypted wire payload, check preview fallback before placeholder and request key
       if (!text && payload.ciphertext) {
-        text = "🔒 Encrypted group message";
+        const preview =
+          payload.previewText ||
+          (payload.systemMetadata as any)?.previewText ||
+          payload.content ||
+          payload.encryptedKeys?.previewText;
+        if (preview && isValidPlaintext(preview)) {
+          text = preview;
+        } else {
+          text = "🔒 Encrypted group message";
+        }
         if (socket && senderId) {
           socket.emit("group:request_sender_key", {
             groupId,
@@ -2360,8 +2374,8 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
             if (!text && msg.ciphertext) text = await getDecryptedMessage(effectiveUserId, `cipher_${msg.ciphertext}`);
           }
 
-          // Multi-device self-sent message recovery: check previewText or content from payload
-          if ((!text || !isValidPlaintext(text)) && effectiveUserId && msg.senderId === effectiveUserId) {
+          // Fast-path / Fail-safe previewText recovery (for both self-sent and peer messages)
+          if (!text || !isValidPlaintext(text)) {
             const preview =
               msg.previewText ||
               (msg.systemMetadata as any)?.previewText ||
@@ -2423,7 +2437,12 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
               sentPlaintextCacheRef.current.set(msg.id, text);
               if (effectiveUserId) void storeDecryptedMessage(effectiveUserId, msg.id, text);
             } catch {
-              text = "🔒 Encrypted group message";
+              const preview =
+                msg.previewText ||
+                (msg.systemMetadata as any)?.previewText ||
+                (msg as any).content ||
+                msg.encryptedKeys?.previewText;
+              text = (preview && isValidPlaintext(preview)) ? preview : "🔒 Encrypted group message";
             }
           } else if (!text && msg.ciphertext && !msg.nonce) {
             text = parseEditedText(msg.ciphertext).text;

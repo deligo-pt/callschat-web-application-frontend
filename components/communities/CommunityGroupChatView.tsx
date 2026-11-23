@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useGroupChat, GroupMessage } from "@/hooks/useGroupChat";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
+import { ChatDateDivider } from "@/components/chat/ChatDateDivider";
+import { isSameDay, formatMessageDateDivider } from "@/utils/dateFormatter";
 import { GroupInput } from "@/components/group/GroupInput";
 import { groupService } from "@/services/group.service";
 
@@ -191,20 +193,25 @@ export function CommunityGroupChatView({ group, community, onBack }: CommunityGr
                 const isMe = msg.senderId === currentUserId || msg.id.startsWith("optimistic-");
                 const prevMsg = idx > 0 ? rawMessages[idx - 1] : null;
                 const nextMsg = idx < rawMessages.length - 1 ? rawMessages[idx + 1] : null;
+                const isFirstOfDay = !prevMsg || !isSameDay(prevMsg.createdAt, msg.createdAt);
                 const isNextSameSender = nextMsg?.senderId === msg.senderId;
-                const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
+                const isFirstFromSender = isFirstOfDay || !prevMsg || prevMsg.senderId !== msg.senderId;
 
                 return (
-                  <GroupMessageBubble
-                    key={msg.id}
-                    msg={msg}
-                    isMe={isMe}
-                    showAvatar={isFirstFromSender}
-                    isNextSameSender={isNextSameSender}
-                    isFirstFromSender={isFirstFromSender}
-                    groupId={group.id}
-                    groupMembersCount={group.memberCount}
-                  />
+                  <React.Fragment key={msg.id}>
+                    {isFirstOfDay && (
+                      <ChatDateDivider label={formatMessageDateDivider(msg.createdAt)} />
+                    )}
+                    <GroupMessageBubble
+                      msg={msg}
+                      isMe={isMe}
+                      showAvatar={isFirstFromSender}
+                      isNextSameSender={isNextSameSender}
+                      isFirstFromSender={isFirstFromSender}
+                      groupId={group.id}
+                      groupMembersCount={group.memberCount}
+                    />
+                  </React.Fragment>
                 );
               })
             )}

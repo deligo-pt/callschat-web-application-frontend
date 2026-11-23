@@ -32,6 +32,8 @@ import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import { useCallContext } from "@/components/providers/CallContext";
 import { ChatOptionsMenu } from "@/components/chat/ChatOptionsMenu";
 import { MessageBubble } from "@/components/chat/MessageBubble";
+import { ChatDateDivider } from "@/components/chat/ChatDateDivider";
+import { isSameDay, formatMessageDateDivider } from "@/utils/dateFormatter";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MediaGallery } from "@/components/chat/MediaGallery";
 import { MediaPreviewModal } from "@/components/chat/MediaPreviewModal";
@@ -1214,9 +1216,12 @@ function ChatRoomPageContent() {
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
               const msg = visibleMsgs[virtualRow.index];
               const index = virtualRow.index;
+              const prevMsg = index > 0 ? visibleMsgs[index - 1] : null;
+              const isFirstOfDay =
+                !prevMsg || !isSameDay(prevMsg.createdAt, msg.createdAt);
               const isMe = msg.senderId === currentUserId;
               const showTail =
-                index === 0 || visibleMsgs[index - 1]?.senderId !== msg.senderId;
+                index === 0 || isFirstOfDay || prevMsg?.senderId !== msg.senderId;
               const isPinned = pinnedMessages?.some((p: any) => p.messageId === msg.id);
 
               return (
@@ -1233,6 +1238,9 @@ function ChatRoomPageContent() {
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
+                  {isFirstOfDay && (
+                    <ChatDateDivider label={formatMessageDateDivider(msg.createdAt)} />
+                  )}
                   <MessageBubble
                     msg={msg}
                     isMe={isMe}

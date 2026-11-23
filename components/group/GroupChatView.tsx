@@ -88,6 +88,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GroupInput } from "@/components/group/GroupInput";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
+import { ChatDateDivider } from "@/components/chat/ChatDateDivider";
+import { isSameDay, formatMessageDateDivider } from "@/utils/dateFormatter";
 import { MediaGallery } from "@/components/chat/MediaGallery";
 import { MessageInfoModal } from "@/components/group/MessageInfoModal";
 import { CreatePollModal } from "@/components/group/CreatePollModal";
@@ -1314,6 +1316,9 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                 const msg = messages[index];
                 if (!msg) return null;
 
+                const prevAnyMsg = index > 0 ? messages[index - 1] : null;
+                const isFirstOfDay = !prevAnyMsg || !isSameDay(prevAnyMsg.createdAt, msg.createdAt);
+
                 if (msg.isSystem || msg.systemEventType) {
                   return (
                     <div
@@ -1329,6 +1334,9 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
                     >
+                      {isFirstOfDay && (
+                        <ChatDateDivider label={formatMessageDateDivider(msg.createdAt)} />
+                      )}
                       <GroupMessageBubble
                         msg={msg}
                         isMe={false}
@@ -1362,7 +1370,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                   }
                 }
 
-                const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
+                const isFirstFromSender = isFirstOfDay || !prevMsg || prevMsg.senderId !== msg.senderId;
                 const isNextSameSender = nextMsg?.senderId === msg.senderId;
 
                 return (
@@ -1379,6 +1387,9 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
+                    {isFirstOfDay && (
+                      <ChatDateDivider label={formatMessageDateDivider(msg.createdAt)} />
+                    )}
                     <GroupMessageBubble
                       msg={msg}
                       isMe={isMe}
