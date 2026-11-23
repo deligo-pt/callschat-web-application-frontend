@@ -3061,7 +3061,8 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
           (typeof window !== "undefined" && conversationId ? sessionStorage.getItem(`active_peer_${conversationId}`) : null) ||
           "";
         const isValidPeer = Boolean(targetPeerId && targetPeerId !== "null" && targetPeerId !== "undefined");
-        const effectiveSkipEncryption = !isValidPeer || isBizChatRef.current;
+        const isPinEvent = Boolean(text && text.startsWith("__PIN_EVENT__:"));
+        const effectiveSkipEncryption = !isValidPeer || isBizChatRef.current || isPinEvent;
 
         let ciphertext, nonce;
         let recipientRegId: string | null = null;
@@ -3069,13 +3070,13 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
         let wireMsgType: number = 2;
 
         if (effectiveSkipEncryption) {
-          // B2C, support ticket, or unencrypted chat: send as plaintext with explicit wire markers
+          // B2C, support ticket, or unencrypted chat / control events: send as plaintext with explicit wire markers
           ciphertext = text || null;
           nonce = null;
           wireMsgType = 0;
           encryptedKeysPayload = {
             protocol: 'plaintext',
-            previewText: text ? text.substring(0, 100) : null,
+            previewText: isPinEvent ? "📌 Pinned a message" : (text ? text.substring(0, 100) : null),
           };
         } else if (text) {
             const activeMyPriv = myPrivateKeyRef.current || myPrivateKey;
@@ -3346,7 +3347,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
                   recipientRegistrationId: recipientRegId,
                   senderPublicKey: (myPublicKeyRef.current || myPublicKey) || null,
                   selfEncryptedSessionKey,
-                  previewText: text ? text.substring(0, 100) : null,
+                  previewText: text ? (text.startsWith("__PIN_EVENT__:") ? "📌 Pinned a message" : text.substring(0, 100)) : null,
                 };
               }
             }
@@ -3375,7 +3376,7 @@ export const useChat = (conversationId: string, currentUserId: string, activePee
 
         let previewText = null;
         if (text) {
-          previewText = text.substring(0, 100); // Send first 100 chars as preview
+          previewText = text.startsWith("__PIN_EVENT__:") ? "📌 Pinned a message" : text.substring(0, 100);
         }
 
         const payload = {

@@ -141,7 +141,7 @@ const parseEditedText = (rawText: string) => {
   return { text: rawText, isEdited: false };
 };
 
-const isValidPlaintext = (text: string | null | undefined): boolean => {
+export const isValidPlaintext = (text: string | null | undefined): boolean => {
   if (!text || typeof text !== "string") return false;
   const trimmed = text.trim();
   if (trimmed === "") return false;
@@ -2268,14 +2268,56 @@ export const useGroupChat = (groupId: string, currentUserId: string) => {
 
   const pinMessage = useCallback(
     async (messageId: string, durationSeconds?: number) => {
-      await groupService.pinMessage(groupId, messageId, durationSeconds);
+      // Optimistic update
+      const targetMsg = messages.find((m) => m.id === messageId);
+      if (targetMsg) {
+        setPinnedMessages((prev) => [
+          {
+            id: `opt-pin-${Date.now()}`,
+            groupId,
+            groupMessageId: messageId,
+            pinnedBy: currentUserId,
+            pinnedAt: new Date().toISOString(),
+            expiresAt: durationSeconds ? new Date(Date.now() + durationSeconds * 1000).toISOString() : null,
+            groupMessage: targetMsg as any,
+          },
+          ...prev.filter((p) => p.groupMessageId !== messageId),
+        ]);
+      }
+      try {
+        await groupService.pinMessage(groupId, messageId, durationSeconds);
+        const pinsRes = await groupService.fetchPinnedMessages(groupId);
+        if (pinsRes.success && pinsRes.data) {
+          setPinnedMessages(pinsRes.data);
+        }
+      } catch (err) {
+        // Revert on error
+        const pinsRes = await groupService.fetchPinnedMessages(groupId);
+        if (pinsRes.success && pinsRes.data) {
+          setPinnedMessages(pinsRes.data);
+        }
+      }
     },
-    [groupId]
+    [groupId, messages, currentUserId]
   );
 
   const unpinMessage = useCallback(
     async (messageId: string) => {
-      await groupService.unpinMessage(groupId, messageId);
+      // Optimistic update
+      setPinnedMessages((prev) => prev.filter((p) => p.groupMessageId !== messageId));
+      try {
+        await groupService.unpinMessage(groupId, messageId);
+        const pinsRes = await groupService.fetchPinnedMessages(groupId);
+        if (pinsRes.success && pinsRes.data) {
+          setPinnedMessages(pinsRes.data);
+        }
+      } catch (err) {
+        // Revert on error
+        const pinsRes = await groupService.fetchPinnedMessages(groupId);
+        if (pinsRes.success && pinsRes.data) {
+          setPinnedMessages(pinsRes.data);
+        }
+      }
     },
     [groupId]
   );
