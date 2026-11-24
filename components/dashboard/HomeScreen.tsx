@@ -8,6 +8,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { getOptimizedImageUrl } from "@/utils/image";
 import { useRouter } from "next/navigation";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { useContacts } from "@/context/ContactsContext";
+import { resolveDisplayName } from "@/utils/resolveDisplayName";
 
 // --- Types for Real-Time Data ---
 interface ActiveUser {
@@ -29,6 +31,7 @@ interface ChatPreview {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { getContact } = useContacts();
   const [searchQuery, setSearchQuery] = React.useState("");
   
   // Real-time state placeholders
@@ -154,20 +157,35 @@ export default function HomeScreen() {
             </div>
             
             <div className="mt-4 flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-              {activeUsers.map((user) => (
-                <div key={user.id} className="relative flex shrink-0 flex-col items-center">
-                  <div className="relative rounded-full border-[2.5px] border-[#22C55E] p-0.5 transition-transform hover:scale-105 cursor-pointer">
-                    <img 
-                      src={getOptimizedImageUrl(user.avatarUrl, 52, 52)} 
-                      alt={user.name} 
-                      className="h-[52px] w-[52px] rounded-full object-cover"
-                    />
+              {activeUsers.map((user) => {
+                const contact = getContact(user.id);
+                const resolved = resolveDisplayName(
+                  {
+                    userId: user.id,
+                    profileDisplayName: user.name,
+                    phone: contact?.phoneNumber,
+                  },
+                  contact
+                );
+                const displayName = resolved.title || user.name || "User";
+                const firstName = displayName.split(" ")[0] || "User";
+                const avatarSrc = contact?.avatarUrl || user.avatarUrl;
+
+                return (
+                  <div key={user.id} className="relative flex shrink-0 flex-col items-center">
+                    <div className="relative rounded-full border-[2.5px] border-[#22C55E] p-0.5 transition-transform hover:scale-105 cursor-pointer">
+                      <img 
+                        src={getOptimizedImageUrl(avatarSrc, 52, 52)} 
+                        alt={displayName} 
+                        className="h-[52px] w-[52px] rounded-full object-cover"
+                      />
+                    </div>
+                    <span className="mt-1.5 text-[11px] font-medium text-[#8F95B2]" title={displayName}>
+                      {firstName}
+                    </span>
                   </div>
-                  <span className="mt-1.5 text-[11px] font-medium text-[#8F95B2]">
-                    {user.name.split(' ')[0]}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

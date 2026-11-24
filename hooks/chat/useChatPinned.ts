@@ -3,7 +3,12 @@ import { ChatMessage, PinnedMessage } from "../useChat";
 
 interface UseChatPinnedParams {
   messages: ChatMessage[];
-  sendMessage: (text: string, recipientId: string) => Promise<void> | void;
+  sendMessage: (
+    text: string,
+    currentUserId: string,
+    file?: File | null,
+    skipEncryption?: boolean
+  ) => Promise<void> | void;
   currentUserId: string;
 }
 
@@ -85,7 +90,12 @@ export function useChatPinned({
         previewText: previewText || "",
         previewMedia: previewMedia || "",
       };
-      sendMessage(`__PIN_EVENT__:${JSON.stringify(payload)}`, currentUserId);
+      sendMessage(
+        `__PIN_EVENT__:${JSON.stringify(payload)}`,
+        currentUserId,
+        null,
+        true
+      );
     },
     [sendMessage, currentUserId]
   );

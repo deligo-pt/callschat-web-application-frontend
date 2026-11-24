@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "@/components/chat/VoiceMessagePlayer";
+import { formatFullDateTime } from "@/utils/dateFormatter";
 import { useContacts } from "@/context/ContactsContext";
 import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import {
@@ -459,7 +460,10 @@ export function GroupMessageBubble({
               {subtitle}
             </span>
           </div>
-          <span className="text-[10px] text-[#8696A0] font-medium self-end ml-1 shrink-0">
+          <span
+            className="text-[10px] text-[#8696A0] font-medium self-end ml-1 shrink-0 cursor-default"
+            title={formatFullDateTime(msg.createdAt)}
+          >
             {formatTime(msg.createdAt)}
           </span>
         </div>
@@ -879,7 +883,12 @@ export function GroupMessageBubble({
         {/* Bubble Footer (Time & Delivery Receipts) */}
         <div className="flex items-center justify-end gap-1.5 px-3 pb-1.5 -mt-1 text-[10.5px] text-[#667781] dark:text-[#8696A0]">
           {msg.isEdited && <span className="italic">edited</span>}
-          <span>{formatTime(msg.createdAt)}</span>
+          <span
+            className="cursor-default"
+            title={formatFullDateTime(msg.createdAt)}
+          >
+            {formatTime(msg.createdAt)}
+          </span>
           {isMe && (
             <span className="inline-flex items-center">
               {status === "SENDING" ? (

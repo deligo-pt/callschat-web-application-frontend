@@ -51,7 +51,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import apiClient from "@/services/api.client";
-import { useGroupChat, QuotedMessage, GroupMessage } from "@/hooks/useGroupChat";
+import { useGroupChat, QuotedMessage, GroupMessage, isValidPlaintext } from "@/hooks/useGroupChat";
 import { useContacts, Contact } from "@/hooks/useContacts";
 import { encryptMessage, decryptMessage, generateAndStoreKeyPair } from "@/utils/crypto";
 import { getUserPrivateKey, getUserPrivateKeyRing, getStoredGroupKey, storeGroupKey } from "@/utils/keyStore";
@@ -88,6 +88,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GroupInput } from "@/components/group/GroupInput";
 import { GroupMessageBubble } from "@/components/group/GroupMessageBubble";
+import { ChatDateDivider } from "@/components/chat/ChatDateDivider";
+import { isSameDay, formatMessageDateDivider } from "@/utils/dateFormatter";
 import { MediaGallery } from "@/components/chat/MediaGallery";
 import { MessageInfoModal } from "@/components/group/MessageInfoModal";
 import { CreatePollModal } from "@/components/group/CreatePollModal";
@@ -249,6 +251,42 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     estimateSize: () => 72,
     overscan: 8,
   });
+
+  const activePinned = pinnedMessages && pinnedMessages.length > 0 ? pinnedMessages[0] : null;
+
+  const pinnedOriginalMsg = useMemo(() => {
+    if (!activePinned) return null;
+    return messages.find((m) => m.id === activePinned.groupMessageId);
+  }, [activePinned, messages]);
+
+  const pinnedSenderName = useMemo(() => {
+    if (!activePinned) return "";
+    const origProfile = pinnedOriginalMsg?.sender?.profile;
+    if (origProfile?.displayName) return origProfile.displayName;
+    const dbProfile = (activePinned.groupMessage?.sender as any)?.profile;
+    if (dbProfile?.displayName) return dbProfile.displayName;
+    const anySender = (pinnedOriginalMsg?.sender || activePinned.groupMessage?.sender) as any;
+    if (anySender?.name) return anySender.name;
+    if (anySender?.phone) return anySender.phone;
+    return "Member";
+  }, [activePinned, pinnedOriginalMsg]);
+
+  const pinnedDisplayText = useMemo(() => {
+    if (!activePinned) return "";
+    if (pinnedOriginalMsg?.text && isValidPlaintext(pinnedOriginalMsg.text)) {
+      return pinnedOriginalMsg.text;
+    }
+    const preview = (activePinned.groupMessage?.systemMetadata as any)?.previewText;
+    if (preview && isValidPlaintext(preview)) {
+      return preview;
+    }
+    const media = pinnedOriginalMsg?.mediaUrl || activePinned.groupMessage?.mediaUrl;
+    if (media) {
+      const type = pinnedOriginalMsg?.mediaType || activePinned.groupMessage?.mediaType || "Photo";
+      return `📷 ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    }
+    return activePinned.groupMessage?.text || "Pinned message";
+  }, [activePinned, pinnedOriginalMsg]);
 
   const canEditGroupInfo = isAdmin || groupDetails?.editGroupInfoScope !== "ONLY_ADMINS";
   const isOwner = groupDetails?.createdBy === currentUserId;
@@ -990,8 +1028,6 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
     `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&size=256`;
   const memberCount = groupDetails?.memberCount || groupMembers.length || 0;
 
-  const activePinned = pinnedMessages && pinnedMessages.length > 0 ? pinnedMessages[0] : null;
-
   return (
     <div
       className="flex h-full w-full relative overflow-hidden"
@@ -1197,14 +1233,19 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
         {activePinned && (
           <div
             onClick={() => scrollToMessage(activePinned.groupMessageId)}
-            className="bg-[#FFF8E7] dark:bg-[#1f2c34] px-4 py-2 flex items-center justify-between border-b border-[#FFE8A3]/70 dark:border-gray-800 text-xs cursor-pointer hover:opacity-95 shadow-xs"
+            className="bg-[#FFF8E7] dark:bg-[#1f2c34] px-4 py-2 flex items-center justify-between border-b border-[#FFE8A3]/70 dark:border-gray-800 text-xs cursor-pointer hover:opacity-95 shadow-xs transition-colors"
           >
             <div className="flex items-center gap-2.5 truncate">
               <Pin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
               <div className="flex flex-col truncate">
-                <span className="font-semibold text-emerald-700 dark:text-emerald-400">Pinned message</span>
-                <span className="text-gray-600 dark:text-gray-300 truncate">
-                  {activePinned.groupMessage?.text || "Click to jump to message"}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">Pinned message</span>
+                  {pinnedSenderName && (
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400 font-normal truncate">• {pinnedSenderName}</span>
+                  )}
+                </div>
+                <span className="text-gray-700 dark:text-gray-200 truncate font-medium">
+                  {pinnedDisplayText}
                 </span>
               </div>
             </div>
@@ -1314,6 +1355,9 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                 const msg = messages[index];
                 if (!msg) return null;
 
+                const prevAnyMsg = index > 0 ? messages[index - 1] : null;
+                const isFirstOfDay = !prevAnyMsg || !isSameDay(prevAnyMsg.createdAt, msg.createdAt);
+
                 if (msg.isSystem || msg.systemEventType) {
                   return (
                     <div
@@ -1329,6 +1373,9 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
                     >
+                      {isFirstOfDay && (
+                        <ChatDateDivider label={formatMessageDateDivider(msg.createdAt)} />
+                      )}
                       <GroupMessageBubble
                         msg={msg}
                         isMe={false}
@@ -1362,7 +1409,7 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                   }
                 }
 
-                const isFirstFromSender = !prevMsg || prevMsg.senderId !== msg.senderId;
+                const isFirstFromSender = isFirstOfDay || !prevMsg || prevMsg.senderId !== msg.senderId;
                 const isNextSameSender = nextMsg?.senderId === msg.senderId;
 
                 return (
@@ -1379,6 +1426,9 @@ export function GroupChatView({ groupId: propGroupId, backUrl = "/chats" }: Grou
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
+                    {isFirstOfDay && (
+                      <ChatDateDivider label={formatMessageDateDivider(msg.createdAt)} />
+                    )}
                     <GroupMessageBubble
                       msg={msg}
                       isMe={isMe}

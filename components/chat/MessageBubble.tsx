@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getRawMediaUrl } from "@/utils/image";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { formatFullDateTime } from "@/utils/dateFormatter";
 import { useContacts } from "@/context/ContactsContext";
 import { resolveDisplayName } from "@/utils/resolveDisplayName";
 import {
@@ -606,7 +607,10 @@ export function MessageBubble({
               {subtitle}
             </span>
           </div>
-          <span className="text-[10px] text-[#8696A0] font-medium self-end ml-1">
+          <span
+            className="text-[10px] text-[#8696A0] font-medium self-end ml-1 cursor-default"
+            title={formatFullDateTime(msg.createdAt)}
+          >
             {formatTime(msg.createdAt)}
           </span>
         </div>
@@ -628,7 +632,10 @@ export function MessageBubble({
           isMe={isMe}
         />
         <div className={cn("flex items-center gap-1 mt-1 px-1", isMe ? "justify-end text-gray-500" : "justify-start text-gray-500")}>
-          <span className="text-[11px] font-medium">
+          <span
+            className="text-[11px] font-medium cursor-default"
+            title={formatFullDateTime(msg.createdAt)}
+          >
             {formatTime(msg.createdAt)}
           </span>
         </div>
@@ -1137,7 +1144,10 @@ export function MessageBubble({
               <span>{formatCountdown(secondsLeft)}</span>
             </span>
           )}
-          <span className="text-[11px] font-medium flex items-center gap-1">
+          <span
+            className="text-[11px] font-medium flex items-center gap-1 cursor-default"
+            title={formatFullDateTime(msg.createdAt)}
+          >
             {msg.isEdited && <span className="italic font-normal">(edited)</span>}
             {formatTime(msg.createdAt)}
             {isMe && (
