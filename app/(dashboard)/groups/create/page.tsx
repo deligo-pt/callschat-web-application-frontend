@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Users, Search, Shield, Check, X, ShieldAlert, CheckCircle2, Loader2, Star, Camera, Heart, Lock } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { ArrowLeft, Users, Search, Shield, Check, CheckCircle2, Loader2, Camera, Heart, Lock } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -41,6 +41,8 @@ interface Contact {
   initials: string;
   color: string;
   avatarUrl?: string;
+  isOnCallsChat: boolean;
+  isUnregistered: boolean;
 }
 
 const COLORS = ["bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-pink-500", "bg-emerald-500"];
@@ -57,19 +59,22 @@ export default function CreateGroupPage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { contacts: rawContacts, isLoading: isLoadingContacts } = useContacts();
+  const { contacts: rawContacts, registeredCount, isLoading: isLoadingContacts } = useContacts();
 
   const contacts: Contact[] = rawContacts.map((c, index) => ({
-    id: c.userId,
+    id: c.userId || c.id,
     name: c.name,
     phone: c.phone,
-    initials: c.name.slice(0, 2).toUpperCase(),
+    initials: (c.name || "U").slice(0, 2).toUpperCase(),
     color: COLORS[index % COLORS.length],
     avatarUrl: c.avatarUrl || undefined,
+    isOnCallsChat: !c.isUnregistered && Boolean(c.userId),
+    isUnregistered: Boolean(c.isUnregistered),
   }));
 
   // Step 2 State
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterTab, setFilterTab] = useState<"callschat" | "all">("callschat");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
   // Step 3 State
@@ -84,9 +89,13 @@ export default function CreateGroupPage() {
   };
   const handleBack = () => setStep((s) => Math.max(s - 1, 1));
 
-  const toggleMember = (id: string) => {
+  const toggleMember = (contact: Contact) => {
+    if (!contact.isOnCallsChat) {
+      toast.info(`${contact.name} hasn't joined CallsChat yet. Only CallsChat users can be added to the group.`);
+      return;
+    }
     setSelectedMembers((prev) =>
-      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
+      prev.includes(contact.id) ? prev.filter((m) => m !== contact.id) : [...prev, contact.id]
     );
   };
 
@@ -102,10 +111,16 @@ export default function CreateGroupPage() {
     }
   };
 
-  const filteredContacts = contacts.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (c.phone && c.phone.includes(searchQuery))
-  );
+  const filteredContacts = contacts.filter((c) => {
+    if (filterTab === "callschat" && !c.isOnCallsChat) return false;
+
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) || 
+      (c.phone && c.phone.includes(q))
+    );
+  });
 
   const handleCreateGroup = async () => {
     setIsCreating(true);
@@ -119,7 +134,7 @@ export default function CreateGroupPage() {
 
       if (!myUserId) throw new Error("Could not identify current user");
 
-      let myPrivKey = await getUserPrivateKey(myUserId);
+      const myPrivKey = await getUserPrivateKey(myUserId);
       
       if (!myPrivKey) throw new Error("Local private key missing");
 
@@ -201,9 +216,10 @@ export default function CreateGroupPage() {
       toast.success("Group created successfully!");
       // Redirect directly to the newly created group chat (WhatsApp style)
       router.push(`/groups/${groupRes.data.id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating group:", err);
-      toast.error(err?.message || "Failed to create group. Please try again.");
+      const errorMsg = err instanceof Error ? err.message : "Failed to create group. Please try again.";
+      toast.error(errorMsg);
       setIsCreating(false);
     }
   };
@@ -308,7 +324,7 @@ export default function CreateGroupPage() {
           {step === 2 && (
             <div className="flex flex-col items-center w-full animate-in fade-in duration-200 h-full">
               <div className="w-full flex flex-col flex-1 min-h-0">
-                <div className="relative mb-3 shrink-0">
+                <div className="relative mb-2.5 shrink-0">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696A0]" />
                   <input
                     type="text"
@@ -317,6 +333,34 @@ export default function CreateGroupPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full h-10 rounded-xl bg-[#F0F2F5] dark:bg-[#202C33] pl-10 pr-4 text-[13.5px] text-[#111B21] dark:text-[#E9EDEF] placeholder-[#8696A0] focus:outline-none transition-colors"
                   />
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 mb-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("callschat")}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-[12px] font-medium transition-all cursor-pointer shrink-0",
+                      filterTab === "callschat"
+                        ? "bg-[#00A884] text-white shadow-xs font-semibold"
+                        : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
+                    )}
+                  >
+                    CallsChat ({registeredCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("all")}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-[12px] font-medium transition-all cursor-pointer shrink-0",
+                      filterTab === "all"
+                        ? "bg-[#00A884] text-white shadow-xs font-semibold"
+                        : "bg-[#F0F2F5] dark:bg-[#202C33] text-[#54656F] dark:text-[#8696A0] hover:bg-[#E9EDEF] dark:hover:bg-[#2A3942]"
+                    )}
+                  >
+                    All ({contacts.length})
+                  </button>
                 </div>
                 
                 {selectedMembers.length > 0 && (
@@ -348,30 +392,42 @@ export default function CreateGroupPage() {
                       return (
                         <div
                           key={contact.id}
-                          onClick={() => toggleMember(contact.id)}
+                          onClick={() => toggleMember(contact)}
                           className={cn(
                             "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors",
                             isSelected 
                               ? "bg-[#00A884]/10 dark:bg-[#00A884]/15" 
-                              : "hover:bg-[#F0F2F5] dark:hover:bg-[#202C33]"
+                              : "hover:bg-[#F0F2F5] dark:hover:bg-[#202C33]",
+                            !contact.isOnCallsChat && "opacity-75"
                           )}
                         >
                           <div className="flex items-center gap-3">
                             {contact.avatarUrl ? (
-                              <img src={getOptimizedImageUrl(contact.avatarUrl)} className="h-10 w-10 rounded-full object-cover bg-slate-100 dark:bg-slate-800" />
+                              <img src={getOptimizedImageUrl(contact.avatarUrl)} alt={contact.name} className="h-10 w-10 rounded-full object-cover bg-slate-100 dark:bg-slate-800" />
                             ) : (
                               <div className={cn("h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-[13px]", contact.color)}>
                                 {contact.initials}
                               </div>
                             )}
                             <div className="flex flex-col">
-                              <span className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">{contact.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[14px] font-semibold text-[#111B21] dark:text-[#E9EDEF]">{contact.name}</span>
+                                {!contact.isOnCallsChat && (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[#8696A0]">
+                                    Not on CallsChat
+                                  </span>
+                                )}
+                              </div>
                               {contact.phone && <span className="text-[11.5px] text-[#667781] dark:text-[#8696A0]">{contact.phone}</span>}
                             </div>
                           </div>
                           <div className={cn(
                             "h-[22px] w-[22px] rounded-full border flex items-center justify-center transition-colors shrink-0",
-                            isSelected ? "bg-[#00A884] border-[#00A884]" : "border-[#CBD5E1] dark:border-[#374248]"
+                            !contact.isOnCallsChat 
+                              ? "opacity-30 border-[#CBD5E1] dark:border-[#374248]" 
+                              : isSelected 
+                                ? "bg-[#00A884] border-[#00A884]" 
+                                : "border-[#CBD5E1] dark:border-[#374248]"
                           )}>
                             {isSelected && <Check className="h-3.5 w-3.5 text-white stroke-[3]" />}
                           </div>
@@ -502,26 +558,5 @@ export default function CreateGroupPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-// Custom lock icon to match the design
-function LockIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
   );
 }
