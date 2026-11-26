@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
     QrCode,
     Sparkles,
@@ -9,17 +10,43 @@ import {
     CheckCircle2,
     ArrowUpRight,
     Lock,
-    Shield,
     Star,
     Terminal,
-    DownloadCloud
+    DownloadCloud,
+    Download,
+    Briefcase,
+    User
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import {
+    appReleaseService,
+    type LatestPublicReleases,
+} from "@/services/app-release.service";
 
 export default function DownloadCTA() {
     const t = useTranslations("download_cta_section");
+    const [releases, setReleases] = useState<LatestPublicReleases>({
+        personal: null,
+        business: null,
+    });
+    const [isLoadingReleases, setIsLoadingReleases] = useState(true);
+
+    useEffect(() => {
+        let active = true;
+        appReleaseService
+            .getLatestPublicReleases()
+            .then((data) => {
+                if (active) setReleases(data);
+            })
+            .finally(() => {
+                if (active) setIsLoadingReleases(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
 
     return (
         <section
@@ -156,6 +183,120 @@ export default function DownloadCTA() {
                                     </div>
                                 </motion.button>
 
+                            </div>
+
+                            {/* Direct Android APK Download Cards (CallsChat & CallsChat Business) */}
+                            <div className="mt-6 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        Direct Android APK Downloads
+                                    </span>
+                                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                        ✓ Verified Official APKs
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                    {/* CallsChat (Personal) APK */}
+                                    {releases.personal ? (
+                                        <motion.a
+                                            href={appReleaseService.getApkDownloadUrl("PERSONAL")}
+                                            whileHover={{ scale: 1.02, y: -2 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-3.5 text-left shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                                                    <User className="h-5 w-5 text-white" />
+                                                </div>
+                                                <div className="leading-tight min-w-0">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-100">
+                                                        Android APK
+                                                    </p>
+                                                    <p className="text-sm font-bold tracking-tight truncate">
+                                                        CallsChat
+                                                    </p>
+                                                    <p className="text-[11px] text-blue-100/90 font-mono">
+                                                        v{releases.personal.versionName} ·{" "}
+                                                        {appReleaseService.formatApkFileSize(
+                                                            releases.personal.fileSizeBytes
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Download className="h-4 w-4 shrink-0 text-white/90" />
+                                        </motion.a>
+                                    ) : (
+                                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-800/60 text-slate-400 px-4 py-3.5 border border-slate-700/70">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700/50">
+                                                    <User className="h-5 w-5 text-slate-400" />
+                                                </div>
+                                                <div className="leading-tight">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                                        Android APK
+                                                    </p>
+                                                    <p className="text-sm font-bold text-slate-300">
+                                                        CallsChat
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        {isLoadingReleases ? "Checking version..." : "Coming Soon"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* CallsChat Business APK */}
+                                    {releases.business ? (
+                                        <motion.a
+                                            href={appReleaseService.getApkDownloadUrl("BUSINESS")}
+                                            whileHover={{ scale: 1.02, y: -2 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-3.5 text-left shadow-lg shadow-emerald-600/20 border border-emerald-400/30 transition-all cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                                                    <Briefcase className="h-5 w-5 text-white" />
+                                                </div>
+                                                <div className="leading-tight min-w-0">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-100">
+                                                        Android APK
+                                                    </p>
+                                                    <p className="text-sm font-bold tracking-tight truncate">
+                                                        CallsChat Business
+                                                    </p>
+                                                    <p className="text-[11px] text-emerald-100/90 font-mono">
+                                                        v{releases.business.versionName} ·{" "}
+                                                        {appReleaseService.formatApkFileSize(
+                                                            releases.business.fileSizeBytes
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Download className="h-4 w-4 shrink-0 text-white/90" />
+                                        </motion.a>
+                                    ) : (
+                                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-800/60 text-slate-400 px-4 py-3.5 border border-slate-700/70">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700/50">
+                                                    <Briefcase className="h-5 w-5 text-slate-400" />
+                                                </div>
+                                                <div className="leading-tight">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                                        Android APK
+                                                    </p>
+                                                    <p className="text-sm font-bold text-slate-300">
+                                                        CallsChat Business
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        {isLoadingReleases ? "Checking version..." : "Coming Soon"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Interactive Laser-Scanned QR Code Box */}
