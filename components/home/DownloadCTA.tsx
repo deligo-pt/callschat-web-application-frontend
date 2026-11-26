@@ -214,10 +214,11 @@ export default function DownloadCTA() {
                                                         Android APK
                                                     </p>
                                                     <p className="text-sm font-bold tracking-tight truncate">
-                                                        CallsChat
+                                                        {releases.personal.appName || "CallsChat"}
                                                     </p>
                                                     <p className="text-[11px] text-blue-100/90 font-mono">
-                                                        v{releases.personal.versionName} ·{" "}
+                                                        v{releases.personal.versionName} (Code{" "}
+                                                        {releases.personal.versionCode}) ·{" "}
                                                         {appReleaseService.formatApkFileSize(
                                                             releases.personal.fileSizeBytes
                                                         )}
@@ -264,10 +265,11 @@ export default function DownloadCTA() {
                                                         Android APK
                                                     </p>
                                                     <p className="text-sm font-bold tracking-tight truncate">
-                                                        CallsChat Business
+                                                        {releases.business.appName || "CallsChat Business"}
                                                     </p>
                                                     <p className="text-[11px] text-emerald-100/90 font-mono">
-                                                        v{releases.business.versionName} ·{" "}
+                                                        v{releases.business.versionName} (Code{" "}
+                                                        {releases.business.versionCode}) ·{" "}
                                                         {appReleaseService.formatApkFileSize(
                                                             releases.business.fileSizeBytes
                                                         )}

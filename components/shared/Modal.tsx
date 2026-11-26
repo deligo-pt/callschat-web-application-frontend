@@ -75,12 +75,12 @@ export default function Modal({
                                 <User className="h-5 w-5" />
                             </div>
                             <div className="text-left min-w-0">
-                                <p className="text-sm font-bold text-slate-900 dark:text-white">
-                                    CallsChat (Personal)
+                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                    {releases.personal?.appName || "CallsChat (Personal)"}
                                 </p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
                                     {releases.personal
-                                        ? `v${releases.personal.versionName} · ${appReleaseService.formatApkFileSize(
+                                        ? `v${releases.personal.versionName} (Code ${releases.personal.versionCode}) · ${appReleaseService.formatApkFileSize(
                                               releases.personal.fileSizeBytes
                                           )} · ${releases.personal.minOsVersion || "Android 8.0+"}`
                                         : isLoading
@@ -112,12 +112,12 @@ export default function Modal({
                                 <Briefcase className="h-5 w-5" />
                             </div>
                             <div className="text-left min-w-0">
-                                <p className="text-sm font-bold text-slate-900 dark:text-white">
-                                    CallsChat Business
+                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                    {releases.business?.appName || "CallsChat Business"}
                                 </p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
                                     {releases.business
-                                        ? `v${releases.business.versionName} · ${appReleaseService.formatApkFileSize(
+                                        ? `v${releases.business.versionName} (Code ${releases.business.versionCode}) · ${appReleaseService.formatApkFileSize(
                                               releases.business.fileSizeBytes
                                           )} · ${releases.business.minOsVersion || "Android 8.0+"}`
                                         : isLoading
