@@ -4,6 +4,8 @@ export interface PublicAppRelease {
   id: string;
   appType: AppReleaseType;
   platform: 'ANDROID' | 'IOS';
+  appName: string;
+  packageName: string | null;
   versionName: string;
   versionCode: number;
   fileName: string;
